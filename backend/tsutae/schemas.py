@@ -48,7 +48,7 @@ class FixedRule(Frozen):
 
     key: str = Field(pattern=QUESTION_KEY_PATTERN)
     question_key: str = Field(pattern=QUESTION_KEY_PATTERN)
-    threshold_celsius: float
+    threshold_celsius: float = Field(ge=35.0, le=42.0, allow_inf_nan=False)
     patient_string_key: str
 
 
@@ -58,7 +58,7 @@ class RegimenSkill(Frozen):
     version: int = Field(ge=1)
     regimen: Regimen
     cycle_days: int = Field(ge=7, le=42)
-    pump_removal_day: int | None = None
+    pump_removal_day: int | None = Field(default=None, ge=1)
     questions: list[Question] = Field(min_length=1)
     fixed_rules: list[FixedRule] = Field(default_factory=list)
 
@@ -67,9 +67,17 @@ class RegimenSkill(Frozen):
         keys = [q.key for q in self.questions]
         if len(keys) != len(set(keys)):
             raise ValueError("questions の key が重複している")
+        by_key = {q.key: q for q in self.questions}
         for rule in self.fixed_rules:
-            if rule.question_key not in keys:
+            if rule.question_key not in by_key:
                 raise ValueError(f"fixed_rule {rule.key} が未知の質問を参照している")
+            if by_key[rule.question_key].answer_type != "temperature":
+                raise ValueError(f"fixed_rule {rule.key} は体温の質問だけを参照できる")
+        if (
+            self.pump_removal_day is not None
+            and self.pump_removal_day > self.cycle_days
+        ):
+            raise ValueError("pump_removal_day が cycle_days を超えている")
         return self
 
     @property

@@ -1,0 +1,729 @@
+{
+  "patient_id": "P-EVAL0002",
+  "role": "eval",
+  "regimen": "FOLFOX",
+  "visit_date": "2026-09-21",
+  "reception_no": "B-102",
+  "courses": [
+    {
+      "course_no": 1,
+      "infusion_date": "2026-08-18",
+      "planned_date": "2026-08-18",
+      "next_visit": "2026-09-01"
+    },
+    {
+      "course_no": 2,
+      "infusion_date": "2026-09-08",
+      "planned_date": "2026-09-01",
+      "next_visit": "2026-09-21"
+    }
+  ],
+  "entries": [
+    {
+      "seq": 1,
+      "recorded_at": "2026-08-18T20:40:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "present"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "点滴の日。つめたい物で指がすこしピリピリ。"
+    },
+    {
+      "seq": 2,
+      "recorded_at": "2026-08-19T21:10:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "なんとなく食欲がない。吐き気はない。"
+    },
+    {
+      "seq": 3,
+      "recorded_at": "2026-08-21T20:30:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "present"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 37.1
+        }
+      ],
+      "free_text": "ポンプを外した日から口のなかがヒリヒリする。ごはんは半分のこした。"
+    },
+    {
+      "seq": 4,
+      "recorded_at": "2026-08-22T20:50:00+09:00",
+      "too_sick": false,
+      "by_proxy": true,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "hard"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "hard"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 37.3
+        }
+      ],
+      "free_text": "夫のかわりに妻が書いてます。口内炎が3つできて、しみて水ものみにくそう。食欲もなくておかゆを少しだけ。"
+    },
+    {
+      "seq": 5,
+      "recorded_at": "2026-08-23T18:40:00+09:00",
+      "too_sick": true,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": []
+    },
+    {
+      "seq": 6,
+      "recorded_at": "2026-08-24T20:00:00+09:00",
+      "too_sick": true,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": []
+    },
+    {
+      "seq": 7,
+      "recorded_at": "2026-08-25T21:00:00+09:00",
+      "too_sick": false,
+      "by_proxy": true,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "hard"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "妻が代わりに書いてます。口の痛みは少しまし。熱は出なかった。"
+    },
+    {
+      "seq": 8,
+      "recorded_at": "2026-08-27T20:15:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "口内炎はまだ1つのこってる。食欲はもどってきたけど味がしない。"
+    },
+    {
+      "seq": 9,
+      "recorded_at": "2026-08-28T20:40:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "present"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 36.8
+        }
+      ],
+      "free_text": "口内炎がしみて夕飯はおかゆだけ。なにかあれば妻の携帯090-0000-0000にお願いします。"
+    },
+    {
+      "seq": 10,
+      "recorded_at": "2026-08-30T20:30:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "昨日の夜、すこしおなかがゆるかった。2回トイレにいった。"
+    },
+    {
+      "seq": 11,
+      "recorded_at": "2026-09-01T21:00:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 36.5
+        }
+      ],
+      "free_text": "今日は点滴の予定だったけど延期になった。口内炎もなく、ごはんもふつうに食べられた。"
+    },
+    {
+      "seq": 12,
+      "recorded_at": "2026-09-02T20:20:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ]
+    },
+    {
+      "seq": 13,
+      "recorded_at": "2026-09-04T20:10:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "天気がよかったので散歩した。だるさはなかつた。"
+    },
+    {
+      "seq": 14,
+      "recorded_at": "2026-09-06T21:20:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "歯みがきのとき歯ぐきがすこししみた。"
+    },
+    {
+      "seq": 15,
+      "recorded_at": "2026-09-07T20:00:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "none"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 36.6
+        }
+      ]
+    },
+    {
+      "seq": 16,
+      "recorded_at": "2026-09-08T21:00:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "present"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "1週間おくれて2回目。帰りにつめたい水を飲んだらのどがピリッとした。"
+    },
+    {
+      "seq": 17,
+      "recorded_at": "2026-09-09T20:40:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "食欲がなくてうどんを半分。吐き気はなかった。"
+    },
+    {
+      "seq": 18,
+      "recorded_at": "2026-09-11T19:30:00+09:00",
+      "too_sick": true,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": []
+    },
+    {
+      "seq": 19,
+      "recorded_at": "2026-09-12T20:30:00+09:00",
+      "too_sick": false,
+      "by_proxy": true,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "hard"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "hard"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 37.2
+        }
+      ],
+      "free_text": "妻です。ポンプを外した日の夜から口内炎がひどくて、食欲もなくてほとんど食べていません。"
+    },
+    {
+      "seq": 20,
+      "recorded_at": "2026-09-13T20:30:00+09:00",
+      "too_sick": true,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": []
+    },
+    {
+      "seq": 21,
+      "recorded_at": "2026-09-14T21:10:00+09:00",
+      "too_sick": false,
+      "by_proxy": true,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "hard"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "妻です。きのうは一日ねていました。食欲はきのうより少しまし。下痢はしていません。"
+    },
+    {
+      "seq": 22,
+      "recorded_at": "2026-09-15T20:50:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "present"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "おとといの夜は口がいたくてつらかった。今日は口内炎がしみる程度。"
+    },
+    {
+      "seq": 23,
+      "recorded_at": "2026-09-16T08:10:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "present"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 36.9
+        }
+      ]
+    },
+    {
+      "seq": 24,
+      "recorded_at": "2026-09-16T20:45:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [],
+      "free_text": "夕方からおなかがはる感じ。"
+    },
+    {
+      "seq": 25,
+      "recorded_at": "2026-09-17T20:20:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "not_measured"
+        }
+      ],
+      "free_text": "口内炎はだいぶよくなった。まだ少ししみる。"
+    },
+    {
+      "seq": 26,
+      "recorded_at": "2026-09-19T21:00:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 36.6
+        }
+      ],
+      "free_text": "食欲はもどってきた。吐き気もない。"
+    },
+    {
+      "seq": 27,
+      "recorded_at": "2026-09-21T07:30:00+09:00",
+      "too_sick": false,
+      "by_proxy": false,
+      "skill_version": "regimen-folfox@1",
+      "answers": [
+        {
+          "question_key": "numbness",
+          "value": "none"
+        },
+        {
+          "question_key": "diarrhea",
+          "value": "none"
+        },
+        {
+          "question_key": "stomatitis",
+          "value": "none"
+        },
+        {
+          "question_key": "nausea_appetite",
+          "value": "present"
+        },
+        {
+          "question_key": "fever",
+          "value": "measured",
+          "temperature": 36.5
+        }
+      ]
+    }
+  ]
+}

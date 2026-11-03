@@ -1,0 +1,547 @@
+{
+  "patient_id": "P-EVAL0002",
+  "labels": [
+    {
+      "entry_seq": 1,
+      "events": [
+        {
+          "date": "2026-08-18",
+          "day": 1,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "つめたい物で指がすこしピリピリ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "冷たい物でのピリピリは異常感覚。口のヒリヒリ・痛みは口腔内痛、口内炎は口腔粘膜炎に当てる（このファイル共通）"
+    },
+    {
+      "entry_seq": 2,
+      "events": [
+        {
+          "date": "2026-08-19",
+          "day": 2,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "なんとなく食欲がない",
+          "recalled": false
+        },
+        {
+          "date": "2026-08-19",
+          "day": 2,
+          "course_no": 1,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気はない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "nausea_appetite「ある」は食欲不振で説明がつくので食い違いではない"
+    },
+    {
+      "entry_seq": 3,
+      "events": [
+        {
+          "date": "2026-08-20",
+          "day": 3,
+          "course_no": 1,
+          "term": "口腔内痛",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "ポンプを外した日から口のなかがヒリヒリする",
+          "recalled": true
+        },
+        {
+          "date": "2026-08-21",
+          "day": 4,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "ごはんは半分のこした",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "「ポンプを外した日」= C1 Day3（8/20、入力なしの日）"
+    },
+    {
+      "entry_seq": 4,
+      "events": [
+        {
+          "date": "2026-08-22",
+          "day": 5,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎が3つできて",
+          "recalled": false
+        },
+        {
+          "date": "2026-08-22",
+          "day": 5,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "食欲もなくておかゆを少しだけ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "家族（妻）の代理入力"
+    },
+    {
+      "entry_seq": 7,
+      "events": [
+        {
+          "date": "2026-08-25",
+          "day": 8,
+          "course_no": 1,
+          "term": "口腔内痛",
+          "question_key": "stomatitis",
+          "status": "improving",
+          "source_quote": "口の痛みは少しまし",
+          "recalled": false
+        },
+        {
+          "date": "2026-08-25",
+          "day": 8,
+          "course_no": 1,
+          "term": "発熱",
+          "question_key": "fever",
+          "status": "absent",
+          "source_quote": "熱は出なかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "家族（妻）の代理入力。stomatitis「つらい」＋改善中は食い違いにしない"
+    },
+    {
+      "entry_seq": 8,
+      "events": [
+        {
+          "date": "2026-08-27",
+          "day": 10,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎はまだ1つのこってる",
+          "recalled": false
+        },
+        {
+          "date": "2026-08-27",
+          "day": 10,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "improving",
+          "source_quote": "食欲はもどってきた",
+          "recalled": false
+        },
+        {
+          "date": "2026-08-27",
+          "day": 10,
+          "course_no": 1,
+          "term": "味覚異常",
+          "status": "present",
+          "source_quote": "味がしない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "stomatitis",
+          "closed_answer": "none",
+          "free_text_quote": "口内炎はまだ1つのこってる"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ stomatitis「なし」＋自由記載に口内炎"
+    },
+    {
+      "entry_seq": 9,
+      "events": [
+        {
+          "date": "2026-08-28",
+          "day": 11,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎がしみて夕飯はおかゆだけ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "識別子（明らかな架空の電話番号）入り。一次置換で「[伏せ字]」になる。引用は識別子を含まない範囲"
+    },
+    {
+      "entry_seq": 10,
+      "events": [
+        {
+          "date": "2026-08-29",
+          "day": 12,
+          "course_no": 1,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "present",
+          "source_quote": "昨日の夜、すこしおなかがゆるかった",
+          "recalled": true
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "「昨日の夜」= 8/29（入力なしの日）。記録日 8/30 の diarrhea「なし」とは日が違うので食い違いではない"
+    },
+    {
+      "entry_seq": 11,
+      "events": [
+        {
+          "date": "2026-09-01",
+          "day": 15,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "absent",
+          "source_quote": "口内炎もなく",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-01",
+          "day": 15,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "ごはんもふつうに食べられた",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "C2 の予定日だが実投与は 9/08。この日は C1 Day15"
+    },
+    {
+      "entry_seq": 13,
+      "events": [
+        {
+          "date": "2026-09-04",
+          "day": 18,
+          "course_no": 1,
+          "term": "倦怠感",
+          "status": "absent",
+          "source_quote": "だるさはなかつた",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "「なかつた」は誤字（なかった）"
+    },
+    {
+      "entry_seq": 14,
+      "events": [
+        {
+          "date": "2026-09-06",
+          "day": 20,
+          "course_no": 1,
+          "term": "口腔内痛",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "歯ぐきがすこししみた",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "stomatitis",
+          "closed_answer": "none",
+          "free_text_quote": "歯ぐきがすこししみた"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ stomatitis「なし」＋自由記載に軽い口の痛み（C1 Day20）"
+    },
+    {
+      "entry_seq": 16,
+      "events": [
+        {
+          "date": "2026-09-08",
+          "day": 1,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "つめたい水を飲んだらのどがピリッとした",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "C2 Day1（予定より7日延期）"
+    },
+    {
+      "entry_seq": 17,
+      "events": [
+        {
+          "date": "2026-09-09",
+          "day": 2,
+          "course_no": 2,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "食欲がなくてうどんを半分",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-09",
+          "day": 2,
+          "course_no": 2,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気はなかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false
+    },
+    {
+      "entry_seq": 19,
+      "events": [
+        {
+          "date": "2026-09-10",
+          "day": 3,
+          "course_no": 2,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "ポンプを外した日の夜から口内炎がひどくて",
+          "recalled": true
+        },
+        {
+          "date": "2026-09-12",
+          "day": 5,
+          "course_no": 2,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "食欲もなくてほとんど食べていません",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "家族（妻）の代理入力。「ポンプを外した日」= C2 Day3（9/10、入力なしの日）"
+    },
+    {
+      "entry_seq": 21,
+      "events": [
+        {
+          "date": "2026-09-13",
+          "day": 6,
+          "course_no": 2,
+          "term": "疲労",
+          "status": "present",
+          "source_quote": "きのうは一日ねていました",
+          "recalled": true
+        },
+        {
+          "date": "2026-09-14",
+          "day": 7,
+          "course_no": 2,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "improving",
+          "source_quote": "食欲はきのうより少しまし",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-14",
+          "day": 7,
+          "course_no": 2,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "下痢はしていません",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "relative_time",
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "家族（妻）の代理入力。「きのう」= 9/13（つらくて書けない日）。寝込んでいた＝疲労"
+    },
+    {
+      "entry_seq": 22,
+      "events": [
+        {
+          "date": "2026-09-13",
+          "day": 6,
+          "course_no": 2,
+          "term": "口腔内痛",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "おとといの夜は口がいたくてつらかった",
+          "recalled": true
+        },
+        {
+          "date": "2026-09-15",
+          "day": 8,
+          "course_no": 2,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "今日は口内炎がしみる程度",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "「おととい」= 9/13（つらくて書けない日）"
+    },
+    {
+      "entry_seq": 24,
+      "events": [
+        {
+          "date": "2026-09-16",
+          "day": 9,
+          "course_no": 2,
+          "term": "腹部膨満",
+          "status": "present",
+          "source_quote": "おなかがはる感じ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "同じ日の朝に回答のみの記録あり。腹部膨満は対応するクローズ質問なし"
+    },
+    {
+      "entry_seq": 25,
+      "events": [
+        {
+          "date": "2026-09-17",
+          "day": 10,
+          "course_no": 2,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "improving",
+          "source_quote": "口内炎はだいぶよくなった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "stomatitis",
+          "closed_answer": "none",
+          "free_text_quote": "口内炎はだいぶよくなった"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ stomatitis「なし」＋自由記載に改善中の口内炎"
+    },
+    {
+      "entry_seq": 26,
+      "events": [
+        {
+          "date": "2026-09-19",
+          "day": 12,
+          "course_no": 2,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "improving",
+          "source_quote": "食欲はもどってきた",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-19",
+          "day": 12,
+          "course_no": 2,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気もない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "negation"
+      ],
+      "expect_unprocessed": false
+    }
+  ]
+}

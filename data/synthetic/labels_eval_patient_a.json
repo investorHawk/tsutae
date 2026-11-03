@@ -1,0 +1,502 @@
+{
+  "patient_id": "P-EVAL0001",
+  "labels": [
+    {
+      "entry_seq": 1,
+      "events": [
+        {
+          "date": "2026-09-01",
+          "day": 1,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "つめたいお茶をさわったら指がピリピリした",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-01",
+          "day": 1,
+          "course_no": 1,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気はなかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "冷たい物でのピリピリ（冷感過敏）は異常感覚、しびれ・ジンジンは末梢性感覚ニューロパチーに当てる（このファイル共通）"
+    },
+    {
+      "entry_seq": 2,
+      "events": [
+        {
+          "date": "2026-09-02",
+          "day": 2,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "食欲はいつもの半分くらい",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-02",
+          "day": 2,
+          "course_no": 1,
+          "term": "発熱",
+          "question_key": "fever",
+          "status": "absent",
+          "source_quote": "熱は出なかった",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-02",
+          "day": 2,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "冷たい水で手をあらうとビリっとくる",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false
+    },
+    {
+      "entry_seq": 4,
+      "events": [
+        {
+          "date": "2026-09-05",
+          "day": 5,
+          "course_no": 1,
+          "term": "倦怠感",
+          "status": "present",
+          "source_quote": "だるくて昼まで横になってた",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-05",
+          "day": 5,
+          "course_no": 1,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "下痢はなかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "同じ日の夜に回答のみの記録あり（diarrhea none で一致）。だるい＝倦怠感"
+    },
+    {
+      "entry_seq": 6,
+      "events": [
+        {
+          "date": "2026-09-07",
+          "day": 7,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "冷たいものはだいぶ平気になってきた",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false
+    },
+    {
+      "entry_seq": 7,
+      "events": [
+        {
+          "date": "2026-09-08",
+          "day": 8,
+          "course_no": 1,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "手先がすこしジンジンするくらい",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "numbness",
+          "closed_answer": "none",
+          "free_text_quote": "手先がすこしジンジンするくらい"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ numbness「なし」＋自由記載に軽いしびれ"
+    },
+    {
+      "entry_seq": 8,
+      "events": [
+        {
+          "date": "2026-09-09",
+          "day": 9,
+          "course_no": 1,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気も下痢もなし",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-09",
+          "day": 9,
+          "course_no": 1,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "吐き気も下痢もなし",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "回答なし（自由記載のみ）"
+    },
+    {
+      "entry_seq": 9,
+      "events": [
+        {
+          "date": "2026-09-11",
+          "day": 11,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "小さい口内炎がひとつできた",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-11",
+          "day": 11,
+          "course_no": 1,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "しびれは指先だけ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false
+    },
+    {
+      "entry_seq": 10,
+      "events": [
+        {
+          "date": "2026-09-12",
+          "day": 12,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "冷蔵庫から出したら、指がピリピリした",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "識別子（一般的な姓＋さん、架空の人物）入り。一次置換で「○○さん」になる。引用は識別子を含まない範囲"
+    },
+    {
+      "entry_seq": 12,
+      "events": [
+        {
+          "date": "2026-09-14",
+          "day": 14,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "absent",
+          "source_quote": "口内炎はなおった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "「なおった」は absent とする。「あした」は予定で出来事ではない"
+    },
+    {
+      "entry_seq": 13,
+      "events": [
+        {
+          "date": "2026-09-15",
+          "day": 1,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "顔と指がピリピリ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "「つめくて」は誤字（つめたくて）"
+    },
+    {
+      "entry_seq": 14,
+      "events": [
+        {
+          "date": "2026-09-17",
+          "day": 3,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "指先のしびれが前よりつよい",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false
+    },
+    {
+      "entry_seq": 15,
+      "events": [
+        {
+          "date": "2026-09-16",
+          "day": 2,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "点滴の次の日から冷たいものにさわれない",
+          "recalled": true
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "「点滴の次の日から」= C2 Day2（9/16、入力なしの日）。続いている症状は開始日で1件とする"
+    },
+    {
+      "entry_seq": 16,
+      "events": [
+        {
+          "date": "2026-09-19",
+          "day": 5,
+          "course_no": 2,
+          "term": "発熱",
+          "question_key": "fever",
+          "status": "absent",
+          "source_quote": "熱は出なかった",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-19",
+          "day": 5,
+          "course_no": 2,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気もない",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-19",
+          "day": 5,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "しびれはきのうよりまし",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "fever は not_measured なので「熱は出なかった」と食い違いにはしない"
+    },
+    {
+      "entry_seq": 18,
+      "events": [
+        {
+          "date": "2026-09-17",
+          "day": 3,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "先週木曜まではしびれがつよかった",
+          "recalled": true
+        },
+        {
+          "date": "2026-09-22",
+          "day": 8,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "いまはだいぶ楽",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-22",
+          "day": 8,
+          "course_no": 2,
+          "term": "悪寒",
+          "status": "absent",
+          "source_quote": "寒気もなかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving",
+        "relative_time",
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "「先週木曜」= 9/17（記録日 9/22 火。週の始まりを月曜・日曜どちらにしても同じ）。「〜まで」は終わりの日を出来事の日とする。同じ記録に同じ用語が2件（回想と記録日）"
+    },
+    {
+      "entry_seq": 20,
+      "events": [
+        {
+          "date": "2026-09-23",
+          "day": 9,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "つめたい風にあたったら手がピリピリした",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "同じ日の朝に回答のみの記録あり（numbness present で一致）"
+    },
+    {
+      "entry_seq": 21,
+      "events": [
+        {
+          "date": "2026-09-24",
+          "day": 10,
+          "course_no": 2,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "下痢はしてないです",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "diarrhea",
+          "closed_answer": "present",
+          "free_text_quote": "下痢はしてないです"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ diarrhea「ある」＋自由記載で否定"
+    },
+    {
+      "entry_seq": 22,
+      "events": [
+        {
+          "date": "2026-09-26",
+          "day": 12,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "しびれはほとんど気にならない",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-26",
+          "day": 12,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "つめたい物はまだ少しピリッとする",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "numbness",
+          "closed_answer": "none",
+          "free_text_quote": "つめたい物はまだ少しピリッとする"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ numbness「なし」＋自由記載に改善中のしびれと冷感過敏"
+    },
+    {
+      "entry_seq": 23,
+      "events": [
+        {
+          "date": "2026-09-27",
+          "day": 13,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "手先のしびれは少しのこってる",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false
+    }
+  ]
+}

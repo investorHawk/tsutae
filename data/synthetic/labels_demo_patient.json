@@ -1,0 +1,713 @@
+{
+  "patient_id": "P-DEMO0001",
+  "labels": [
+    {
+      "entry_seq": 2,
+      "events": [
+        {
+          "date": "2026-09-28",
+          "day": 2,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "指先がピリピリする",
+          "recalled": false
+        },
+        {
+          "date": "2026-09-28",
+          "day": 2,
+          "course_no": 1,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "食欲はいつもの半分くらい",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "冷たい物で誘発されるピリピリ（冷感過敏）は異常感覚とする"
+    },
+    {
+      "entry_seq": 6,
+      "events": [
+        {
+          "date": "2026-09-29",
+          "day": 3,
+          "course_no": 1,
+          "term": "倦怠感",
+          "question_key": null,
+          "status": "present",
+          "source_quote": "ポンプを外した日からずっとだるくて寝てた",
+          "recalled": true
+        },
+        {
+          "date": "2026-10-02",
+          "day": 6,
+          "course_no": 1,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "present",
+          "source_quote": "きょうは下痢が2回",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "「ポンプを外した日」= C1 Day3（9/29）。期間の始まりを出来事の日付とする"
+    },
+    {
+      "entry_seq": 7,
+      "events": [
+        {
+          "date": "2026-10-03",
+          "day": 7,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎ができて",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-03",
+          "day": 7,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "冷蔵庫のたまごを出したら指がピリピリした",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "「しみるる」は誤字（原文のまま）"
+    },
+    {
+      "entry_seq": 8,
+      "events": [
+        {
+          "date": "2026-10-04",
+          "day": 8,
+          "course_no": 1,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "きょうは下痢はなかった",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-04",
+          "day": 8,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎はまだいたい",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "diarrhea",
+          "closed_answer": "present",
+          "free_text_quote": "きょうは下痢はなかった"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction",
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ回答は下痢「ある」、自由記載は「なかった」（解決せず並べる）"
+    },
+    {
+      "entry_seq": 9,
+      "events": [
+        {
+          "date": "2026-10-06",
+          "day": 10,
+          "course_no": 1,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "手のピリピリはだいぶ楽になった",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-06",
+          "day": 10,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "improving",
+          "source_quote": "口内炎もちょっとましになってきた",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": null
+    },
+    {
+      "entry_seq": 11,
+      "events": [
+        {
+          "date": "2026-10-08",
+          "day": 12,
+          "course_no": 1,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎のくすりをもらった。まだしみる",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-08",
+          "day": 12,
+          "course_no": 1,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気はなかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "架空の医療機関名を含む（一次置換で[病院]になる想定）。引用は機関名を含まない範囲"
+    },
+    {
+      "entry_seq": 12,
+      "events": [
+        {
+          "date": "2026-10-10",
+          "day": 14,
+          "course_no": 1,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "指先のしびれがすこしのこってる",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "架空の電話番号を含む（一次置換で伏せ字になる想定）。C2 は予定 10/11 から延期されたが理由は書かない"
+    },
+    {
+      "entry_seq": 13,
+      "events": [
+        {
+          "date": "2026-10-08",
+          "day": 12,
+          "course_no": 1,
+          "term": "味覚異常",
+          "question_key": null,
+          "status": "present",
+          "source_quote": "ごはんの味がへんなのは先週木曜まで",
+          "recalled": true
+        },
+        {
+          "date": "2026-10-12",
+          "day": 16,
+          "course_no": 1,
+          "term": "味覚異常",
+          "question_key": null,
+          "status": "absent",
+          "source_quote": "いまはふつう",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "記録日 10/12（月）の「先週木曜」= 10/8（C1 Day12）。「〜まで」は症状のあった最後の日を日付とする"
+    },
+    {
+      "entry_seq": 15,
+      "events": [
+        {
+          "date": "2026-10-14",
+          "day": 2,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "また冷たいものでピリピリ",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-14",
+          "day": 2,
+          "course_no": 2,
+          "term": "しゃっくり",
+          "question_key": null,
+          "status": "present",
+          "source_quote": "しゃっくりもとまらない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": null
+    },
+    {
+      "entry_seq": 19,
+      "events": [
+        {
+          "date": "2026-10-15",
+          "day": 3,
+          "course_no": 2,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "present",
+          "source_quote": "ポンプを外した日の夜から下痢がつづいてて",
+          "recalled": true
+        },
+        {
+          "date": "2026-10-18",
+          "day": 6,
+          "course_no": 2,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "present",
+          "source_quote": "下痢がつづいてて、きょうも3回",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-18",
+          "day": 6,
+          "course_no": 2,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "ほとんど食べれてない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "家族の代理入力。「ポンプを外した日」= C2 Day3（10/15）"
+    },
+    {
+      "entry_seq": 20,
+      "events": [
+        {
+          "date": "2026-10-14",
+          "day": 2,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "点滴の次の日から続いてた手のピリピリ",
+          "recalled": true
+        },
+        {
+          "date": "2026-10-19",
+          "day": 7,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "手のピリピリ、きょうは少しまし",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-19",
+          "day": 7,
+          "course_no": 2,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎がひとつできた",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time",
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": "「点滴の次の日」= C2 Day2（10/14）。始まりと今日の改善を別の出来事にする"
+    },
+    {
+      "entry_seq": 22,
+      "events": [
+        {
+          "date": "2026-10-20",
+          "day": 8,
+          "course_no": 2,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "下痢はなかった",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-20",
+          "day": 8,
+          "course_no": 2,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎がしみて",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ回答は同じ日の朝の記録（自由記載のみの記録）"
+    },
+    {
+      "entry_seq": 24,
+      "events": [
+        {
+          "date": "2026-10-23",
+          "day": 11,
+          "course_no": 2,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "スーパーの冷凍コーナーで手がジンジンした",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "numbness",
+          "closed_answer": "none",
+          "free_text_quote": "スーパーの冷凍コーナーで手がジンジンした"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction"
+      ],
+      "expect_unprocessed": false,
+      "note": "クローズ回答はしびれ「なし」、自由記載に冷感で手がジンジン"
+    },
+    {
+      "entry_seq": 25,
+      "events": [
+        {
+          "date": "2026-10-25",
+          "day": 13,
+          "course_no": 2,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "手のしびれはあいかわらづ",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "一般的な姓＋さんを含む（一次置換で○○さんになる想定）。「あいかわらづ」は誤字"
+    },
+    {
+      "entry_seq": 26,
+      "events": [
+        {
+          "date": "2026-10-22",
+          "day": 10,
+          "course_no": 2,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎は先週木曜までいたかった",
+          "recalled": true
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "記録日 10/26（月）の「先週木曜」= 10/22（C2 Day10）。「〜まで」は症状のあった最後の日を日付とする"
+    },
+    {
+      "entry_seq": 28,
+      "events": [
+        {
+          "date": "2026-10-28",
+          "day": 2,
+          "course_no": 3,
+          "term": "しゃっくり",
+          "question_key": null,
+          "status": "present",
+          "source_quote": "しゃっくりがとまらない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": null
+    },
+    {
+      "entry_seq": 29,
+      "events": [
+        {
+          "date": "2026-10-28",
+          "day": 2,
+          "course_no": 3,
+          "term": "異常感覚",
+          "question_key": "numbness",
+          "status": "present",
+          "source_quote": "きょうも水道の水でピリピリ",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-28",
+          "day": 2,
+          "course_no": 3,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "食欲もあまりない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "「点滴の次の日」= C3 Day2 = 記録日（10/28）。回想ではない"
+    },
+    {
+      "entry_seq": 33,
+      "events": [
+        {
+          "date": "2026-10-31",
+          "day": 5,
+          "course_no": 3,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "present",
+          "source_quote": "夕方から下痢が3回あった",
+          "recalled": false
+        },
+        {
+          "date": "2026-10-31",
+          "day": 5,
+          "course_no": 3,
+          "term": "食欲不振",
+          "question_key": "nausea_appetite",
+          "status": "present",
+          "source_quote": "ほとんど食べてない",
+          "recalled": false
+        }
+      ],
+      "contradictions": [
+        {
+          "question_key": "diarrhea",
+          "closed_answer": "none",
+          "free_text_quote": "夕方から下痢が3回あった"
+        }
+      ],
+      "hard_case_tags": [
+        "contradiction"
+      ],
+      "expect_unprocessed": false,
+      "note": "C3 Day5。同じ日の「つらくて書けない」の後に家族が代理入力。クローズ回答は下痢「なし」"
+    },
+    {
+      "entry_seq": 34,
+      "events": [
+        {
+          "date": "2026-11-01",
+          "day": 6,
+          "course_no": 3,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "improving",
+          "source_quote": "下痢は2回。きのうよりはまし",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": null
+    },
+    {
+      "entry_seq": 35,
+      "events": [
+        {
+          "date": "2026-10-31",
+          "day": 5,
+          "course_no": 3,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "おとといの夜から口内炎がいたい",
+          "recalled": true
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "relative_time"
+      ],
+      "expect_unprocessed": false,
+      "note": "回想。「おととい」= 10/31（C3 Day5）"
+    },
+    {
+      "entry_seq": 36,
+      "events": [
+        {
+          "date": "2026-11-03",
+          "day": 8,
+          "course_no": 3,
+          "term": "発熱",
+          "question_key": "fever",
+          "status": "present",
+          "source_quote": "熱をはかったら37.9",
+          "recalled": false
+        },
+        {
+          "date": "2026-11-03",
+          "day": 8,
+          "course_no": 3,
+          "term": "悪寒",
+          "question_key": null,
+          "status": "present",
+          "source_quote": "夕方さむけがして",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": false,
+      "note": "C3 Day8。クローズ回答の体温 37.9"
+    },
+    {
+      "entry_seq": 37,
+      "events": [
+        {
+          "date": "2026-11-05",
+          "day": 10,
+          "course_no": 3,
+          "term": "発熱",
+          "question_key": "fever",
+          "status": "absent",
+          "source_quote": "熱はもう出ていない",
+          "recalled": false
+        },
+        {
+          "date": "2026-11-05",
+          "day": 10,
+          "course_no": 3,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "present",
+          "source_quote": "口内炎はまだすこしいたい",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": null
+    },
+    {
+      "entry_seq": 38,
+      "events": [],
+      "contradictions": [],
+      "hard_case_tags": [],
+      "expect_unprocessed": true,
+      "note": "辞書にない架空の姓＋「さん」。一次置換では残り、二次検出（unknown_before_honorific）で送信対象外になる想定。D6 デモ用"
+    },
+    {
+      "entry_seq": 39,
+      "events": [
+        {
+          "date": "2026-11-07",
+          "day": 12,
+          "course_no": 3,
+          "term": "末梢性感覚ニューロパチー",
+          "question_key": "numbness",
+          "status": "improving",
+          "source_quote": "しびれはだいぶ楽",
+          "recalled": false
+        },
+        {
+          "date": "2026-11-07",
+          "day": 12,
+          "course_no": 3,
+          "term": "口腔粘膜炎",
+          "question_key": "stomatitis",
+          "status": "improving",
+          "source_quote": "口内炎も少しまし",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "mild_improving"
+      ],
+      "expect_unprocessed": false,
+      "note": null
+    },
+    {
+      "entry_seq": 40,
+      "events": [
+        {
+          "date": "2026-11-08",
+          "day": 13,
+          "course_no": 3,
+          "term": "悪心",
+          "question_key": "nausea_appetite",
+          "status": "absent",
+          "source_quote": "吐き気も下痢もなかった",
+          "recalled": false
+        },
+        {
+          "date": "2026-11-08",
+          "day": 13,
+          "course_no": 3,
+          "term": "下痢",
+          "question_key": "diarrhea",
+          "status": "absent",
+          "source_quote": "吐き気も下痢もなかった",
+          "recalled": false
+        }
+      ],
+      "contradictions": [],
+      "hard_case_tags": [
+        "negation"
+      ],
+      "expect_unprocessed": false,
+      "note": "一般的な姓＋先生を含む（一次置換で○○先生になる想定）"
+    }
+  ]
+}

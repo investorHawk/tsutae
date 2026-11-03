@@ -64,20 +64,22 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 `skill_versions` は「その日の記録に使った質問集」を後から引くためのスナップショット（未設問「−−」の表示に使う）。起動時に現在の SKILL.md が未登録なら登録する。
 
 ### W1-db の公開関数（`tsutae.db`）
+- 接続はリクエスト（またはバックグラウンドでの1回の生成）ごとに開く。WAL モード
 - `connect(path: Path) -> sqlite3.Connection`（row_factory=Row、foreign_keys ON、`check_same_thread=False`）、`init_db(conn)`（schema.sql を流す。何度呼んでもよい）
 - 患者: `create_patient(conn, regimen, patient_id=None) -> str`, `get_patient(conn, pid) -> dict | None`, `list_patients(conn) -> list[dict]`
 - コース: `upsert_course(conn, course: Course) -> Course`, `list_courses(conn, pid) -> list[Course]`（course_no 昇順）
 - 記録: `add_entry(conn, pid, entry: EntryCreate, recorded_at: datetime, skill_version: str) -> Entry`, `list_entries(conn, pid, start: date | None = None, end: date | None = None) -> list[Entry]`（recorded_at 昇順）, `get_entry(conn, entry_id) -> Entry | None`
-- 受診: `create_visit(conn, pid, reception_no, visit_date, expires_at, course_no) -> int`, `get_visit(conn, vid) -> dict | None`, `list_visits(conn, statuses: tuple[str, ...] | None = None) -> list[dict]`, `set_visit_status(conn, vid, status, fallback: bool | None = None)`, `save_timeline(conn, vid, timeline: Timeline)`, `get_timeline(conn, vid) -> Timeline | None`, `save_report(conn, vid, html, data: ReportData)`, `get_report(conn, vid) -> tuple[str, ReportData] | None`, `mark_printed(conn, vid)`（reports・timelines を削除し reception_no を NULL、status=printed）, `purge_expired(conn, now: datetime) -> int`（expires_at を過ぎた未印刷の受診に同じ削除をして件数を返す）
+- 受診: `create_visit(conn, pid, reception_no, visit_date, expires_at, course_no) -> int`, `get_visit(conn, vid) -> dict | None`, `list_visits(conn, statuses: tuple[str, ...] | None = None) -> list[dict]`, `set_visit_status(conn, vid, status, fallback: bool | None = None)`, `save_timeline(conn, vid, timeline: Timeline)`, `get_timeline(conn, vid) -> Timeline | None`, `save_report(conn, vid, html, data: ReportData)`, `get_report(conn, vid) -> tuple[str, ReportData] | None`, `mark_printed(conn, vid)`（reports・timelines を削除し reception_no を NULL、status=printed。printed への変更はこの関数だけで、`set_visit_status` は printed を受け付けない。印刷済みの受診への `save_*` は `VisitClosedError`）, `purge_expired(conn, now: datetime) -> int`（expires_at を過ぎた未印刷の受診に同じ削除をして件数を返す）
 - ログ: `add_pipeline_log(conn, run_kind, run_id, event, **fields) -> None`, `list_pipeline_logs(conn, run_kind, run_id) -> list[dict]`
 - Skill: `create_skill_change(...) -> int`, `get_skill_change`, `list_skill_changes`, `update_skill_change(conn, id, **fields)`, `save_skill_version(conn, skill_name, version, content, questions: list[Question] | None)`, `get_skill_version(conn, skill_name, version) -> dict | None`, `latest_skill_version(conn, skill_name) -> dict | None`
 
 ## 3. コースと Day（W1-course、`tsutae.course`、純関数）
 - Day1 = 実投与日。次コースの実投与日の前日までが今コース。次コースが未登録なら `infusion_date + cycle_days - 1` まで（それ以降の記録は、次コース登録まで今コースの Day15, 16… として数える）
 - `build_schedule(courses: list[Course], course_no: int, cycle_days: int, pump_removal_day: int | None) -> CourseSchedule`
-- `day_of(d: date, schedule: CourseSchedule) -> int | None`（Day1 より前は None。次コース開始日以降も None）
+- `day_of(d: date, schedule: CourseSchedule, *, courses: Sequence[Course]) -> int | None`（Day1 より前は None。次コース開始日以降も None。courses は schedule を作ったのと同じもの）
+- `validate_courses(courses) -> list[Course]`（course_no 順に並べて返す。course_no の重複・実投与日の逆転などの矛盾は `CourseValidationError(code)`（ValueError）。どの関数も矛盾した courses にはこの例外を出す。医師 API の実投与日登録は保存前にこれを呼び、失敗は 400 `{"error": code}`）
 - `course_for_date(courses, d) -> Course | None`、`current_course(courses, today) -> Course | None`（実投与日が today 以前で最大の course_no）、`previous_course(courses, course_no) -> Course | None`
-- `grid_days(schedule, until: date | None = None) -> list[int]`（今コース: Day1〜max(cycle_days, until までの日数)。前コース: Day1〜その最終日）
+- `grid_days(schedule, until: date | None = None) -> list[int]`（今コース: Day1〜max(last_day_date の Day, until の Day)。前コース（until なし）: Day1〜last_day_date の Day）
 - `delay_note(schedule) -> str | None` → `"延期（予定より2日）"`。延期の理由は書かない
 
 ## 4. Skill（W1-skills、`tsutae.skills`）
@@ -132,6 +134,7 @@ fixed_rules:
 - 評価用 `eval_patient_a.json` / `eval_patient_b.json`: 各2コース、デモとは別の人・別のパターン
 - 自由記載は全体で約60件。**全ての自由記載に正解ラベル**（暦日・Day・用語・status・食い違い・引用）。難ケース4種（`contradiction` / `mild_improving` / `relative_time` / `negation`）をそれぞれ複数件。相対時間は「点滴の次の日から」「先週木曜まで」「ポンプを外した日」を必ず含む
 - `source_quote` は**一次置換後**の自由記載に部分一致すること（テストで検査）
+- 回想（recalled）は「出来事の暦日が記録日より前」なら true（相対時間で日付を戻した場合も含む）
 - 用語は `backend/tsutae/data/ctcae_terms.json`: `[{"term": "下痢", "en": "Diarrhea", "question_key": "diarrhea"}, …]`（CTCAE v5.0 日本語訳 JCOG 版の有害事象名を約30語。出典「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」をファイル内 `source` に）。ラベルの term はこの一覧から選ぶ
 
 ## 7. 変換パイプライン（W2-pipeline、`tsutae.pipeline`）

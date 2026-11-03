@@ -70,3 +70,16 @@ def test_escaped_line_break_before_digits_is_not_id_like() -> None:
     # 依頼文の JSON では改行が \\n。n と数字をつないで A023 の形にしない
     prompt = json.dumps({"t": "だるい\n2026年"}, ensure_ascii=False)
     assert RULE_ID_LIKE not in [d.rule for d in detect_identifiers(prompt)]
+
+
+@pytest.mark.parametrize(
+    "text", ["腫瘍マーカーのCA125が上がった", "ＣＡ１２５は35", "ca242"]
+)
+def test_tumor_marker_names_are_not_id_like(text: str) -> None:
+    # 患者が書きうる検査名は識別子として扱わない（送らない記録を無駄に増やさない）
+    assert detect_in_patient_text(text) == []
+
+
+@pytest.mark.parametrize("text", ["CA1250", "A-023", "AB1234"])
+def test_lab_name_allowance_is_exact(text: str) -> None:
+    assert [d.rule for d in detect_in_patient_text(text)] == [RULE_ID_LIKE]

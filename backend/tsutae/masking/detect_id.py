@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 _LETTER = "A-Za-zＡ-Ｚａ-ｚ"
 _DIGIT = "0-9０-９"
@@ -36,6 +37,19 @@ ID_LIKE_RE = re.compile(
 )
 
 
+# 形が id_like に当たるが、患者が自由記載に書きうる検査名（腫瘍マーカー）。
+# NFKC と大文字化の後でちょうど一致するときだけ通す（前後は英数字でない）
+ALLOWED_LAB_NAMES = frozenset({"CA125", "CA242", "CA602"})
+
+
+def _is_lab_name(token: str) -> bool:
+    return unicodedata.normalize("NFKC", token).upper() in ALLOWED_LAB_NAMES
+
+
 def id_like_spans(text: str) -> list[tuple[int, int]]:
     """id_like の (開始, 終わり) の一覧。"""
-    return [(m.start(), m.end()) for m in ID_LIKE_RE.finditer(text)]
+    return [
+        (m.start(), m.end())
+        for m in ID_LIKE_RE.finditer(text)
+        if not _is_lab_name(m.group(0))
+    ]

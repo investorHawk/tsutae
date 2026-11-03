@@ -22,6 +22,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   invalid_date: "日付は YYYY-MM-DD の形で、暦にある日を入れてください",
   note_too_long: "メモは200字までです",
   invalid_visit_id: "受診の番号が正しくありません",
+  generating:
+    "変換の最中です。終わってから印刷・印刷済みにしてください（数分かかることがあります）",
   not_regenerable:
     "この受診は今はもう一度変換できません（生成中・AI の結果あり・印刷済み・期限切れ）",
   bad_password: "パスワードが違います",

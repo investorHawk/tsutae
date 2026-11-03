@@ -239,7 +239,11 @@ def list_visits(conn: Conn) -> dict[str, Any]:
 
 @_protected.get("/visits/{vid}/report", response_class=HTMLResponse)
 def get_report(vid: VisitId, conn: Conn) -> HTMLResponse:
-    _open_visit(conn, vid)
+    visit = _open_visit(conn, vid)
+    if visit["status"] == "generating":
+        # 生成中（AI でもう一度変換している最中を含む）は前のレポートも出さない
+        # （印刷して印刷済みにすると新しい結果が捨てられる）。契約どおり 404
+        raise ApiError(404, "not_found")
     saved = db.get_report(conn, vid)
     if saved is None:
         raise ApiError(404, "not_found")
@@ -249,7 +253,14 @@ def get_report(vid: VisitId, conn: Conn) -> HTMLResponse:
 
 @_protected.post("/visits/{vid}/printed")
 def mark_printed(vid: VisitId, conn: Conn) -> dict[str, bool]:
-    """レポート・変換結果・受付番号を消して printed にする（何度呼んでもよい）。"""
+    """レポート・変換結果・受付番号を消して printed にする（何度呼んでもよい）。
+
+    生成中（AI でもう一度変換している最中を含む）は 409 generating（前のレポートで
+    印刷済みにして、新しい結果を捨てないように）。
+    """
+    visit = db.get_visit(conn, vid)
+    if visit is not None and visit["status"] == "generating":
+        raise ApiError(409, "generating")
     try:
         db.mark_printed(conn, vid)
     except db.NotFoundError as exc:

@@ -293,7 +293,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 医師 API の状態を変える POST（login 以外。logout を含む）は `require_same_origin`: `Sec-Fetch-Site` が cross-site/same-site、または `Origin` が「要求の Host の origin」とも `public_base_url` の origin とも違えば 403 `cross_origin`（どちらのヘッダも無ければ通す）。リバースプロキシが Host を書き換える構成では `public_base_url` を正しく設定する。frontend を別のサブドメインに置く構成は使えない
 - 送り直しの重複防止: 同じ患者・同じ内容の記録が120秒以内にあれば新しく作らずその記録を返す（`db.add_entry_once`）。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）
 
-- `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」
+- `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
 
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=["project"]`、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_h3(work_root, logger)`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）

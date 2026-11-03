@@ -291,3 +291,24 @@ def test_cross_origin_is_403(client: TestClient, headers: dict[str, str]) -> Non
     assert r.json() == {"error": "cross_origin"}
     assert factory.calls == 0
     assert _visit(client, vid)["status"] == "failed"
+
+
+def test_while_generating_old_report_is_hidden_and_cannot_be_printed(
+    client: TestClient,
+) -> None:
+    # やり直しの最中（generating）に前のレポートを印刷して印刷済みにすると、新しい結果が
+    # 捨てられる（Codex のレビュー）。レポートは 404、印刷済みは 409 にする
+    vid = _demo_visit(client, "failed")
+    with db_conn(client.app) as conn:
+        assert db.begin_regeneration(conn, vid)
+        conn.execute(
+            "INSERT INTO reports (visit_id, html, data_json) VALUES (?, ?, ?)",
+            (vid, "<p>old</p>", "{}"),
+        )
+        conn.commit()
+    r = client.get(f"/api/doctor/visits/{vid}/report")
+    assert r.status_code == 404
+    r = client.post(f"/api/doctor/visits/{vid}/printed")
+    assert r.status_code == 409
+    assert r.json() == {"error": "generating"}
+    assert _visit(client, vid)["status"] == "generating"

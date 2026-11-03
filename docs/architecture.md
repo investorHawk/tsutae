@@ -284,7 +284,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - フロントの契約は `scripts/dump_api_fixtures.py` が実 API から書き出す `frontend/src/test/fixtures/api/*.json` で検査する（`backend/tests/test_dump_api_fixtures.py` が古くなっていないことを確かめる）。API を変えたら fixture を書き直す
 
 ### 2026-11-04 明け方の決定
-- 起動時（lifespan。purge の後に1回だけ）に、受付番号が残っていて期限内の status=generating の受診を `api/orphans.recover_orphans` で回収する: Claude を呼ばずにフォールバック（AI変換なし）のレポートを作って ready にする（変換は同じプロセスの BackgroundTasks で動くので、止まった・再起動したプロセスの生成中は二度と終わらない）。ログ `orphan_recovered`。単一プロセス（`--workers 1`）が前提
+- 起動時（lifespan。purge の後に1回だけ）に、受付番号が残っていて期限内の status=generating の受診を `api/orphans.recover_orphans` で回収する: Claude を呼ばずにフォールバック（AI変換なし）のレポートを作って ready にする（変換は同じプロセスの BackgroundTasks で動くので、止まった・再起動したプロセスの生成中は二度と終わらない）。ログ `orphan_recovered`。単一プロセス（`--workers 1`）が前提。稼働中も10分ごとの掃除で、最後のログ（無ければ受付）から `pipeline_timeout_s + 120` 秒以上動きの無い生成中を同じ方法で回収する（`orphans.recover_stale`。convert は `pipeline_timeout_s` で打ち切られるので、動いている生成は奪わない）
 
 - D4 の依頼は、同じ Skill の作業中（diff の無い pending）があれば 409 `busy`。`created_at` から `pipeline_timeout_s` を過ぎた作業中の行は `failed`（`stale_request`）にしてから判定する（`GET /skill-changes` の前にも、30秒の余裕をつけて同じ片付けをする）。フロントは作業中の行を「生成中」と出して3秒ごとに履歴を取り直す
 - フロントの通信のタイムアウト: 患者 API 20秒、医師 API 30秒、D4 の依頼 10分（打ち切りは通信の失敗と同じ扱い）

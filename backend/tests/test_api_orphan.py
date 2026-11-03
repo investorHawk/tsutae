@@ -5,7 +5,8 @@
   1回だけ、受付番号が残っていて期限内の generating を全て、Claude を呼ばずに
   フォールバックのレポートにして ready（fallback=True）にする
 - 印刷済み・期限切れ・ready には触れない。1件が壊れていても他は救い、壊れた1件は failed
-- 起動後に作られた generating（同じプロセスで生成中）は奪わない
+- 起動後に作られた generating（同じプロセスで生成中）は奪わない。周期タスクの
+  `recover_stale` は動きの無い（最後のログから pipeline_timeout_s + 120 秒以上）ものだけ
 """
 
 from __future__ import annotations
@@ -221,7 +222,7 @@ def test_visit_without_free_text_is_ready_without_claude(
 def test_visits_created_after_startup_are_not_taken(
     tmp_path: Path, fixed_today: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """回収は起動時の1回だけ（周期タスクに紛れ込まない）。"""
+    """周期タスクは動きの無いものだけを取る（新しい generating は奪わない）。"""
     monkeypatch.setattr(app_module, "PURGE_INTERVAL_S", 0.02)
     calls: list[int] = []
     real = app_module.purge_once
@@ -244,3 +245,124 @@ def test_visits_created_after_startup_are_not_taken(
             assert _state(conn, vid)[:2] == ("generating", False)
             assert _events(conn, vid) == []
         assert client.app.state.runner_factory.calls == 0
+
+
+# --- 稼働中の回収（動きの無い generating だけ。purge の周期タスクから呼ぶ） ---
+
+
+def _stale_after(settings: Settings) -> timedelta:
+    return timedelta(seconds=settings.pipeline_timeout_s + 120)
+
+
+def _log_at(conn: Any, vid: int, ts: Any) -> None:
+    db.add_pipeline_log(conn, "visit", vid, "run_start", ts=ts)
+
+
+def test_stale_after_default_is_timeout_plus_margin(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path, pipeline_timeout_s=30.0)
+    assert orphans.stale_after_for(settings) == timedelta(seconds=150)
+
+
+def test_recover_stale_takes_only_visits_without_recent_activity(
+    tmp_path: Path, fixed_today: str
+) -> None:
+    import asyncio
+
+    settings, conn = _prepared_db(tmp_path)
+    pid = _patient(conn)
+    stale_after = _stale_after(settings)
+    clock = now() + stale_after * 3
+    old_log = _visit(conn, pid, "A-1", hours=72)
+    _log_at(conn, old_log, clock - stale_after - timedelta(seconds=1))
+    fresh_log = _visit(conn, pid, "A-2", hours=72)
+    _log_at(conn, fresh_log, clock - stale_after * 4)
+    _log_at(conn, fresh_log, clock - timedelta(seconds=10))
+    no_log = _visit(conn, pid, "A-3", hours=72)
+    printed = _visit(conn, pid, "P-1", hours=72)
+    db.mark_printed(conn, printed)
+    expired = _visit(conn, pid, "E-1", hours=-1)
+    before_fresh = _state(conn, fresh_log)
+    before_printed = _state(conn, printed)
+    before_expired = _state(conn, expired)
+    conn.close()
+
+    recovered = asyncio.run(
+        orphans.recover_stale(settings, now=clock, stale_after=stale_after)
+    )
+
+    conn = db.connect(settings.db_path)
+    try:
+        assert recovered == 2
+        for vid in (old_log, no_log):
+            visit = db.get_visit(conn, vid)
+            assert (visit["status"], visit["fallback"]) == ("ready", True)
+            assert FALLBACK_MARK in db.get_report(conn, vid)[0]
+            assert "orphan_recovered" in _events(conn, vid)
+        assert _state(conn, fresh_log) == before_fresh
+        assert _state(conn, printed) == before_printed
+        assert _state(conn, expired) == before_expired
+        for vid in (fresh_log, printed, expired):
+            assert "orphan_recovered" not in _events(conn, vid)
+    finally:
+        conn.close()
+
+
+def test_recover_stale_leaves_new_visit_without_logs(
+    tmp_path: Path, fixed_today: str
+) -> None:
+    import asyncio
+
+    settings, conn = _prepared_db(tmp_path)
+    pid = _patient(conn)
+    vid = _visit(conn, pid, "A-1")
+    conn.close()
+    clock = now() + _stale_after(settings) - timedelta(seconds=1)
+    assert asyncio.run(orphans.recover_stale(settings, now=clock)) == 0
+    conn = db.connect(settings.db_path)
+    try:
+        assert _state(conn, vid)[:2] == ("generating", False)
+        assert _events(conn, vid) == []
+    finally:
+        conn.close()
+
+
+def test_recover_stale_scan_failure_returns_zero(
+    tmp_path: Path, fixed_today: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    import asyncio
+
+    settings = make_settings(tmp_path, db_path=tmp_path / "missing" / "x.db")
+    assert asyncio.run(orphans.recover_stale(settings, now=now())) == 0
+    assert "orphan_scan_failed" in caplog.text
+
+
+def test_purge_loop_calls_recover_stale_and_survives_its_failure(
+    tmp_path: Path,
+    fixed_today: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(app_module, "PURGE_INTERVAL_S", 0.02)
+    purges: list[int] = []
+    stale_calls: list[Any] = []
+    real = app_module.purge_once
+
+    def counting(settings):
+        purges.append(1)
+        return real(settings)
+
+    async def broken_stale(settings, *, now=None, stale_after=None):
+        stale_calls.append(now)
+        raise RuntimeError("secret text")
+
+    monkeypatch.setattr(app_module, "purge_once", counting)
+    monkeypatch.setattr(orphans, "recover_stale", broken_stale)
+    with api_client(tmp_path):
+        deadline = time.monotonic() + 5.0
+        while len(stale_calls) < 3 and time.monotonic() < deadline:
+            time.sleep(0.02)
+    assert len(stale_calls) >= 3  # 失敗しても周期は止まらない
+    assert len(purges) >= 3
+    assert all(c is not None for c in stale_calls)
+    assert "RuntimeError" in caplog.text
+    assert "secret text" not in caplog.text

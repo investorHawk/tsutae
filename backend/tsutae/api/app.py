@@ -10,7 +10,10 @@
   置き、終了時に止める（医師 API が呼ばれなくても期限切れの中身を消す）
 - 起動時（purge の後・リクエストを受ける前）に1回だけ `orphans.recover_orphans`:
   生成中のまま残った受診（前のプロセスが変換中に止まった）を Claude を呼ばずに
-  AI 変換なしのレポートにする（周期タスクには入れない）
+  AI 変換なしのレポートにする
+- 周期タスクでは purge の後に `orphans.recover_stale`: 動きの無い generating
+  （最後のログから pipeline_timeout_s + 120 秒以上）だけを同じやり方で救う
+  （稼働中に生成が DB を開けずに抜けた受診を、再起動を待たずに回収する）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
 - 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`）は、モジュールがあれば
   `router` を載せる（無ければ飛ばす。中の import の失敗は隠さない）
@@ -76,17 +79,29 @@ def purge_once(settings: Settings) -> int:
         conn.close()
 
 
+async def _recover_stale_once(settings: Settings) -> None:
+    """動きの無い generating を救う。失敗は型名だけ残す（周期を止めない）。"""
+    try:
+        recovered = await orphans.recover_stale(settings, now=now())
+    except Exception as exc:  # noqa: BLE001 — 回収の失敗でサーバを止めない
+        _log.warning("api.stale_recover_failed error_type=%s", type(exc).__name__)
+        return
+    if recovered:
+        _log.info("動きの無い生成中の受診 %d 件を AI 変換なしにした", recovered)
+
+
 async def _purge_loop(settings: Settings, interval_s: float) -> None:
-    """interval_s ごとに purge_once を回す。失敗は型名だけ残して次の周期へ。"""
+    """interval_s ごとに purge_once と recover_stale を回す。失敗は型名だけ残す。"""
     while True:
         await asyncio.sleep(interval_s)
         try:
             purged = await asyncio.to_thread(purge_once, settings)
         except Exception as exc:  # noqa: BLE001 — 掃除の失敗でサーバを止めない
             _log.warning("api.purge_failed error_type=%s", type(exc).__name__)
-            continue
+            purged = 0
         if purged:
             _log.info("期限切れの受診 %d 件を消した", purged)
+        await _recover_stale_once(settings)
 
 
 @asynccontextmanager

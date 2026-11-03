@@ -60,6 +60,20 @@ const EMIT_TITLES: Readonly<Record<string, string>> = {
   emit_report: "emit_report レポートの項目を提出",
 };
 
+/** 変換全体の出来事（ログの event 名）の見出し。知らない名前はそのまま出す。 */
+export const RUN_TITLES: Readonly<Record<string, string>> = {
+  input_prepared: "input_prepared 入力を準備（伏せ字・範囲）",
+  run_start: "run_start 変換を開始",
+  skill_check: "skill_check Skill の版を照合",
+  run_end: "run_end 変換を終了",
+  fallback: "fallback AI変換なしに切り替え",
+  internal_error: "internal_error 想定外のエラー",
+  visit_ready: "visit_ready レポートを作成",
+  visit_failed: "visit_failed レポートを作れなかった",
+  visit_closed: "visit_closed 印刷済み・期限切れ（何もしない）",
+  orphan_recovered: "orphan_recovered 再起動で止まった受診を回収",
+};
+
 const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
   [/^(deny|denied)\b/i, "拒否", "deny"],
   [/^block/i, "遮断", "deny"],
@@ -164,7 +178,7 @@ function titleOf(e: PipelineEvent, kind: EventKind, hookId: HookId | null) {
     case "tool":
       return `ツール ${e.tool_name}`;
     default:
-      return e.event;
+      return RUN_TITLES[e.event] ?? e.event;
   }
 }
 

@@ -119,7 +119,12 @@ describe("toViewEvents", () => {
     expect(views[4].title).toBe("date-normalizer 完了");
     expect(views[6].title).toBe("emit_timeline 時系列を提出");
     expect(views[7].title).toBe("ツール Agent");
-    expect(views[0].title).toBe("run_start");
+    expect(views[0].title).toBe("run_start 変換を開始");
+  });
+
+  it("知らない出来事の名前はそのまま出す", () => {
+    const [view] = toViewEvents([ev({ event: "something_new" })]);
+    expect(view.title).toBe("something_new");
   });
 
   it("decision は 拒否 / 受理 などの語とコードに分ける", () => {

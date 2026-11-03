@@ -1,0 +1,36 @@
+# secrets
+.env
+.env.*
+*.key
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# data
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+
+# claude code local
+.claude/settings.local.json
+.claude/.cc-writes/
+
+# 非公開の参考資料
+docs/reference/event-rules.md

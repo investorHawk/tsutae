@@ -62,7 +62,8 @@ def add_entry_once(
     """同じ内容の記録が recorded_at の前 window 以内にあればそれを、無ければ保存して返す。
 
     探すのと入れるのを1つの write_transaction で行う（同時の送り直しでも1件）。
-    内容の比較に skill_version は使わない（返すのは保存済みの記録そのもの）。
+    同じとみなすのは、内容に加えて記録日（JST）と skill_version も同じときだけ
+    （日をまたいだ記録・D4 の承認で版が変わった後の記録は別の記録。spec 4.1・4.3）。
     """
     validate_skill_version(skill_version)
     if window < timedelta(0):
@@ -74,7 +75,17 @@ def add_entry_once(
         recent = _load_entries(
             conn, "e.patient_id = ? AND e.recorded_at >= ?", (pid, since)
         )
-        found = next((e for e in recent if saved_content(e) == wanted), None)
+        day = to_jst_date(recorded_at)
+        found = next(
+            (
+                e
+                for e in recent
+                if saved_content(e) == wanted
+                and e.record_date == day
+                and e.skill_version == skill_version
+            ),
+            None,
+        )
         if found is not None:
             return found
         entry_id = insert_entry_rows(conn, pid, entry, recorded_at, skill_version)

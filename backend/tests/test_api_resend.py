@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from pipeline_fakes import FakeRunner
 
 from tsutae import db
-from tsutae.config import now, today
+from tsutae.config import jst_datetime, now, today
 from tsutae.schemas import ClosedAnswer, EntryCreate
 
 C3 = [(1, date(2026, 9, 27)), (2, date(2026, 10, 13)), (3, date(2026, 10, 27))]
@@ -145,14 +145,45 @@ def test_add_entry_once_returns_existing(client: TestClient, pid: str) -> None:
         at = now()
         first = db.add_entry_once(conn, pid, entry, at, "regimen-folfox@1", window)
         again = db.add_entry_once(
-            conn, pid, entry, at + timedelta(seconds=119), "regimen-folfox@2", window
+            conn, pid, entry, at + timedelta(seconds=119), "regimen-folfox@1", window
         )
         later = db.add_entry_once(
             conn, pid, entry, at + timedelta(seconds=121), "regimen-folfox@1", window
         )
     assert again.id == first.id
-    assert again.skill_version == "regimen-folfox@1"  # 保存済みのものを返す
     assert later.id != first.id
+
+
+def test_add_entry_once_new_skill_version_is_a_new_entry(
+    client: TestClient, pid: str
+) -> None:
+    # D4 の承認で版が上がった直後の同じ内容の記録は、別の記録（記録ごとに版を持つ）
+    entry = EntryCreate(free_text="（合成）むかむか")
+    window = timedelta(seconds=120)
+    with db_conn(client.app) as conn:
+        at = now()
+        first = db.add_entry_once(conn, pid, entry, at, "regimen-folfox@1", window)
+        after = db.add_entry_once(
+            conn, pid, entry, at + timedelta(seconds=30), "regimen-folfox@2", window
+        )
+    assert after.id != first.id
+    assert after.skill_version == "regimen-folfox@2"
+
+
+def test_add_entry_once_across_midnight_is_a_new_entry(
+    client: TestClient, pid: str
+) -> None:
+    # 23:59 と 0:00 の同じ内容は別の日の記録（1日に複数回・日ごとに数える）
+    entry = EntryCreate(free_text="（合成）だるい")
+    window = timedelta(seconds=120)
+    late = jst_datetime(date(2026, 11, 8), 23, 59)
+    with db_conn(client.app) as conn:
+        first = db.add_entry_once(conn, pid, entry, late, "regimen-folfox@1", window)
+        next_day = db.add_entry_once(
+            conn, pid, entry, late + timedelta(seconds=90), "regimen-folfox@1", window
+        )
+    assert next_day.id != first.id
+    assert next_day.record_date == date(2026, 11, 9)
 
 
 # ---------------------------------------------------------------------------

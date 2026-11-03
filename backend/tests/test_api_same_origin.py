@@ -189,3 +189,24 @@ def test_patient_api_is_not_checked(client: TestClient) -> None:
 
 def test_require_same_origin_is_exported() -> None:
     assert "require_same_origin" in deps.__all__
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        ("http://192.0.2.1:80", "http://192.0.2.1"),
+        ("https://Example.TEST:443", "https://example.test"),
+        ("http://[2001:0db8:0:0:0:0:0:1]:5173", "http://[2001:db8::1]:5173"),
+    ],
+)
+def test_origins_are_compared_after_normalizing(a: str, b: str) -> None:
+    from tsutae.api.deps import _origin_of
+
+    assert _origin_of(a) == _origin_of(b)
+
+
+@pytest.mark.parametrize("bad", ["null", "", "not a url", "http://"])
+def test_malformed_origin_is_not_an_origin(bad: str) -> None:
+    from tsutae.api.deps import _origin_of
+
+    assert _origin_of(bad) is None

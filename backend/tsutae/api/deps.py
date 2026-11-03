@@ -36,6 +36,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import logging
 import re
 import sqlite3
@@ -386,22 +387,42 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _CROSS_FETCH_SITES = frozenset({"cross-site", "same-site"})
 
 
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
 def _origin_of(url: str) -> str | None:
-    """`scheme://host[:port]`（小文字）。scheme か host が無ければ None。"""
+    """正規化した `scheme://host:port`。scheme か host が無ければ None。
+
+    小文字にし、既定のポート（http 80・https 443）を補い、IPv6 は短い書き方にそろえる
+    （`http://192.0.2.1:80` と `http://192.0.2.1`、`[2001:0db8::0:1]` と `[2001:db8::1]`
+    を同じ origin とみなす）。
+    """
     try:
         parts = urlsplit(url.strip())
+        scheme = parts.scheme.lower()
+        host = parts.hostname
+        port = parts.port
     except ValueError:
         return None
-    if not parts.scheme or not parts.netloc:
+    if not scheme or not host:
         return None
-    return f"{parts.scheme}://{parts.netloc}".lower()
+    try:
+        addr = ipaddress.ip_address(host)
+        host = f"[{addr.compressed}]" if addr.version == 6 else addr.compressed
+    except ValueError:
+        host = host.lower()
+    if port is None:
+        port = _DEFAULT_PORTS.get(scheme)
+    return f"{scheme}://{host}:{port}" if port is not None else f"{scheme}://{host}"
 
 
 def _allowed_origins(request: Request) -> set[str]:
     allowed: set[str] = set()
     host = request.headers.get("host")
     if host:
-        allowed.add(f"{request.url.scheme}://{host}".lower())
+        own = _origin_of(f"{request.url.scheme}://{host}")
+        if own is not None:
+            allowed.add(own)
     public = _origin_of(get_settings_dep(request).public_base_url)
     if public is not None:
         allowed.add(public)
@@ -423,7 +444,8 @@ def require_same_origin(request: Request) -> None:
     origin = request.headers.get("origin")
     if origin is None:
         return
-    if origin.strip().lower() not in _allowed_origins(request):
+    normalized = _origin_of(origin)
+    if normalized is None or normalized not in _allowed_origins(request):
         raise ApiError(403, "cross_origin")
 
 

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import shutil
 import sqlite3
 import sys
@@ -241,8 +242,53 @@ def approve_on_copy(
 # ---------------------------------------------------------------------------
 
 
-def _editor(settings: Settings, dry_run: bool) -> SkillEditor:
-    return DryRunSkillEditor() if dry_run else SdkSkillEditor(settings=settings)
+def _short(value: Any, limit: int = 300) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
+def _debug_line(message: Any) -> str | None:
+    """--debug 用: ツールの呼び出しと結果（エラーは本文の頭）を1行ずつ。"""
+    kind = type(message).__name__
+    content = getattr(message, "content", None)
+    if not isinstance(content, list):
+        sub = getattr(message, "subtype", None)
+        return f"[{kind}] {sub}" if sub else None
+    parts = []
+    for block in content:
+        name = type(block).__name__
+        if name == "ToolUseBlock":
+            tool_input = getattr(block, "input", {}) or {}
+            path = tool_input.get("file_path") if isinstance(tool_input, dict) else None
+            parts.append(f"tool_use {getattr(block, 'name', '?')} path={path}")
+        elif name == "ToolResultBlock":
+            flag = "ERROR" if getattr(block, "is_error", False) else "ok"
+            parts.append(f"tool_result {flag} {_short(getattr(block, 'content', ''))}")
+        elif name == "TextBlock":
+            parts.append(f"text {_short(getattr(block, 'text', ''), 160)}")
+    return f"[{kind}] " + " | ".join(parts) if parts else None
+
+
+def _debug_query(inner: Any) -> Any:
+    async def query_fn(*, prompt: Any, options: Any) -> Any:
+        print(f"[debug] cwd={options.cwd}", file=sys.stderr)
+        async for message in inner(prompt=prompt, options=options):
+            line = _debug_line(message)
+            if line:
+                print("[debug] " + line, file=sys.stderr)
+            yield message
+
+    return query_fn
+
+
+def _editor(settings: Settings, dry_run: bool, debug: bool = False) -> SkillEditor:
+    if dry_run:
+        return DryRunSkillEditor()
+    if debug:
+        from claude_agent_sdk import query
+
+        return SdkSkillEditor(settings=settings, query_fn=_debug_query(query))
+    return SdkSkillEditor(settings=settings)
 
 
 async def _request_once(
@@ -254,7 +300,7 @@ async def _request_once(
             conn,
             args.skill,
             args.request,
-            editor=_editor(settings, args.dry_run),
+            editor=_editor(settings, args.dry_run, args.debug),
             settings=settings,
             skills_home=home,
         )
@@ -310,6 +356,11 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
         "--skill", default=DEFAULT_SKILL, help="書き換える Skill の名前"
     )
     parser.add_argument("--request", default=DEFAULT_REQUEST, help="医師の依頼文")
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="ツールの呼び出しと結果（エラーの頭）を stderr に出す（D4 は患者の文を扱わない）",
+    )
     parser.add_argument(
         "--out-dir", type=Path, default=DEFAULT_OUT_DIR, help="差分と SKILL.md の出力先"
     )

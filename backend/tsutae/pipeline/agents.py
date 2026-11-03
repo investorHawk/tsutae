@@ -6,6 +6,8 @@
 - model は settings.subagent_model、skills はレジメンの Skill（本文の決まりに従わせる）
 - term-mapper には ctcae_terms.json の用語名と question_key を埋める（一覧から選ばせる）
 - 指示の文に敬称・施設名の語を書かない（主エージェントへの依頼文と同じ理由）
+- date-normalizer には主エージェントが依頼文の「日付と Day の対応表」（DAY_TABLE_TITLE。
+  prompt.py が作る）を day_table として渡す。Day は表から引かせ、数えさせない
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ __all__ = [
     "AGENT_NAMES",
     "CONTRADICTION_FINDER",
     "DATE_NORMALIZER",
+    "DAY_TABLE_TITLE",
     "SUBAGENT_DISALLOWED_TOOLS",
     "TERM_MAPPER",
     "build_agents",
@@ -32,6 +35,7 @@ DATE_NORMALIZER = "date-normalizer"
 TERM_MAPPER = "term-mapper"
 CONTRADICTION_FINDER = "contradiction-finder"
 AGENT_NAMES: tuple[str, ...] = (DATE_NORMALIZER, TERM_MAPPER, CONTRADICTION_FINDER)
+DAY_TABLE_TITLE = "日付と Day の対応表"
 # tools=[] が「未指定なので親のツールを継ぐ」と解釈された場合の守り（実 API では未検証）。
 # Skill は入れない（skills の本文の先読みが Skill ツールに依らないかは未検証のため）
 SUBAGENT_DISALLOWED_TOOLS: tuple[str, ...] = (
@@ -58,7 +62,7 @@ _DATE_NORMALIZER_PROMPT = f"""\
 ## 入力（主エージェントから）
 {{"schedule": {{"course_no", "day1_date", "last_day_date", "pump_removal_date", \
 "previous_infusion_date", …}}, "entries": [{{"entry_no", "record_date", "day", "by_proxy", \
-"too_sick", "masked_free_text"}}]}}
+"too_sick", "masked_free_text"}}], "day_table": "{DAY_TABLE_TITLE}（DayN = YYYY-MM-DD（曜）の行）"}}
 
 ## 出力
 {{"mentions": [{{"entry_no": 整数, "source_quote": "引用", "date": "YYYY-MM-DD", \
@@ -70,7 +74,9 @@ _DATE_NORMALIZER_PROMPT = f"""\
 - 否定（「〜はなかった」）や改善中（「だいぶ楽」）の記述も切り出す（status は {TERM_MAPPER} が決める）
 - 症状の記述が無い記録、too_sick の記録、masked_free_text の無い記録からは何も作らない
 - 日付の手がかりが無ければ record_date にし、confidence を 0.5 以下にする
-- day は date を今コースの Day に直したもの（day1_date が Day1）。Day1 より前なら null
+- day は date を day_table（{DAY_TABLE_TITLE}）で引いた値。自分で数えない。表の Day1 より前の\
+日は null。表に無い日（最も遅い record_date より後）の出来事は作らない
+- 曜日（「先週木曜」など）は day_table の曜日から決める
 - recalled は date が record_date より前なら true、同じ日なら false
 """
 
@@ -114,6 +120,8 @@ _CONTRADICTION_FINDER_PROMPT = f"""\
 ## 決まり
 - 見るのは answers と masked_free_text の両方がある記録だけ。date はその記録の record_date、\
 day はその記録の day
+- question_key はその記録の answers にある question_key だけ（回答の無い質問は食い違いにしない）。\
+closed_answer はその回答の value をそのまま写す
 - クローズ「none」で自由記載がその症状を present か improving としているもの、\
 クローズ「present」「hard」で自由記載がその症状を否定しているものが食い違い。\
 細かな決まりは Skill の「食い違い」に従う

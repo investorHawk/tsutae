@@ -4,8 +4,13 @@
 - input_schema は pydantic から作った JSON Schema。SDK は handler の前に jsonschema で
   検査するので、型の誤りはそこで返ることがある。handler では pydantic で検査し直し、
   続けて入力と用語の一覧に照らす（checks.py: 用語・question_key・入力から写す項目・
-  記録日以前の date・重複・食い違いのクローズ回答・per_symptom の行の過不足と順序）。失敗は `is_error` で
-  「項目名つきの短い理由」を返してモデルに直させる（入力値は返さない）
+  記録日以前の date・重複・食い違いのクローズ回答・per_symptom の行の過不足）。失敗は
+  `is_error` で「項目名つきの短い理由（写す値・数える値は期待される値つき）」を返して
+  モデルに直させる（自由記載の文面・用語名は返さない）
+- per_symptom の並び順は拒否しない。受け付けた行を (start_date, term) で並べ直して持つ
+  （term 名の文字列順はモデルが再現しにくい。checks.py の docstring）
+- input_schema は pydantic の schema の複製に、項目ごとの description を足したもの
+  （モデルが項目の決まりをツールの定義から読めるように。元の schema は書き換えない）
 - 引用（source_quote 等）の原文一致は Hook H2 が見る。ここでは見ない
 - emit_report は受け付けた timeline が無ければ拒否する。後から別の timeline を受け付けて
   picks が結び付かなくなったら picks を捨てる（もう一度 emit_report を呼ばせる）
@@ -14,13 +19,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import copy
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from claude_agent_sdk import McpSdkServerConfig, SdkMcpTool, create_sdk_mcp_server, tool
 from pydantic import Field, ValidationError
 
-from tsutae.pipeline.checks import OutputContext, report_problems, timeline_problems
+from tsutae.pipeline.checks import (
+    OutputContext,
+    report_problems,
+    sort_per_symptom,
+    timeline_problems,
+)
 from tsutae.pipeline.logs import EventLogger, reason_code
 from tsutae.schemas import (
     Contradiction,
@@ -54,7 +65,7 @@ EMIT_TIMELINE = "emit_timeline"
 EMIT_REPORT = "emit_report"
 EMIT_TIMELINE_TOOL = f"mcp__{SERVER_NAME}__{EMIT_TIMELINE}"
 EMIT_REPORT_TOOL = f"mcp__{SERVER_NAME}__{EMIT_REPORT}"
-MAX_REASONS = 5
+MAX_REASONS = 20
 
 
 class EmitTimelineArgs(Frozen):
@@ -66,23 +77,89 @@ class EmitReportArgs(Frozen):
     per_symptom: list[SymptomSummary]
 
 
-EMIT_TIMELINE_SCHEMA: dict[str, Any] = EmitTimelineArgs.model_json_schema()
-EMIT_REPORT_SCHEMA: dict[str, Any] = EmitReportArgs.model_json_schema()
+_QUOTE = (
+    "その entry_no の記録の masked_free_text の部分文字列を一字も変えずに写す"
+    "（句読点・空白・改行・全角半角・伏せ字も同じ。要約・つなぎ合わせをしない）"
+)
+_FIELD_DESCRIPTIONS: Mapping[str, Mapping[str, str]] = {
+    "TimelineEvent": {
+        "entry_no": "入力の entries の entry_no（masked_free_text のある記録だけ）",
+        "date": "出来事の暦日 YYYY-MM-DD。その記録の record_date 以前",
+        "day": (
+            "date を依頼文の日付と Day の対応表で引いた Day（自分で数えない）。"
+            "day1_date より前は null。null でも省かない"
+        ),
+        "course_no": "schedule.course_no をそのまま",
+        "term": "用語の一覧（CTCAE v5.0 JCOG版）の用語名をそのまま",
+        "question_key": (
+            "用語の一覧でその term に対応する key。入力の questions に無い key なら null"
+        ),
+        "status": "present（あり）・improving（改善中）・absent（否定）",
+        "source_quote": _QUOTE,
+        "confidence": "0〜1。日付や用語に迷ったら低く",
+        "recalled": "date が record_date より前なら true、同じ日なら false",
+        "by_proxy": "その記録の by_proxy をそのまま",
+    },
+    "Contradiction": {
+        "entry_no": "answers と masked_free_text の両方がある記録の entry_no",
+        "date": "その記録の record_date をそのまま",
+        "day": "その記録の day をそのまま（null でも省かない）",
+        "question_key": "その記録の answers にある question_key",
+        "closed_answer": "その記録の answers のその質問の value をそのまま",
+        "free_text_quote": _QUOTE,
+    },
+    "SymptomSummary": {
+        "term": "受け付けた events の present か improving の term",
+        "question_key": "その term の出来事の question_key",
+        "start_day": (
+            "その term の present か improving の出来事で date が最も早いものの day"
+            "（null でも省かない）"
+        ),
+        "start_date": "その term の present か improving の出来事で最も早い date",
+        "representative_quote": (
+            "その term の present か improving の出来事のどれか1つの source_quote を"
+            "丸ごとそのまま"
+        ),
+        "confidence": "representative_quote に選んだ出来事の confidence をそのまま",
+    },
+}
 
+
+def _described(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """schema の複製の $defs の項目に description を足す（元は書き換えない）。"""
+    out = copy.deepcopy(dict(schema))
+    for name, fields in _FIELD_DESCRIPTIONS.items():
+        props = out.get("$defs", {}).get(name, {}).get("properties", {})
+        for field_name, text in fields.items():
+            if field_name in props:
+                props[field_name]["description"] = text
+    return out
+
+
+EMIT_TIMELINE_SCHEMA: dict[str, Any] = _described(EmitTimelineArgs.model_json_schema())
+EMIT_REPORT_SCHEMA: dict[str, Any] = _described(EmitReportArgs.model_json_schema())
+
+_RESEND = (
+    "エラーや拒否が返ったら何も受け付けていない。理由に挙がった項目を直し、全体を"
+    "もう一度渡す"
+)
 _TIMELINE_DESCRIPTION = (
     "変換した時系列を渡す。入力は {events: TimelineEvent[], contradictions: "
-    "Contradiction[]}。引用は masked_free_text の部分文字列そのまま。term は用語の一覧の"
-    "名前そのもの、course_no・by_proxy・食い違いの closed_answer・date・day は入力から"
-    "写す。date は記録の record_date 以前。同じ出来事・同じ食い違いは重ねない。"
-    "エラーが返ったら理由の項目を直して呼び直す"
+    "Contradiction[]}。項目は schema にあるものだけ（足さない。day は null でも省かない）。"
+    "引用は masked_free_text の部分文字列そのまま。term は用語の一覧の名前そのもの、"
+    "course_no・by_proxy・食い違いの question_key・closed_answer・date・day は入力から"
+    "写す。events の day は依頼文の日付と Day の対応表で date を引く。date は記録の "
+    "record_date 以前。同じ出来事・同じ食い違いは重ねない。" + _RESEND
 )
 _REPORT_DESCRIPTION = (
     "レポートの症状別の時系列を渡す。入力は {per_symptom: SymptomSummary[]}。"
     "emit_timeline が受け付けられた後に呼ぶ。term・question_key は受け付けた events"
-    "（present か improving）のもの、start_date・start_day はその term の最初の出来事の"
-    "もの、representative_quote・confidence はその term の出来事の1つからそのまま。"
-    "present か improving の term ごとにちょうど1行、開始 Day の早い順（同じ日なら"
-    " term 名順）"
+    "（present か improving）のもの、start_date・start_day はその term の present か "
+    "improving の出来事で date が最も早いもののもの、representative_quote・confidence は"
+    "その term の present か improving の出来事の1つの source_quote・confidence を丸ごと"
+    "そのまま。present か improving の term ごとにちょうど1行（省かない・足さない）。"
+    "並びは開始 Day の早い順でよい（受け付けた後に並べ直すので、順序では拒否しない）。"
+    + _RESEND
 )
 
 
@@ -135,7 +212,7 @@ class RunCollector:
         return True
 
     def accept_picks(self, args: EmitReportArgs) -> None:
-        self._picks = ReportPicks(per_symptom=list(args.per_symptom))
+        self._picks = ReportPicks(per_symptom=sort_per_symptom(args.per_symptom))
 
     def log(self, event: str, decision: str) -> None:
         if self._logger is not None:
@@ -153,7 +230,10 @@ def _error(reasons: list[tuple[str, str]], headline: str) -> dict[str, Any]:
     shown = [f"{where}: {msg}" for where, msg in reasons[:MAX_REASONS]]
     if len(reasons) > MAX_REASONS:
         shown.append(f"ほか {len(reasons) - MAX_REASONS} 件")
-    text = f"{headline}。直して呼び直す: " + "; ".join(shown)
+    text = (
+        f"{headline}（何も受け付けていない）。挙げた項目を直し、全体をもう一度渡す: "
+        + "; ".join(shown)
+    )
     return {"content": [{"type": "text", "text": text}], "is_error": True}
 
 

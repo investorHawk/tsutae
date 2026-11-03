@@ -182,7 +182,8 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 範囲外（今コースの Day1 より前・最終日より後・visit_date より後）の記録は**黙って外す**（`UnprocessedEntry` にしない。unprocessed は「伏せ字漏れの疑い・識別子を含む」の意味だけ）。件数はログに `out_of_range_count` で残す
 - 自由記載の記録が1件も無い（`masked_texts` が空）なら Claude を呼ばず、空の Timeline（events・contradictions とも空、unprocessed だけ）で成功
 - `emit_timeline` の検査: event の `date` はその記録の記録日以前。`day` は `course.day_of(date, schedule, courses=...)` と一致（None ならば None のみ）。同じ (entry_no, term, date, status, source_quote) の重複・同じ食い違いの重複は拒否
-- `emit_report` の検査: 受け付けた timeline の present/improving の term ごとに per_symptom の行がちょうど1つ、開始 Day の早い順（同じなら term 名順）。行の欠け・余分・順序違いは拒否（理由は番号と短いコード）
+- `emit_report` の検査: 受け付けた timeline の present/improving の term ごとに per_symptom の行がちょうど1つ。行の欠け・余分・重複は拒否。**順序はサーバーが (start_date, term) で並べ直して受け付ける**（2026-11-04 変更。日本語の term 名の文字コード順はモデルが再現できない）。拒否の理由は番号・項目名と、写す項目・数える項目の**期待される値**を含める（自由記載の文面と用語名は含めない。ログは位置だけ）
+- 依頼文に今コースの「日付と Day の対応表」（Day1〜最も遅い record_date）を入れ、モデルに Day を計算させない
 - `convert` が想定外の例外で `internal_error` にするとき、例外の**型名だけ**をログ（`error_type`）に残す
 
 

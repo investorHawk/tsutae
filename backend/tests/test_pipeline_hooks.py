@@ -234,6 +234,36 @@ async def test_h2_checks_report_representative_quote_against_any_text() -> None:
     assert "per_symptom.1.representative_quote" in _reason(result)
 
 
+async def test_h2_reason_says_how_to_fix_and_to_resend_everything() -> None:
+    h2 = make_h2(MASKED, MemoryLogger())
+    bad = _timeline_input(
+        events=[{"entry_no": 1, "source_quote": "夕方から、下痢が3回あった"}]
+    )
+    reason = _reason(await h2(_pre(EMIT_TIMELINE_TOOL, bad), None, CTX))
+    assert "受け付けていない" in reason and "全体" in reason
+    for word in ("句読点", "空白", "改行", "全角半角"):
+        assert word in reason, word
+    no_text = _timeline_input(events=[{"entry_no": 9, "source_quote": "下痢"}])
+    reason = _reason(await h2(_pre(EMIT_TIMELINE_TOOL, no_text), None, CTX))
+    assert "masked_free_text" in reason and "null" in reason
+
+
+async def test_h2_report_reason_points_at_accepted_source_quotes() -> None:
+    h2 = make_h2(MASKED, MemoryLogger())
+    bad = {"per_symptom": [{"representative_quote": "熱が出た"}]}
+    reason = _reason(await h2(_pre(EMIT_REPORT_TOOL, bad), None, CTX))
+    assert "source_quote" in reason
+
+
+async def test_h2_lists_up_to_twenty_problems() -> None:
+    h2 = make_h2(MASKED, MemoryLogger())
+    events = [{"entry_no": 1, "source_quote": "腹痛"} for _ in range(25)]
+    reason = _reason(await h2(_pre(EMIT_TIMELINE_TOOL, {"events": events}), None, CTX))
+    assert "events.19.source_quote" in reason
+    assert "events.20.source_quote" not in reason
+    assert "ほか 5 件" in reason
+
+
 async def test_h2_denies_malformed_input_without_raising() -> None:
     h2 = make_h2(MASKED, MemoryLogger())
     for payload in (None, [], {"events": "x"}, {"events": [1]}, {"per_symptom": 3}):

@@ -141,3 +141,16 @@ def test_prompts_do_not_trip_the_detector() -> None:
     for agent in _agents().values():
         assert detect_identifiers(agent.prompt) == []
         assert detect_identifiers(agent.description) == []
+
+
+def test_date_normalizer_reads_day_from_the_table() -> None:
+    # Day はモデルに数えさせない（主エージェントが依頼文の対応表を渡す）
+    prompt = _agents()[DATE_NORMALIZER].prompt
+    assert "day_table" in prompt
+    assert "日付と Day の対応表" in prompt
+    assert "数えない" in prompt
+
+
+def test_contradiction_finder_uses_only_answered_question_keys() -> None:
+    prompt = _agents()[CONTRADICTION_FINDER].prompt
+    assert "answers にある question_key" in prompt

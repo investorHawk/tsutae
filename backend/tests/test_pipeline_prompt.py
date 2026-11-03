@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+from datetime import date, timedelta
 
 import pytest
 from pipeline_fakes import (
@@ -13,9 +15,12 @@ from pipeline_fakes import (
     regimen_skill,
 )
 
+from tsutae.course import day_of
+from tsutae.dataset import to_courses
 from tsutae.masking import detect_identifiers
+from tsutae.pipeline.checks import OutputContext
 from tsutae.pipeline.prompt import JSON_FENCE, SYSTEM_PROMPT, build_prompt
-from tsutae.schemas import PipelineInput
+from tsutae.schemas import MaskedEntry, PipelineInput, PreparedInput
 
 HONORIFICS = ("さん", "先生", "様", "くん", "ちゃん")
 
@@ -198,7 +203,119 @@ def test_system_prompt_states_w2b_checks() -> None:
         "重ねて出さない",
         "present か improving の用語ごとに1行",
         "開始 Day の早い順",
-        "term 名順",
         "改行",
+    ):
+        assert word in SYSTEM_PROMPT, word
+    # 同じ日の term 名順（文字コード順）は求めない。アプリが並べ直す
+    assert "文字コード順" not in SYSTEM_PROMPT
+    assert "並べ直す" in SYSTEM_PROMPT
+
+
+# --- 日付と Day の対応表（Day をモデルに数えさせない） ---------------------------
+
+WEEKDAYS = "月火水木金土日"
+_ROW = re.compile(r"^- Day(\d+) = (\d{4}-\d{2}-\d{2})（([月火水木金土日])）$", re.M)
+
+
+def _day_rows(prompt: str) -> list[tuple[int, date, str]]:
+    return [
+        (int(n), date.fromisoformat(d), w)
+        for n, d, w in _ROW.findall(_instructions(prompt))
+    ]
+
+
+@pytest.mark.parametrize("name", CASE_NAMES)
+def test_day_table_follows_course_day_of_and_the_check(name: str) -> None:
+    patient, _ = load_case(name)
+    courses = to_courses(patient)
+    checked = 0
+    for visit_date in course_last_days(name):
+        prepared = prepare_case(name, visit_date)
+        if not prepared.input.entries:
+            continue
+        checked += 1
+        schedule = prepared.input.schedule
+        ctx = OutputContext.from_prepared(prepared)
+        rows = _day_rows(build_prompt(prepared))
+        latest = max(e.record_date for e in prepared.input.entries)
+        assert [n for n, _, _ in rows] == list(range(1, len(rows) + 1))
+        assert rows[0][1] == schedule.day1_date
+        assert rows[-1][1] == latest <= schedule.last_day_date
+        for n, d, weekday in rows:
+            assert day_of(d, schedule, courses=courses) == n, (name, d)
+            assert ctx.day_ok(d, n), (name, d)
+            assert WEEKDAYS[d.weekday()] == weekday
+        by_date = {d: n for n, d, _ in rows}
+        for entry in prepared.input.entries:
+            assert by_date[entry.record_date] == entry.day
+        before = schedule.day1_date - timedelta(days=1)
+        assert day_of(before, schedule, courses=courses) is None
+        assert ctx.day_ok(before, None)
+    assert checked > 0
+
+
+def test_day_table_states_out_of_range_days() -> None:
+    prepared = prepare_case("demo_patient")
+    text = _instructions(build_prompt(prepared))
+    schedule = prepared.input.schedule
+    latest = max(e.record_date for e in prepared.input.entries)
+    assert f"{schedule.day1_date} より前の日" in text
+    assert "null" in text
+    assert f"{latest} より後の日" in text
+    assert "対応表" in text and "数えない" in text
+
+
+def test_demo_day_table_stops_at_the_latest_record_date() -> None:
+    # 受診日が最終日より前なら、表は最も遅い記録日まで（それより後の出来事は作れない）
+    prepared = prepare_case("demo_patient")
+    rows = _day_rows(build_prompt(prepared))
+    latest = max(e.record_date for e in prepared.input.entries)
+    assert rows[-1][1] == latest
+
+
+def test_day_table_for_a_long_course_passes_the_detector() -> None:
+    # CAPOX（21日）や延びたコースでも、表の行が H1 の検出器に掛からないこと
+    prepared = prepare_case("demo_patient")
+    schedule = prepared.input.schedule
+    last = schedule.day1_date + timedelta(days=24)
+    entry = MaskedEntry(
+        entry_no=1,
+        record_date=last,
+        day=25,
+        by_proxy=False,
+        too_sick=False,
+        masked_free_text="足の裏が赤い",
+    )
+    long = PreparedInput(
+        input=prepared.input.model_copy(
+            update={
+                "schedule": schedule.model_copy(update={"last_day_date": last}),
+                "entries": [entry],
+            }
+        ),
+        entry_ids={1: 1},
+        masked_texts={1: "足の裏が赤い"},
+    )
+    prompt = build_prompt(long)
+    assert len(_day_rows(prompt)) == 25
+    assert detect_identifiers(prompt) == []
+
+
+def test_system_prompt_says_day_comes_from_the_table() -> None:
+    assert "日付と Day の対応表" in SYSTEM_PROMPT
+    assert "自分で数えない" in SYSTEM_PROMPT
+
+
+def test_system_prompt_states_shape_rules_checked_by_the_tools() -> None:
+    # pydantic（extra="forbid"・必須）・H2・checks が拒否する条件を先に伝える
+    for word in (
+        "ほかの項目を足さない",
+        "null でも省かない",
+        "masked_free_text が null の記録",
+        "answers にある question_key",
+        "丸ごとそのまま",
+        "date が最も早い",
+        "何も受け付けていない",
+        "全体をもう一度",
     ):
         assert word in SYSTEM_PROMPT, word

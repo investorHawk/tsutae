@@ -48,8 +48,14 @@ Problem = tuple[str, str]  # (項目の位置, 理由)
 H2_MATCHER = f"{EMIT_TIMELINE_TOOL}|{EMIT_REPORT_TOOL}"
 H3_MATCHER = "Write|Edit|MultiEdit"
 SUBAGENT_TOOLS = ("Agent", "Task")  # init では Task、Hook では Agent（T03）
-MAX_PROBLEMS = 10
+MAX_PROBLEMS = 20
 ALLOW = "allow"
+H2_REASON_HEAD = (
+    "引用の検査で拒否した（このツールの入力は何も受け付けていない）。引用はその"
+    " entry_no の masked_free_text の部分文字列を一字も変えずに使う（句読点・空白・改行"
+    "・全角半角・伏せ字も原文のまま。要約・言い換え・つなぎ合わせをしない）。挙げた項目を"
+    "直し、全体をもう一度渡す（引用のほかの項目はこの後に検査する）: "
+)
 
 
 def _get(data: Any, key: str) -> Any:
@@ -117,7 +123,11 @@ def _quote_problem(
         return where, "オブジェクトでない"
     no = _entry_no(item.get("entry_no"))
     if no is None or no not in texts:
-        return f"{where}.entry_no", "自由記載のある記録の entry_no でない"
+        return (
+            f"{where}.entry_no",
+            "自由記載のある記録の entry_no でない（masked_free_text が null の記録"
+            "・入力に無い番号からは作らない）",
+        )
     quote = _usable_quote(item.get(key))
     if quote is None:
         return f"{where}.{key}", "引用が無い"
@@ -154,7 +164,13 @@ def _report_problems(tool_input: dict, texts: Mapping[int, str]) -> list[Problem
         if quote is None:
             problems.append((where, "引用が無い"))
         elif not any(quote in text for text in texts.values()):
-            problems.append((where, "どの masked_free_text の部分文字列でもない"))
+            problems.append(
+                (
+                    where,
+                    "どの masked_free_text の部分文字列でもない（受け付けた events の"
+                    " source_quote を丸ごとそのまま使う）",
+                )
+            )
     return problems
 
 
@@ -162,9 +178,7 @@ def _h2_reason(problems: list[Problem]) -> str:
     shown = [f"{where}（{why}）" for where, why in problems[:MAX_PROBLEMS]]
     if len(problems) > MAX_PROBLEMS:
         shown.append(f"ほか {len(problems) - MAX_PROBLEMS} 件")
-    return "引用の検査で拒否した。引用は masked_free_text の部分文字列を一字も変えずに使い、" "直して呼び直す: " + "; ".join(
-        shown
-    )
+    return H2_REASON_HEAD + "; ".join(shown)
 
 
 def make_h2(masked_texts: Mapping[int, str], logger: EventLogger) -> HookFn:

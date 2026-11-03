@@ -238,12 +238,56 @@ def test_label_report_rows_must_all_be_there_in_order() -> None:
     assert len(rows) >= 3
     missing = handle_emit_report({"per_symptom": rows[:-1]}, collector)
     assert missing["is_error"] is True and "行が無い" in _text(missing)
-    swapped = handle_emit_report(
-        {"per_symptom": [rows[1], rows[0], *rows[2:]]}, collector
-    )
-    assert swapped["is_error"] is True and "per_symptom.1" in _text(swapped)
     assert collector.picks is None
     assert not handle_emit_report(REPORT, collector).get("is_error")
+
+
+def test_report_rows_in_any_order_are_accepted_and_sorted() -> None:
+    # 「同じ日なら term 名順」は文字列の順でモデルが再現しにくい。拒否せず並べ直す
+    collector = _with_timeline(timeline=TIMELINE)
+    rows = REPORT["per_symptom"]
+    result = handle_emit_report({"per_symptom": rows[::-1]}, collector)
+    assert not result.get("is_error")
+    assert collector.picks == ReportPicks.model_validate(REPORT)
+    keys = [(s.start_date, s.term) for s in collector.picks.per_symptom]
+    assert keys == sorted(keys)
+
+
+def test_error_says_nothing_was_accepted_and_to_resend_everything() -> None:
+    collector = _collector()
+    result = handle_emit_timeline({"events": [_event(day=99)]}, collector)
+    text = _text(result)
+    assert "受け付けていない" in text
+    assert "全体" in text
+
+
+def test_error_lists_up_to_twenty_reasons() -> None:
+    collector = _collector()
+    events = [_event(day=99, source_quote=f"{i}") for i in range(25)]
+    text = _text(handle_emit_timeline({"events": events}, collector))
+    assert "events.19.day" in text
+    assert "events.20.day" not in text
+    assert "ほか 5 件" in text
+
+
+def test_schema_fields_carry_descriptions_for_the_model() -> None:
+    from tsutae.pipeline.tools import EmitReportArgs, EmitTimelineArgs
+
+    defs = EMIT_TIMELINE_SCHEMA["$defs"]
+    event = defs["TimelineEvent"]["properties"]
+    assert "対応表" in event["day"]["description"]
+    assert "部分文字列" in event["source_quote"]["description"]
+    assert "description" in defs["Contradiction"]["properties"]["closed_answer"]
+    summary = EMIT_REPORT_SCHEMA["$defs"]["SymptomSummary"]["properties"]
+    assert "source_quote" in summary["representative_quote"]["description"]
+    # 元の pydantic の schema は書き換えない（複製に足す）
+    plain = EmitTimelineArgs.model_json_schema()["$defs"]["TimelineEvent"]
+    assert "description" not in plain["properties"]["day"]
+    assert "description" not in (
+        EmitReportArgs.model_json_schema()["$defs"]["SymptomSummary"]["properties"][
+            "start_day"
+        ]
+    )
 
 
 def test_invalid_report_is_error_with_item_name() -> None:

@@ -21,13 +21,17 @@ architecture §7 / §7b の「Grade・重症などの語を出さない」をプ
 - per_symptom（report-format の Skill「症状別の時系列」§4）: 受け付けた timeline の、
   status が present か improving の出来事に結び付ける
   - その term ごとに行がちょうど1つ（欠け・余分・重複は拒否。空は出来事が無い時だけ）
-  - 開始 Day の早い順、同じなら term 名順（Day1 前の回想は start_day が null になる
-    ので、start_date で比べる。Day の順と同じ）
+  - 並び順は検査しない。受け付けた後に tools.RunCollector が (start_date, term) で
+    並べ直す。「同じ日なら term 名順」は Python の文字列順（コードポイント順）で、
+    日本語の用語名ではモデルが再現できず、順序違いの拒否は直しのターンを使うだけ。
+    report.validate.verified_per_symptom も必ず並べ直す
   - term・question_key はその用語の出来事のもの
   - start_date・start_day はその用語の最初の出来事のもの
   - representative_quote・confidence は、その用語のどれか1つの出来事の source_quote・
     confidence そのまま（開始日の出来事でなくてよい）
-- 理由は (項目の位置, 決まった短い説明)。入力の文面は返さない（用語名も返さない）
+- 理由は (項目の位置, 短い説明)。入力から写す項目・数えられる項目は、説明に期待される
+  値（日付・Day・真偽値・番号・key・回答の値・confidence）を入れ、1回で直せるようにする。
+  自由記載の文面（引用）と用語名は返さない
 """
 
 from __future__ import annotations
@@ -48,14 +52,35 @@ from tsutae.schemas import (
 )
 from tsutae.synthetic import load_terms, term_question_keys
 
-__all__ = ["OutputContext", "Problem", "report_problems", "timeline_problems"]
+__all__ = [
+    "OutputContext",
+    "Problem",
+    "report_problems",
+    "sort_per_symptom",
+    "timeline_problems",
+]
 
 Problem = tuple[str, str]  # (項目の位置, 理由)
 UNKNOWN_ENTRY = "入力に無い entry_no"
 DUPLICATE_EVENT = "同じ出来事が前にある（重ねて出さない）"
 DUPLICATE_CONTRADICTION = "同じ食い違いが前にある（重ねて出さない）"
 MISSING_ROW = "この出来事の term の行が無い"
-WRONG_ORDER = "開始 Day の早い順（同じ日なら term 名順）に並べる"
+FIRST_EVENT = "その term の present か improving の出来事で date が最も早いもの"
+
+
+def _json(value: object) -> str:
+    """期待される値の書き方（JSON と同じ: null・true・false・数値・ISO 日付・key）。"""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
+def _expect(value: object) -> str:
+    return f"{_json(value)} にする"
 
 
 @dataclass(frozen=True)
@@ -91,13 +116,24 @@ class OutputContext:
     def entry_nos(self) -> frozenset[int]:
         return frozenset(self.entries)
 
+    def expected_day(self, d: date) -> int | None:
+        """date ≦ last_day_date の範囲で course.day_of と同じ Day（Day1 より前は None）。"""
+        if d < self.day1_date:
+            return None
+        return (d - self.day1_date).days + 1
+
     def day_ok(self, d: date, day: int | None) -> bool:
         """date ≦ last_day_date の範囲で course.day_of と同じ判定（範囲外は False）。"""
-        if d < self.day1_date:
-            return day is None
         if d > self.last_day_date:
             return False
-        return day == (d - self.day1_date).days + 1
+        return day == self.expected_day(d)
+
+
+def _day_reason(expected: int | None) -> str:
+    shown = "Day1 より前なので null" if expected is None else f"Day{expected}"
+    return (
+        f"date の Day と違う（この date は {shown}。依頼文の日付と Day の対応表で引く）"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -108,11 +144,13 @@ class OutputContext:
 def _term_problems(where: str, ev: TimelineEvent, ctx: OutputContext) -> list[Problem]:
     if ev.term not in ctx.term_keys:
         return [(f"{where}.term", "用語の一覧に無い（一覧の用語名をそのまま使う）")]
-    if ev.question_key != ctx.term_keys[ev.term]:
+    expected = ctx.term_keys[ev.term]
+    if ev.question_key != expected:
         return [
             (
                 f"{where}.question_key",
-                "term に対応する質問の key と違う（今回の質問に無い key なら null）",
+                f"term に対応する質問の key と違う（{_expect(expected)}。"
+                "今回の質問に無い key なら null）",
             )
         ]
     return []
@@ -125,21 +163,35 @@ def _event_problems(i: int, ev: TimelineEvent, ctx: OutputContext) -> list[Probl
         return [(f"{where}.entry_no", UNKNOWN_ENTRY)]
     found = _term_problems(where, ev, ctx)
     if ev.course_no != ctx.course_no:
-        found.append((f"{where}.course_no", "schedule.course_no と違う"))
-    if ev.by_proxy != entry.by_proxy:
-        found.append((f"{where}.by_proxy", "その記録の by_proxy と違う"))
-    if ev.date > entry.record_date:
-        found.append((f"{where}.date", "その記録の record_date より後にしない"))
-    elif not ctx.day_ok(ev.date, ev.day):
         found.append(
             (
-                f"{where}.day",
-                "date から数えた Day と違う（day1_date が Day1、前は null）",
+                f"{where}.course_no",
+                f"schedule.course_no と違う（{_expect(ctx.course_no)}）",
             )
         )
-    if ev.recalled != (ev.date < entry.record_date):
+    if ev.by_proxy != entry.by_proxy:
         found.append(
-            (f"{where}.recalled", "date が record_date より前なら true、ほかは false")
+            (
+                f"{where}.by_proxy",
+                f"その記録の by_proxy と違う（{_expect(entry.by_proxy)}）",
+            )
+        )
+    if ev.date > entry.record_date:
+        found.append(
+            (
+                f"{where}.date",
+                f"その記録の record_date（{_json(entry.record_date)}）より後にしない",
+            )
+        )
+    elif not ctx.day_ok(ev.date, ev.day):
+        found.append((f"{where}.day", _day_reason(ctx.expected_day(ev.date))))
+    recalled = ev.date < entry.record_date
+    if ev.recalled != recalled:
+        found.append(
+            (
+                f"{where}.recalled",
+                f"date が record_date より前なら true、ほかは false（{_expect(recalled)}）",
+            )
         )
     return found
 
@@ -154,18 +206,29 @@ def _contradiction_problems(
     answers = {a.question_key: a.value for a in entry.answers}
     found: list[Problem] = []
     if c.question_key not in answers:
-        found.append((f"{where}.question_key", "その記録にこの質問の回答が無い"))
+        found.append(
+            (
+                f"{where}.question_key",
+                "その記録にこの質問の回答が無い（その記録の answers にある key だけ）",
+            )
+        )
     elif c.closed_answer != answers[c.question_key]:
         found.append(
             (
                 f"{where}.closed_answer",
-                "その記録の回答と違う（クローズ回答は書き換えない）",
+                f"その記録の回答と違う（{_expect(answers[c.question_key])}。"
+                "クローズ回答は書き換えない）",
             )
         )
     if c.date != entry.record_date:
-        found.append((f"{where}.date", "その記録の record_date と違う"))
+        found.append(
+            (
+                f"{where}.date",
+                f"その記録の record_date と違う（{_expect(entry.record_date)}）",
+            )
+        )
     if c.day != entry.day:
-        found.append((f"{where}.day", "その記録の day と違う"))
+        found.append((f"{where}.day", f"その記録の day と違う（{_expect(entry.day)}）"))
     return found
 
 
@@ -218,25 +281,50 @@ def _summary_problems(
     found: list[Problem] = []
     if s.question_key != first.question_key:
         found.append(
-            (f"{where}.question_key", "その term の出来事の question_key と違う")
-        )
-    if s.start_date != first.date:
-        found.append((f"{where}.start_date", "その term の最初の出来事の date と違う"))
-    elif s.start_day != first.day:
-        found.append((f"{where}.start_day", "その term の最初の出来事の day と違う"))
-    picked = [e for e in events if e.source_quote == s.representative_quote]
-    if not picked:
-        found.append(
             (
-                f"{where}.representative_quote",
-                "その term の出来事の source_quote のどれとも一致しない",
+                f"{where}.question_key",
+                f"その term の出来事の question_key と違う（{_expect(first.question_key)}）",
             )
         )
-    elif all(e.confidence != s.confidence for e in picked):
+    if s.start_date != first.date:
         found.append(
-            (f"{where}.confidence", "代表引用に選んだ出来事の confidence と違う")
+            (
+                f"{where}.start_date",
+                f"{FIRST_EVENT}の date と違う（{_expect(first.date)}）",
+            )
         )
+    elif s.start_day != first.day:
+        found.append(
+            (
+                f"{where}.start_day",
+                f"{FIRST_EVENT}の day と違う（{_expect(first.day)}）",
+            )
+        )
+    found += _pick_problems(where, s, events)
     return found
+
+
+def _pick_problems(
+    where: str, s: SymptomSummary, events: list[TimelineEvent]
+) -> list[Problem]:
+    picked = [e for e in events if e.source_quote == s.representative_quote]
+    if not picked:
+        return [
+            (
+                f"{where}.representative_quote",
+                "その term の present か improving の出来事の source_quote の"
+                "どれとも一致しない（どれか1つの source_quote を丸ごとそのまま写す）",
+            )
+        ]
+    if all(e.confidence != s.confidence for e in picked):
+        shown = " か ".join(sorted({_json(e.confidence) for e in picked}))
+        return [
+            (
+                f"{where}.confidence",
+                f"代表引用に選んだ出来事の confidence と違う（{shown} にする）",
+            )
+        ]
+    return []
 
 
 def _symptom_events(timeline: Timeline) -> dict[str, list[tuple[int, TimelineEvent]]]:
@@ -280,12 +368,9 @@ def _missing_rows(
     return [(f"events.{i}.term", MISSING_ROW) for i in firsts]
 
 
-def _order_problems(per_symptom: Sequence[SymptomSummary]) -> list[Problem]:
-    keys = [(s.start_date, s.term) for s in per_symptom]
-    for i in range(1, len(keys)):
-        if keys[i] < keys[i - 1]:
-            return [(f"per_symptom.{i}", WRONG_ORDER)]
-    return []
+def sort_per_symptom(per_symptom: Sequence[SymptomSummary]) -> list[SymptomSummary]:
+    """開始日の早い順、同じなら term 名順（Python の文字列順）に並べた新しいリスト。"""
+    return sorted(per_symptom, key=lambda s: (s.start_date, s.term))
 
 
 def report_problems(
@@ -294,5 +379,4 @@ def report_problems(
     if timeline is None:
         return [("(root)", "先に emit_timeline を受け付けさせてから呼ぶ")]
     by_term = _symptom_events(timeline)
-    found = _row_problems(per_symptom, by_term) + _missing_rows(per_symptom, by_term)
-    return found or _order_problems(per_symptom)
+    return _row_problems(per_symptom, by_term) + _missing_rows(per_symptom, by_term)

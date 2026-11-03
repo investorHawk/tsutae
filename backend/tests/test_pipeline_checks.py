@@ -193,16 +193,15 @@ def test_missing_row_points_at_the_first_event_of_that_term() -> None:
     assert problems == [(f"events.{first_index}.term", "この出来事の term の行が無い")]
 
 
-def test_rows_out_of_order_are_rejected() -> None:
+def test_rows_out_of_order_are_accepted() -> None:
+    # term 名順（文字コード順）はモデルが再現しにくく、report も必ず並べ直すので拒否しない
+    # （受け付けた後に tools.RunCollector が並べ直す）。欠け・余分・重複は拒否のまま
     timeline, rows = _label_timeline_and_rows()
-    swapped = [rows[1], rows[0], *rows[2:]]
-    problems = report_problems(swapped, timeline)
-    assert problems == [
-        ("per_symptom.1", "開始 Day の早い順（同じ日なら term 名順）に並べる")
-    ]
+    assert report_problems([rows[1], rows[0], *rows[2:]], timeline) == []
+    assert report_problems(rows[::-1], timeline) == []
 
 
-def test_same_start_date_is_ordered_by_term_name() -> None:
+def test_same_start_date_in_any_term_order_is_accepted() -> None:
     base = _event(status="present", source_quote="下痢", term="下痢")
     other = _event(
         status="present",
@@ -223,12 +222,96 @@ def test_same_start_date_is_ordered_by_term_name() -> None:
         for e in sorted([base, other], key=lambda e: e.term)
     ]
     assert report_problems(rows, timeline) == []
-    assert [w for w, _ in report_problems(rows[::-1], timeline)] == ["per_symptom.1"]
+    assert report_problems(rows[::-1], timeline) == []
+
+
+def test_missing_and_extra_rows_are_still_rejected_in_any_order() -> None:
+    timeline, rows = _label_timeline_and_rows()
+    reordered = rows[::-1]
+    assert [w for w, _ in report_problems(reordered[1:], timeline)]
+    assert [w for w, _ in report_problems([*reordered, reordered[0]], timeline)] == [
+        f"per_symptom.{len(rows)}.term"
+    ]
+
+
+# --- 理由に期待される値を入れる（原文・用語名は入れない） ----------------------
+
+
+def _why(problems: list[tuple[str, str]], where: str) -> str:
+    return dict(problems)[where]
+
+
+def test_day_reason_names_the_expected_day() -> None:
+    problems = timeline_problems([_event(day=12)], [], CTX)
+    assert "Day13" in _why(problems, "events.0.day")
+    assert "対応表" in _why(problems, "events.0.day")
+    before = _event(date=date(2026, 10, 20), day=1, recalled=True)
+    assert "null" in _why(timeline_problems([before], [], CTX), "events.0.day")
+
+
+def test_copy_reasons_name_the_expected_values() -> None:
+    event = _event(
+        course_no=9, by_proxy=True, recalled=True, question_key="nausea_appetite"
+    )
+    problems = timeline_problems([event], [], CTX)
+    assert "3 にする" in _why(problems, "events.0.course_no")
+    assert "false にする" in _why(problems, "events.0.by_proxy")
+    assert "false にする" in _why(problems, "events.0.recalled")
+    assert "diarrhea にする" in _why(problems, "events.0.question_key")
+    late = _event(date=date(2026, 11, 9), day=14)
+    assert "2026-11-08" in _why(timeline_problems([late], [], CTX), "events.0.date")
+
+
+def test_contradiction_reasons_name_the_expected_values() -> None:
+    good = _contradiction()
+    entry = CTX.entries[good.entry_no]
+    wrong_answer = "hard" if good.closed_answer != "hard" else "none"
+    bad = _contradiction(
+        date="2026-10-01", day=(entry.day or 0) + 1, closed_answer=wrong_answer
+    )
+    problems = timeline_problems([], [bad], CTX)
+    assert entry.record_date.isoformat() in _why(problems, "contradictions.0.date")
+    assert f"{entry.day}" in _why(problems, "contradictions.0.day")
+    assert good.closed_answer in _why(problems, "contradictions.0.closed_answer")
+
+
+def test_summary_reasons_name_the_expected_values() -> None:
+    timeline, rows = _label_timeline_and_rows()
+    row = rows[0]
+    wrong_date = row.model_copy(update={"start_date": date(2026, 10, 1)})
+    problems = report_problems([wrong_date, *rows[1:]], timeline)
+    assert row.start_date.isoformat() in _why(problems, "per_symptom.0.start_date")
+    wrong_day = row.model_copy(update={"start_day": 99})
+    problems = report_problems([wrong_day, *rows[1:]], timeline)
+    assert f"{row.start_day}" in _why(problems, "per_symptom.0.start_day")
+    wrong_conf = row.model_copy(update={"confidence": 0.11})
+    problems = report_problems([wrong_conf, *rows[1:]], timeline)
+    assert f"{row.confidence}" in _why(problems, "per_symptom.0.confidence")
+
+
+def test_representative_quote_reason_says_whole_source_quote() -> None:
+    timeline, rows = _label_timeline_and_rows()
+    cut = rows[0].model_copy(
+        update={"representative_quote": rows[0].representative_quote[:-1]}
+    )
+    why = _why(
+        report_problems([cut, *rows[1:]], timeline),
+        "per_symptom.0.representative_quote",
+    )
+    assert "source_quote" in why and "そのまま" in why
 
 
 def test_problems_never_contain_record_text() -> None:
     timeline, rows = _label_timeline_and_rows()
     quotes = {e.source_quote for e in timeline.events}
-    for candidate in ([], rows[::-1], rows[1:]):
+    terms = {e.term for e in timeline.events}
+    shifted = [r.model_copy(update={"start_day": 99, "confidence": 0.01}) for r in rows]
+    for candidate in ([], rows[::-1], rows[1:], shifted):
         for where, why in report_problems(candidate, timeline):
-            assert not any(q in where or q in why for q in quotes)
+            assert not any(q in where or q in why for q in quotes | terms)
+    wrong = [
+        e.model_copy(update={"day": 99, "course_no": 9, "by_proxy": True})
+        for e in timeline.events
+    ]
+    for where, why in timeline_problems(wrong, timeline.contradictions, CTX):
+        assert not any(q in where or q in why for q in quotes | terms)

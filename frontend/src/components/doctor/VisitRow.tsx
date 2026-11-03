@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { reportUrl } from "../../api/doctor";
 import type { VisitSummary } from "../../api/types";
@@ -16,19 +17,29 @@ interface VisitRowProps {
 }
 
 function Actions({ visit, onPrinted, onRegenerate }: VisitRowProps) {
-  const regenerate = (
-    <RegenerateButton onRegenerate={() => onRegenerate(visit)} />
-  );
+  // 「AI でもう一度変換」を依頼している間は、同じ行の印刷・印刷済みを押せない
+  // （サーバーも生成中の印刷済みを 409 にするが、押せる見た目にしない）
+  const [regenerating, setRegenerating] = useState(false);
+  async function regenerateThis() {
+    setRegenerating(true);
+    try {
+      await onRegenerate(visit);
+    } finally {
+      setRegenerating(false);
+    }
+  }
+  const regenerate = <RegenerateButton onRegenerate={regenerateThis} />;
   switch (visit.status) {
     case "ready":
       return (
         <div className="d-actions">
-          <PrintButton url={reportUrl(visit.id)} />
+          <PrintButton url={reportUrl(visit.id)} disabled={regenerating} />
           <TwoStepButton
             label="印刷済み"
             prompt="レポート・変換結果・受付番号を削除します。印刷は済みましたか？"
             confirmLabel="削除する（印刷済み）"
             onConfirm={() => onPrinted(visit)}
+            disabled={regenerating}
           />
           {visit.fallback ? regenerate : null}
           <Link className="d-sublink" to={`/doctor/pipeline/${visit.id}`}>

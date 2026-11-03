@@ -15,7 +15,14 @@ type Status = "idle" | "loading" | "opened" | "failed";
  * iframe は display:none にしない（ブラウザによっては空白を印刷する）。印刷の後も残す
  * （print の直後に消すと印刷が取り消されるブラウザがある）。
  */
-export default function PrintButton({ url }: { url: string }) {
+export default function PrintButton({
+  url,
+  disabled = false,
+}: {
+  url: string;
+  /** 同じ行の「AI でもう一度変換」を依頼している間は押せない */
+  disabled?: boolean;
+}) {
   const [round, setRound] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -57,7 +64,7 @@ export default function PrintButton({ url }: { url: string }) {
       <button
         type="button"
         className="d-linkbutton d-linkbutton--primary"
-        disabled={status === "loading"}
+        disabled={disabled || status === "loading"}
         onClick={start}
       >
         印刷

@@ -147,6 +147,10 @@ describe("Visits: AI でもう一度変換", () => {
       name: "変換を依頼中…",
     });
     expect(busy).toBeDisabled();
+    // 依頼中は同じ行の印刷・印刷済みも押せない（前のレポートで印刷済みにしない）
+    const row = within(rowOf("A-025"));
+    expect(row.getByRole("button", { name: "印刷" })).toBeDisabled();
+    expect(row.getByRole("button", { name: "印刷済み" })).toBeDisabled();
     await u.click(busy);
     expect(countOf(fetchMock, REGEN_14)).toBe(1);
     await act(async () => {

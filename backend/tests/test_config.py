@@ -20,3 +20,28 @@ def test_to_jst_date_crosses_midnight() -> None:
 
 def test_load_env_file_missing_is_false(tmp_path) -> None:
     assert config.load_env_file(tmp_path / "nope.env") is False
+
+
+def test_fixed_today_clock_moves_forward(monkeypatch) -> None:
+    # TSUTAE_TODAY の時計は固定日から実時間で進む（日をまたげば翌日になり、TTL が働く）
+    from datetime import datetime, timedelta
+
+    real = [datetime(2026, 11, 4, 23, 0, tzinfo=config.JST)]
+
+    class _Clock:
+        @staticmethod
+        def now(tz=None):
+            return real[0]
+
+        def __getattr__(self, name):
+            return getattr(datetime, name)
+
+    monkeypatch.setenv("TSUTAE_TODAY", "2026-11-09")
+    monkeypatch.setattr(config, "_FIXED_ANCHORS", {})
+    monkeypatch.setattr(config, "datetime", _Clock())
+    first = config.now()
+    assert first == datetime(2026, 11, 9, 23, 0, tzinfo=config.JST)
+    assert config.today() == date(2026, 11, 9)
+    real[0] = real[0] + timedelta(hours=2)
+    assert config.now() == datetime(2026, 11, 10, 1, 0, tzinfo=config.JST)
+    assert config.today() == date(2026, 11, 10)

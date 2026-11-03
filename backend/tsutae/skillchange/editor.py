@@ -25,6 +25,7 @@ from claude_agent_sdk import ClaudeAgentOptions, HookMatcher, ResultMessage, que
 from tsutae.config import Settings, get_settings
 from tsutae.pipeline.hooks import H3_MATCHER, make_h1, make_h3, make_h4
 from tsutae.pipeline.logs import EventLogger, MemoryLogger, reason_code
+from tsutae.pipeline.orchestrator import NO_SESSION_PERSISTENCE
 from tsutae.pipeline.runner import stats_from_result
 from tsutae.schemas import RunStats
 from tsutae.skills import SKILL_FILE_NAME, is_valid_skill_name
@@ -202,6 +203,8 @@ def build_options(
         model=settings.model,
         allowed_tools=list(EDITOR_ALLOWED_TOOLS),
         disallowed_tools=list(EDITOR_DISALLOWED_TOOLS),
+        # 会話の記録（依頼文・Skill の本文）を ~/.claude/projects/ に残さない
+        extra_args=dict(NO_SESSION_PERSISTENCE),
         permission_mode="acceptEdits",
         hooks=build_hooks(work_root, logger),  # type: ignore[arg-type]
         max_turns=EDITOR_MAX_TURNS,

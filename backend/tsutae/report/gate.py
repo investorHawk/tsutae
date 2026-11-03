@@ -16,13 +16,11 @@ PreparedInput は変換パイプラインが作る。レポートはそれを信
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
 from tsutae import course as course_mod
-from tsutae.masking import check_text, detect_identifiers
 from tsutae.report.errors import ReportBuildError
 from tsutae.schemas import (
     ClosedAnswer,
@@ -102,25 +100,16 @@ def _check_skills(
 
 
 def mask_free_text(free_text: str | None) -> tuple[str | None, str | None]:
-    """元の自由記載に、変換の入力と同じ整形・伏せ字を掛ける。(伏せ字後の文, 外す理由)。
+    """元の自由記載に、変換の入力と同じ伏せ字を掛ける。(伏せ字後の文, 外す理由)。
 
-    pipeline.inputs と同じ手順（制御文字を空白に → 一次・二次 → 依頼文の JSON での
-    見え方にも二次）。理由があればその記録は送れない。
+    正本は `tsutae.pipeline.inputs.mask_free_text`（写しを持つと食い違う。正規化すると
+    空になる文を片方だけ '' にしていた）。理由があればその記録は送れない。
     """
     # pipeline/__init__ は orchestrator（SDK）を読み込む。将来 service → report の
-    # 循環にならないよう、呼ぶときに読み込む（整形の規則は pipeline.inputs が正本）
-    from tsutae.pipeline.inputs import flatten_text
+    # 循環にならないよう、呼ぶときに読み込む
+    from tsutae.pipeline.inputs import mask_free_text as pipeline_mask_free_text
 
-    flat = flatten_text(free_text) if free_text else None
-    if flat is None:
-        return None, None
-    check = check_text(flat)
-    if check.reason is not None:
-        return None, check.reason
-    in_prompt = detect_identifiers(json.dumps(check.masked, ensure_ascii=False))
-    if in_prompt:
-        return None, in_prompt[0].rule
-    return check.masked, None
+    return pipeline_mask_free_text(free_text)
 
 
 def _same_record(

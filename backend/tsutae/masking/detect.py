@@ -17,7 +17,8 @@
   ひらがなの施設名も一次より広く拾う）→ detect_facility.py
 - address_number: 都道府県・市区町村の後に番地らしい数字が続く（空白・改行を挟んでも）、
   または単位の無い N-N-N・N丁目・N番地 → detect_address.py
-- id_like: 英字1〜2字＋ハイフン類＋英数字3字以上（A-023・P-DEMO0001 の取り残し）
+- id_like: 英字1〜2字＋ハイフン類＋英数字3字以上（A-023・P-DEMO0001 の取り残し）、
+  区切り無しの英字1〜2字＋数字3字以上（A023）、下線・中黒の区切り（P_DEMO0001）
   → detect_id.py
 
 入口は2つ（architecture.md §5 W2b の決定）:

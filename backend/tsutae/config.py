@@ -78,21 +78,32 @@ def get_settings() -> Settings:
     )
 
 
+# TSUTAE_TODAY の値ごとに「初めて使った実時刻」を覚える（固定日の時計の起点）
+_FIXED_ANCHORS: dict[str, datetime] = {}
+
+
 def today() -> date:
-    """JST の今日。`TSUTAE_TODAY` があればそれを返す（デモ・テスト用）。"""
-    fixed = os.environ.get("TSUTAE_TODAY")
-    if fixed:
-        return date.fromisoformat(fixed)
-    return datetime.now(JST).date()
+    """JST の今日。`TSUTAE_TODAY` があれば、その日から始まる時計（now）の日付。"""
+    return now().date()
 
 
 def now() -> datetime:
-    """JST の現在時刻（tz-aware）。`TSUTAE_TODAY` があればその日の現在時刻。"""
+    """JST の現在時刻（tz-aware）。
+
+    `TSUTAE_TODAY` があれば、その日の「初めて使った時の時刻」から実時間で進む時計にする
+    （デモ・テスト用）。日をまたげば翌日になるので、24時間 TTL も働く。
+    """
     current = datetime.now(JST)
     fixed = os.environ.get("TSUTAE_TODAY")
-    if fixed:
-        return datetime.combine(date.fromisoformat(fixed), current.timetz())
-    return current
+    if not fixed:
+        return current
+    fixed_date = date.fromisoformat(fixed)
+    if current.date() >= fixed_date:
+        # 時計がすでに固定日以降を指している（差し替えた時計など）: そのまま使う
+        return current
+    anchor = _FIXED_ANCHORS.setdefault(fixed, current)
+    start = datetime.combine(fixed_date, anchor.timetz())
+    return start + (current - anchor)
 
 
 def to_jst_date(value: datetime) -> date:

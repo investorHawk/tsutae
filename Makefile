@@ -21,7 +21,7 @@ seed:
 	.venv/bin/python scripts/seed_demo.py
 
 dev-api:
-	.venv/bin/uvicorn tsutae.api.app:app --reload --port 8000 --app-dir backend
+	.venv/bin/uvicorn tsutae.api.app:app --reload --host 127.0.0.1 --port 8000 --app-dir backend --no-proxy-headers
 
 dev-web:
 	cd frontend && npx vite

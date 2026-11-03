@@ -11,8 +11,8 @@
   check_text の masked そのもの（改行を含みうる。H2 の部分一致と食い違わない）
 - 外す記録（`UnprocessedEntry(entry_id, reason)`。原文は D6 だけに出る）:
   1. 自由記載に `exclude_literals`（service が渡す仮名ID・受付番号）を含む →
-     `known_identifier`。NFKC＋casefold（ハイフン類は `-` に揃え、改行・タブ・空白・
-     制御文字・書式文字は除く）で比べる。
+     `known_identifier`。NFKC＋casefold のあと文字・数字以外（区切り記号・空白・
+     制御文字・書式文字・長音符）を全て除いて比べる（A023・P_DEMO0001 も一致）。
      一次が `[ID]` に置き換える前の原文で比べる
   2. 二次に掛かった → 最初の規則名
   3. 伏せ字後の文を JSON にした形（依頼文での見え方）で二次に掛かった → 最初の規則名
@@ -23,7 +23,6 @@
 from __future__ import annotations
 
 import json
-import re
 import unicodedata
 from collections.abc import Sequence
 from datetime import date
@@ -46,15 +45,14 @@ from tsutae.schemas import (
 __all__ = [
     "REASON_KNOWN_IDENTIFIER",
     "PrepareInputError",
-    "flatten_text",
     "mask_free_text",
     "prepare_input",
 ]
 
 REASON_KNOWN_IDENTIFIER = "known_identifier"
 INPUT_PREPARED_EVENT = "input_prepared"
-# NFKC で `-` にならないハイフン類（‐‑‒–—―−）
-_HYPHENS_RE = re.compile("[\u2010-\u2015\u2212]")
+# 区切りに使われる長音符（Lm なので文字として残ってしまう）。半角 ｰ は NFKC で ー
+_PROLONGED_MARKS = frozenset("ー")
 
 
 class PrepareInputError(ValueError):
@@ -104,19 +102,11 @@ def _masked_entry(
     )
 
 
-def flatten_text(text: str) -> str | None:
-    """互換のため残す（report.gate が使う）。整形はせず、空白だけの文を None にする。
-
-    以前は改行・制御文字を空白にしていたが、正規化は masking.check_text の責務になった
-    （§7 W2b）。新しいコードは `mask_free_text` を使う。
-    """
-    return text if text.strip() else None
-
-
 def mask_free_text(text: str | None) -> tuple[str | None, str | None]:
     """(伏せ字後の文, 外す理由)。理由があれば送らない。空の文は (None, None)。
 
-    prepare_input と同じ手順（exclude_literals の照合を除く）。report の照合もこれを使う。
+    prepare_input と同じ手順（exclude_literals の照合を除く）。report.gate もこれを呼ぶ
+    （写しを持たない。正規化して空になる文を片方だけ '' にすると entry_mismatch）。
     """
     if not text or not text.strip():
         return None, None
@@ -132,16 +122,20 @@ def mask_free_text(text: str | None) -> tuple[str | None, str | None]:
 
 
 def _fold(text: str) -> str:
-    """識別子の比較用: NFKC → ハイフン類を `-` → 制御・書式・空白を除く → casefold。
+    """識別子の比較用: NFKC → casefold → 文字（L 系）と数字（N 系）だけを残す。
 
-    除くのは Unicode の C 系（Cc: 改行・タブ、Cf: U+200B 等）と Z 系（Zs: 空白・全角空白、
-    Zl: U+2028、Zp: U+2029）。`P-\nDEMO0001`・`A-\t023` のように分割しても一致させる
-    （一次・二次の正規表現は分割形を拾わない）。
+    記号・句読点（P 系: ハイフン・下線・中黒・ピリオド・スラッシュ等、S 系）、制御・
+    書式文字（C 系）、空白（Z 系）と長音符「ー」は全て除く。`A023`・`A・023`・
+    `P_DEMO0001`・`P-\nDEMO0001` を `A-023`・`P-DEMO0001` と同じに扱う（一次・二次の
+    正規表現は区切りの崩れた形を拾いきれない）。照合する側の文字列も同じく畳む。
+    誤って一致した記録は送らないだけ（安全側）。
     """
-    normalized = _HYPHENS_RE.sub("-", unicodedata.normalize("NFKC", text))
-    return "".join(
-        ch for ch in normalized if unicodedata.category(ch)[0] not in "CZ"
-    ).casefold()
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(ch for ch in folded if _is_id_char(ch))
+
+
+def _is_id_char(ch: str) -> bool:
+    return unicodedata.category(ch)[0] in "LN" and ch not in _PROLONGED_MARKS
 
 
 def _fold_literals(literals: Sequence[str]) -> tuple[str, ...]:

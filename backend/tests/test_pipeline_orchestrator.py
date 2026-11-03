@@ -17,6 +17,9 @@ from claude_agent_sdk import (
     ResultError,
     ResultMessage,
 )
+from claude_agent_sdk._internal.transport.subprocess_cli import (
+    SubprocessCLITransport,
+)
 from pipeline_fakes import (
     FakeRunner,
     RaisingRunner,
@@ -131,8 +134,27 @@ def test_build_options_values(tmp_path: Path) -> None:
         "Read",
         "Glob",
         "Grep",
+        # 遅延読み込みを切り、emit_* が常に直接見えるようにする（同梱 CLI の分岐）
+        "ToolSearch",
+        # T03 の init に出た、使わない組み込みツール（説明文とターンを使わせない）
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "DesignSync",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "Monitor",
+        "PushNotification",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "TaskStop",
     ]
     assert options.disallowed_tools == list(DISALLOWED_TOOLS)
+    assert not set(ALLOWED_TOOLS) & set(DISALLOWED_TOOLS)
+    # 会話の記録（伏せ字後の自由記載・変換結果）を ~/.claude/projects に残さない
+    assert options.extra_args == {"no-session-persistence": None}
     assert options.permission_mode == "dontAsk"
     assert options.max_turns == 12
     assert options.max_budget_usd == 1.5
@@ -147,6 +169,19 @@ def test_build_options_values(tmp_path: Path) -> None:
         "SubagentStart",
         "SubagentStop",
     }
+
+
+def test_cli_command_disables_session_persistence(tmp_path: Path) -> None:
+    """SDK が組み立てる CLI の引数に --no-session-persistence が入る（SDK は既定で付けない）。"""
+    prepared = prepare_case(DEMO)
+    collector = RunCollector.from_prepared(prepared)
+    options = build_options(prepared, collector, MemoryLogger(), SETTINGS, tmp_path)
+    transport = SubprocessCLITransport(prompt="x", options=options)
+    transport._cli_path = "claude"  # 起動はしない（引数を組み立てるだけ）
+    cmd = transport._build_command()
+    assert "--no-session-persistence" in cmd
+    disallowed = cmd[cmd.index("--disallowedTools") + 1].split(",")
+    assert "ToolSearch" in disallowed
 
 
 async def test_build_options_server_and_hooks_use_given_collector(

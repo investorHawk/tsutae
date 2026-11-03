@@ -6,7 +6,8 @@
   検査する（未知の質問・回答の型違いは 422 invalid_input）
 - 登録（Cookie の発行はここだけ）は、クライアント（request.client.host）ごとに失敗
   （unknown_patient）が 10 分で 10 回に達したら、以降の試行を 429 too_many_attempts
-  で断る（正しい pid でも断る。成功・422 は数えない）
+  で断る（正しい pid でも断る。成功・422 は数えない）。全クライアントの合計が 10 分で
+  100 回に達したときも全員を断る（X-Forwarded-For を回す迂回の歯止め。deps 参照）
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from tsutae.api.deps import (
     ApiError,
     AppSettings,
     Conn,
+    client_key,
     is_patient_id,
     register_limiter,
     require_patient,
@@ -78,11 +80,6 @@ def _check_answers(entry: EntryCreate, skill: RegimenSkill) -> None:
             raise ApiError(422, "invalid_input")
 
 
-def _client_key(request: Request) -> str:
-    client = request.client
-    return client.host if client is not None and client.host else "unknown"
-
-
 @router.post("/register")
 def register(
     body: RegisterIn,
@@ -92,7 +89,7 @@ def register(
     settings: AppSettings,
 ) -> dict[str, bool]:
     limiter = register_limiter(request.app)
-    key = _client_key(request)
+    key = client_key(request)
     at = now()
     if limiter.is_blocked(key, at):
         raise ApiError(429, "too_many_attempts")

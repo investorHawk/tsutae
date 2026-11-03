@@ -269,3 +269,15 @@ def test_logging_to_restores_previous_logger() -> None:
             assert current_logger() is inner
         assert current_logger() is outer
     assert current_logger() is not outer
+
+
+def test_cli_command_disables_session_persistence(work_root: Path) -> None:
+    # 依頼文・Skill の本文を ~/.claude/projects/ に残さない（pipeline と同じ）
+    from claude_agent_sdk._internal.transport.subprocess_cli import (
+        SubprocessCLITransport,
+    )
+
+    options = build_options(work_root, get_settings(), MemoryLogger())
+    transport = SubprocessCLITransport(prompt="x", options=options)
+    transport._cli_path = "claude"  # 起動はしない（引数を組み立てるだけ）
+    assert "--no-session-persistence" in transport._build_command()

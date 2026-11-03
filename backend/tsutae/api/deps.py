@@ -6,15 +6,22 @@
 - 想定外の例外は 500 `{"error": "internal_error"}`。このモジュールのログ
   （`tsutae.api.deps`）には固定のイベント名・例外の型名・相関ID（`X-Error-Id`
   ヘッダでも返す）だけを残す（例外の文面・traceback・入力は残さない。患者の文面を
-  含みうるため）。注意: Starlette の ServerErrorMiddleware はこの後で例外を投げ直す
-  ので、サーバ（uvicorn）側のログには traceback が出うる
+  含みうるため）。Starlette の ServerErrorMiddleware はこの後で例外を投げ直すが、
+  最も外側の `tsutae.api.error_guard.SuppressServerErrors` が握りつぶすので、サーバ
+  （uvicorn）のログに文面・traceback は出ない
 - 患者 Cookie `tsutae_pid` = `<仮名ID>.<base64url(HMAC-SHA256(secret_key, "patient:" +
   仮名ID))>`（パディングなし 43 字。署名が無い・違う・形が違えば 401）。発行は
   `POST /api/patient/register` だけ。医師 Cookie `tsutae_doctor` =
   `<発行時刻(秒)>.<HMAC-SHA256>`（secret_key で署名、12時間で失効）。どちらも
   HttpOnly・SameSite=Lax。Secure は public_base_url が https のときだけ
-- 登録の試行回数の上限は `AttemptLimiter`（プロセス内。`register_limiter(app)` で
-  app.state に1つ置く）
+- 試行回数の上限は `AttemptLimiter`（プロセス内）。登録用は `register_limiter(app)`、
+  医師ログイン用は `login_limiter(app)` で app.state に1つずつ置く。キーは
+  `client_key(request)`（request.client.host）。uvicorn は既定で 127.0.0.1 から来た
+  要求の X-Forwarded-For を信用して client.host を書き換えるので、手前のプロキシが
+  利用者の XFF を素通しすると1クライアントの上限は迂回できる。そのため全体の失敗の
+  上限（max_total）も掛ける（あふれたら全員を断る。追う相手の数もこれで抑えられる）。
+  公開するときは、信用するプロキシが XFF を上書きする（追記しない）こと、または
+  uvicorn を `--no-proxy-headers` / `--forwarded-allow-ips` で絞ることが前提
 """
 
 from __future__ import annotations
@@ -45,6 +52,11 @@ __all__ = [
     "AppSettings",
     "ApiError",
     "AttemptLimiter",
+    "LOGIN_MAX_FAILURES",
+    "LOGIN_MAX_TOTAL",
+    "LOGIN_WINDOW",
+    "REGISTER_MAX_TOTAL",
+    "client_key",
     "Conn",
     "DOCTOR_COOKIE",
     "DOCTOR_TOKEN_TTL",
@@ -63,6 +75,7 @@ __all__ = [
     "get_settings_dep",
     "install_error_handlers",
     "is_patient_id",
+    "login_limiter",
     "make_doctor_token",
     "make_patient_token",
     "register_limiter",
@@ -85,8 +98,13 @@ _TOKEN_RE = re.compile(r"(?P<issued>[0-9]{1,12})\.(?P<sig>[0-9a-f]{64})")
 _PATIENT_TOKEN_RE = re.compile(r"(?P<pid>[^.]{1,64})\.(?P<sig>[A-Za-z0-9_-]{43})")
 REGISTER_MAX_FAILURES = 10
 REGISTER_WINDOW = timedelta(minutes=10)
+REGISTER_MAX_TOTAL = 100  # 全クライアントの合計（XFF を回す迂回への歯止め）
+LOGIN_MAX_FAILURES = 5
+LOGIN_WINDOW = timedelta(minutes=10)
+LOGIN_MAX_TOTAL = 30
 _LIMITER_SWEEP_AT = 1024  # 追う相手がこれより多くなったら古いものを掃除する
 _LIMITER_STATE = "register_limiter"
+_LOGIN_LIMITER_STATE = "login_limiter"
 _limiter_init_lock = threading.Lock()
 _HTTP_CODES = {
     400: "bad_request",
@@ -314,23 +332,37 @@ def require_doctor(request: Request) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 登録の試行回数の上限（プロセス内）
+# 試行回数の上限（プロセス内。登録・医師ログイン）
 # ---------------------------------------------------------------------------
+
+
+def client_key(request: Request) -> str:
+    """上限のキー（request.client.host。プロキシの前提はモジュールの説明を参照）。"""
+    client = request.client
+    return client.host if client is not None and client.host else "unknown"
 
 
 class AttemptLimiter:
     """クライアントごとの失敗の時刻を窓の間だけ覚える。スレッドから呼んでよい。
 
     失敗が窓の中で max_failures 回に達したら `is_blocked` が True（次の試行を断る）。
+    max_total を渡すと、全クライアントの失敗の合計が窓の中でそれに達したときも、
+    どのキーでも True（キーを使い捨てにする迂回を止め、追う相手の数も抑える）。
     成功は数えない（記録しない）。
     """
 
-    def __init__(self, max_failures: int, window: timedelta) -> None:
+    def __init__(
+        self, max_failures: int, window: timedelta, *, max_total: int | None = None
+    ) -> None:
         if max_failures < 1 or window <= timedelta(0):
             raise ValueError("max_failures は 1 以上、window は正")
+        if max_total is not None and max_total < 1:
+            raise ValueError("max_total は 1 以上")
         self._max = max_failures
         self._window = window
+        self._max_total = max_total
         self._failures: dict[str, deque[datetime]] = {}
+        self._all: deque[datetime] = deque()
         self._lock = threading.Lock()
 
     def _drop_old(self, key: str, at: datetime) -> deque[datetime] | None:
@@ -345,8 +377,18 @@ class AttemptLimiter:
             return None
         return times
 
+    def _total_blocked(self, at: datetime) -> bool:
+        if self._max_total is None:
+            return False
+        cutoff = at - self._window
+        while self._all and self._all[0] <= cutoff:
+            self._all.popleft()
+        return len(self._all) >= self._max_total
+
     def is_blocked(self, key: str, at: datetime) -> bool:
         with self._lock:
+            if self._total_blocked(at):
+                return True
             times = self._drop_old(key, at)
             return times is not None and len(times) >= self._max
 
@@ -355,6 +397,8 @@ class AttemptLimiter:
             if len(self._failures) >= _LIMITER_SWEEP_AT:
                 self._prune_locked(at)
             self._failures.setdefault(key, deque()).append(at)
+            if self._max_total is not None:
+                self._all.append(at)
 
     def prune(self, at: datetime) -> None:
         """窓の外の失敗だけになった相手を忘れる。"""
@@ -370,13 +414,28 @@ class AttemptLimiter:
             return len(self._failures)
 
 
-def register_limiter(app: FastAPI) -> AttemptLimiter:
-    """app.state の登録用の上限（無ければ作る。アプリごとに独立）。"""
-    limiter = getattr(app.state, _LIMITER_STATE, None)
+def _limiter_for(
+    app: FastAPI, state_name: str, max_failures: int, window: timedelta, total: int
+) -> AttemptLimiter:
+    limiter = getattr(app.state, state_name, None)
     if limiter is None:
         with _limiter_init_lock:
-            limiter = getattr(app.state, _LIMITER_STATE, None)
+            limiter = getattr(app.state, state_name, None)
             if limiter is None:
-                limiter = AttemptLimiter(REGISTER_MAX_FAILURES, REGISTER_WINDOW)
-                setattr(app.state, _LIMITER_STATE, limiter)
+                limiter = AttemptLimiter(max_failures, window, max_total=total)
+                setattr(app.state, state_name, limiter)
     return limiter
+
+
+def register_limiter(app: FastAPI) -> AttemptLimiter:
+    """app.state の登録用の上限（無ければ作る。アプリごとに独立）。"""
+    return _limiter_for(
+        app, _LIMITER_STATE, REGISTER_MAX_FAILURES, REGISTER_WINDOW, REGISTER_MAX_TOTAL
+    )
+
+
+def login_limiter(app: FastAPI) -> AttemptLimiter:
+    """app.state の医師ログイン用の上限（登録用とは別のインスタンス）。"""
+    return _limiter_for(
+        app, _LOGIN_LIMITER_STATE, LOGIN_MAX_FAILURES, LOGIN_WINDOW, LOGIN_MAX_TOTAL
+    )

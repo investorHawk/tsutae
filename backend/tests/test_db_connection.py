@@ -107,3 +107,9 @@ def test_shared_connection_does_not_commit_half_written_entry(
     assert errors == ["boom"]
     assert conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0] == 0
     assert len(list_pipeline_logs(conn, "visit", 1)) == 1
+
+
+def test_connect_enables_secure_delete(tmp_db_path: Path) -> None:
+    """消した行（期限切れのレポート等）をファイルに残さない。"""
+    conn = connect(tmp_db_path)
+    assert conn.execute("PRAGMA secure_delete").fetchone()[0] == 1

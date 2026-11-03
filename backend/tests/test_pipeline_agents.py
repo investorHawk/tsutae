@@ -40,6 +40,18 @@ def test_roles_have_no_tools_and_use_subagent_model_and_skill() -> None:
         assert agent.skills == ["regimen-folfox"]
 
 
+def test_roles_also_deny_emit_and_subagent_tools() -> None:
+    # tools=[] が「親のツールを全部継ぐ」と解釈されても、結果の提出と孫の起動はさせない。
+    # Skill は入れない（skills の先読みが Skill ツールに依るかは未検証のため）
+    for agent in _agents().values():
+        assert agent.disallowedTools == [
+            "mcp__tsutae__emit_timeline",
+            "mcp__tsutae__emit_report",
+            "Agent",
+            "Task",
+        ]
+
+
 def test_capox_skill_name_is_passed_through() -> None:
     agents = build_agents(SETTINGS, "regimen-capox")
     assert all(a.skills == ["regimen-capox"] for a in agents.values())

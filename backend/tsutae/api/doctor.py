@@ -1,5 +1,8 @@
 """医師 API（docs/architecture.md §8 医師・§8b。Skill の書き換えは doctor_skills.py）。
 
+- ログインはクライアントごとに失敗（bad_password）が 10 分で 5 回、全体で 30 回に
+  達したら、以降の試行を 429 too_many_attempts で断る（正しいパスワードでも断る。
+  成功・422 は数えない。`deps.login_limiter`。キーの前提は deps の説明を参照）
 - ログイン・ログアウト以外の全経路で医師 Cookie を検査する（`require_doctor`。
   無い・改ざん・期限切れは 401 not_logged_in。本文の検証より先に走る）。ログアウトは
   Cookie を消すだけなので検査しない（失効後でもログアウトできる）
@@ -17,7 +20,7 @@ import sqlite3
 from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Path, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,7 +31,9 @@ from tsutae.api.deps import (
     Conn,
     check_doctor_password,
     clear_doctor_cookie,
+    client_key,
     is_patient_id,
+    login_limiter,
     require_doctor,
     set_doctor_cookie,
 )
@@ -76,8 +81,16 @@ class PatientIn(BaseModel):
 
 
 @router.post("/login")
-def login(body: LoginIn, response: Response, settings: AppSettings) -> dict[str, bool]:
+def login(
+    body: LoginIn, request: Request, response: Response, settings: AppSettings
+) -> dict[str, bool]:
+    limiter = login_limiter(request.app)
+    key = client_key(request)
+    at = now()
+    if limiter.is_blocked(key, at):
+        raise ApiError(429, "too_many_attempts")
     if not check_doctor_password(body.password, settings):
+        limiter.record_failure(key, at)
         raise ApiError(401, "bad_password")
     set_doctor_cookie(response, settings)
     return {"ok": True}

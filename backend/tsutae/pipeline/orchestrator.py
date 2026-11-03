@@ -61,7 +61,13 @@ from tsutae.schemas import (
 )
 from tsutae.skills import is_valid_skill_name, load_skill
 
-__all__ = ["ALLOWED_TOOLS", "DISALLOWED_TOOLS", "build_options", "convert"]
+__all__ = [
+    "ALLOWED_TOOLS",
+    "DISALLOWED_TOOLS",
+    "NO_SESSION_PERSISTENCE",
+    "build_options",
+    "convert",
+]
 
 # サブエージェント起動ツールは init では Task、Hook では Agent（T03）
 ALLOWED_TOOLS: tuple[str, ...] = (
@@ -83,7 +89,31 @@ DISALLOWED_TOOLS: tuple[str, ...] = (
     "Read",
     "Glob",
     "Grep",
+    # 遅延読み込み（ToolSearch 経由でしか MCP ツールに届かない）を切る。同梱 CLI は
+    # ToolSearch が disallowedTools にあると tool search を無効にする（CLI の文字列
+    # 「Tool search disabled: ToolSearchTool is not available (may have been disallowed
+    # via disallowedTools)」で確認。2026-11-04）。H4 も ToolSearch を許していない
+    "ToolSearch",
+    # 使わない組み込みツール（T03 の init に出たもの）。H4 も拒否するが、説明文が
+    # コンテキストに載り、誤って呼ぶと max_turns を使う
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "DesignSync",
+    "EnterWorktree",
+    "ExitWorktree",
+    "ListAgents",
+    "Monitor",
+    "PushNotification",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "SendMessage",
+    "TaskStop",
 )
+# 会話の記録（依頼文＝伏せ字後の自由記載、サブエージェントの出力、emit_* の引数＝
+# 変換結果）を ~/.claude/projects/<cwd>/<session>.jsonl に書かせない（spec §13.3）。
+# SDK の transport は既定でこのフラグを付けない
+NO_SESSION_PERSISTENCE: dict[str, str | None] = {"no-session-persistence": None}
 _log = logging.getLogger(__name__)
 _MAX_TURNS_RE = re.compile(
     r"max(?:imum)?[\s_-]*(?:number[\s_-]+of[\s_-]+)?turns", re.IGNORECASE
@@ -133,6 +163,7 @@ def build_options(
         max_turns=settings.pipeline_max_turns,
         max_budget_usd=settings.pipeline_max_budget_usd,
         system_prompt=SYSTEM_PROMPT,
+        extra_args=dict(NO_SESSION_PERSISTENCE),
     )
 
 

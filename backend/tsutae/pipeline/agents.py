@@ -1,7 +1,8 @@
 """サブエージェント3役の定義（AgentDefinition）。
 
-- 3役はツールを持たない（tools=[]）。JSON のテキストを返し、主エージェントがまとめて
-  emit_timeline / emit_report を呼ぶ（Hook の掛け所を1か所にする。docs/decisions.md）
+- 3役はツールを持たない（tools=[]。念のため disallowedTools に emit_*・Agent・Task）。
+  JSON のテキストを返し、主エージェントがまとめて emit_timeline / emit_report を呼ぶ
+  （Hook の掛け所を1か所にする。docs/decisions.md）
 - model は settings.subagent_model、skills はレジメンの Skill（本文の決まりに従わせる）
 - term-mapper には ctcae_terms.json の用語名と question_key を埋める（一覧から選ばせる）
 - 指示の文に敬称・施設名の語を書かない（主エージェントへの依頼文と同じ理由）
@@ -14,6 +15,7 @@ from typing import Any
 from claude_agent_sdk import AgentDefinition
 
 from tsutae.config import Settings
+from tsutae.pipeline.tools import EMIT_REPORT_TOOL, EMIT_TIMELINE_TOOL
 from tsutae.skills import is_valid_skill_name
 from tsutae.synthetic import load_terms
 
@@ -21,6 +23,7 @@ __all__ = [
     "AGENT_NAMES",
     "CONTRADICTION_FINDER",
     "DATE_NORMALIZER",
+    "SUBAGENT_DISALLOWED_TOOLS",
     "TERM_MAPPER",
     "build_agents",
 ]
@@ -29,6 +32,14 @@ DATE_NORMALIZER = "date-normalizer"
 TERM_MAPPER = "term-mapper"
 CONTRADICTION_FINDER = "contradiction-finder"
 AGENT_NAMES: tuple[str, ...] = (DATE_NORMALIZER, TERM_MAPPER, CONTRADICTION_FINDER)
+# tools=[] が「未指定なので親のツールを継ぐ」と解釈された場合の守り（実 API では未検証）。
+# Skill は入れない（skills の本文の先読みが Skill ツールに依らないかは未検証のため）
+SUBAGENT_DISALLOWED_TOOLS: tuple[str, ...] = (
+    EMIT_TIMELINE_TOOL,
+    EMIT_REPORT_TOOL,
+    "Agent",
+    "Task",
+)
 
 _COMMON = """\
 外来化学療法の記録（伏せ字済み。症例は全て合成）を扱います。読み込まれている Skill の本文の\
@@ -150,6 +161,7 @@ def build_agents(
             description=description,
             prompt=prompt,
             tools=[],
+            disallowedTools=list(SUBAGENT_DISALLOWED_TOOLS),
             model=settings.subagent_model,
             skills=[regimen_skill_name],
         )

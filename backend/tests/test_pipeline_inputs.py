@@ -306,6 +306,14 @@ IDS = ("P-DEMO0001", "A-023")
         "ｐ－ｄｅｍｏ０００１で登録",  # 全角・小文字（NFKC＋casefold）
         "Ａ－０２３番で待った",
         "a-023",
+        # 区切り記号の省略・置き換え（照合は英数字以外を全て除いて比べる）
+        "受付はA023番だった",
+        "IDはPDEMO0001と書いてある",
+        "IDはP_DEMO0001",
+        "受付票はA・023",
+        "受付はAー023",
+        "受付はA.023",
+        "IDはP／DEMO／0001",
     ],
 )
 def test_text_with_known_identifier_is_not_sent(text: str) -> None:

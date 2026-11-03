@@ -45,7 +45,8 @@ class VisitClosedError(ValueError):
 def connect(path: Path) -> sqlite3.Connection:
     """SQLite に接続する。
 
-    row_factory=Row、foreign_keys ON、busy_timeout、ファイルなら journal_mode=WAL。
+    row_factory=Row、foreign_keys ON、busy_timeout、secure_delete ON（消した行の中身を
+    ゼロで上書きする）、ファイルなら journal_mode=WAL。
     check_same_thread=False だが、共有するときはモジュール冒頭の注意を読むこと。
     """
     if str(path) != MEMORY:
@@ -56,6 +57,9 @@ def connect(path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute(f"PRAGMA busy_timeout = {int(BUSY_TIMEOUT_MS)}")
+    conn.execute(
+        "PRAGMA secure_delete = ON"
+    )  # 消した行（期限切れのレポート等）を残さない
     if str(path) != MEMORY:
         conn.execute("PRAGMA journal_mode = WAL")
     return conn

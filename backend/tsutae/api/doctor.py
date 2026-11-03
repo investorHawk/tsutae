@@ -258,13 +258,12 @@ def mark_printed(vid: VisitId, conn: Conn) -> dict[str, bool]:
     生成中（AI でもう一度変換している最中を含む）は 409 generating（前のレポートで
     印刷済みにして、新しい結果を捨てないように）。
     """
-    visit = db.get_visit(conn, vid)
-    if visit is not None and visit["status"] == "generating":
-        raise ApiError(409, "generating")
     try:
-        db.mark_printed(conn, vid)
+        printed = db.mark_printed(conn, vid, refuse_generating=True)
     except db.NotFoundError as exc:
         raise ApiError(404, "not_found") from exc
+    if not printed:
+        raise ApiError(409, "generating")
     return {"ok": True}
 
 

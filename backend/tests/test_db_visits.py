@@ -522,3 +522,14 @@ def test_mark_printed_leaves_no_text_in_wal(
     wal = Path(str(tmp_db_path) + "-wal")
     if wal.exists():
         assert marker.encode() not in wal.read_bytes()
+
+
+def test_mark_printed_can_refuse_generating(conn: sqlite3.Connection, pid: str) -> None:
+    # 状態の確認と削除を同じロックの中で行う（AI でもう一度変換との競合）
+    vid = _visit(conn, pid)  # generating
+    assert mark_printed(conn, vid, refuse_generating=True) is False
+    assert get_visit(conn, vid)["status"] == "generating"
+    assert get_visit(conn, vid)["reception_no"] is not None
+    set_visit_status(conn, vid, "ready", fallback=True)
+    assert mark_printed(conn, vid, refuse_generating=True) is True
+    assert get_visit(conn, vid)["status"] == "printed"

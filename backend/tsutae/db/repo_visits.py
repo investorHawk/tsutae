@@ -396,13 +396,27 @@ def _erase_results(conn: sqlite3.Connection, vid: int) -> None:
     conn.execute("UPDATE visits SET reception_no = NULL WHERE id = ?", (vid,))
 
 
-def mark_printed(conn: sqlite3.Connection, vid: int) -> None:
-    """印刷済みにする。レポート・変換結果・受付番号を削除し status=printed。"""
+def mark_printed(
+    conn: sqlite3.Connection, vid: int, *, refuse_generating: bool = False
+) -> bool:
+    """印刷済みにする。レポート・変換結果・受付番号を削除し status=printed。
+
+    refuse_generating=True なら、生成中（やり直しの最中を含む）は何も変えずに False。
+    状態の確認と削除は同じ書き込みロックの中で行う（AI でもう一度変換との競合で、
+    生成中の受診を印刷済みにしない）。
+    """
     require_exists(conn, "visits", vid, "visit")
     with write_transaction(conn):
+        if refuse_generating:
+            row = conn.execute(
+                "SELECT status FROM visits WHERE id = ?", (vid,)
+            ).fetchone()
+            if row is not None and row["status"] == "generating":
+                return False
         _erase_results(conn, vid)
         conn.execute("UPDATE visits SET status = 'printed' WHERE id = ?", (vid,))
     _checkpoint(conn)
+    return True
 
 
 def purge_expired(conn: sqlite3.Connection, now: datetime) -> int:

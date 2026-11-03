@@ -332,6 +332,24 @@ async def test_h1_hook_stage_blocks_prompt_in_sdk(tmp_path: Path) -> None:
     assert logger.find("hook_h1_block")[0]["decision"] == "block:at_mark"
 
 
+async def test_h1_in_sdk_does_not_block_prompts_written_for_subagents(
+    tmp_path: Path,
+) -> None:
+    # build_options の H1 はアプリの依頼文だけを止める。主エージェントがサブエージェントに
+    # 書いた依頼文（ここでは敬称を含む文）は通して記録だけ残す
+    prepared, _timeline, _report = _demo()
+    collector = RunCollector.from_prepared(prepared)
+    logger = MemoryLogger()
+    options = build_options(prepared, collector, logger, SETTINGS, tmp_path)
+    (matcher,) = options.hooks["UserPromptSubmit"]
+    (h1,) = matcher.hooks
+    sub = {"hook_event_name": "UserPromptSubmit", "prompt": "担当者さんの記録を直して"}
+    assert await h1(sub, None, {"signal": None}) == {}
+    assert logger.find("hook_h1_subagent_flag")
+    ours = {"hook_event_name": "UserPromptSubmit", "prompt": build_prompt(prepared)}
+    assert await h1(ours, None, {"signal": None}) == {}  # 依頼文はきれい
+
+
 # --- H2 ---------------------------------------------------------------------
 
 

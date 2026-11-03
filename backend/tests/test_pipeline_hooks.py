@@ -510,3 +510,29 @@ async def test_build_hooks_wires_everything_with_block_on_failure() -> None:
     assert _denied(await h2(_pre(EMIT_TIMELINE_TOOL, bad), None, CTX))
     h1 = hooks["UserPromptSubmit"][0].hooks[0]
     assert (await h1(_prompt("担当者さん"), None, CTX))["decision"] == "block"
+
+
+async def test_h1_with_expected_prompt_still_blocks_our_prompt() -> None:
+    logger = MemoryLogger()
+    ours = "担当者さんに聞いた"
+    h1 = make_h1(logger, expected_prompt=ours)
+    result = await h1(_prompt(ours + "\n"), None, CTX)
+    assert result["decision"] == "block"
+
+
+async def test_h1_only_flags_prompts_the_model_wrote_for_subagents() -> None:
+    # UserPromptSubmit は主エージェントがサブエージェントに書いた依頼文にも発火する。
+    # 送信済みのデータから書かれた文なので止めない（2026-11-04 の評価で2コースが
+    # これで no_timeline になった）。規則のコードだけを残す
+    logger = MemoryLogger()
+    h1 = make_h1(logger, expected_prompt="アプリが作った依頼文")
+    result = await h1(_prompt("担当者さんの記録を日付に直して"), None, CTX)
+    assert result == {}
+    assert logger.find("hook_h1_subagent_flag") == [
+        {
+            "event": "hook_h1_subagent_flag",
+            "hook_name": "H1",
+            "decision": f"flag:{RULE_UNKNOWN_BEFORE_HONORIFIC}",
+        }
+    ]
+    assert logger.find("hook_h1_block") == []

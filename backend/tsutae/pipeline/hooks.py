@@ -77,7 +77,16 @@ def _deny(reason: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def make_h1(logger: EventLogger) -> HookFn:
+def make_h1(logger: EventLogger, expected_prompt: str | None = None) -> HookFn:
+    """H1（UserPromptSubmit）。依頼文全体に二次検出が掛かれば止める。
+
+    expected_prompt を渡すと、止めるのはその依頼文（アプリが作って送る文）だけにする。
+    UserPromptSubmit は主エージェントがサブエージェントに書いた依頼文にも発火するが、
+    それは送信済みの（検査を通った）データからモデルが書いた文で、止めても何も守らず
+    変換が no_timeline で失敗するだけ（2026-11-04 の評価で2コースがこれで失敗した）。
+    その場合は規則のコードだけをログに残して通す（`hook_h1_subagent_flag`）。
+    """
+
     async def h1(input_data: Any, tool_use_id: str | None, context: Any) -> dict:
         prompt = _get(input_data, "prompt")
         if isinstance(prompt, str):
@@ -86,6 +95,16 @@ def make_h1(logger: EventLogger) -> HookFn:
                 logger.event("hook_h1_allow", hook_name="H1", decision=ALLOW)
                 return {}
             rule = found[0].rule
+            if (
+                expected_prompt is not None
+                and prompt.strip() != expected_prompt.strip()
+            ):
+                logger.event(
+                    "hook_h1_subagent_flag",
+                    hook_name="H1",
+                    decision=reason_code("flag", rule),
+                )
+                return {}
         else:
             rule = "invalid_prompt"
         logger.event(
@@ -348,11 +367,15 @@ def build_hooks(
     logger: EventLogger,
     allowed_tools: Iterable[str],
     allowed_subagents: Iterable[str],
+    expected_prompt: str | None = None,
 ) -> dict[str, list[HookMatcher]]:
-    """変換1回分の Hook（H1・H4・H2・trace）。H3 は D4 の書き換えで使う。"""
+    """変換1回分の Hook（H1・H4・H2・trace）。H3 は D4 の書き換えで使う。
+
+    expected_prompt はアプリが送る依頼文（H1 はこれだけを止める。make_h1 を参照）。
+    """
     trace = make_trace_hooks(logger)
     return {
-        "UserPromptSubmit": [_matcher(make_h1(logger))],
+        "UserPromptSubmit": [_matcher(make_h1(logger, expected_prompt))],
         "PreToolUse": [
             _matcher(make_h4(allowed_tools, allowed_subagents, logger)),
             _matcher(make_h2(masked_texts, logger), H2_MATCHER),

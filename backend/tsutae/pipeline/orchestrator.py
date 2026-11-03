@@ -162,6 +162,7 @@ def build_options(
             logger=logger,
             allowed_tools=ALLOWED_TOOLS,
             allowed_subagents=AGENT_NAMES,
+            expected_prompt=build_prompt(prepared),
         ),
         max_turns=settings.pipeline_max_turns,
         max_budget_usd=settings.pipeline_max_budget_usd,

@@ -87,6 +87,7 @@ make dev-web                           # http://127.0.0.1:5173
 - テスト / lint: `make test` / `make lint`
 - Agent SDK の動作確認: `make smoke`／精度評価: `make eval`（どちらも API を呼ぶ）
 - 見本のレポート: `.venv/bin/python scripts/render_sample_report.py [--fallback]`
+- 本物の Claude でデモ患者の受診を1回生成: `.venv/bin/python scripts/run_demo_visit.py`（一時 DB を使う。結果は `docs/eval/demo-visit-*.html|json`。`--dry-run` なら API を呼ばない）
 
 ## 既知の限界
 - 伏せ字の見逃し（`backend/tsutae/masking/__init__.py` に一覧）: 空白・改行をはさんだ「い・く」で終わるひらがなの名前、番地の無い住所、辞書にない1字の名前、敬称の付かない名前・英語の敬称

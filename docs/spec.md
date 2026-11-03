@@ -155,7 +155,10 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 1. 医師が一文入力 → Agent SDK `query()`（`allowed_tools=["Read","Edit","Write"]`, H3 付き）が該当 SKILL.md を編集
 2. サーバーが差分（unified diff）を D4 に表示 → 医師が承認／却下
 3. 承認で `version` を上げ、翌日の記録から新しい質問集が出る。レポートの列も変わる
-4. 却下なら git checkout 相当で戻す（Skill は git 管理）
+4. 却下なら一時コピーを捨てるだけ（本体は触っていない）。承認時に本体へ書き込み、コミットする（Skill は git 管理）
+
+- 書き換えはエージェントに**一時コピー**を編集させ、サーバーがバリデータ（frontmatter の `version`・`questions` の構造検査）を通してから差分を作る。壊れた Skill は差分を出さず失敗にする
+- SKILL.md は YAML frontmatter に `version` と `questions`（key・文言・回答型）を持ち、本文に自然言語の説明を置く。アプリは frontmatter だけを読む
 
 ## 10. レポート仕様（A4 一枚、モノクロ印刷前提）
 

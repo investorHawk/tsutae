@@ -407,3 +407,37 @@ class EntryLabel(Frozen):
 class PatientLabels(Frozen):
     patient_id: str
     labels: list[EntryLabel]
+
+
+# ---------------------------------------------------------------------------
+# パイプラインの受け渡し（W2）
+# ---------------------------------------------------------------------------
+
+
+class PreparedInput(Frozen):
+    """伏せ字・選別を済ませた変換の入力。レポート組み立てとフォールバックも使う。"""
+
+    input: PipelineInput
+    entry_ids: dict[int, int]  # entry_no -> entries.id
+    masked_texts: dict[int, str]  # entry_no -> 一次置換後の自由記載
+    unprocessed: list[UnprocessedEntry] = Field(default_factory=list)
+
+
+class RunStats(Frozen):
+    duration_ms: int = 0
+    num_turns: int = 0
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cost_usd: float = 0.0
+
+
+class ConversionResult(Frozen):
+    """変換の結果。timeline が None ならフォールバック（AI変換なし）。"""
+
+    timeline: Timeline | None
+    picks: ReportPicks | None
+    fallback: bool
+    error_code: str | None = (
+        None  # 例: "timeout", "max_turns", "sdk_error", "no_timeline", "h1_blocked"
+    )
+    stats: RunStats = Field(default_factory=RunStats)

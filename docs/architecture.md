@@ -134,13 +134,68 @@ fixed_rules:
 - `source_quote` は**一次置換後**の自由記載に部分一致すること（テストで検査）
 - 用語は `backend/tsutae/data/ctcae_terms.json`: `[{"term": "下痢", "en": "Diarrhea", "question_key": "diarrhea"}, …]`（CTCAE v5.0 日本語訳 JCOG 版の有害事象名を約30語。出典「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」をファイル内 `source` に）。ラベルの term はこの一覧から選ぶ
 
-## 7. 変換パイプライン（W2、要点のみ。詳細は W2 で確定）
-- 入力 `PipelineInput`（伏せ字済み・通し番号・コース日程のみ。**仮名ID・受付番号は入れない**）
-- 主エージェント（`claude-opus-5-5`）が `agents=` のサブエージェント3役（`claude-sonnet-5-5`）を呼ぶ。**サブエージェントはツールを持たず JSON テキストを返す**。主エージェントがそれをまとめて `mcp__tsutae__emit_timeline` → `mcp__tsutae__emit_report` を呼ぶ（Hook H2 はここに掛ける）
-- `AgentRunner` プロトコルを挟み、テストは偽の runner で行う（ツールのハンドラと Hook を直接呼ぶ）
-- Hook: H1 `UserPromptSubmit`（`detect_identifiers` でプロンプト全体を検査、`decision: "block"`）／H2 `PreToolUse`（引用の部分一致）／H3 `PreToolUse` Write|Edit（D4 の書き込み先限定）／H4 `PreToolUse`（許可外ツールを deny）。意見のない Hook は `{}` を返す。`HookMatcher(on_failure="block")`
-- 失敗・タイムアウト・emit されない → フォールバック（AI変換なし）
-- レポート HTML は **`ReportData` から Jinja2 で決定的に描画**。AI は HTML を書かない。AI が決めるのは events・contradictions・per_symptom の選び方だけ
+## 7. 変換パイプライン（W2-pipeline、`tsutae.pipeline`）
+
+T03 スモークの事実（`docs/decisions.md`）: H1 は `UserPromptSubmit` で止められる／サブエージェント内のツール呼び出しにも `PreToolUse` が掛かる（`agent_type` に定義名）／起動ツール名は init で `Task`、Hook で `Agent`／組み込みエージェント（general-purpose 等）と Bash・Write 等が既定で見える／`max_turns` 超過は `ResultError` 例外。
+
+| ファイル | 中身 |
+|---|---|
+| `inputs.py` | `prepare_input(*, courses, entries, regimen_skill, report_skill, visit_date) -> PreparedInput`。今コース（`course.current_course(courses, visit_date)`）の Day1〜min(最終日, visit_date) の記録だけ。記録日時順に entry_no=1,2,… を振る。自由記載は `masking.check_text` に掛け、検出があればその**記録ごと**入力から外し `UnprocessedEntry(entry_id, reason=規則名)`。仮名ID・受付番号は入れない |
+| `prompt.py` | `build_prompt(prepared) -> str`（主エージェントへの依頼文＋ `PipelineInput` の JSON）、`SYSTEM_PROMPT`。**依頼文に敬称（さん・先生 等）を書かない**（H1 が自分の依頼文に反応しないように。テストで `detect_identifiers(build_prompt(...)) == []` を確かめる） |
+| `agents.py` | `build_agents(settings, regimen_skill_name) -> dict[str, AgentDefinition]`: `date-normalizer` / `term-mapper` / `contradiction-finder`。model=`settings.subagent_model`、`tools=[]`（ツールなし。JSON テキストを返す）、`skills=[regimen_skill_name]`。prompt は日本語で、出力 JSON の形を明示 |
+| `tools.py` | `RunCollector`（1回の変換の受け皿。timeline と picks を保持）、`handle_emit_timeline(args, collector) -> dict`、`handle_emit_report(args, collector) -> dict`（pydantic で検証し、失敗は `{"content":[…], "is_error": True}` で理由を返してモデルに直させる）、`build_server(collector) -> McpSdkServerConfig`（名前 `tsutae`、ツール `emit_timeline` `emit_report`） |
+| `hooks.py` | 下の表 |
+| `logs.py` | `PipelineLogger(conn, run_kind, run_id)`: `event(name, **fields)` で `db.add_pipeline_log`。**文面（プロンプト・引用・理由の本文）は入れない**。理由は規則名などの短いコードだけ。テスト用に conn なしで記録だけ持つ `MemoryLogger` も置く |
+| `runner.py` | `AgentRunner` プロトコル: `async run(prompt: str, options: ClaudeAgentOptions, collector: RunCollector) -> RunStats`。`SdkRunner` は `claude_agent_sdk.query` を回し ResultMessage から RunStats を作る。テスト用の `FakeRunner` は `backend/tests/` 側に置く（options.hooks の H1・H2・H4 を実際に呼び、collector 経由で handle_emit_* を呼ぶ） |
+| `orchestrator.py` | `build_options(prepared, collector, logger, settings, skills_home) -> ClaudeAgentOptions`、`async convert(prepared, *, runner, logger, settings) -> ConversionResult` |
+| `service.py` | 7d |
+
+Hook（`hooks.py`）。意見のない Hook は `{}` を返す。全て `HookMatcher(on_failure="block")`。
+
+| 関数 | イベント・matcher | 挙動 |
+|---|---|---|
+| `make_h1(logger)` | UserPromptSubmit | `detect_identifiers(prompt)` に掛かれば `{"decision":"block","reason":<規則名>,"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","suppressOriginalPrompt":True}}` |
+| `make_h2(masked_texts, logger)` | PreToolUse `mcp__tsutae__emit_timeline\|mcp__tsutae__emit_report` | events の `source_quote`・contradictions の `free_text_quote`・per_symptom の `representative_quote` が、その entry_no の伏せ字後の文に部分一致しない、または entry_no が未知 → `permissionDecision: "deny"` と理由（どの項目かを番号で。原文は入れない） |
+| `make_h3(skills_root, logger)` | PreToolUse `Write\|Edit\|MultiEdit` | `file_path` を `resolve()` してから、`skills_root/.claude/skills/<SKILL_NAME_PATTERN>/SKILL.md` でなければ deny |
+| `make_h4(allowed_tools, allowed_subagents, logger)` | PreToolUse（matcher なし＝全ツール） | 許可外のツール、`Agent`/`Task` の `subagent_type` が許可外 → deny |
+| `make_trace_hooks(logger)` | SubagentStart / SubagentStop / PostToolUse | 記録するだけ（D5 の可視化用） |
+| `build_hooks(*, masked_texts, logger, allowed_tools, allowed_subagents)` | — | 上をまとめた `dict[str, list[HookMatcher]]` |
+
+`convert` の手順: ①入力の記録が0件なら Claude を呼ばず空の Timeline（unprocessed だけ）で成功 ②コードで `detect_identifiers(prompt)` → 掛かれば `error_code="h1_blocked"` でフォールバック ③`asyncio.wait_for(runner.run(...), settings.pipeline_timeout_s)` ④`TimeoutError`→`timeout`、`ClaudeSDKError`（`ResultError` を含む）→ メッセージに max turns があれば `max_turns`、他は `sdk_error`、emit_timeline が来ない→`no_timeline` ⑤成功なら `ConversionResult(timeline（unprocessed を足す）, picks, fallback=False, stats)`。例外の本文はログに入れない（コードだけ）。
+
+ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project"]`, `skills=[<regimen skill>, "report-format-default"]`, `model=settings.model`, `agents=build_agents(...)`, `mcp_servers={"tsutae": build_server(collector)}`, `allowed_tools=["Task", "Agent", "Skill", "mcp__tsutae__emit_timeline", "mcp__tsutae__emit_report"]`, `disallowed_tools=["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch", "Workflow", "Read", "Glob", "Grep"]`, `permission_mode="dontAsk"`, `hooks=build_hooks(...)`, `max_turns=settings.pipeline_max_turns`, `max_budget_usd=settings.pipeline_max_budget_usd`, `system_prompt=SYSTEM_PROMPT`。
+
+主エージェントの手順（SYSTEM_PROMPT と build_prompt に書く）: Skill（regimen と report-format）を読む → 3役を `Agent` ツールで呼ぶ（date-normalizer と contradiction-finder、その後 term-mapper。並行でよい）→ 結果をまとめ `emit_timeline`（events, contradictions）→ report-format に従い `emit_report`（per_symptom）。Grade・重さの語・助言・原因の推測を出さない。欠けた日を埋めない。食い違いを解決しない。
+
+## 7b. レポート（W2-report、`tsutae.report`）
+
+| ファイル | 中身 |
+|---|---|
+| `build.py` | `build_report_data(*, reception_no, patient_id, regimen_skill, report_skill, courses, entries, visit_date, prepared, result: ConversionResult, questions_by_version: dict[str, list[Question]]) -> ReportData`。**決定的**（同じ入力なら同じ出力）。下の規則 |
+| `render.py` + `templates/report.html.j2` + `templates/report.css` | `render_report_html(data: ReportData, *, questions: list[Question]) -> str`。Jinja2（autoescape）。下の描画規則 |
+
+組み立ての規則:
+- header: 記録日数＝記録（too_sick を含む）のある日数、入力なし＝記録の無い日数、つらくて書けない＝too_sick の日数（今コースの Day1〜min(最終日, visit_date)）。延期注記は `course.delay_note`。`fallback` は `result.fallback`
+- attention（この順）: 食い違い（timeline.contradictions）／`fever_attention_celsius` 以上の体温（今コース）／つらくて書けない（今コース。前コースの同じ Day も too_sick なら `previous_course_same_day=True`）／未処理の記録（count のみ）
+- grid: 今コースの行（質問ごと）＋体温行（`show_temperature_row`）＋ `show_previous_course` なら前コースの行（**クローズ回答のみ**、AI の結果を使わない）。セル state: その日の記録の回答＝none/present/hard、記録が無い＝no_input、その日の記録の skill_version の質問集にその質問が無い＝not_asked、too_sick だけの日＝too_sick。同じ日に複数の回答があれば重い方（hard > present > none）。free_text_mark は今コースの events（status が present か improving、question_key 一致、event の date のその Day）、recalled_mark はその event が recalled。列: by_proxy の記録がある日は「代」、too_sick の日は斜線
+- per_symptom: `result.picks.per_symptom`（無ければ空）
+- quotes: 伏せ字後の自由記載（`prepared.masked_texts`）を Day 順に、`quotes_max_items` まで。未処理の記録は載せない
+- フォールバック（`result.timeline is None`）: free_text_mark なし・食い違いなし・per_symptom 空。経過表と引用は同じ
+
+描画の規則: A4 一枚・モノクロ（`@page { size: A4; margin: 10mm }`、`@media print`）。セル: なし=薄い「−」、ある=網掛け、つらい=濃い網掛け、入力なし=空白、未設問=「−−」、つらくて書けない=列全体の斜線、○・「回」・列頭「代」、凡例を欄外に固定。冒頭に「症例は全て合成」、fallback なら「AI変換なし」。用語の欄外に「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」。low_confidence_threshold 未満の per_symptom は「？」。**Grade・軽症・中等症・重症・重篤などの語を出さない**（テストで検査）。引用が多く溢れる場合は引用欄を2枚目に回す（`page-break-before`）
+
+## 7c. 評価（W2-eval、`tsutae.eval`）
+
+| ファイル | 中身 |
+|---|---|
+| `metrics.py` | 純関数。`evaluate(predicted: Timeline, prepared: PreparedInput, labels: list[EntryLabel]) -> EvalResult`（EvalResult は eval 内で定義）。entry_no ↔ entry_seq は `prepared.entry_ids`（合成データでは entries.id = seq）。①日付正規化の一致率（ラベルの event ごとに同じ記録・同じ term（無ければ同じ question_key）の予測を対応づけ、date と day の一致率）②用語の一致率（同じ記録に同じ term の予測があるか）③食い違いの再現率・適合率（(記録, question_key) で対応）④「軽い・改善中を absent と誤る／取りこぼす」件数と「否定を present/improving とした」件数 ⑤引用一致率（予測の source_quote が伏せ字後の文に部分一致する割合）。失敗例の一覧（記録・項目・期待・予測）を返す。expect_unprocessed の記録と、今回の入力に入っていない記録は除外 |
+| `run.py` | `python -m tsutae.eval.run [--cache-only RUN_DIR] [--patients ...]`。role=eval の患者の**各コース**について visit_date=そのコースの最終日で `prepare_input` → `convert(SdkRunner)` → 予測を `docs/eval/runs/<日時>/<patient>_c<n>.json` に保存 → metrics → `docs/eval/<日付>.md`（5指標の実測値・失敗例・モデル名・所要時間・費用）。`--cache-only` は保存済みの予測から metrics と md だけ作り直す（API を呼ばない）。`.env` は `config.load_env_file()` で読む |
+| synthetic 連携 | `to_entries(patient) -> list[Entry]`（id=seq）と `to_courses(patient) -> list[Course]` を `tsutae/eval/dataset.py` に置く |
+
+## 7d. 受診時の生成（W2-service、`tsutae.pipeline.service`）
+- `async generate_visit_report(conn, visit_id, *, runner, settings, logger=None) -> None`: visits から患者・visit_date を読み、courses・entries・Skill（`skill_versions` から版ごとの質問集）を集め、`prepare_input` → `convert` → `build_report_data` → `render_report_html` → `save_timeline`（timeline が None でも unprocessed だけの Timeline を保存）・`save_report`・`set_visit_status(ready, fallback=…)`。途中で例外が出てもフォールバックのレポートを作って ready にし、それも失敗したら failed。受付番号は Claude に送らない
+- `ensure_skill_versions(conn, skills_dir) -> None`: 現在の SKILL.md が `skill_versions` に無ければ登録する（起動時・合成データ投入時に呼ぶ）
+- `questions_by_version(conn) -> dict[str, list[Question]]`（`"regimen-folfox@1"` → 質問集）
 
 ## 8. API（W3、FastAPI。フロントはこの形で作る）
 共通: JSON。エラーは `{"error": "<code>"}`（文面ではなくコード。患者画面はコードから `patient_strings.json` のキーを選ぶ）。

@@ -9,7 +9,7 @@
 | 項目 | 値 |
 |---|---|
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
-| テスト件数 | 3785件 通過 / 全3785件（backend 2739/2739、frontend 1046/1046。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
+| テスト件数 | 3792件 通過 / 全3792件（backend 2746/2746、frontend 1046/1046。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 未実施（`make eval` で `docs/eval/` に5指標の実測値と失敗例を残す） |
 | 動作確認 | ブラウザ（スマホ幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認 を通しで確認（API を呼ばない構成。2026-11-04） |
 
@@ -97,6 +97,7 @@ make dev-web                           # http://127.0.0.1:5173
 - Agent SDK の動作確認: `make smoke`／精度評価: `make eval`（どちらも API を呼ぶ）
 - 見本のレポート: `.venv/bin/python scripts/render_sample_report.py [--fallback]`
 - 本物の Claude でデモ患者の受診を1回生成: `.venv/bin/python scripts/run_demo_visit.py`（一時 DB を使う。結果は `docs/eval/demo-visit-*.html|json`。`--dry-run` なら API を呼ばない）
+- 本物の Claude で D4 の書き換えを1回試す: `.venv/bin/python scripts/run_demo_skill_change.py [--request 依頼文] [--approve]`（一時コピーの上で行い、本体の SKILL.md は変えない。差分は `docs/eval/demo-skill-change-*.diff`）
 
 ## 既知の限界
 - 伏せ字の見逃し（`backend/tsutae/masking/__init__.py` に一覧）: 空白・改行をはさんだ「い・く」で終わるひらがなの名前、番地の無い住所、辞書にない1字の名前、敬称の付かない名前・英語の敬称

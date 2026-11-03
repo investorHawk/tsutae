@@ -5,6 +5,7 @@
 
 ## 撮影の前に（前日まで）
 1. 先生が `! .venv/bin/python scripts/run_demo_visit.py` を実行し、本物の Claude で ready・fallback なしになることを確かめる（`docs/eval/demo-visit-*.html` を開いて中身を見る）
+   - D4 も `! .venv/bin/python scripts/run_demo_skill_change.py` で一度通す（本体の SKILL.md は変えない。差分は `docs/eval/demo-skill-change-*.diff`）
 2. 撮影用の DB を新しく作る（既存の DB は消さない）: `TSUTAE_DB=data/demo-take1.db make seed`
 3. 起動: `TSUTAE_DB=data/demo-take1.db TSUTAE_TODAY=2026-11-09 make dev-api` と `make dev-web`（スマホで撮るなら README の「スマホで試す」）
 4. ブラウザの拡大率・ウィンドウの大きさを決める。医師画面は院内PCの想定で横長、患者画面はスマホ幅

@@ -1,0 +1,14 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/skill-changes",
+  "request": {
+    "skill_name": "regimen-folfox",
+    "request_text": "口内炎の質問で食事がとれたかも聞いて"
+  },
+  "status": 200,
+  "body": {
+    "id": 1,
+    "status": "pending",
+    "diff": "--- a/regimen-folfox/SKILL.md\n+++ b/regimen-folfox/SKILL.md\n@@ -127,3 +127,4 @@\n - 質問を足すときは新しい `key`（英小文字で始まり、英小文字・数字・下線）を作る。既存の `key` を別の意味に使い回さない（過去の記録がその key を指している）\n - 質問文は患者の画面にそのまま出る。助言や説明の文を混ぜない\n - `fixed_rules` の `question_key` は `questions` にある key だけ\n+- 依頼: 口内炎の質問で食事がとれたかも聞いて\n"
+  }
+}

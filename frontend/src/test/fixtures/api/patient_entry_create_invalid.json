@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-DEMO0001/entries",
+  "request": {
+    "answers": [
+      {
+        "question_key": "unknown_question",
+        "value": "none"
+      }
+    ]
+  },
+  "status": 422,
+  "body": {
+    "error": "invalid_input"
+  }
+}

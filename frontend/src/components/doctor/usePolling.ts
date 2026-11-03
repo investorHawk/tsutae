@@ -1,6 +1,9 @@
 /**
  * 一定の間隔で取り直す（D3 は5秒、D5 は2秒）。前の取得が終わってから次の
  * タイマーを掛ける（重ならない）。アンマウントで止まる。
+ * 値（data・error・updatedAt・stopped）はマウントの間の1つの対象のもの。取る対象
+ * （D5 の受診など）が変わるなら、呼び出し側が key を変えて描き直す（Pipeline.tsx）。
+ * 前の対象の値を新しい対象の見出しの下に残さないため。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 

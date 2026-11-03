@@ -22,6 +22,24 @@ const MESSAGES: Readonly<Record<string, string>> = {
   invalid_date: "日付は YYYY-MM-DD の形で、暦にある日を入れてください",
   note_too_long: "メモは200字までです",
   invalid_visit_id: "受診の番号が正しくありません",
+  bad_password: "パスワードが違います",
+  // Skill の書き換え（D4。409 は pending のまま、やり直せるものを含む）
+  busy: "ほかの承認・却下を処理中です。少し待ってからもう一度押してください",
+  not_pending: "この変更はもう承認待ちではありません（履歴を見てください）",
+  stale:
+    "依頼の後に Skill が変わったため承認できません。もう一度依頼してください",
+  version_conflict: "Skill の version が合わないため承認できません",
+  write_error: "Skill を書き込めませんでした",
+  lock_error: "Skill のロックを取れませんでした",
+  editor_unavailable: "書き換えの仕組みが使えません",
+  invalid_name: "Skill の名前が正しくありません",
+  invalid_request: "依頼の一文が空か、長すぎます",
+  unknown_skill: "その Skill はありません",
+  base_invalid: "今の SKILL.md が壊れているため書き換えられません",
+  no_change: "書き換えても中身が変わりませんでした",
+  h1_blocked: "依頼の一文に個人を特定しうる語があるため送りませんでした",
+  invalid_input: "入力の形が正しくありません",
+  internal_error: "サーバーで想定外の失敗がありました",
 };
 
 export function errorCode(err: unknown): string {

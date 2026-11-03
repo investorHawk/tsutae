@@ -53,6 +53,7 @@ const SKILL_LIST = {
     { name: "regimen-folfox", version: 1 },
     { name: "report-format-default", version: 3 },
   ],
+  invalid: [],
 };
 
 function api(extra: Record<string, RouteValue> = {}) {
@@ -304,7 +305,7 @@ describe("Settings（D4 設定を変える）", () => {
   );
 
   it("Skill 一覧の応答が契約と違えば invalid_response", async () => {
-    api({ [SKILLS]: { skills: [{ name: "regimen-folfox" }] } });
+    api({ [SKILLS]: { skills: [{ name: "regimen-folfox" }], invalid: [] } });
     renderSettings();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "invalid_response",

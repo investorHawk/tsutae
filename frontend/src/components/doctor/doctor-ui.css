@@ -381,3 +381,13 @@
   gap: 12px;
   margin-bottom: 12px;
 }
+
+/* D4: 読めない Skill（GET skills の invalid） */
+.d-skill-invalid ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.d-skill-invalid .d-badge {
+  margin-left: 0.25rem;
+}

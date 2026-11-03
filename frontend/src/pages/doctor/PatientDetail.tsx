@@ -37,9 +37,16 @@ function NoticeView({ notice }: { notice: Notice | null }) {
   return null;
 }
 
-/** D2 コース登録。実投与日・予定日・次回受診予定日を登録・修正する。 */
+/**
+ * D2 コース登録。実投与日・予定日・次回受診予定日を登録・修正する。
+ * 患者ごとに描き直す（別の患者へ移ったら、フォーム・知らせ・送信中を前の患者から引き継がない）。
+ */
 export default function PatientDetail() {
   const { pid = "" } = useParams();
+  return <PatientCourseEditor key={pid} pid={pid} />;
+}
+
+function PatientCourseEditor({ pid }: { pid: string }) {
   const handleError = useDoctorApiError();
   const { courses, loadError, regimen, reload } = usePatientCourses(
     pid,

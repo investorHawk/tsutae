@@ -386,19 +386,25 @@ def _raise_os_error(*_args: Any, **_kwargs: Any) -> Any:
     raise OSError("injected")
 
 
-@pytest.mark.xfail(
-    raises=OSError,
-    strict=True,
-    reason="skillchange/service.py: 行を作った後の OSError が 500 になり pending が残る",
-)
 @pytest.mark.parametrize("where", ["mkdtemp", "mkdir", "open"])
 def test_filesystem_failure_after_row_is_failed(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, where: str
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, where: str
 ) -> None:
+    temp_root = tmp_path / "tmp"  # 一時ディレクトリの置き場をこのテスト専用にする
+    temp_root.mkdir()
+    monkeypatch.setattr(service_module.tempfile, "tempdir", str(temp_root))
     if where == "mkdtemp":
         monkeypatch.setattr(service_module.tempfile, "mkdtemp", _raise_os_error)
     elif where == "mkdir":
-        monkeypatch.setattr(service_module.Path, "mkdir", _raise_os_error)
+        # Path.mkdir は全体で共有（db.connect も呼ぶ）なので、一時ディレクトリの中だけ落とす
+        real_mkdir = service_module.Path.mkdir
+
+        def mkdir(self: Path, *args: Any, **kwargs: Any) -> None:
+            if service_module._TEMP_PREFIX in str(self):
+                raise OSError("injected")
+            real_mkdir(self, *args, **kwargs)
+
+        monkeypatch.setattr(service_module.Path, "mkdir", mkdir)
     else:
         monkeypatch.setattr(service_module, "open", _raise_os_error, raising=False)
     r = _request(client)
@@ -407,3 +413,5 @@ def test_filesystem_failure_after_row_is_failed(
     (item,) = client.get("/api/doctor/skill-changes").json()["skill_changes"]
     assert item["status"] == "failed"
     assert isinstance(item["error_code"], str) and 0 < len(item["error_code"]) <= 40
+    assert item["error_code"] == service_module.WORKDIR_ERROR
+    assert list(temp_root.iterdir()) == []  # 作りかけの一時ディレクトリも消す

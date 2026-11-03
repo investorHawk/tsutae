@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -37,6 +37,16 @@ from tsutae.schemas import (
 
 VISIT_DAY = date(2026, 11, 9)
 EXPIRES = datetime(2026, 11, 10, 9, 30, tzinfo=JST)
+PAST = datetime(2026, 11, 8, 9, 30, tzinfo=JST)  # 固定した「今日」より前に期限切れ
+
+
+@pytest.fixture(autouse=True)
+def _pin_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """保存は「今」と expires_at を比べるので、今日を受診日に固定する。
+
+    固定しないと、実際の日付が EXPIRES を過ぎた日にテストが落ちる。
+    """
+    monkeypatch.setenv("TSUTAE_TODAY", "2026-11-09")
 
 
 @pytest.fixture
@@ -416,3 +426,82 @@ def test_set_visit_status_does_not_reopen_printed_visit(
     with pytest.raises(VisitClosedError):
         set_visit_status(conn, vid, "ready", fallback=False)
     assert get_visit(conn, vid)["status"] == "printed"
+
+
+# ---------------------------------------------------------------------------
+# 期限切れ（expires_at を過ぎた）が、まだ purge_expired されていない受診
+# ---------------------------------------------------------------------------
+
+
+def _assert_untouched(conn: sqlite3.Connection, vid: int, status: str) -> None:
+    visit = get_visit(conn, vid)
+    assert visit["reception_no"] == "A-023"  # purge はしない（拒否するだけ）
+    assert (visit["status"], visit["fallback"]) == (status, False)
+    assert _count(conn, "timelines", vid) == 0
+    assert _count(conn, "reports", vid) == 0
+    assert conn.in_transaction is False
+
+
+@pytest.mark.parametrize(
+    "write",
+    [
+        lambda c, v: save_timeline(c, v, _timeline()),
+        lambda c, v: save_report(c, v, "<html>late</html>", _report()),
+        lambda c, v: set_visit_status(c, v, "ready", fallback=True),
+        lambda c, v: set_visit_status(c, v, "failed"),
+    ],
+    ids=["save_timeline", "save_report", "set_ready", "set_failed"],
+)
+def test_expired_but_not_purged_is_rejected(
+    conn: sqlite3.Connection, pid: str, write
+) -> None:
+    vid = _visit(conn, pid, expires_at=PAST)
+    with pytest.raises(VisitClosedError):
+        write(conn, vid)
+    _assert_untouched(conn, vid, "generating")
+
+
+def test_expired_but_not_purged_keeps_old_results(
+    conn: sqlite3.Connection, pid: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vid = _visit(conn, pid)
+    save_timeline(conn, vid, _timeline())
+    save_report(conn, vid, "<html>first</html>", _report())
+    set_visit_status(conn, vid, "ready")
+    monkeypatch.setattr("tsutae.db.repo_visits.clock_now", lambda: EXPIRES)
+    with pytest.raises(VisitClosedError):
+        save_report(conn, vid, "<html>late</html>", _report())
+    with pytest.raises(VisitClosedError):
+        set_visit_status(conn, vid, "failed")
+    assert get_report(conn, vid)[0] == "<html>first</html>"  # 上書きしない
+    assert get_visit(conn, vid)["status"] == "ready"
+
+
+@pytest.mark.parametrize(
+    ("now", "accepted"),
+    [
+        (EXPIRES - timedelta(microseconds=1), True),
+        (EXPIRES, False),  # purge_expired と同じく、期限ちょうどで閉じる
+        (EXPIRES.astimezone(UTC), False),  # 別のタイムゾーンでも同じ瞬間
+        (datetime(2026, 11, 10, 9, 29, 59), True),  # naive は JST とみなす
+    ],
+)
+def test_expiry_boundary_for_saves(
+    conn: sqlite3.Connection,
+    pid: str,
+    monkeypatch: pytest.MonkeyPatch,
+    now: datetime,
+    accepted: bool,
+) -> None:
+    vid = _visit(conn, pid)
+    monkeypatch.setattr("tsutae.db.repo_visits.clock_now", lambda: now)
+    if accepted:
+        save_timeline(conn, vid, _timeline())
+        set_visit_status(conn, vid, "ready")
+        assert get_visit(conn, vid)["status"] == "ready"
+        return
+    with pytest.raises(VisitClosedError):
+        save_timeline(conn, vid, _timeline())
+    with pytest.raises(VisitClosedError):
+        set_visit_status(conn, vid, "ready")
+    _assert_untouched(conn, vid, "generating")

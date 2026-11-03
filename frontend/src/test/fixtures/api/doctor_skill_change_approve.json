@@ -1,0 +1,10 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/skill-changes/1/approve",
+  "request": null,
+  "status": 200,
+  "body": {
+    "ok": true,
+    "new_version": 2
+  }
+}

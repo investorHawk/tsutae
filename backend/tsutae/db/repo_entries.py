@@ -38,40 +38,60 @@ def add_entry(
     skill_version: str,
 ) -> Entry:
     """記録を1件保存し、保存した内容を Entry で返す。"""
-    if not isinstance(skill_version, str) or not SKILL_VERSION_PATTERN.fullmatch(
-        skill_version
-    ):
-        raise ValueError("skill_version は <skill-name>@<version>")
+    validate_skill_version(skill_version)
     require_exists(conn, "patients", pid, "patient")
-    at = to_jst(recorded_at)
     with write_transaction(conn):
-        cur = conn.execute(
-            "INSERT INTO entries (patient_id, recorded_at, record_date, kind,"
-            " by_proxy, skill_version) VALUES (?, ?, ?, ?, ?, ?)",
-            (
-                pid,
-                dt_to_db(at),
-                date_to_db(to_jst_date(at)),
-                entry.kind,
-                int(entry.by_proxy),
-                skill_version,
-            ),
-        )
-        entry_id = int(cur.lastrowid)
-        conn.executemany(
-            "INSERT INTO closed_answers (entry_id, question_key, value, temperature)"
-            " VALUES (?, ?, ?, ?)",
-            [(entry_id, a.question_key, a.value, a.temperature) for a in entry.answers],
-        )
-        if entry.free_text is not None:
-            conn.execute(
-                "INSERT INTO free_texts (entry_id, text) VALUES (?, ?)",
-                (entry_id, entry.free_text),
-            )
+        entry_id = insert_entry_rows(conn, pid, entry, recorded_at, skill_version)
     saved = get_entry(conn, entry_id)
     if saved is None:  # pragma: no cover - 直前に書いた行が無いのは異常
         raise RuntimeError("entry was not saved")
     return saved
+
+
+def validate_skill_version(skill_version: str) -> None:
+    if not isinstance(skill_version, str) or not SKILL_VERSION_PATTERN.fullmatch(
+        skill_version
+    ):
+        raise ValueError("skill_version は <skill-name>@<version>")
+
+
+def insert_entry_rows(
+    conn: sqlite3.Connection,
+    pid: str,
+    entry: EntryCreate,
+    recorded_at: datetime,
+    skill_version: str,
+) -> int:
+    """記録の行（回答・自由記載を含む）を入れて id を返す。
+
+    検査（validate_skill_version・患者の有無）は呼び出し側で済ませ、
+    write_transaction を開いておくこと。
+    """
+    at = to_jst(recorded_at)
+    cur = conn.execute(
+        "INSERT INTO entries (patient_id, recorded_at, record_date, kind,"
+        " by_proxy, skill_version) VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            pid,
+            dt_to_db(at),
+            date_to_db(to_jst_date(at)),
+            entry.kind,
+            int(entry.by_proxy),
+            skill_version,
+        ),
+    )
+    entry_id = int(cur.lastrowid)
+    conn.executemany(
+        "INSERT INTO closed_answers (entry_id, question_key, value, temperature)"
+        " VALUES (?, ?, ?, ?)",
+        [(entry_id, a.question_key, a.value, a.temperature) for a in entry.answers],
+    )
+    if entry.free_text is not None:
+        conn.execute(
+            "INSERT INTO free_texts (entry_id, text) VALUES (?, ?)",
+            (entry_id, entry.free_text),
+        )
+    return entry_id
 
 
 def get_entry(conn: sqlite3.Connection, entry_id: int) -> Entry | None:

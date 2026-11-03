@@ -20,7 +20,7 @@ export type SkillPhase =
       busy: boolean;
       error: string | null;
     }
-  | { kind: "approved"; skillName: string; newVersion: number | null }
+  | { kind: "approved"; skillName: string; newVersion: number }
   | { kind: "rejected"; skillName: string }
   | { kind: "failed"; changeId: number | null; code: string };
 
@@ -76,9 +76,8 @@ export function useSkillChangeFlow({
     setPhase({ ...phase, busy: true, error: null });
     try {
       if (approve) {
-        const res = await approveSkillChange(target.id);
-        const newVersion =
-          typeof res.new_version === "number" ? res.new_version : null;
+        // new_version は必須（無い応答は approveSkillChange が invalid_response にする）
+        const { new_version: newVersion } = await approveSkillChange(target.id);
         setPhase({ kind: "approved", skillName: target.skillName, newVersion });
       } else {
         await rejectSkillChange(target.id);
@@ -86,6 +85,7 @@ export function useSkillChangeFlow({
       }
       onDecided(approve);
     } catch (err) {
+      // 409 busy（別の承認・却下がロックを握っている）は確認画面のまま。もう一度押せる
       setPhase(reviewOf(target, handleError(err)));
     }
   }

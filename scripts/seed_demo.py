@@ -6,8 +6,8 @@
 - 今の SKILL.md を skill_versions に登録する（`ensure_skill_versions`）
 - 既にいる患者（仮名IDが同じ）は飛ばす。**DB を消さない・上書きしない**（何度流してもよい）
 - 記録は合成データの seq の順に入れる（空の DB ならデモ患者の entries.id は seq と同じ）
-- 1人分（患者・コース・記録）は1つのトランザクションで入れる。途中で失敗すればその
-  患者は丸ごと残らないので、次に流せば入れ直せる（`_atomic` を参照）
+- 1人分（患者・コース・記録）は `db.seed_patient` で1つのトランザクションで入れる。
+  途中で失敗すればその患者は丸ごと残らないので、次に流せば入れ直せる
 """
 
 from __future__ import annotations
@@ -15,61 +15,27 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import sys
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
 from pathlib import Path
 
 from tsutae import db
 from tsutae.config import get_settings, load_env_file
-from tsutae.dataset import to_courses, to_entry_create
+from tsutae.dataset import to_courses, to_entries
 from tsutae.pipeline.service import ensure_skill_versions
 from tsutae.schemas import SyntheticPatient
 from tsutae.synthetic import all_patients
 
 
-@contextmanager
-def _atomic(conn: sqlite3.Connection) -> Iterator[None]:
-    """中の書き込みを1つの `BEGIN IMMEDIATE … COMMIT` にまとめる（例外なら ROLLBACK）。
-
-    db の書き込み関数はそれぞれ `with conn:` で commit するので、外側で包むだけでは
-    1つにならない。そこで一時的に `conn.autocommit = True`（Python 3.12+）にして
-    commit()/rollback() を何もしない状態にし、自分で BEGIN/COMMIT を出す。終われば
-    autocommit を元に戻す。書きかけのトランザクションがあれば始めない。
-    """
-    if conn.in_transaction:
-        raise RuntimeError("書きかけのトランザクションがある")
-    previous = conn.autocommit
-    conn.autocommit = True
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-        try:
-            yield
-            conn.execute("COMMIT")
-        except BaseException:
-            if conn.in_transaction:
-                conn.execute("ROLLBACK")
-            raise
-    finally:
-        conn.autocommit = previous
-
-
 def _seed_one(conn: sqlite3.Connection, patient: SyntheticPatient) -> bool:
     """まだいなければ1人分を1つのトランザクションで入れる。入れたら True。"""
-    with _atomic(conn):
-        if db.get_patient(conn, patient.patient_id) is not None:
-            return False
-        _insert_patient(conn, patient)
-        return True
-
-
-def _insert_patient(conn: sqlite3.Connection, patient: SyntheticPatient) -> None:
-    pid = db.create_patient(conn, patient.regimen, patient_id=patient.patient_id)
-    for course in to_courses(patient):
-        db.upsert_course(conn, course)
-    for src in sorted(patient.entries, key=lambda e: e.seq):
-        db.add_entry(
-            conn, pid, to_entry_create(src), src.recorded_at, src.skill_version
-        )
+    entries = sorted(to_entries(patient), key=lambda e: e.id)  # seq の順
+    return db.seed_patient(
+        conn,
+        patient_id=patient.patient_id,
+        regimen=patient.regimen,
+        courses=to_courses(patient),
+        entries=entries,
+    )
 
 
 def seed(

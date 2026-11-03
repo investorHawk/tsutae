@@ -1,0 +1,14 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/skill-changes",
+  "request": {
+    "skill_name": "regimen-folfox",
+    "request_text": "今のままでよい"
+  },
+  "status": 200,
+  "body": {
+    "id": 2,
+    "status": "failed",
+    "diff": null
+  }
+}

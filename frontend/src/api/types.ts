@@ -17,6 +17,8 @@ export type AnswerValue = ThreeLevel | FeverValue;
 export type AnswerType = "three_level" | "temperature";
 export type EntryKind = "too_sick" | "answers" | "free_text" | "mixed";
 export type VisitStatus = "generating" | "ready" | "printed" | "failed";
+/** 印刷待ち一覧（GET visits）に出る状態。印刷済み・期限切れは一覧に出ない。 */
+export type OpenVisitStatus = Exclude<VisitStatus, "printed">;
 export type SkillChangeStatus = "pending" | "approved" | "rejected" | "failed";
 
 export const REGIMENS: readonly Regimen[] = ["FOLFOX", "CAPOX"];
@@ -174,12 +176,15 @@ export interface CoursesResponse {
   courses: Course[];
 }
 
+/**
+ * 印刷待ち一覧の1件（W3 後の決定）。出るのは受付番号のある generating・ready・failed だけ
+ * （印刷済み・期限切れは一覧から消える）。
+ */
 export interface VisitSummary {
   id: number;
-  /** 印刷済み・期限切れで null */
-  reception_no: string | null;
+  reception_no: string;
   patient_id: string;
-  status: VisitStatus;
+  status: OpenVisitStatus;
   fallback: boolean;
   created_at: IsoDateTime;
   expires_at: IsoDateTime;
@@ -224,8 +229,21 @@ export interface SkillInfo {
   version: number;
 }
 
+/**
+ * 読めない Skill（壊れた SKILL.md・欠けた必須 Skill）。一覧から黙って落とさず、
+ * 設定画面に出す（W3 後の決定。§8 の表は code と書くが、API の項目名は error_code）。
+ */
+export interface InvalidSkill {
+  name: string;
+  /** 例 "format"・"schema"・"missing" */
+  error_code: string;
+  /** regimen の2本と report-format-default */
+  required: boolean;
+}
+
 export interface SkillsResponse {
   skills: SkillInfo[];
+  invalid: InvalidSkill[];
 }
 
 export interface CreateSkillChangeRequest {
@@ -240,10 +258,7 @@ export interface CreateSkillChangeResponse {
   diff: string | null;
 }
 
-/**
- * GET /api/doctor/skill-changes の1件。§8 は「一覧」としか書いていないので、
- * skill_changes 表（§2）の列を仮置きで写している（契約の確定待ち）。
- */
+/** GET /api/doctor/skill-changes の1件（new_text は返さない。差分で足りる）。 */
 export interface SkillChange {
   id: number;
   skill_name: string;
@@ -261,7 +276,13 @@ export interface SkillChangesResponse {
   skill_changes: SkillChange[];
 }
 
-export interface DecideSkillChangeResponse {
-  ok: boolean;
-  new_version?: number | null;
+/** POST approve の応答。new_version（上がった後の version）は必須。 */
+export interface ApproveSkillChangeResponse {
+  ok: true;
+  new_version: number;
+}
+
+/** POST reject の応答（{ok: true} だけ）。 */
+export interface RejectSkillChangeResponse {
+  ok: true;
 }

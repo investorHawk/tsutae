@@ -1,0 +1,29 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/skills",
+  "request": null,
+  "status": 200,
+  "body": {
+    "skills": [
+      {
+        "name": "regimen-capox",
+        "version": 1
+      },
+      {
+        "name": "regimen-folfox",
+        "version": 2
+      },
+      {
+        "name": "report-format-default",
+        "version": 1
+      }
+    ],
+    "invalid": [
+      {
+        "name": "regimen-extra",
+        "error_code": "schema",
+        "required": false
+      }
+    ]
+  }
+}

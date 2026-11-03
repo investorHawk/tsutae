@@ -51,16 +51,17 @@ function Actions({ visit, onPrinted }: VisitRowProps) {
           </Link>
         </div>
       );
-    default:
-      return <span className="d-muted">削除済み</span>;
   }
 }
 
-/** D3 の1行。受付番号・仮名ID・状態・AI変換なし・未処理・操作。 */
+/**
+ * D3 の1行。受付番号・仮名ID・状態・AI変換なし・未処理・操作。
+ * 一覧に出るのは generating・ready・failed だけ（印刷済み・期限切れは API が出さない）。
+ */
 export default function VisitRow({ visit, onPrinted }: VisitRowProps) {
   return (
     <tr className={`d-visit d-visit--${visit.status}`}>
-      <td className="d-reception">{visit.reception_no ?? "—"}</td>
+      <td className="d-reception">{visit.reception_no}</td>
       <td>
         <code>{visit.patient_id}</code>
       </td>

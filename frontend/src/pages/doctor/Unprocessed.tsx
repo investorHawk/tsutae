@@ -14,15 +14,25 @@ const RULE_LABELS: Readonly<Record<string, string>> = {
   long_digits: "7桁以上の数字列がある（電話番号・番号の疑い）",
   at_mark: "@ がある（メールアドレスの疑い）",
   before_facility: "施設名らしき語がある（病院名の疑い）",
+  address_number: "番地らしき数字の並びがある（住所の疑い）",
+  id_like: "英字とハイフンと番号の並びがある（ID・受付番号の疑い）",
+  known_identifier: "この患者の仮名ID か受付番号が書かれている",
 };
 
 function ruleLabel(reason: string): string {
   return RULE_LABELS[reason] ?? "伏せ字漏れの疑い";
 }
 
-/** D6 未処理の記載。伏せ字漏れの疑いで Claude に送らなかった記録の原文（院内画面だけ）。 */
+/**
+ * D6 未処理の記載。伏せ字漏れの疑いで Claude に送らなかった記録の原文（院内画面だけ）。
+ * 受診ごとに描き直す（別の受診へ移ったら前の受診の原文・失敗を引き継がない）。
+ */
 export default function Unprocessed() {
   const { visitId } = useParams();
+  return <UnprocessedView key={visitId ?? ""} visitId={visitId} />;
+}
+
+function UnprocessedView({ visitId }: { visitId: string | undefined }) {
   const id = parseVisitId(visitId);
   const handleError = useDoctorApiError();
   const [items, setItems] = useState<UnprocessedItem[] | null>(null);

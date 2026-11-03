@@ -26,10 +26,50 @@ export const isOptNumber = (v: unknown): boolean =>
 /** 1 以上の整数。 */
 export const isPositiveInt = (v: unknown): v is number => isInt(v) && v >= 1;
 
-/** "YYYY-MM-DD"（§2 の日付の形）。 */
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-export const isIsoDate = (v: unknown): v is string =>
-  isString(v) && ISO_DATE.test(v);
+/** 項目が存在する（値が null でもよい。省略は不正）。 */
+export function has(v: Item, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(v, key);
+}
+
+/** 型の `T | null`（? なし）: 項目は必須、値は null か isValue に合うもの。 */
+export const hasNullable =
+  (key: string, isValue: (x: unknown) => boolean) =>
+  (v: Item): boolean =>
+    has(v, key) && (v[key] === null || isValue(v[key]));
+
+/** 年月日が暦に実在する（2026-02-30・13月を落とす）。 */
+function isCalendarDate(year: number, month: number, day: number): boolean {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day
+  );
+}
+
+/** "YYYY-MM-DD"（§2 の日付の形）で、暦に実在する日。 */
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+export const isIsoDate = (v: unknown): v is string => {
+  const m = isString(v) ? ISO_DATE.exec(v) : null;
+  return m !== null && isCalendarDate(Number(m[1]), Number(m[2]), Number(m[3]));
+};
+
+/**
+ * ISO 8601 の日時（§2: +09:00 付き。Python の isoformat の形で、秒は必須・小数秒は6桁まで）。
+ * 日付は暦に実在し、時刻は 00:00:00〜23:59:59。
+ */
+const ISO_DATE_TIME =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?\+09:00$/;
+export const isIsoDateTime = (v: unknown): v is string => {
+  const m = isString(v) ? ISO_DATE_TIME.exec(v) : null;
+  return (
+    m !== null &&
+    isIsoDate(m[1]) &&
+    Number(m[2]) < 24 &&
+    Number(m[3]) < 60 &&
+    Number(m[4]) < 60
+  );
+};
 /** null・省略を許す "YYYY-MM-DD"。 */
 export const isOptIsoDate = (v: unknown): boolean =>
   v === undefined || v === null || isIsoDate(v);

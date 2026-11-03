@@ -125,7 +125,10 @@ const cases: Case[] = [
     run: () => listSkills(),
     method: "GET",
     url: "/api/doctor/skills",
-    response: { skills: [{ name: "regimen-folfox", version: 1 }] },
+    response: {
+      skills: [{ name: "regimen-folfox", version: 1 }],
+      invalid: [],
+    },
   },
   {
     name: "createSkillChange",
@@ -198,7 +201,9 @@ describe("医師 API", () => {
 
 describe("checkDoctorSession", () => {
   it("200 ならログイン済み", async () => {
-    const fetchMock = mockFetch(() => jsonResponse({ skills: [] }));
+    const fetchMock = mockFetch(() =>
+      jsonResponse({ skills: [], invalid: [] }),
+    );
     await expect(checkDoctorSession()).resolves.toBe(true);
     expect(callOf(fetchMock).url).toBe("/api/doctor/skills");
   });

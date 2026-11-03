@@ -2,6 +2,7 @@
  * 患者 API（§8 患者）の 2xx 応答の検査。契約で列挙された項目は全て存在を必須にする
  * （nullable の項目は「存在して null」を許す。省略は不正）。ClosedAnswer の規則
  * （measured のときだけ体温 30.0〜45.0）と、質問・回答の key の重複も見る。
+ * 日時は +09:00 付き ISO 8601、日付は暦に実在する YYYY-MM-DD。
  * 合わなければ invalid_response（画面は error.generic を出す。真っ白にしない）。
  */
 import {
@@ -16,8 +17,12 @@ import {
 import {
   type Item,
   everyItem,
+  has,
+  hasNullable,
   isBool,
   isInt,
+  isIsoDate,
+  isIsoDateTime,
   isString,
   oneOf,
 } from "./validate";
@@ -37,14 +42,9 @@ const ENTRY_KINDS: readonly EntryKind[] = [
 const isStringList = (v: unknown): boolean =>
   Array.isArray(v) && v.every(isString);
 
-/** 項目が存在する（値が null でもよい）。 */
-function has(v: Item, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(v, key);
-}
-
 /** 項目が存在し、値が null か文字列。 */
 function hasNullableString(v: Item, key: string): boolean {
-  return has(v, key) && (v[key] === null || isString(v[key]));
+  return hasNullable(key, isString)(v);
 }
 
 /** 配列の要素の key に重複が無い。 */
@@ -109,8 +109,8 @@ function isPatientAnswer(v: Item): boolean {
 function isPatientEntry(v: Item): boolean {
   return (
     isInt(v.id) &&
-    isString(v.recorded_at) &&
-    isString(v.record_date) &&
+    isIsoDateTime(v.recorded_at) &&
+    isIsoDate(v.record_date) &&
     oneOf(ENTRY_KINDS)(v.kind) &&
     isBool(v.by_proxy) &&
     isString(v.skill_version) &&

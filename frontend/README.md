@@ -19,6 +19,19 @@ npx prettier --check "src/**/*.{ts,tsx,css}"
 - Skill 変更の差分が空（空白だけを含む）なら失敗として扱い、承認させない。
 - `Course.note` は200字まで（code point で数える。schemas.py の `max_length=200` と同じ）。
 
+## API の契約テスト（実際の FastAPI の応答）
+
+`src/test/fixtures/api/*.json` は `scripts/dump_api_fixtures.py` が書く実際の応答（1件は `{method, path, request, status, body}`。日時は 2026-11-09T10:00+09:00 に固定）。API を変えたらリポジトリ直下で流し直す:
+
+```sh
+.venv/bin/python scripts/dump_api_fixtures.py
+```
+
+- `backend/tests/test_dump_api_fixtures.py`: fixture が今の API の出力と同じこと（古くなっていないこと）
+- `src/api/contract.calls.test.ts`: 全 fixture を API の関数に流す（経路・メソッド・本文が同じ、成功は検査を通る、失敗は `ApiError(status, code)`）
+- `src/api/contract.guards.test.ts`: 各 guard が fixture を受け入れ、壊した fixture を拒む
+- fixture を足したら、両テストの表（`CALLS`・`GUARDS`）にも足す（足さないとテストが落ちる）
+
 ## 患者画面の直書き検査と、その限界
 
 `src/test/patientTextLint.ts` が TypeScript の構文木で患者のファイルを検査する（テストは `src/test/patientNoHardcodedText.test.ts` と `src/components/patient/noHardcodedText.test.ts`）。

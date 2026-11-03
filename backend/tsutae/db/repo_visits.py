@@ -5,8 +5,13 @@ visits の行そのものは残す（状態の履歴として）。
 
 消した中身が戻らないように:
 - status=printed にする経路は mark_printed だけ（set_visit_status は printed を拒否）
-- reception_no が NULL の受診（印刷済み・期限切れ）には save_timeline / save_report
-  できない（VisitClosedError）。生成が印刷済み操作や期限より遅れて終わる場合に備える
+- 閉じた受診（印刷済み、または期限切れ）には save_timeline / save_report /
+  save_visit_result / set_visit_status できない（VisitClosedError）。期限切れは
+  `expires_at <= 今`（`config.now()`）で決める。purge_expired がまだ受付番号を
+  消していなくても拒否する（purge はしない。消すのは purge_expired だけ）。
+  生成が印刷済み操作や期限より遅れて終わる場合に備える
+- save_visit_result は timeline・report・status を1つのトランザクションで書く（途中で
+  失敗すれば何も残らない）。生成の終わりはこれを使う
 - purge_expired は status を問わず、期限を過ぎて中身が残っている受診を全て消す
 """
 
@@ -140,50 +145,100 @@ def set_visit_status(
     """状態を変える。fallback=None なら fallback は変えない。
 
     printed は受け付けない（中身を消さずに印刷済みにしないよう mark_printed を使う）。
-    受診が無ければ NotFoundError、印刷済み・期限切れなら VisitClosedError。
+    受診が無ければ NotFoundError、印刷済み・期限切れ（purge 前を含む）なら
+    VisitClosedError。
     """
-    if status == "printed":
-        raise ValueError("printed にするのは mark_printed だけ")
-    _validate_status(status)
-    # 印刷済み・期限切れ（受付番号を消した受診）は条件付き UPDATE で触らない。
-    # 別の接続の mark_printed と競合しても printed を ready に戻さない
-    guard = " AND reception_no IS NOT NULL AND status != 'printed'"
+    _validate_settable_status(status)
     with write_transaction(conn):
-        if fallback is None:
-            cur = conn.execute(
-                "UPDATE visits SET status = ? WHERE id = ?" + guard, (status, vid)
-            )
-        else:
-            cur = conn.execute(
-                "UPDATE visits SET status = ?, fallback = ? WHERE id = ?" + guard,
-                (status, int(bool(fallback)), vid),
-            )
-    if cur.rowcount == 0:
+        changed = _update_status(conn, vid, status, fallback, _now_db())
+    if not changed:
         _raise_not_open(conn, vid)
 
 
+def _validate_settable_status(status: str) -> None:
+    if status == "printed":
+        raise ValueError("printed にするのは mark_printed だけ")
+    _validate_status(status)
+
+
+# 閉じた受診（印刷済み・受付番号を消した・期限を過ぎた）は条件付き UPDATE で触らない。
+# 別の接続の mark_printed と競合しても printed を ready に戻さない。期限の比較は
+# purge_expired（expires_at <= now で消す）と同じ境界: expires_at > now の間だけ開いている。
+# 日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する（connection.py）
+_STATUS_GUARD = (
+    " AND reception_no IS NOT NULL AND status != 'printed' AND expires_at > ?"
+)
+
+
+def _now_db() -> str:
+    """条件付き書き込みで expires_at と比べる「今」。"""
+    return dt_to_db(clock_now())
+
+
+def _update_status(
+    conn: sqlite3.Connection,
+    vid: int,
+    status: str,
+    fallback: bool | None,
+    now_db: str,
+) -> bool:
+    """条件付きで状態を変え、変えたら True。呼び出し側で write_transaction を開く。"""
+    if fallback is None:
+        cur = conn.execute(
+            "UPDATE visits SET status = ? WHERE id = ?" + _STATUS_GUARD,
+            (status, vid, now_db),
+        )
+    else:
+        cur = conn.execute(
+            "UPDATE visits SET status = ?, fallback = ? WHERE id = ?" + _STATUS_GUARD,
+            (status, int(bool(fallback)), vid, now_db),
+        )
+    return cur.rowcount > 0
+
+
 def _raise_not_open(conn: sqlite3.Connection, vid: int) -> None:
-    """保存できなかった理由を例外にする（受診が無い／受付番号を消した受診）。"""
+    """保存できなかった理由を例外にする（受診が無い／閉じた受診）。"""
     if get_visit(conn, vid) is None:
         raise NotFoundError("visit not found")
     raise VisitClosedError("visit is printed or expired")
 
 
-def _save_result(
-    conn: sqlite3.Connection, vid: int, sql: str, values: tuple[object, ...]
+_OPEN_VISIT = (
+    " FROM visits WHERE id = ? AND reception_no IS NOT NULL AND expires_at > ?"
+)
+_TIMELINE_SQL = (
+    "INSERT INTO timelines (visit_id, json) SELECT id, ?"
+    + _OPEN_VISIT
+    + " ON CONFLICT (visit_id) DO UPDATE SET json = excluded.json"
+)
+_REPORT_SQL = (
+    "INSERT INTO reports (visit_id, html, data_json) SELECT id, ?, ?"
+    + _OPEN_VISIT
+    + " ON CONFLICT (visit_id) DO UPDATE SET"
+    " html = excluded.html, data_json = excluded.data_json"
+)
+
+
+def _write_if_open(
+    conn: sqlite3.Connection,
+    vid: int,
+    sql: str,
+    values: tuple[object, ...],
+    now_db: str,
 ) -> None:
-    """受付番号が残っている受診にだけ書く（確認と書き込みを1文で行う）。
+    """受付番号が残っていて期限前の受診にだけ書く（確認と書き込みを1文で行う）。
 
-    sql は `INSERT INTO <表> (...) SELECT id, ?... FROM visits WHERE id = ?
-    AND reception_no IS NOT NULL ON CONFLICT ...` の形の内部の固定文。
+    sql は `_TIMELINE_SQL` / `_REPORT_SQL`（内部の固定文）。書けなければ例外を出す。
+    呼び出し側で write_transaction を開いておくこと（例外で rollback される）。
     """
-    with write_transaction(conn):
-        cur = conn.execute(sql, (*values, vid))
-        if cur.rowcount == 0:
-            _raise_not_open(conn, vid)
+    cur = conn.execute(sql, (*values, vid, now_db))
+    if cur.rowcount == 0:
+        _raise_not_open(conn, vid)
 
 
-_OPEN_VISIT = " FROM visits WHERE id = ? AND reception_no IS NOT NULL"
+def _check_html(html: object) -> None:
+    if not isinstance(html, str):
+        raise ValueError("html は文字列")
 
 
 def save_timeline(conn: sqlite3.Connection, vid: int, timeline: Timeline) -> None:
@@ -191,14 +246,9 @@ def save_timeline(conn: sqlite3.Connection, vid: int, timeline: Timeline) -> Non
 
     受診が無ければ NotFoundError、印刷済み・期限切れなら VisitClosedError。
     """
-    _save_result(
-        conn,
-        vid,
-        "INSERT INTO timelines (visit_id, json) SELECT id, ?"
-        + _OPEN_VISIT
-        + " ON CONFLICT (visit_id) DO UPDATE SET json = excluded.json",
-        (timeline.model_dump_json(),),
-    )
+    values = (timeline.model_dump_json(),)
+    with write_transaction(conn):
+        _write_if_open(conn, vid, _TIMELINE_SQL, values, _now_db())
 
 
 def get_timeline(conn: sqlite3.Connection, vid: int) -> Timeline | None:
@@ -215,17 +265,39 @@ def save_report(
 
     受診が無ければ NotFoundError、印刷済み・期限切れなら VisitClosedError。
     """
-    if not isinstance(html, str):
-        raise ValueError("html は文字列")
-    _save_result(
-        conn,
-        vid,
-        "INSERT INTO reports (visit_id, html, data_json) SELECT id, ?, ?"
-        + _OPEN_VISIT
-        + " ON CONFLICT (visit_id) DO UPDATE SET"
-        " html = excluded.html, data_json = excluded.data_json",
-        (html, data.model_dump_json()),
-    )
+    _check_html(html)
+    values = (html, data.model_dump_json())
+    with write_transaction(conn):
+        _write_if_open(conn, vid, _REPORT_SQL, values, _now_db())
+
+
+def save_visit_result(
+    conn: sqlite3.Connection,
+    vid: int,
+    *,
+    timeline: Timeline,
+    html: str,
+    data: ReportData,
+    status: str,
+    fallback: bool,
+) -> None:
+    """変換結果・レポート・状態（と fallback）を1つのトランザクションで保存する。
+
+    どれかが失敗すれば全て rollback する（timeline だけ残る、などは起きない）。
+    受診が無ければ NotFoundError、印刷済み・期限切れ（purge 前を含む）なら
+    VisitClosedError（何も変えない）。
+    status は set_visit_status と同じく printed を受け付けない。
+    """
+    _validate_settable_status(status)
+    _check_html(html)
+    values = (timeline.model_dump_json(), html, data.model_dump_json())
+    with write_transaction(conn):
+        now_db = _now_db()  # ロックを取った後の「今」を3つの文で共有する
+        # 先に条件付きで状態を変える（閉じた受診なら何も書かずに例外）
+        if not _update_status(conn, vid, status, bool(fallback), now_db):
+            _raise_not_open(conn, vid)
+        _write_if_open(conn, vid, _TIMELINE_SQL, values[:1], now_db)
+        _write_if_open(conn, vid, _REPORT_SQL, values[1:], now_db)
 
 
 def get_report(conn: sqlite3.Connection, vid: int) -> tuple[str, ReportData] | None:

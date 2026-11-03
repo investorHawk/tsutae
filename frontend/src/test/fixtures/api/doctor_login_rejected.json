@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/login",
+  "request": {
+    "password": "wrong-password"
+  },
+  "status": 401,
+  "body": {
+    "error": "bad_password"
+  }
+}

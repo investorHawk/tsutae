@@ -10,6 +10,7 @@ from api_helpers import load_seed_module
 
 from tsutae import db
 from tsutae.config import SKILLS_DIR
+from tsutae.dataset import to_entry_create
 from tsutae.synthetic import all_patients
 
 seed_demo = load_seed_module()
@@ -87,33 +88,30 @@ def test_main_with_db_option_twice(
         conn.close()
 
 
-class _Boom(RuntimeError):
-    pass
+def _fail_on_nth_entry(conn: sqlite3.Connection, nth: int) -> None:
+    """この接続で、表に既に nth-1 件あるときの entries への INSERT を本物の DB の
+    失敗にする（一時トリガ。seed_patient の中の1件ごとの INSERT で起きる）。"""
+    conn.execute(
+        "CREATE TEMP TRIGGER fail_entries BEFORE INSERT ON main.entries"
+        f" WHEN (SELECT COUNT(*) FROM main.entries) >= {int(nth) - 1}"
+        " BEGIN SELECT RAISE(ABORT, 'injected'); END"
+    )
 
 
-def _fail_on_nth_add_entry(monkeypatch: pytest.MonkeyPatch, nth: int) -> None:
-    real = db.add_entry
-    calls = {"n": 0}
-
-    def flaky(*args, **kwargs):
-        calls["n"] += 1
-        if calls["n"] == nth:
-            raise _Boom("わざと失敗")
-        return real(*args, **kwargs)
-
-    monkeypatch.setattr(db, "add_entry", flaky)
+def _stop_failing(conn: sqlite3.Connection) -> None:
+    conn.execute("DROP TRIGGER temp.fail_entries")
 
 
 def test_failure_mid_patient_leaves_nothing_and_rerun_completes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     path = tmp_path / "seed.db"
     conn = db.connect(path)
     try:
-        _fail_on_nth_add_entry(monkeypatch, 3)  # デモ患者の3件目の記録で落とす
-        with pytest.raises(_Boom):
+        db.init_db(conn)
+        _fail_on_nth_entry(conn, 3)  # デモ患者の3件目の記録で落とす
+        with pytest.raises(sqlite3.Error):
             seed_demo.seed(conn, skills_dir=SKILLS_DIR)
-        monkeypatch.undo()
         assert conn.in_transaction is False
         assert db.list_patients(conn) == []  # 途中の患者を残さない
     finally:
@@ -131,17 +129,16 @@ def test_failure_mid_patient_leaves_nothing_and_rerun_completes(
         other.close()
 
 
-def test_failure_in_later_patient_keeps_earlier_complete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_failure_in_later_patient_keeps_earlier_complete(tmp_path: Path) -> None:
     conn = db.connect(tmp_path / "seed.db")
     try:
+        db.init_db(conn)
         order = [p.patient_id for p, _labels in all_patients()]
         first_entries = len(EXPECTED[order[0]].entries)
-        _fail_on_nth_add_entry(monkeypatch, first_entries + 2)  # 2人目の途中
-        with pytest.raises(_Boom):
+        _fail_on_nth_entry(conn, first_entries + 2)  # 2人目の途中
+        with pytest.raises(sqlite3.Error):
             seed_demo.seed(conn, skills_dir=SKILLS_DIR)
-        monkeypatch.undo()
+        _stop_failing(conn)
         counts = _counts(conn)
         assert set(counts) == {order[0]}  # 1人目は完全、2人目は無い
         first = EXPECTED[order[0]]
@@ -163,56 +160,31 @@ def test_autocommit_setting_is_restored(tmp_path: Path) -> None:
         conn.close()
 
 
-class _CommitFails:
-    """COMMIT だけを失敗させる接続の包み（他は本物に渡す）。"""
-
-    def __init__(self, conn) -> None:
-        self._conn = conn
-
-    def execute(self, sql: str, *args):
-        if sql == "COMMIT":
-            raise sqlite3.OperationalError("database is locked")
-        return self._conn.execute(sql, *args)
-
-    def __getattr__(self, name: str):
-        return getattr(self._conn, name)
-
-    def __setattr__(self, name: str, value) -> None:
-        if name == "_conn":
-            object.__setattr__(self, name, value)
-        else:
-            setattr(self._conn, name, value)
+def test_seed_demo_has_no_handwritten_transaction() -> None:
+    """BEGIN/COMMIT の直書きをやめ、db.seed_patient に任せる。"""
+    source = Path(seed_demo.__file__).read_text(encoding="utf-8")
+    for word in ("BEGIN", "COMMIT", "ROLLBACK", "autocommit"):
+        assert word not in source
 
 
-def test_atomic_rolls_back_when_commit_fails(tmp_path: Path) -> None:
+def test_seed_keeps_seq_as_entry_id_on_empty_db(tmp_path: Path) -> None:
+    """空の DB なら entries.id は合成データの seq と同じ（正解ラベルとの突き合わせ）。"""
     conn = db.connect(tmp_path / "seed.db")
     try:
-        db.init_db(conn)
-        before = conn.autocommit
-        wrapped = _CommitFails(conn)
-        with pytest.raises(sqlite3.OperationalError), seed_demo._atomic(wrapped):
-            conn.execute(
-                "INSERT INTO patients (id, regimen, created_at) VALUES (?, ?, ?)",
-                ("P-ZZZZ0001", "FOLFOX", "2026-11-09T09:00:00.000000+09:00"),
-            )
-        assert conn.in_transaction is False
-        assert conn.autocommit == before
-        assert db.list_patients(conn) == []
+        seed_demo.seed(conn, skills_dir=SKILLS_DIR)
+        demo = EXPECTED["P-DEMO0001"]
+        by_id = {e.id: e for e in db.list_entries(conn, "P-DEMO0001")}
+        assert set(by_id) == {src.seq for src in demo.entries}
+        for src in demo.entries:
+            saved = by_id[src.seq]
+            assert saved.recorded_at == src.recorded_at
+            assert saved.free_text == to_entry_create(src).free_text
+            assert saved.by_proxy == src.by_proxy
     finally:
         conn.close()
 
 
-def test_atomic_refuses_open_transaction(tmp_path: Path) -> None:
-    conn = db.connect(tmp_path / "seed.db")
-    try:
-        db.init_db(conn)
-        conn.execute(
-            "INSERT INTO patients (id, regimen, created_at) VALUES (?, ?, ?)",
-            ("P-ZZZZ0002", "FOLFOX", "2026-11-09T09:00:00.000000+09:00"),
-        )
-        assert conn.in_transaction
-        with pytest.raises(RuntimeError), seed_demo._atomic(conn):
-            pass
-        conn.rollback()
-    finally:
-        conn.close()
+def test_seed_demo_uses_schema_types_only() -> None:
+    """db の中の専用の型（旧 SeedEntry）を使わない。"""
+    source = Path(seed_demo.__file__).read_text(encoding="utf-8")
+    assert "SeedEntry" not in source

@@ -42,7 +42,7 @@ def create_patient(
     if regimen not in REGIMENS:
         raise ValueError(f"unknown regimen: {regimen!r}")
     if patient_id is not None:
-        _validate_patient_id(patient_id)
+        validate_new_patient(regimen, patient_id)
         _insert_patient(conn, patient_id, regimen)
         return patient_id
     for _ in range(_ID_ATTEMPTS):
@@ -55,12 +55,31 @@ def create_patient(
     raise RuntimeError("仮名IDの生成に失敗した")
 
 
+def validate_new_patient(regimen: str, patient_id: str) -> None:
+    """regimen と（指定された）仮名IDの形を検査する。違えば ValueError。"""
+    if regimen not in REGIMENS:
+        raise ValueError(f"unknown regimen: {regimen!r}")
+    _validate_patient_id(patient_id)
+
+
 def _insert_patient(conn: sqlite3.Connection, pid: str, regimen: str) -> None:
     with write_transaction(conn):
-        conn.execute(
-            "INSERT INTO patients (id, regimen, created_at) VALUES (?, ?, ?)",
-            (pid, regimen, dt_to_db(now())),
-        )
+        insert_patient_row(conn, pid, regimen)
+
+
+def insert_patient_row(
+    conn: sqlite3.Connection, pid: str, regimen: str, *, skip_existing: bool = False
+) -> bool:
+    """患者の行を入れ、入れたら True。呼び出し側で write_transaction を開いておくこと。
+
+    skip_existing=True なら、同じ仮名IDがいれば何もせず False（確認と挿入を1文で行う）。
+    """
+    conflict = " ON CONFLICT (id) DO NOTHING" if skip_existing else ""
+    cur = conn.execute(
+        "INSERT INTO patients (id, regimen, created_at) VALUES (?, ?, ?)" + conflict,
+        (pid, regimen, dt_to_db(now())),
+    )
+    return cur.rowcount > 0
 
 
 def _patient_row(row: sqlite3.Row) -> dict[str, Any]:
@@ -110,23 +129,7 @@ def upsert_course(conn: sqlite3.Connection, course: Course) -> Course:
     """(patient_id, course_no) で登録・上書きし、id 付きの新しい Course を返す。"""
     require_exists(conn, "patients", course.patient_id, "patient")
     with write_transaction(conn):
-        conn.execute(
-            "INSERT INTO courses (patient_id, course_no, infusion_date, planned_date,"
-            " next_visit, note) VALUES (?, ?, ?, ?, ?, ?)"
-            " ON CONFLICT (patient_id, course_no) DO UPDATE SET"
-            " infusion_date = excluded.infusion_date,"
-            " planned_date = excluded.planned_date,"
-            " next_visit = excluded.next_visit,"
-            " note = excluded.note",
-            (
-                course.patient_id,
-                course.course_no,
-                date_to_db(course.infusion_date),
-                date_to_db(course.planned_date),
-                date_to_db(course.next_visit),
-                course.note,
-            ),
-        )
+        upsert_course_row(conn, course)
     row = conn.execute(
         f"SELECT {_COURSE_COLUMNS} FROM courses WHERE patient_id = ? AND course_no = ?",
         (course.patient_id, course.course_no),
@@ -134,6 +137,27 @@ def upsert_course(conn: sqlite3.Connection, course: Course) -> Course:
     if row is None:  # pragma: no cover - 直前に書いた行が無いのは異常
         raise NotFoundError("course not found")
     return _course_row(row)
+
+
+def upsert_course_row(conn: sqlite3.Connection, course: Course) -> None:
+    """コースの行を入れる・上書きする。呼び出し側で write_transaction を開いておくこと。"""
+    conn.execute(
+        "INSERT INTO courses (patient_id, course_no, infusion_date, planned_date,"
+        " next_visit, note) VALUES (?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT (patient_id, course_no) DO UPDATE SET"
+        " infusion_date = excluded.infusion_date,"
+        " planned_date = excluded.planned_date,"
+        " next_visit = excluded.next_visit,"
+        " note = excluded.note",
+        (
+            course.patient_id,
+            course.course_no,
+            date_to_db(course.infusion_date),
+            date_to_db(course.planned_date),
+            date_to_db(course.next_visit),
+            course.note,
+        ),
+    )
 
 
 def list_courses(conn: sqlite3.Connection, pid: str) -> list[Course]:

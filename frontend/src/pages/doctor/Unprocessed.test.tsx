@@ -35,6 +35,22 @@ describe("Unprocessed", () => {
     expect(screen.getByText(/敬称の前/)).toBeInTheDocument();
   });
 
+  it.each([
+    ["address_number", /住所の疑い/],
+    ["id_like", /受付番号の疑い/],
+    ["known_identifier", /仮名ID か受付番号/],
+  ])("W2b で増えた規則 %s にも説明を出す", async (reason, label) => {
+    mockApi({
+      "GET /api/doctor/visits/12/unprocessed": {
+        entries: [
+          { entry_id: 31, record_date: "2026-11-03", reason, text: RAW },
+        ],
+      },
+    });
+    renderRoute("/doctor/unprocessed/12", ROUTE, <Unprocessed />);
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
   it("「紙には載りません」の注記がある", async () => {
     mockApi({ "GET /api/doctor/visits/12/unprocessed": { entries: [] } });
     renderRoute("/doctor/unprocessed/12", ROUTE, <Unprocessed />);

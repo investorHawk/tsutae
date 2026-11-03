@@ -1,7 +1,8 @@
 """受診時の生成（docs/architecture.md §7d）。
 
 `generate_visit_report` の手順:
-1. 受診を読む。無い・受付番号が消えている（印刷済み・期限切れ）なら何もしない
+1. 受診を読む。無い・受付番号が消えている（印刷済み・期限切れ）・expires_at を
+   過ぎている（purge 前）なら何もしない（Claude を呼ばない）
 2. 患者・コース・記録・Skill（今の SKILL.md）・版ごとの質問集（skill_versions）を集め、
    `prepare_input(exclude_literals=(仮名ID, 受付番号))`。受付番号・仮名IDは Claude に
    送らない（自由記載に含む記録は known_identifier で外れる。§7 W2b）
@@ -10,22 +11,21 @@
 4. `build_report_data` → `render_report_html`。AI の結果で組み立てられなければ
    AI 変換なし（timeline=None）で組み立て直す（ログ `fallback`、decision は
    `report_error:<型名>`）
-5. `save_timeline`（AI 変換なしなら unprocessed だけの Timeline）→ `save_report` →
-   `set_visit_status(ready, fallback=…)`
+5. `db.save_visit_result`（timeline（AI 変換なしなら unprocessed だけの Timeline）・
+   report・ready と fallback を1つのトランザクションで。印刷済み・期限切れなら何も
+   変えずに VisitClosedError）
 
 - prepare_input までに失敗した（入力が作れない）ときは、フォールバックのレポートも
   作れないので failed。service が run_start・run_end（decision `prepare_error:<型名>`）を書く
 - 組み立て直しも失敗したら failed（ログ `visit_failed` を1回、decision は最後の失敗）
-- 途中で印刷済みになった受診（`VisitClosedError`）は状態を変えずに終える。failed・ready に
-  する直前にも受診を読み直し、受付番号が消えていれば触らない。読み直しと状態の更新は
-  db の書き込みロック（`write_transaction`。mark_printed と同じプロセス内ロック）の中で
-  行い、同じプロセスの mark_printed が間に入らないようにする（別プロセスからの
-  mark_printed は防げない。db に条件付きの状態更新が入るまでの暫定）
+- 途中で印刷済みになった受診（`VisitClosedError`）は状態を変えずに終える。ready への
+  保存も failed への更新も db の条件付き更新（受付番号が残っている受診だけ）なので、
+  別の接続・別プロセスの mark_printed と競合しても printed を戻さない。failed にする
+  ときは読み直しも db の書き込みロック（`write_transaction`）の中で行う
 - 取り消し（CancelledError）は run_end（decision `cancelled`）を書き、failed にして通す
 - ログには文面を入れない（例外は型名だけ）。例外は外へ出さない（取り消しはそのまま通す）
-
-既知の限界: timeline・report・status は別々のトランザクション（db に一括保存の公開関数が
-無い）。save_timeline の後で save_report が失敗すると、failed の受診に timeline が残る
+- 保存（save_visit_result）が db の失敗で落ちれば何も残らず、failed にする
+  （ログ `visit_failed`、decision は `save_error:<型名>`）
 """
 
 from __future__ import annotations
@@ -42,8 +42,8 @@ from typing import Any
 
 from tsutae import db
 from tsutae.config import Settings
-from tsutae.db import VisitClosedError
-from tsutae.db.connection import write_transaction
+from tsutae.config import now as clock_now
+from tsutae.db import VisitClosedError, write_transaction
 from tsutae.pipeline.inputs import prepare_input
 from tsutae.pipeline.logs import EventLogger, PipelineLogger, reason_code
 from tsutae.pipeline.orchestrator import convert
@@ -203,8 +203,15 @@ def questions_by_version(
 
 
 def _is_open(visit: Mapping[str, Any] | None) -> bool:
-    """受付番号が残っている（印刷済み・期限切れでない）受診か。"""
-    return visit is not None and visit["reception_no"] is not None
+    """受付番号が残っていて期限（expires_at）前の受診か。
+
+    purge_expired がまだ走っていなくても、期限を過ぎていれば閉じたものとして扱う
+    （db の条件付き書き込みと同じ境界: expires_at > now の間だけ開いている）。
+    """
+    if visit is None or visit["reception_no"] is None:
+        return False
+    expires_at = visit["expires_at"]
+    return expires_at is not None and expires_at > clock_now()
 
 
 def _gather(
@@ -322,8 +329,8 @@ def _set_status_if_open(
     """受付番号が残っていれば状態を変えて True。消えていれば（印刷済み等）触らず False。
 
     読み直しと更新を db の書き込みロックの中で行う（同じプロセスの mark_printed が
-    間に入らない）。set_visit_status の VisitClosedError（db が条件付き更新になったとき）
-    も閉じた受診として扱う。
+    間に入らない）。set_visit_status は条件付き更新なので、別プロセスの mark_printed
+    に負けたとき（VisitClosedError）も閉じた受診として扱う。
     """
     with write_transaction(conn):
         if not _is_open(db.get_visit(conn, visit_id)):
@@ -357,13 +364,20 @@ def _save(
     data: ReportData,
     html: str,
 ) -> bool:
-    """保存して ready にする。印刷済みになっていれば False（状態は変えない）。"""
+    """1つのトランザクションで保存して ready にする。印刷済みなら False（何も変えない）。"""
     try:
-        db.save_timeline(conn, visit_id, timeline)
-        db.save_report(conn, visit_id, html, data)
+        db.save_visit_result(
+            conn,
+            visit_id,
+            timeline=timeline,
+            html=html,
+            data=data,
+            status="ready",
+            fallback=data.fallback,
+        )
     except VisitClosedError:
         return False
-    return _set_status_if_open(conn, visit_id, "ready", fallback=data.fallback)
+    return True
 
 
 def _publish(

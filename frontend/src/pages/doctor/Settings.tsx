@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ErrorNote from "../../components/doctor/ErrorNote";
 import SkillChangeHistory from "../../components/doctor/SkillChangeHistory";
+import SkillInvalidList from "../../components/doctor/SkillInvalidList";
 import SkillPhaseNote from "../../components/doctor/SkillPhaseNote";
 import SkillRequestForm from "../../components/doctor/SkillRequestForm";
 import SkillReview from "../../components/doctor/SkillReview";
@@ -45,6 +46,7 @@ export default function Settings() {
           prefix="Skill の一覧を読み込めません"
         />
       ) : null}
+      <SkillInvalidList items={catalog.invalid} />
       {catalog.historyError ? (
         <ErrorNote
           code={catalog.historyError}

@@ -1,0 +1,37 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/patients/P-DEMO0001/courses",
+  "request": null,
+  "status": 200,
+  "body": {
+    "courses": [
+      {
+        "id": 1,
+        "patient_id": "P-DEMO0001",
+        "course_no": 1,
+        "infusion_date": "2026-09-27",
+        "planned_date": "2026-09-27",
+        "next_visit": null,
+        "note": null
+      },
+      {
+        "id": 2,
+        "patient_id": "P-DEMO0001",
+        "course_no": 2,
+        "infusion_date": "2026-10-13",
+        "planned_date": "2026-10-11",
+        "next_visit": null,
+        "note": null
+      },
+      {
+        "id": 3,
+        "patient_id": "P-DEMO0001",
+        "course_no": 3,
+        "infusion_date": "2026-10-27",
+        "planned_date": "2026-10-27",
+        "next_visit": null,
+        "note": null
+      }
+    ]
+  }
+}

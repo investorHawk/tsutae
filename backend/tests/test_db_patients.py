@@ -188,3 +188,14 @@ def test_upsert_course_unknown_patient_raises(conn: sqlite3.Connection) -> None:
                 patient_id="P-NOPE0000", course_no=1, infusion_date=date(2026, 9, 1)
             ),
         )
+
+
+def test_patient_id_pattern_and_write_transaction_are_public() -> None:
+    from tsutae import db
+    from tsutae.api import deps
+    from tsutae.db.connection import write_transaction
+
+    assert db.write_transaction is write_transaction
+    assert deps.PATIENT_ID_PATTERN is db.PATIENT_ID_PATTERN  # 重複定義しない
+    assert db.PATIENT_ID_PATTERN.fullmatch("P-DEMO0001")
+    assert not db.PATIENT_ID_PATTERN.fullmatch("p-demo0001")

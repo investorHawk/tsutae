@@ -22,7 +22,10 @@ const CREATE = "POST /api/doctor/skill-changes";
 const REQUEST = "（合成）口内炎の質問を足して";
 const LOAD_ERROR = /読み込めません/;
 
-const SKILL_LIST = { skills: [{ name: "regimen-folfox", version: 1 }] };
+const SKILL_LIST = {
+  skills: [{ name: "regimen-folfox", version: 1 }],
+  invalid: [],
+};
 
 function change(patch: Partial<SkillChange>): SkillChange {
   return {

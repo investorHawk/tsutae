@@ -483,3 +483,56 @@ async def test_sdk_editor_logs_reach_db_through_request(conn, home, settings):
     (done,) = [r for r in logs if r["event"] == "editor_done"]
     assert (done["duration_ms"], done["tokens_in"], done["tokens_out"]) == (700, 11, 4)
     assert done["cost_usd"] == pytest.approx(0.05)
+
+
+# ---------------------------------------------------------------------------
+# 行を作った後の一時ディレクトリの失敗（mkdtemp・mkdir・open の OSError）
+# ---------------------------------------------------------------------------
+
+
+def _fail_workdir(monkeypatch: pytest.MonkeyPatch, where: str) -> None:
+    from tsutae.skillchange import service as service_module
+
+    def broken(*_args, **_kwargs):
+        raise PermissionError("秘密のパス")
+
+    if where == "mkdtemp":
+        monkeypatch.setattr(service_module.tempfile, "mkdtemp", broken)
+        return
+    if where == "open":
+        monkeypatch.setattr(service_module, "open", broken, raising=False)
+        return
+    real_mkdir = Path.mkdir
+
+    def mkdir(self, *args, **kwargs):
+        if service_module._TEMP_PREFIX in str(self):
+            broken()
+        return real_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(service_module.Path, "mkdir", mkdir)
+
+
+@pytest.mark.parametrize("where", ["mkdtemp", "mkdir", "open"])
+async def test_workdir_os_error_is_failed_and_cleaned(
+    conn, home, settings, skill_file, tmp_path, monkeypatch, where
+):
+    from tsutae.skillchange import service as service_module
+
+    temp_root = tmp_path / "tmp"
+    temp_root.mkdir()
+    monkeypatch.setattr(service_module.tempfile, "tempdir", str(temp_root))
+    before = skill_file.read_bytes()
+    _fail_workdir(monkeypatch, where)
+    editor = FakeEditor()
+    cid = await _request(conn, home, settings, editor)
+    change = db.get_skill_change(conn, cid)
+    assert (change["status"], change["error_code"]) == ("failed", "workdir_error")
+    assert change["diff"] is None and change["new_text"] is None
+    assert editor.calls == []  # 写しが無いまま editor を呼ばない
+    assert list(temp_root.iterdir()) == []  # 作りかけの一時ディレクトリも消す
+    assert skill_file.read_bytes() == before
+    logs = db.list_pipeline_logs(conn, "skill_change", cid)
+    assert ("workdir_error", "error_type:PermissionError") in [
+        (r["event"], r["decision"]) for r in logs
+    ]
+    assert "秘密" not in repr(logs)

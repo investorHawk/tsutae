@@ -94,16 +94,23 @@ describe("{ok} の応答の検査", () => {
     ["new_version が文字列", { ok: true, new_version: "2" }],
     ["new_version が 0", { ok: true, new_version: 0 }],
     ["new_version が小数", { ok: true, new_version: 2.5 }],
+    ["new_version が null", { ok: true, new_version: null }],
+    ["new_version が無い", { ok: true }],
   ])("approveSkillChange: %s は invalid_response", async (_l, b) => {
     await expectInvalid(b, () => approveSkillChange(3));
   });
 
-  it("approveSkillChange: new_version が無い・null は通す（§8 は省略可）", async () => {
-    mockFetch(() => jsonResponse({ ok: true, new_version: null }));
+  it("approveSkillChange: new_version は必須（W3 後の決定）で、あれば通す", async () => {
+    mockFetch(() => jsonResponse({ ok: true, new_version: 2 }));
     await expect(approveSkillChange(3)).resolves.toEqual({
       ok: true,
-      new_version: null,
+      new_version: 2,
     });
+  });
+
+  it("rejectSkillChange: {ok: true} だけで通す（new_version は無い）", async () => {
+    mockFetch(() => jsonResponse({ ok: true }));
+    await expect(rejectSkillChange(3)).resolves.toEqual({ ok: true });
   });
 });
 
@@ -156,7 +163,17 @@ describe("一覧・作成の応答の検査", () => {
     ["listUnprocessed", {}, () => listUnprocessed(12)],
     ["getPipelineEvents", { events: [] }, () => getPipelineEvents(12)],
     ["listSkills", {}, () => listSkills()],
-    ["listSkills 要素", { skills: [{ name: "x" }] }, () => listSkills()],
+    [
+      "listSkills 要素",
+      { skills: [{ name: "x" }], invalid: [] },
+      () => listSkills(),
+    ],
+    ["listSkills invalid が無い", { skills: [] }, () => listSkills()],
+    [
+      "listSkills invalid の要素",
+      { skills: [], invalid: [{ name: "regimen-x", code: "format" }] },
+      () => listSkills(),
+    ],
     ["createSkillChange", { id: 3 }, () => createSkillChange("a", "b")],
     ["listSkillChanges", {}, () => listSkillChanges()],
   ])("%s: 壊れた本文は invalid_response", async (_l, b, call) => {

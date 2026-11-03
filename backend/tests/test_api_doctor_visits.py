@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from tsutae import db
 from tsutae.config import jst_datetime, now
+from tsutae.db.connection import dt_to_db
 from tsutae.schemas import EntryCreate
 
 C3 = [(1, date(2026, 9, 27)), (2, date(2026, 10, 13)), (3, date(2026, 10, 27))]
@@ -162,12 +163,18 @@ def test_report_html_with_headers(client: TestClient) -> None:
     assert "A-023" in r.text
 
 
-def test_report_of_expired_visit_is_404(tmp_path: Path, fixed_today: str) -> None:
-    with api_client(tmp_path, report_ttl_hours=0) as c:
-        login_doctor(c)
-        _pid, visit = _ready_visit(c)
-        with db_conn(c.app) as conn:
-            assert db.get_report(conn, visit["id"]) is not None  # まだ消していない
+def test_report_of_expired_visit_is_404(client: TestClient) -> None:
+    # 生成が済んだ後に期限を過ぎた受診（期限切れの受診にはもう保存できないので、
+    # ready にしてから expires_at を過去にする）
+    c = client
+    _pid, visit = _ready_visit(c)
+    past = dt_to_db(now() - timedelta(minutes=1))
+    with db_conn(c.app) as conn:
+        conn.execute(
+            "UPDATE visits SET expires_at = ? WHERE id = ?", (past, visit["id"])
+        )
+        conn.commit()
+        assert db.get_report(conn, visit["id"]) is not None  # まだ消していない
         r = c.get(f"/api/doctor/visits/{visit['id']}/report")
         assert r.status_code == 404
         assert r.json() == {"error": "not_found"}

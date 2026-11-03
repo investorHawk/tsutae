@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/login",
+  "request": {
+    "password": "test-doctor-password"
+  },
+  "status": 200,
+  "body": {
+    "ok": true
+  }
+}

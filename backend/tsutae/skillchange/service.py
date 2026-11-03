@@ -10,6 +10,7 @@ request_change の手順（本体の SKILL.md には触らない）:
 5. 写しを読み validate_skill_text。エージェントが version を変えていれば元の版に戻して
    検査し直す → unified diff（空なら no_change）→ diff・new_text を保存
 どこで失敗しても failed と短い error_code（取り消しは cancelled にしてから再送出）。
+行を作った後の一時ディレクトリの作成・写しの失敗（OSError）は `workdir_error`。
 
 後始末: 一時ディレクトリの削除に失敗したら、書き込み権を戻して1回だけやり直す。
 それでも消せなければ `temp_cleanup_failed`（`error_type:<型名>`）をログに残す
@@ -57,12 +58,15 @@ from tsutae.skills import (
 __all__ = [
     "MAX_REQUEST_CHARS",
     "RUN_KIND",
+    "WORKDIR_ERROR",
     "approve_change",
     "reject_change",
     "request_change",
 ]  # approve_change・reject_change は approve.py（従来の import 先を保つ）
 
 MAX_REQUEST_CHARS = 2000
+# 一時ディレクトリの作成・写しの書き込み（mkdtemp・mkdir・open）の OSError の error_code
+WORKDIR_ERROR = "workdir_error"
 _TEMP_PREFIX = "tsutae-skillchange-"
 _CLEANUP_ATTEMPTS = 2
 _log = logging.getLogger(__name__)
@@ -194,16 +198,34 @@ async def _edit_in_copy(
     logger: EventLogger,
 ) -> str:
     """一時ディレクトリの写しを editor に直させ、新しい本文を返す。"""
-    work_root = Path(tempfile.mkdtemp(prefix=_TEMP_PREFIX)).resolve()
     try:
-        copy = work_root / ".claude" / "skills" / name / SKILL_FILE_NAME
-        copy.parent.mkdir(parents=True)
-        with open(copy, "w", encoding="utf-8", newline="") as f:
-            f.write(old)
+        work_root = Path(tempfile.mkdtemp(prefix=_TEMP_PREFIX)).resolve()
+    except OSError as exc:
+        raise _workdir_error(exc, logger) from exc
+    try:
+        copy = _write_copy(work_root, name, old, logger)
         await _run_editor(editor, work_root, name, request_text, settings, logger)
         return _read_copy(copy)
     finally:
         _remove_tree(work_root, logger)
+
+
+def _write_copy(work_root: Path, name: str, old: str, logger: EventLogger) -> Path:
+    """work_root の `.claude/skills/<name>/SKILL.md` に今の本文を写し、その場所を返す。"""
+    copy = work_root / ".claude" / "skills" / name / SKILL_FILE_NAME
+    try:
+        copy.parent.mkdir(parents=True)
+        with open(copy, "w", encoding="utf-8", newline="") as f:
+            f.write(old)
+    except OSError as exc:
+        raise _workdir_error(exc, logger) from exc
+    return copy
+
+
+def _workdir_error(exc: OSError, logger: EventLogger) -> SkillChangeError:
+    """一時ディレクトリを作れない・写せない（行は作った後なので failed にする）。"""
+    logger.event(WORKDIR_ERROR, decision=reason_code("error_type", type(exc).__name__))
+    return SkillChangeError(WORKDIR_ERROR)
 
 
 def _make_writable(root: Path) -> None:

@@ -32,6 +32,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from tsutae import db
 from tsutae.config import Settings, now
+from tsutae.db import PATIENT_ID_PATTERN  # 仮名IDの形（db と同じもの。再公開する）
 
 __all__ = [
     "AppSettings",
@@ -64,7 +65,6 @@ PATIENT_COOKIE = "tsutae_pid"
 DOCTOR_COOKIE = "tsutae_doctor"
 PATIENT_COOKIE_MAX_AGE = 180 * 24 * 3600
 DOCTOR_TOKEN_TTL = timedelta(hours=12)
-PATIENT_ID_PATTERN = re.compile(r"P-[A-Z0-9]{8}")
 ERROR_ID_HEADER = "X-Error-Id"
 INTERNAL_ERROR_EVENT = "api.internal_error"
 _log = logging.getLogger(__name__)

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VisitSummary } from "../../api/types";
 import { countOf, mockApi, renderRoute } from "../../components/doctor/testing";
+import { fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
 import Visits from "./Visits";
 
@@ -35,12 +36,6 @@ const VISITS: VisitSummary[] = [
     reception_no: "A-025",
     patient_id: "P-EVALB001",
     fallback: true,
-  }),
-  visit({
-    id: 11,
-    reception_no: null,
-    patient_id: "P-OLD00001",
-    status: "printed",
   }),
   visit({ id: 15, reception_no: "A-026", status: "failed" }),
 ];
@@ -92,11 +87,40 @@ describe("Visits（D3 印刷待ち）", () => {
     expect(row.getByText("印刷待ち")).toHaveClass("d-status--ready");
     expect(within(rowOf("A-024")).getByText("生成中")).toBeInTheDocument();
     expect(within(rowOf("A-026")).getByText("失敗")).toBeInTheDocument();
+  });
+
+  it("実際の API の応答（fixture）をそのまま並べる", async () => {
+    mockApi({ [LIST]: fixtureBody("doctor_visits") as object });
+    renderVisits();
+    await screen.findByText("A-023");
+    expect(within(rowOf("A-023")).getByText("印刷待ち")).toBeInTheDocument();
     expect(
-      within(
-        screen.getByText("P-OLD00001").closest("tr") as HTMLElement,
-      ).getByText("印刷済み"),
+      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件" }),
+    ).toHaveAttribute("href", "/doctor/unprocessed/1");
+    expect(within(rowOf("B-101")).getByText("生成中")).toBeInTheDocument();
+    expect(within(rowOf("C-202")).getByText("失敗")).toBeInTheDocument();
+    expect(
+      screen.getByText("印刷待ち 1 件 ・ 生成中 1 件 ・ 失敗 1 件"),
     ).toBeInTheDocument();
+  });
+
+  it("一覧に印刷済み（printed）が来たら契約違反として出す（W3 後の決定）", async () => {
+    const printed = { ...VISITS[0], id: 11, status: "printed" };
+    mockApi({ [LIST]: { visits: [VISITS[1], printed] } });
+    renderVisits();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "invalid_response",
+    );
+    expect(screen.queryByText("A-024")).toBeNull();
+  });
+
+  it("受付番号の無い受診が来たら契約違反として出す", async () => {
+    const bare = { ...VISITS[0], reception_no: null };
+    mockApi({ [LIST]: { visits: [bare] } });
+    renderVisits();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "invalid_response",
+    );
   });
 
   it("件数のまとめを出す", async () => {

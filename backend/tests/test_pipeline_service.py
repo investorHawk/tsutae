@@ -45,6 +45,16 @@ PID = DEMO.patient_id
 RECEPTION_NO = DEMO.reception_no
 UNPROCESSED_SEQ = 38  # 「磯鷲さん」（辞書にない架空の姓＋さん。二次検出）
 UNPROCESSED_WORD = "磯鷲"
+EXPIRES_AT = jst_datetime(date(2026, 11, 10), 12)
+
+
+@pytest.fixture(autouse=True)
+def _pin_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """保存は「今」と expires_at（2026-11-10 12:00）を比べるので、今日を固定する。
+
+    固定しないと、実際の日付が期限を過ぎた日にテストが落ちる。
+    """
+    monkeypatch.setenv("TSUTAE_TODAY", "2026-11-09")
 
 
 @pytest.fixture
@@ -72,15 +82,12 @@ def _seed_demo(conn: sqlite3.Connection) -> None:
     ensure_skill_versions(conn, SKILLS_DIR)
 
 
-def _visit(conn: sqlite3.Connection, reception_no: str = RECEPTION_NO) -> int:
-    return db.create_visit(
-        conn,
-        PID,
-        reception_no,
-        DEMO.visit_date,
-        jst_datetime(date(2026, 11, 10), 12),
-        3,
-    )
+def _visit(
+    conn: sqlite3.Connection,
+    reception_no: str = RECEPTION_NO,
+    expires_at: datetime = EXPIRES_AT,
+) -> int:
+    return db.create_visit(conn, PID, reception_no, DEMO.visit_date, expires_at, 3)
 
 
 @pytest.fixture
@@ -389,6 +396,57 @@ async def test_printed_visit_does_nothing(
     assert db.get_timeline(conn, demo) is None
 
 
+async def test_expired_but_not_purged_visit_does_nothing(
+    conn: sqlite3.Connection, settings: Any
+) -> None:
+    """期限（expires_at）を過ぎた受診は、purge_expired の前でも Claude を呼ばない。"""
+    _seed_demo(conn)
+    vid = _visit(conn, expires_at=jst_datetime(date(2026, 11, 9), 0))
+    runner = _label_runner(conn)
+    await generate_visit_report(conn, vid, runner=runner, settings=settings)
+
+    assert runner.calls == 0
+    visit = db.get_visit(conn, vid)
+    assert (visit["status"], visit["reception_no"]) == ("generating", RECEPTION_NO)
+    assert db.get_report(conn, vid) is None
+    assert db.get_timeline(conn, vid) is None
+    assert _events(conn, vid) == []
+
+
+class _ExpiringRunner:
+    """変換の途中で期限を過ぎる（purge_expired はまだ走っていない）。"""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.monkeypatch = monkeypatch
+        self.calls = 0
+
+    async def run(
+        self, prompt: str, options: ClaudeAgentOptions, collector: RunCollector
+    ) -> RunStats:
+        self.calls += 1
+        self.monkeypatch.setenv("TSUTAE_TODAY", "2026-11-11")
+        return RunStats()
+
+
+async def test_expired_during_generation_saves_nothing(
+    conn: sqlite3.Connection,
+    demo: int,
+    settings: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = _ExpiringRunner(monkeypatch)
+    await generate_visit_report(conn, demo, runner=runner, settings=settings)
+
+    assert runner.calls == 1
+    visit = db.get_visit(conn, demo)
+    assert visit["status"] == "generating"  # ready にも failed にもしない
+    assert db.get_report(conn, demo) is None
+    assert db.get_timeline(conn, demo) is None
+    names = _events(conn, demo)
+    assert "visit_ready" not in names and "visit_failed" not in names
+    assert names.count("visit_closed") == 1
+
+
 @pytest.mark.parametrize("read_error", [False, True])
 async def test_unknown_or_unreadable_visit_does_nothing(
     conn: sqlite3.Connection,
@@ -543,7 +601,7 @@ async def test_save_error_marks_failed(
     monkeypatch: pytest.MonkeyPatch,
     error: Exception,
 ) -> None:
-    monkeypatch.setattr(service.db, "save_report", _raiser(error))
+    monkeypatch.setattr(service.db, "save_visit_result", _raiser(error))
     await generate_visit_report(conn, demo, runner=FakeRunner(), settings=settings)
     assert db.get_visit(conn, demo)["status"] == "failed"
     logs = db.list_pipeline_logs(conn, "visit", demo)
@@ -622,18 +680,6 @@ def _print_from_other_thread(
     return original, threads, blocked
 
 
-def _trigger_after_save(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
-    fired = threading.Event()
-    original = db.save_report
-
-    def save_report(*args: Any, **kwargs: Any) -> None:
-        original(*args, **kwargs)
-        fired.set()
-
-    monkeypatch.setattr(service.db, "save_report", save_report)
-    return fired
-
-
 def _trigger_on_build_error(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
     fired = threading.Event()
 
@@ -645,21 +691,19 @@ def _trigger_on_build_error(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
     return fired
 
 
-def _print_inside_save(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
-    """save_report の直後（再読込より前）に、同じスレッドで印刷済みにする。"""
-    original = db.save_report
+def _print_before_save(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
+    """保存（save_visit_result）の直前に、同じスレッドで印刷済みにする。"""
+    original = db.save_visit_result
 
-    def save_then_print(c: sqlite3.Connection, vid: int, *args: Any) -> None:
-        original(c, vid, *args)
+    def print_then_save(c: sqlite3.Connection, vid: int, **kwargs: Any) -> None:
         db.mark_printed(c, vid)
+        original(c, vid, **kwargs)
 
-    monkeypatch.setattr(service.db, "save_report", save_then_print)
+    monkeypatch.setattr(service.db, "save_visit_result", print_then_save)
     return threading.Event()  # 別スレッドは使わない
 
 
-@pytest.mark.parametrize(
-    "arm", [_print_inside_save, _trigger_after_save, _trigger_on_build_error]
-)
+@pytest.mark.parametrize("arm", [_print_before_save, _trigger_on_build_error])
 async def test_printed_after_recheck_keeps_printed(
     conn: sqlite3.Connection,
     demo: int,
@@ -668,8 +712,11 @@ async def test_printed_after_recheck_keeps_printed(
     monkeypatch: pytest.MonkeyPatch,
     arm: Callable[[pytest.MonkeyPatch], threading.Event],
 ) -> None:
-    """保存の直後・再読込（open を確認）の直後で ready / failed にする直前に、印刷済みに
-    される（後の2つは別の接続・別のスレッドから）。printed のまま、中身も消えたまま。
+    """保存の直前・再読込（open を確認）の直後で failed にする直前に、印刷済みに
+    される（後者は別の接続・別のスレッドから）。printed のまま、中身も消えたまま。
+
+    保存と ready は1つのトランザクション（save_visit_result）なので、保存の後で
+    ready にする前に割り込まれる窓は無い。
     """
     trigger = arm(monkeypatch)
     get_visit, threads, blocked = _print_from_other_thread(
@@ -681,8 +728,10 @@ async def test_printed_after_recheck_keeps_printed(
         assert not thread.is_alive()
     # 別スレッドの mark_printed は書き込みのロックで待たされ、service の後に入る
     assert blocked == ([True] if threads else [])
+    names = _events(conn, demo)
+    assert "visit_ready" not in names
     if not threads:
-        assert "visit_ready" not in _events(conn, demo)
+        assert names.count("visit_closed") == 1
     visit = get_visit(conn, demo)
     assert visit["status"] == "printed"
     assert visit["reception_no"] is None
@@ -690,22 +739,29 @@ async def test_printed_after_recheck_keeps_printed(
     assert db.get_timeline(conn, demo) is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="db に3つの保存を1つのトランザクションにする・timeline を消す公開関数が"
-    "無い（契約への要望）。service だけでは直せない",
-)
+def _fail_inserts_into(conn: sqlite3.Connection, table: str) -> None:
+    """この接続で table への INSERT を本物の DB の失敗にする（一時トリガ）。"""
+    assert table in {"timelines", "reports"}
+    conn.execute(
+        f"CREATE TEMP TRIGGER fail_{table} BEFORE INSERT ON main.{table}"
+        " BEGIN SELECT RAISE(ABORT, 'injected'); END"
+    )
+
+
+@pytest.mark.parametrize("table", ["timelines", "reports"])
 async def test_save_error_leaves_no_timeline(
-    conn: sqlite3.Connection,
-    demo: int,
-    settings: Any,
-    monkeypatch: pytest.MonkeyPatch,
+    conn: sqlite3.Connection, demo: int, settings: Any, table: str
 ) -> None:
-    locked = sqlite3.OperationalError("database is locked")
-    monkeypatch.setattr(service.db, "save_report", _raiser(locked))
+    """保存の途中（timeline の後の report など）で DB が失敗しても、何も残さず failed。"""
+    _fail_inserts_into(conn, table)
     await generate_visit_report(conn, demo, runner=FakeRunner(), settings=settings)
     assert db.get_visit(conn, demo)["status"] == "failed"
     assert db.get_timeline(conn, demo) is None
+    assert db.get_report(conn, demo) is None
+    logs = db.list_pipeline_logs(conn, "visit", demo)
+    failed = [r["decision"] for r in logs if r["event"] == "visit_failed"]
+    assert failed == ["save_error:IntegrityError"]
+    assert "visit_ready" not in [r["event"] for r in logs]
 
 
 def _counting_get_skill_version(

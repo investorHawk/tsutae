@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/visits/1/printed",
+  "request": null,
+  "status": 200,
+  "body": {
+    "ok": true
+  }
+}

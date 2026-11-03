@@ -4,10 +4,10 @@
  * （§9 W2b の決定。{ok:false} を成功として扱わない）。
  */
 import {
+  isApproveResponse,
   isCoursesResponse,
   isCreatePatientResponse,
   isCreateSkillChangeResponse,
-  isDecideResponse,
   isOkTrue,
   isPatientsResponse,
   isPipelineEventsResponse,
@@ -19,18 +19,19 @@ import {
 } from "./doctorGuards";
 import { getJson, isApiError, postJson, seg } from "./http";
 import type {
+  ApproveSkillChangeResponse,
   CoursesResponse,
   Course,
   CreatePatientRequest,
   CreatePatientResponse,
   CreateSkillChangeRequest,
   CreateSkillChangeResponse,
-  DecideSkillChangeResponse,
   LoginRequest,
   OkResponse,
   PatientsResponse,
   PipelineEventsResponse,
   Regimen,
+  RejectSkillChangeResponse,
   SkillChangesResponse,
   SkillsResponse,
   UnprocessedResponse,
@@ -178,20 +179,25 @@ export function listSkillChanges(): Promise<SkillChangesResponse> {
   );
 }
 
+/**
+ * 承認。応答の new_version（上がった後の version）は必須。Skill のロックを別の承認・
+ * 却下が握っていれば 409 {"error":"busy"}（変更は pending のまま。やり直せる）。
+ */
 export function approveSkillChange(
   id: number,
-): Promise<DecideSkillChangeResponse> {
-  return postChecked<DecideSkillChangeResponse>(
+): Promise<ApproveSkillChangeResponse> {
+  return postChecked<ApproveSkillChangeResponse>(
     `/api/doctor/skill-changes/${seg(id)}/approve`,
-    isDecideResponse,
+    isApproveResponse,
   );
 }
 
+/** 却下。応答は {ok: true} だけ。承認と同じく 409 busy がありうる。 */
 export function rejectSkillChange(
   id: number,
-): Promise<DecideSkillChangeResponse> {
-  return postChecked<DecideSkillChangeResponse>(
+): Promise<RejectSkillChangeResponse> {
+  return postChecked<RejectSkillChangeResponse>(
     `/api/doctor/skill-changes/${seg(id)}/reject`,
-    isDecideResponse,
+    isOkTrue,
   );
 }

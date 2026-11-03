@@ -77,7 +77,7 @@ describe("医師のログイン", () => {
         return logout();
       }
       if (url === "/api/doctor/skills") {
-        return jsonResponse({ skills: [] });
+        return jsonResponse({ skills: [], invalid: [] });
       }
       if (url === "/api/doctor/visits") {
         return jsonResponse({ visits: [] });
@@ -166,7 +166,7 @@ describe("医師のログイン", () => {
   });
 
   it("ログイン後の画面にメニューがある", async () => {
-    mockFetch(() => jsonResponse({ skills: [] }));
+    mockFetch(() => jsonResponse({ skills: [], invalid: [] }));
     render(
       <MemoryRouter initialEntries={["/doctor/settings"]}>
         <App />

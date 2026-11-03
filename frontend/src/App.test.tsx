@@ -32,7 +32,7 @@ function mockApi(doctorStatus: number): FetchMock {
     }
     if (url === "/api/doctor/skills") {
       return doctorStatus === 200
-        ? jsonResponse({ skills: [] })
+        ? jsonResponse({ skills: [], invalid: [] })
         : jsonResponse({ error: "not_logged_in" }, doctorStatus);
     }
     return jsonResponse({ error: "not_found" }, 404);

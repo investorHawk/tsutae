@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/courses",
+  "request": {
+    "patient_id": "P-FIXT0001",
+    "course_no": 2,
+    "infusion_date": "2026-11-01"
+  },
+  "status": 400,
+  "body": {
+    "error": "course_order"
+  }
+}

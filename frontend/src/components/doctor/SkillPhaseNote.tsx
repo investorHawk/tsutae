@@ -25,8 +25,7 @@ export default function SkillPhaseNote({
       return (
         <p role="status" className="d-ok d-big-note">
           承認しました。<code>{phase.skillName}</code> は version{" "}
-          {phase.newVersion ?? "（不明）"}{" "}
-          になりました。翌日の記録から反映されます。
+          {phase.newVersion} になりました。翌日の記録から反映されます。
         </p>
       );
     case "rejected":

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getPipelineEvents } from "../../api/doctor";
 import { isApiError } from "../../api/http";
@@ -42,9 +42,17 @@ function toSnapshot(body: unknown): Snapshot {
   };
 }
 
-/** D5 パイプライン可視化。2秒ごとに取り直し、ready / failed で止める。 */
+/**
+ * D5 パイプライン可視化。2秒ごとに取り直し、ready / failed で止める。
+ * 受診ごとに描き直す（別の受診へ移ったら、前の受診の状態・出来事・失敗・停止を引き継がず、
+ * 前の受診の遅い応答も捨てる。usePolling の値は描いている間だけのもの）。
+ */
 export default function Pipeline() {
   const { visitId } = useParams();
+  return <PipelineView key={visitId ?? ""} visitId={visitId} />;
+}
+
+function PipelineView({ visitId }: { visitId: string | undefined }) {
   const id = parseVisitId(visitId);
   const handleError = useDoctorApiError();
   const fetcher = useCallback(
@@ -59,17 +67,6 @@ export default function Pipeline() {
       return isUnauthorized(err) || (isApiError(err) && err.status === 404);
     },
   });
-  const { refresh } = polling;
-  const firstId = useRef(id);
-
-  useEffect(() => {
-    // 同じ画面のまま別の受診へ移ったら取り直す（初回は usePolling が取る）
-    if (firstId.current !== id) {
-      firstId.current = id;
-      refresh();
-    }
-  }, [id, refresh]);
-
   const snap = polling.data;
 
   return (

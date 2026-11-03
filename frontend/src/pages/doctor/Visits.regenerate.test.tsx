@@ -159,6 +159,26 @@ describe("Visits: AI でもう一度変換", () => {
     await waitFor(() => expect(countOf(fetchMock, LIST)).toBe(2));
   });
 
+  it("印刷済みの確認を開いたまま依頼しても、削除の確定は押せない", async () => {
+    const pending = deferred<Response>();
+    mockApi({
+      [LIST]: { visits: VISITS },
+      [REGEN_14]: () => pending.promise,
+    });
+    renderVisits();
+    await screen.findByText("A-025");
+    const u = user();
+    const row = within(rowOf("A-025"));
+    await u.click(row.getByRole("button", { name: "印刷済み" }));
+    await u.click(buttonIn("A-025"));
+    expect(
+      row.getByRole("button", { name: "削除する（印刷済み）" }),
+    ).toBeDisabled();
+    await act(async () => {
+      pending.resolve(jsonResponse({ ok: true }));
+    });
+  });
+
   it("409 not_regenerable なら code を出し、ボタンを戻す", async () => {
     mockApi({
       [LIST]: { visits: VISITS },

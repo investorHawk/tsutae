@@ -76,7 +76,7 @@ export default function TwoStepButton({
         ref={confirmRef}
         type="button"
         className="d-danger"
-        disabled={busy}
+        disabled={busy || disabled}
         onClick={() => void confirm()}
       >
         {confirmLabel}

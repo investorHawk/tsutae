@@ -406,15 +406,16 @@ def mark_printed(
     生成中の受診を印刷済みにしない）。
     """
     require_exists(conn, "visits", vid, "visit")
+    guard = " AND status != 'generating'" if refuse_generating else ""
     with write_transaction(conn):
-        if refuse_generating:
-            row = conn.execute(
-                "SELECT status FROM visits WHERE id = ?", (vid,)
-            ).fetchone()
-            if row is not None and row["status"] == "generating":
-                return False
+        # 状態の確認は UPDATE の条件で行う（最初の書き込みで SQLite のトランザクションが
+        # 始まるので、確認と削除の間に別の接続が generating にすることはできない）
+        cur = conn.execute(
+            "UPDATE visits SET status = 'printed' WHERE id = ?" + guard, (vid,)
+        )
+        if cur.rowcount == 0:
+            return False
         _erase_results(conn, vid)
-        conn.execute("UPDATE visits SET status = 'printed' WHERE id = ?", (vid,))
     _checkpoint(conn)
     return True
 

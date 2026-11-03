@@ -69,7 +69,7 @@ T03 で確かめる4点:
 | T54 | 受診 API: `POST /api/visit` → バックグラウンド生成 → `generating/ready/failed` | 失敗時に fallback レポートで `ready` になるテスト | T34, T36, T53 | opus |
 | T55 | 医師 API（印刷待ち一覧・レポート・印刷済みで削除・実投与日登録）、環境変数パスワード | 印刷済みで reports/timelines/受付番号が消えるテスト | T54 | opus |
 | T56 | 24時間 TTL 削除 | 時刻を進めるテスト | T55 | opus |
-| T57 | 固定規則: 38.0℃以上をコードで判定し、`patient_strings.json` の施設案内文（spec 11節のデモ用架空文面）をそのまま返す | 37.9／38.0 の境界テスト | T12, T53 | opus |
+| T57 | `patient_strings.json`（患者画面の全定型文。spec 3.1）を作り、固定規則: 38.0℃以上をコードで判定して施設案内文（spec 11節のデモ用架空文面）をそのまま返す | 37.9／38.0 の境界テスト。患者画面の文言が全てこのファイルにある | T12, T53 | opus |
 | T58 | **アーキテクチャテスト**: 患者 API が `reports`/`timelines` を import しない、患者レスポンスの文字列が `patient_strings.json` 由来のみ | CI（`make test`）に含まれる | T53, T55, T57 | opus |
 
 ## 6. 患者 Web と設定ループ（11/7）
@@ -77,7 +77,7 @@ T03 で確かめる4点:
 | ID | タスク | 完了条件 | 依存 | 担当 |
 |---|---|---|---|---|
 | T60 | フロント骨組み（React + Vite + TS、vitest、Prettier）。患者・医師を別ルート | `npm test` が通り `make test` に組み込まれる | T02 | sol |
-| T61 | P0 登録／P1 今日の記録（段階0〜2、代理トグル、大きなボタン）／P2 自分の記録／P3 受診（受付番号→定型文）／P4 固定規則表示 | **スマホ幅で 入力 → QR → 定型画面 が通しで動く**（11/7 完了条件） | T53, T54, T57, T60 | sol |
+| T61 | P0 登録／P1 今日の記録（段階0〜2、代理トグル、大きなボタン）／P2 自分の記録／P3 受診（受付番号→定型文）／P4 固定規則表示。文言は全て T57 の `patient_strings.json` から | **スマホ幅で 入力 → QR → 定型画面 が通しで動く**（11/7 完了条件） | T53, T54, T57, T60 | sol |
 | T62 | D4 バックエンド: 一文 → Agent SDK（`Read/Edit/Write`、H3 で `.claude/skills/<regimen\|report-format>/` 配下に限定）→ unified diff → 承認で `version` を上げる／却下で戻す。書き換え後に T12 のバリデータを通し、壊れた Skill は差分を出さず失敗にする | H3 が配下外への Write を deny するテスト。承認・却下のテスト | T03, T12 | opus |
 | T63 | `skill_version` による「未設問（−−）」の表示と、翌日の記録から新しい質問が出ること | 質問を足した翌日だけ新しい列が埋まるテスト | T51, T62 | opus |
 | T64 | D4 画面（一文入力 → 差分表示 → 承認／却下） | **設定ループが通しで動く**（11/7 完了条件） | T60, T62 | sol |
@@ -111,11 +111,11 @@ T03 で確かめる4点:
 
 | 項目 | 状態 | 対処 |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | `.env` もシェル環境変数も無し | T01。先生がリポジトリ直下に `.env` を作る |
-| uv | 0.9.26 あり。ただし Claude Code のサンドボックス内では `~/.cache/uv` に書けず落ちる | `uv python install 3.12` と `uv sync` は先生が `! uv ...` で実行するか、`/sandbox` で `~/.cache/uv` `~/.local/share/uv` への書き込みを許可する |
+| `ANTHROPIC_API_KEY` | `.env` もシェル環境変数も無し。さらに **サンドボックスは `.env` の読み取りを拒否する**ので、作った後も Claude 側のサンドボックス内のコマンドからはキーが見えない | T01 で先生が `.env` を作る。API を叩くもの（T03 スモーク、T33/T34 の結合、T41 評価）は先生が `! uv run ...` で実行する。テストは **キーが無ければ API を叩くテストを skip** する設計にする（T02） |
+| uv | 0.9.26 あり。ただしサンドボックス内ではキャッシュ先を変えても落ちる（SystemConfiguration の呼び出しが拒否される） | `uv python install 3.12` と `uv sync` は先生が `! uv ...` で実行する（確実な方法）。以後のテストは `.venv/bin/pytest` を直接呼べばサンドボックス内で回る |
 | Python | システムは 3.9.6。3.12 は未導入 | 上記 uv で入れる |
 | Node | node 20.20、npm 10.8、pnpm 10.27 | そのまま使える |
-| make | Xcode の xcrun 経由で、サンドボックス内ではキャッシュ作成に失敗 | `make` もサンドボックス外、または許可設定が要る。駄目なら `uv run` 直叩きに切り替える |
+| make | `make` コマンドは xcrun 経由でサンドボックス内では失敗するが、実体 `/Library/Developer/CommandLineTools/usr/bin/make` は直接呼べば動く | Makefile は `.venv/bin/pytest` `.venv/bin/ruff` を直接呼ぶ形にし、サンドボックス内でもテストが回るようにする |
 | claude-agent-sdk | PyPI 最新 0.2.177、Python ≥3.10 | spec どおり |
 | GitHub | remote `investorHawk/tsutae` あり。公開かどうかはサンドボックス内の `gh` が TLS で失敗し未確認 | T84 の前に先生が確認 |
 

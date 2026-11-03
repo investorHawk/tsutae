@@ -105,7 +105,7 @@
 |---|---|---|
 | SKILL.md は YAML frontmatter に `version` と `questions` を持ち、アプリは frontmatter だけを読む。書き換え後はバリデータを通す | アプリが質問画面を組み、エージェントが書き換えるため、機械が読める書式と壊れていない保証が要る | 仮置き（技術判断） |
 | D4 の書き換えは一時コピーに対して行い、承認時だけ本体に反映。却下は一時コピーを捨てる | spec v0.1 の「git checkout 相当で戻す」は作業ツリーの他の変更まで巻き戻す恐れがある | 仮置き（技術判断） |
-| `uv`・`make` はサンドボックス内で動かないので、環境構築は先生が `! uv ...` で実行するか `/sandbox` で許可する | `~/.cache/uv` への書き込みと xcrun のキャッシュ作成がサンドボックスで拒否される | 技術確認 |
+| 環境構築と API を叩く実行（`uv python install` `uv sync` `uv run scripts/smoke_agent_sdk.py` `make eval`）は先生が `! ...` で実行する。テストはキーが無ければ API を叩くものを skip し、Makefile は `.venv/bin/*` を直接呼ぶ | サンドボックスは `.env` の読み取りを拒否し、`uv` は SystemConfiguration 呼び出しで落ちる。サンドボックス内で回るものと先生が回すものを分ける | 技術確認 |
 
 ## 未決（先生の判断待ち）
 なし

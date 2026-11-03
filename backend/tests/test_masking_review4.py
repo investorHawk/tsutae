@@ -83,3 +83,31 @@ def test_tumor_marker_names_are_not_id_like(text: str) -> None:
 @pytest.mark.parametrize("text", ["CA1250", "A-023", "AB1234"])
 def test_lab_name_allowance_is_exact(text: str) -> None:
     assert [d.rule for d in detect_in_patient_text(text)] == [RULE_ID_LIKE]
+
+
+@pytest.mark.parametrize(
+    "text", ["孫の蓮くんが来た", "娘の葵ちゃんと散歩した", "孫の陽くん", "蓮くんです"]
+)
+def test_one_kanji_name_with_kun_or_chan_is_detected(text: str) -> None:
+    # 患者の自由記載に出やすい家族の名前（1字の名＋くん・ちゃん）。さん と同じく拾う
+    assert [d.rule for d in detect_in_patient_text(text)] == [
+        "unknown_before_honorific"
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "赤ちゃんが泣く",
+        "孫ちゃんが来た",
+        "兄ちゃんと電話",
+        "母ちゃん",
+        "坊ちゃん",
+        "行くんです",
+        "書くんですか",
+        "聞くんです",
+        "胸がちくんとした",
+    ],
+)
+def test_relation_words_and_verbs_are_not_names(text: str) -> None:
+    assert detect_in_patient_text(text) == []

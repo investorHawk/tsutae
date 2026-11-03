@@ -16,6 +16,7 @@ from tsutae.masking.chars import (
     is_hard_boundary,
     is_hiragana,
     is_japanese,
+    is_kanji,
     is_kanji_or_katakana,
     is_latin_letter,
     run_start,
@@ -41,6 +42,9 @@ _HONORIFIC_RE = re.compile(
 )
 # 漢字・カタカナ・ひらがなが混ざった語（まり子さん・さくらちゃん）をまとめて見る敬称
 _MIXED_HONORIFICS = frozenset({"さん", "ちゃん", "さま"})
+
+# 1字の漢字の名でも検出する敬称（さんは _mixed_span が扱う）
+_SHORT_NAME_HONORIFICS = frozenset({"くん", "ちゃん", "君"})
 
 # 「〜くんです」が動詞（行くんです・長引くんです）かを見る
 _VERB_FORM_RE = re.compile("です|だ|で|じゃ|でしょ|か(?!ら)")
@@ -208,10 +212,16 @@ def _word_span(text: str, end: int, m: re.Match[str], limit: int) -> int | None:
             trailing_fallback=not text.startswith("ちゃんと", m.start()),
             onomatopoeia=is_kun,
         )
-    if start is None or end - start < 2:
+    if start is None:
         return None
     candidate = text[start:end]
     if is_kun and _VERB_FORM_RE.match(text, m.end()) and _looks_like_verb(candidate):
+        return None
+    if end - start < 2:
+        # 1字の漢字の名＋くん・ちゃん（孫の蓮くん・娘の葵ちゃん）。続柄の1字
+        # （孫ちゃん・兄ちゃん・赤ちゃん 等）は許可語で通す
+        if honorific in _SHORT_NAME_HONORIFICS and is_kanji(candidate):
+            return None if is_allowed(candidate, honorific) else start
         return None
     return None if is_allowed(candidate, honorific) else start
 

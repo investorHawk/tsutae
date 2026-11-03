@@ -77,6 +77,11 @@ describe("Today (P1): registration", () => {
     renderToday({ pathname: "/today", state: { registered: true } });
     expect(screen.getByText(s("register.done"))).toBeInTheDocument();
     await screen.findByRole("group", { name: questionText("fever") });
+    // 履歴の state は消す（再読み込みでは「登録しました」を出さない）。表示は残す
+    await waitFor(() =>
+      expect(screen.getByTestId("where")).toHaveAttribute("data-state", "null"),
+    );
+    expect(screen.getByText(s("register.done"))).toBeInTheDocument();
   });
 
   it("bottom navigation links to today and history", async () => {

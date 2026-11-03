@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { DoneMessage, ErrorMessage } from "../../components/patient/Messages";
 import PatientNav from "../../components/patient/PatientNav";
 import { NOT_REGISTERED_KEY } from "../../components/patient/patientApi";
@@ -22,13 +22,19 @@ function cameFromRegister(state: unknown): boolean {
 export default function Today() {
   const { t } = usePatientStrings();
   const location = useLocation();
+  const navigate = useNavigate();
   const [pid] = useState(loadPid);
+  // 「登録しました」は登録の直後の1回だけ。履歴の state は消して、再読み込みでは出さない
+  const [justRegistered] = useState(() => cameFromRegister(location.state));
+  useEffect(() => {
+    if (cameFromRegister(location.state)) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, navigate]);
   return (
     <section className="page">
       <h1>{t("today.title")}</h1>
-      {cameFromRegister(location.state) && (
-        <DoneMessage messageKey="register.done" />
-      )}
+      {justRegistered && <DoneMessage messageKey="register.done" />}
       {pid ? (
         <TodayForm key={location.key} pid={pid} />
       ) : (

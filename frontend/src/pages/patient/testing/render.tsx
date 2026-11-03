@@ -8,7 +8,14 @@ import { STRINGS } from "./fixtures";
 /** 今の経路を出す（画面遷移の確認用）。 */
 export function Where() {
   const location = useLocation();
-  return <output data-testid="where">{location.pathname}</output>;
+  return (
+    <output
+      data-testid="where"
+      data-state={location.state === null ? "null" : "set"}
+    >
+      {location.pathname}
+    </output>
+  );
 }
 
 /** MemoryRouter の最初の場所（経路だけか、遷移時の state つき）。 */

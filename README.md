@@ -83,6 +83,13 @@ make seed            # data/tsutae.db（TSUTAE_DB で変更可）
 TSUTAE_TODAY=2026-11-09 make dev-api   # http://127.0.0.1:8000
 make dev-web                           # http://127.0.0.1:5173
 ```
+- スマホで試す（同じ Wi-Fi）: 登録用 QR の URL が Mac の IP を指すようにする。localhost 以外を指すときは、既定の鍵・パスワードのままだと起動が止まる
+  ```bash
+  TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=http://<Mac の IP>:5173 \
+    TSUTAE_SECRET=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))") \
+    DOCTOR_PASSWORD=<デモ用のパスワード> make dev-api
+  (cd frontend && npx vite --host 0.0.0.0)
+  ```
 - 患者: `http://127.0.0.1:5173/register?pid=P-DEMO0001`（デモ患者。受付番号は例えば `A-023`）
 - 医師: `http://127.0.0.1:5173/doctor/login`（パスワードは `DOCTOR_PASSWORD`、既定 `demo-doctor`）
 - 環境変数（`.env` に書く）: `ANTHROPIC_API_KEY`（変換と D4 に必須）、`DOCTOR_PASSWORD`、`TSUTAE_SECRET`（Cookie の署名鍵。本番では必ず変える）、`TSUTAE_TODAY`（デモ用に「今日」を固定）、`TSUTAE_DB`、`TSUTAE_MODEL`（既定 `claude-opus-5-5`）、`TSUTAE_SUBAGENT_MODEL`（既定 `claude-sonnet-5-5`）

@@ -1,7 +1,9 @@
 """Skill の書き換えの依頼・承認・却下（D4）。docs/architecture.md §9b。
 
 request_change の手順（本体の SKILL.md には触らない）:
-1. 名前（SKILL_NAME_PATTERN）と依頼文を検査。今の SKILL.md を読んで版を得る
+1. 名前（SKILL_NAME_PATTERN）と依頼文を検査。今の SKILL.md を読んで版を得る。
+   同じ Skill に作業中（pending・diff なし）の行があれば busy（created_at から
+   settings.pipeline_timeout_s を過ぎた作業中の行は先に failed・stale_request にする）
    （ここまでの失敗は行を作らず SkillChangeError）
 2. skill_changes を pending で作る（diff・new_text はまだ無い。承認は not_ready で拒む）
 3. 依頼文（editor.build_prompt）に二次検出 → 掛かれば failed・h1_blocked（editor を呼ばない）
@@ -50,7 +52,13 @@ from tsutae.skillchange.check import baseline_of, identifier_like_question
 from tsutae.skillchange.diff import set_version, unified
 from tsutae.skillchange.editor import SkillEditor, build_prompt, logging_to
 from tsutae.skillchange.errors import SkillChangeError
-from tsutae.skillchange.state import RUN_KIND, fail_pending, transition
+from tsutae.skillchange.state import (
+    RUN_KIND,
+    fail_pending,
+    fail_stale_requests,
+    has_working,
+    transition,
+)
 from tsutae.skills import (
     SKILL_FILE_NAME,
     SkillNotFoundError,
@@ -312,6 +320,11 @@ async def request_change(
     name = _check_name(skill_name)
     text = _check_request(request_text)
     old, base = _read_base(name, _skills_dir(skills_home))
+    # 確かめてから行を作るまでに await を挟まない（同じイベントループの別の依頼が
+    # 間に入らない。単一プロセスが前提）
+    fail_stale_requests(conn, settings.pipeline_timeout_s, name)
+    if has_working(conn, name):
+        raise SkillChangeError("busy")
     change_id = db.create_skill_change(conn, name, text, base)
     logger = PipelineLogger(conn, RUN_KIND, change_id)
     logger.event("skill_change_request")

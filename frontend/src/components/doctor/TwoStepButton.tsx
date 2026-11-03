@@ -27,6 +27,14 @@ export default function TwoStepButton({
 }: TwoStepButtonProps) {
   const [step, setStep] = useState<Step>("idle");
   const mounted = useRef(true);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  // 2段目に進んだら確認のボタンへ（押したボタンは消えるので、focus を失わせない）
+  useEffect(() => {
+    if (step === "confirm") {
+      confirmRef.current?.focus();
+    }
+  }, [step]);
 
   useEffect(() => {
     mounted.current = true;
@@ -65,6 +73,7 @@ export default function TwoStepButton({
     <span className="d-twostep" role="group" aria-label={label}>
       <span className="d-twostep-prompt">{prompt}</span>
       <button
+        ref={confirmRef}
         type="button"
         className="d-danger"
         disabled={busy}

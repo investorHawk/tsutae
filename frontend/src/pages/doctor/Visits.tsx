@@ -35,6 +35,7 @@ function Summary({ visits }: { visits: readonly VisitSummary[] }) {
 export default function Visits() {
   const handleError = useDoctorApiError();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const polling = usePolling(fetchVisits, VISITS_POLL_MS, {
     onError: (err) => {
       handleError(err);
@@ -43,10 +44,12 @@ export default function Visits() {
   });
   const visits = polling.data;
 
-  async function handlePrinted(visitId: number) {
+  async function handlePrinted(visit: VisitSummary) {
     setActionError(null);
+    setNotice(null);
     try {
-      await markPrinted(visitId);
+      await markPrinted(visit.id);
+      setNotice(`受付 ${visit.reception_no} のレポートを削除しました`);
     } catch (err) {
       setActionError(handleError(err));
     }
@@ -68,6 +71,9 @@ export default function Visits() {
       {polling.error ? (
         <ErrorNote code={errorCode(polling.error)} prefix="一覧を取れません" />
       ) : null}
+      <p role="status" className="d-ok">
+        {notice ?? ""}
+      </p>
       {actionError ? (
         <ErrorNote code={actionError} prefix="印刷済みにできませんでした" />
       ) : null}

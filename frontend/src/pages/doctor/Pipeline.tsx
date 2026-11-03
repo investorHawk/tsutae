@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getPipelineEvents } from "../../api/doctor";
 import { isApiError } from "../../api/http";
@@ -30,6 +30,26 @@ function isFinished(status: VisitStatus): boolean {
   return FINISHED.includes(status);
 }
 
+/**
+ * 止める条件（ready・failed・printed）を2回続けて見たら止める（1回目の後に1回だけ
+ * 取り直す）。状態が変わった直後に記録される出来事（保存・後始末）を取りこぼさない。
+ * 最後の取り直しで終わっていなければ数え直す。
+ */
+function useStopAfterOneMore(): (snap: Snapshot) => boolean {
+  const seen = useRef(false);
+  return useCallback((snap: Snapshot) => {
+    if (!isFinished(snap.status)) {
+      seen.current = false;
+      return false;
+    }
+    if (seen.current) {
+      return true;
+    }
+    seen.current = true;
+    return false;
+  }, []);
+}
+
 /** 本文を検査して取り出す。status か events が契約と違えば invalid_response。 */
 function toSnapshot(body: unknown): Snapshot {
   const status = isRecord(body) ? body.status : undefined;
@@ -43,7 +63,8 @@ function toSnapshot(body: unknown): Snapshot {
 }
 
 /**
- * D5 パイプライン可視化。2秒ごとに取り直し、ready / failed で止める。
+ * D5 パイプライン可視化。2秒ごとに取り直し、ready / failed / printed を見たら
+ * もう1回だけ取り直して止める。
  * 受診ごとに描き直す（別の受診へ移ったら、前の受診の状態・出来事・失敗・停止を引き継がず、
  * 前の受診の遅い応答も捨てる。usePolling の値は描いている間だけのもの）。
  */
@@ -55,13 +76,14 @@ export default function Pipeline() {
 function PipelineView({ visitId }: { visitId: string | undefined }) {
   const id = parseVisitId(visitId);
   const handleError = useDoctorApiError();
+  const shouldStop = useStopAfterOneMore();
   const fetcher = useCallback(
     async () => toSnapshot(await getPipelineEvents(id ?? 0)),
     [id],
   );
   const polling = usePolling(fetcher, PIPELINE_POLL_MS, {
     enabled: id !== null,
-    shouldStop: (snap) => isFinished(snap.status),
+    shouldStop,
     onError: (err) => {
       handleError(err);
       return isUnauthorized(err) || (isApiError(err) && err.status === 404);

@@ -13,6 +13,10 @@
 - editor が無い（`tsutae.skillchange` を読めない）ときは 503 editor_unavailable
 - 却下も承認と同じ Skill のロック（`skills_home`）の内側で行う（承認の途中で却下して
   本体は新しい版・行は rejected、という食い違いを作らない。握られていれば 409 busy）
+- 同じ Skill の書き換えが作業中（pending・diff なし）なら依頼は 409 busy。作業中のまま
+  pipeline_timeout_s を過ぎた行（再起動などで取り残された）は、依頼と
+  `GET /skill-changes`（こちらは STALE_GRACE_S の余裕を足す）の前に
+  failed・stale_request にする（画面が「生成中」のまま止まらないように）
 - `GET /skills` は壊れた SKILL.md・欠けた必須 Skill を黙って落とさず `invalid` に
   `{name, error_code, required}` で載せる（200 のまま。ログインの確認にも使う経路なので
   500 にして医師画面全体を止めない）。必須は regimen の2本と report-format-default
@@ -43,6 +47,7 @@ from tsutae.skillchange import (
     reject_change,
     request_change,
 )
+from tsutae.skillchange.state import STALE_GRACE_S, fail_stale_requests
 from tsutae.skills import (
     DEFAULT_REPORT_SKILL,
     REGIMEN_SKILL_NAMES,
@@ -164,7 +169,9 @@ def _change_or_404(conn: sqlite3.Connection, change_id: int) -> dict[str, Any]:
 
 
 @router.get("/skill-changes")
-def list_skill_changes(conn: Conn) -> dict[str, Any]:
+def list_skill_changes(conn: Conn, settings: AppSettings) -> dict[str, Any]:
+    """一覧（id 昇順）。取り残された作業中の行は先に failed・stale_request にする。"""
+    fail_stale_requests(conn, settings.pipeline_timeout_s, grace_s=STALE_GRACE_S)
     return {"skill_changes": [_change_out(c) for c in db.list_skill_changes(conn)]}
 
 

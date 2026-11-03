@@ -151,7 +151,7 @@ describe("Settings: 承認・却下の 409 busy", () => {
       within(review).getByRole("button", { name: "承認する" }),
     );
     const alert = await within(review).findByRole("alert");
-    expect(alert).toHaveTextContent("ほかの承認・却下を処理中です");
+    expect(alert).toHaveTextContent("ほかの書き換え・承認・却下を処理中です");
     expect(alert).toHaveTextContent("busy");
     const again = within(review).getByRole("button", { name: "承認する" });
     expect(again).toBeEnabled();
@@ -174,7 +174,7 @@ describe("Settings: 承認・却下の 409 busy", () => {
       within(review).getByRole("button", { name: "却下する" }),
     );
     expect(await within(review).findByRole("alert")).toHaveTextContent(
-      "ほかの承認・却下を処理中です",
+      "ほかの書き換え・承認・却下を処理中です",
     );
     await userEvent.click(
       within(review).getByRole("button", { name: "却下する" }),

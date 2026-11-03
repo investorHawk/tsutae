@@ -14,10 +14,15 @@ import { usePatientStrings } from "../../strings/PatientStrings";
 type Phase = "editing" | "sending" | "done" | "not_registered";
 
 const INVALID_KEY = "visit.invalid";
+/** 今コースが無い（409 no_course）。受付で声をかけてもらう。 */
+const NO_COURSE_KEY = "visit.no_course";
 
 function errorKeyOf(err: unknown): string {
   if (isApiError(err) && (err.status === 400 || err.status === 422)) {
     return INVALID_KEY;
+  }
+  if (isApiError(err) && err.status === 409 && err.code === "no_course") {
+    return NO_COURSE_KEY;
   }
   return GENERIC_ERROR_KEY;
 }
@@ -62,6 +67,7 @@ export default function Visit() {
       <section className="page">
         <h1>{t("visit.title")}</h1>
         <DoneMessage messageKey="visit.done" />
+        <PatientNav />
       </section>
     );
   }

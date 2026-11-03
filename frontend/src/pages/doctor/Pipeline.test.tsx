@@ -100,7 +100,7 @@ function renderPipeline(path = "/doctor/pipeline/12") {
 }
 
 describe("Pipeline（D5 パイプライン可視化）", () => {
-  it("2秒ごとに取り直し、ready になったら止める", async () => {
+  it("2秒ごとに取り直し、ready になったら1回だけ取り直してから止める", async () => {
     const answers = [
       body("generating", EARLY),
       body("generating", EARLY),
@@ -120,17 +120,64 @@ describe("Pipeline（D5 パイプライン可視化）", () => {
     await advance(2000);
     expect(countOf(fetchMock, EVENTS_KEY)).toBe(3);
     expect(await screen.findByText("印刷待ち")).toBeInTheDocument();
+    expect(screen.getByText("2秒ごとに更新中")).toBeInTheDocument();
+    await advance(2000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(4);
     await advance(10_000);
-    expect(countOf(fetchMock, EVENTS_KEY)).toBe(3);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(4);
     expect(screen.getByText(/更新を止めました/)).toBeInTheDocument();
   });
 
-  it("failed でも止める", async () => {
+  it("終わった後の最後の取り直しで、遅れて記録された出来事も出す", async () => {
+    const TAIL = ev({
+      ts: "2026-11-09T10:00:15+09:00",
+      event: "report_saved",
+      decision: "ready",
+    });
+    const answers = [body("ready", LATE), body("ready", [...LATE, TAIL])];
+    const fetchMock = mockApi({
+      [EVENTS_KEY]: () =>
+        jsonResponse(answers.shift() ?? body("ready", [...LATE, TAIL])),
+    });
+    renderPipeline();
+    expect(await screen.findByText("印刷待ち")).toBeInTheDocument();
+    const list = () => screen.getByRole("list", { name: "時系列" });
+    expect(within(list()).getAllByRole("listitem")).toHaveLength(LATE.length);
+    await advance(2000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(2);
+    await waitFor(() =>
+      expect(within(list()).getAllByRole("listitem")).toHaveLength(
+        LATE.length + 1,
+      ),
+    );
+    await advance(10_000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(2);
+    expect(screen.getByText(/更新を止めました/)).toBeInTheDocument();
+  });
+
+  it("failed でも1回だけ取り直してから止める", async () => {
     const fetchMock = mockApi({ [EVENTS_KEY]: body("failed", EARLY) });
     renderPipeline();
     expect(await screen.findByText("失敗")).toBeInTheDocument();
     await advance(10_000);
-    expect(countOf(fetchMock, EVENTS_KEY)).toBe(1);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(2);
+  });
+
+  it("最後の取り直しでまだ終わっていなければ、取り直しを続ける", async () => {
+    const answers = [body("ready", LATE), body("generating", EARLY)];
+    const fetchMock = mockApi({
+      [EVENTS_KEY]: () => jsonResponse(answers.shift() ?? body("ready", LATE)),
+    });
+    renderPipeline();
+    expect(await screen.findByText("印刷待ち")).toBeInTheDocument();
+    await advance(2000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(2);
+    await advance(2000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(3);
+    await advance(2000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(4);
+    await advance(10_000);
+    expect(countOf(fetchMock, EVENTS_KEY)).toBe(4);
   });
 
   it("出来事を時系列のカードで出す（Hook の拒否と規則コードつき）", async () => {

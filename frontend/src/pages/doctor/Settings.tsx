@@ -11,9 +11,13 @@ import SkillReview from "../../components/doctor/SkillReview";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
 import { useSkillCatalog } from "../../components/doctor/useSkillCatalog";
 import { useSkillChangeFlow } from "../../components/doctor/useSkillChangeFlow";
+import { useSkillChangeWatch } from "../../components/doctor/useSkillChangeWatch";
 import "../../components/doctor/doctor-ui.css";
 
-/** D4 設定を変える。一文 → Agent SDK が SKILL.md の一時コピーを書き換え → 差分 → 承認／却下。 */
+/**
+ * D4 設定を変える。一文 → Agent SDK が SKILL.md の一時コピーを書き換え → 差分 → 承認／却下。
+ * 履歴に作業中（pending・diff なし）の変更があれば、終わるまで生成中と出してフォームを止める。
+ */
 export default function Settings() {
   const handleError = useDoctorApiError();
   const catalog = useSkillCatalog(handleError);
@@ -31,6 +35,13 @@ export default function Settings() {
     },
   });
   const { phase } = flow;
+  useSkillChangeWatch({
+    phase,
+    history: catalog.history,
+    reloadHistory: catalog.reloadHistory,
+    watch: flow.watch,
+    settle: flow.settle,
+  });
   const skillName = catalog.skills.some((s) => s.name === chosen)
     ? chosen
     : (catalog.skills.find((s) => s.name === DEFAULT_SKILL)?.name ??

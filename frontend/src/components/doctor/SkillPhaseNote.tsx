@@ -1,6 +1,18 @@
+import { useEffect, useState } from "react";
 import type { SkillChange } from "../../api/types";
 import ErrorNote from "./ErrorNote";
+import { elapsedSeconds } from "./skillChangeWork";
 import type { SkillPhase } from "./useSkillChangeFlow";
+
+/** 経過秒（1秒ごとに描き直す。生成中の間だけ置く）。 */
+function Elapsed({ startedAt }: { startedAt: number }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <>経過 {elapsedSeconds(startedAt, nowMs)} 秒</>;
+}
 
 interface SkillPhaseNoteProps {
   phase: SkillPhase;
@@ -18,7 +30,8 @@ export default function SkillPhaseNote({
         <div role="status" className="d-generating">
           <span className="d-spinner" aria-hidden="true" />
           生成中… Claude が <code>{phase.skillName}</code>{" "}
-          の一時コピーを書き換え、差分を作っています（数十秒かかることがあります）
+          の一時コピーを書き換え、差分を作っています。数分かかることがあります。この画面のままお待ちください（
+          <Elapsed startedAt={phase.startedAt} />）
         </div>
       );
     case "approved":

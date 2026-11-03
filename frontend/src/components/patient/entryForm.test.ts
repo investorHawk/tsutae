@@ -10,6 +10,8 @@ import {
   hasInput,
   parseTemperature,
   setAnswer,
+  temperatureErrors,
+  temperatureProblem,
   unansweredCount,
   type EntryFormState,
 } from "./entryForm";
@@ -283,5 +285,48 @@ describe("hasInput / unansweredCount", () => {
         form({ answers: { diarrhea: "none", fever: "not_measured" } }),
       ),
     ).toBe(3);
+  });
+});
+
+describe("temperatureProblem", () => {
+  it.each([
+    ["36.8", null],
+    ["\uff13\uff16\uff0e\uff18", null],
+    ["30", null],
+    ["45", null],
+    ["", "invalid"],
+    ["   ", "invalid"],
+    ["abc", "invalid"],
+    ["36.8.1", "invalid"],
+    ["-36", "invalid"],
+    ["1e2", "invalid"],
+    ["368", "out_of_range"],
+    ["50", "out_of_range"],
+    ["45.1", "out_of_range"],
+    ["29.9", "out_of_range"],
+    ["3.68", "out_of_range"],
+  ])("%j は %s", (text, expected) => {
+    expect(temperatureProblem(text)).toBe(expected);
+  });
+});
+
+describe("temperatureErrors", () => {
+  it("測った質問ごとに、数字でない・範囲外を分けて返す（質問集の順）", () => {
+    const state = form({
+      answers: { fever: "measured", fever_evening: "measured" },
+      temperatureTexts: { fever: "368", fever_evening: "x" },
+    });
+    expect([...temperatureErrors(TWO_FEVERS, state)]).toEqual([
+      ["fever", "out_of_range"],
+      ["fever_evening", "invalid"],
+    ]);
+  });
+
+  it("正しい値・測っていない質問は含めない", () => {
+    const state = form({
+      answers: { fever: "measured", fever_evening: "not_measured" },
+      temperatureTexts: { fever: "36.8", fever_evening: "x" },
+    });
+    expect(temperatureErrors(TWO_FEVERS, state).size).toBe(0);
   });
 });

@@ -41,16 +41,28 @@ import { type Item, checked } from "./validate";
 
 type Guard = (body: Item) => boolean;
 
+/** 医師 API の打ち切り（ms）。打ち切りは通信の失敗（network_error）と同じ扱い。 */
+export const DOCTOR_TIMEOUT_MS = 30_000;
+/**
+ * D4 の書き換えの依頼の打ち切り（ms）。サーバーは editor を pipeline_timeout_s
+ * （既定 600 秒）で打ち切るので、それに合わせて 10 分待つ。
+ */
+export const SKILL_CHANGE_TIMEOUT_MS = 10 * 60 * 1000;
+
 async function getChecked<T>(path: string, isBody: Guard): Promise<T> {
-  return checked<T>(await getJson<unknown>(path), isBody);
+  return checked<T>(
+    await getJson<unknown>(path, { timeoutMs: DOCTOR_TIMEOUT_MS }),
+    isBody,
+  );
 }
 
 async function postChecked<T>(
   path: string,
   isBody: Guard,
   body?: unknown,
+  timeoutMs: number = DOCTOR_TIMEOUT_MS,
 ): Promise<T> {
-  return checked<T>(await postJson<unknown>(path, body), isBody);
+  return checked<T>(await postJson<unknown>(path, body, { timeoutMs }), isBody);
 }
 
 // --- ログイン -------------------------------------------------------------
@@ -169,6 +181,7 @@ export function createSkillChange(
     "/api/doctor/skill-changes",
     isCreateSkillChangeResponse,
     body,
+    SKILL_CHANGE_TIMEOUT_MS,
   );
 }
 

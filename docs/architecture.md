@@ -286,6 +286,10 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 ### 2026-11-04 明け方の決定
 - 起動時（lifespan。purge の後に1回だけ）に、受付番号が残っていて期限内の status=generating の受診を `api/orphans.recover_orphans` で回収する: Claude を呼ばずにフォールバック（AI変換なし）のレポートを作って ready にする（変換は同じプロセスの BackgroundTasks で動くので、止まった・再起動したプロセスの生成中は二度と終わらない）。ログ `orphan_recovered`。単一プロセス（`--workers 1`）が前提
 
+- D4 の依頼は、同じ Skill の作業中（diff の無い pending）があれば 409 `busy`。`created_at` から `pipeline_timeout_s` を過ぎた作業中の行は `failed`（`stale_request`）にしてから判定する（`GET /skill-changes` の前にも、30秒の余裕をつけて同じ片付けをする）。フロントは作業中の行を「生成中」と出して3秒ごとに履歴を取り直す
+- フロントの通信のタイムアウト: 患者 API 20秒、医師 API 30秒、D4 の依頼 10分（打ち切りは通信の失敗と同じ扱い）
+- 医師画面の「印刷」は、同じオリジンの非表示 iframe にレポートを読み込んで親から `print()` を呼ぶ（レポートの CSP は script を止めるため）。失敗したら「レポートを開く」から ⌘P
+
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=["project"]`、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_h3(work_root, logger)`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
 - `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の同じ相対位置に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない

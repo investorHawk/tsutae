@@ -51,17 +51,35 @@ export type BuildResult =
       reason: "empty" | "temperature_invalid" | "free_text_too_long";
     };
 
-/** 体温の文字列を数値にする。全角は半角に直す。30〜45 の範囲だけ。不正なら null。 */
-export function parseTemperature(text: string): number | null {
-  const normalized = text.normalize("NFKC").trim();
+/**
+ * 体温の入力の問題。数字の形でない（空を含む）なら invalid（temperature.invalid）、
+ * 数字だが 30〜45 の外（小数点の打ち忘れの 368 など）なら out_of_range
+ * （temperature.out_of_range）。正しければ null。全角は半角に直してから見る。
+ */
+export type TemperatureProblem = "invalid" | "out_of_range";
+
+function normalizeTemperature(text: string): string {
+  return text.normalize("NFKC").trim();
+}
+
+export function temperatureProblem(text: string): TemperatureProblem | null {
+  const normalized = normalizeTemperature(text);
   if (!TEMPERATURE_PATTERN.test(normalized)) {
-    return null;
+    return "invalid";
   }
   const value = Number(normalized);
   if (value < TEMPERATURE_MIN || value > TEMPERATURE_MAX) {
+    return "out_of_range";
+  }
+  return null;
+}
+
+/** 体温の文字列を数値にする。全角は半角に直す。30〜45 の範囲だけ。不正なら null。 */
+export function parseTemperature(text: string): number | null {
+  if (temperatureProblem(text) !== null) {
     return null;
   }
-  return value;
+  return Number(normalizeTemperature(text));
 }
 
 /** 答えを入れた新しい状態を返す。同じ答えを押し直すと取り消す。 */
@@ -115,19 +133,30 @@ function answeredPairs(
   });
 }
 
+/** 「測った」のに体温が不正な質問の key → 問題（質問集の順）。 */
+export function temperatureErrors(
+  questions: readonly Question[],
+  state: EntryFormState,
+): ReadonlyMap<string, TemperatureProblem> {
+  return new Map(
+    answeredPairs(questions, state).flatMap(({ question, value }) => {
+      if (value !== "measured") {
+        return [];
+      }
+      const problem = temperatureProblem(
+        state.temperatureTexts[question.key] ?? "",
+      );
+      return problem === null ? [] : [[question.key, problem] as const];
+    }),
+  );
+}
+
 /** 「測った」のに体温が不正な質問の key（質問集の順）。 */
 export function invalidTemperatureKeys(
   questions: readonly Question[],
   state: EntryFormState,
 ): ReadonlySet<string> {
-  return new Set(
-    answeredPairs(questions, state)
-      .filter(
-        ({ question, value }) =>
-          value === "measured" && temperatureOf(state, question.key) === null,
-      )
-      .map(({ question }) => question.key),
-  );
+  return new Set(temperatureErrors(questions, state).keys());
 }
 
 export function unansweredCount(

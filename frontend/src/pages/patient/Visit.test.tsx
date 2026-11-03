@@ -1,5 +1,5 @@
 /** P3 受診時（/visit）。期待する文は patient_strings.json のキーから引く。 */
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
@@ -102,7 +102,25 @@ describe("Visit (P3)", () => {
     ]);
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.queryByRole("navigation")).toBeNull();
+    const nav = screen.getByRole("navigation");
+    expect(
+      within(nav).getByRole("link", { name: s("nav.today") }),
+    ).toHaveAttribute("href", "/today");
+    expect(
+      within(nav).getByRole("link", { name: s("nav.history") }),
+    ).toHaveAttribute("href", "/history");
+  });
+
+  it("409 no_course: visit.no_course and the form stays", async () => {
+    mockPatientApi({
+      visit: () => jsonResponse({ error: "no_course" }, 409),
+    });
+    renderPatient(ROUTES, "/visit");
+    await userEvent.type(field(), "A-023");
+    await userEvent.click(submit());
+    expect(await screen.findByText(s("visit.no_course"))).toBeInTheDocument();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
+    expect(field()).toHaveValue("A-023");
   });
 
   it("uses the cookie only (works without a saved pid)", async () => {

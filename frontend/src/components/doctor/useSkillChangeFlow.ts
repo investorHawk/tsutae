@@ -8,12 +8,28 @@ import type { CreateSkillChangeResponse, SkillChange } from "../../api/types";
 import { checked } from "../../api/validate";
 import { isUsableDiff } from "./diff";
 import { isCreateSkillChangeResponse } from "./guards";
+import {
+  SKILL_CHANGE_FAILED,
+  settleWatched,
+  watchStartedAt,
+} from "./skillChangeWork";
 import type { ReviewTarget } from "./SkillReview";
 
-/** D4 の段階: 入力 → 生成中 → 差分の確認 → 承認／却下（または失敗）。 */
+export { SKILL_CHANGE_FAILED };
+
+/**
+ * D4 の段階: 入力 → 生成中 → 差分の確認 → 承認／却下（または失敗）。
+ * 生成中の changeId は、履歴で見張っている作業中の変更（自分の依頼の応答待ちなら null）。
+ * startedAt は経過秒の起点（ms。見張りでは変更の created_at）。
+ */
 export type SkillPhase =
   | { kind: "input" }
-  | { kind: "generating"; skillName: string }
+  | {
+      kind: "generating";
+      skillName: string;
+      startedAt: number;
+      changeId: number | null;
+    }
   | {
       kind: "review";
       target: ReviewTarget;
@@ -23,9 +39,6 @@ export type SkillPhase =
   | { kind: "approved"; skillName: string; newVersion: number }
   | { kind: "rejected"; skillName: string }
   | { kind: "failed"; changeId: number | null; code: string };
-
-/** 書き換えが失敗した（diff が無い・空）が履歴に error_code が無いときの code。 */
-export const SKILL_CHANGE_FAILED = "skill_change_failed";
 
 interface FlowOptions {
   handleError: (err: unknown) => string;
@@ -50,7 +63,12 @@ export function useSkillChangeFlow({
   const [phase, setPhase] = useState<SkillPhase>({ kind: "input" });
 
   async function request(skillName: string, requestText: string) {
-    setPhase({ kind: "generating", skillName });
+    setPhase({
+      kind: "generating",
+      skillName,
+      startedAt: Date.now(),
+      changeId: null,
+    });
     try {
       const res = checked<CreateSkillChangeResponse>(
         await createSkillChange(skillName, requestText),
@@ -106,5 +124,20 @@ export function useSkillChangeFlow({
     );
   }
 
-  return { phase, request, decide, review };
+  /** 履歴の作業中の変更を見張る（生成中と出し、終わるのを settle で待つ）。 */
+  function watch(change: SkillChange) {
+    setPhase({
+      kind: "generating",
+      skillName: change.skill_name,
+      startedAt: watchStartedAt(change.created_at, Date.now()),
+      changeId: change.id,
+    });
+  }
+
+  /** 取り直した履歴で、見張っている変更が終わっていれば次の段階へ。 */
+  function settle(history: readonly SkillChange[]) {
+    setPhase((prev) => settleWatched(prev, history));
+  }
+
+  return { phase, request, decide, review, watch, settle };
 }

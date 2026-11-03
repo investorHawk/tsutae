@@ -415,3 +415,62 @@ def test_filesystem_failure_after_row_is_failed(
     assert isinstance(item["error_code"], str) and 0 < len(item["error_code"]) <= 40
     assert item["error_code"] == service_module.WORKDIR_ERROR
     assert list(temp_root.iterdir()) == []  # 作りかけの一時ディレクトリも消す
+
+
+# ---------------------------------------------------------------------------
+# 作業中（pending・diff なし）: 同じ Skill の依頼は 409 busy、取り残しは stale_request
+# ---------------------------------------------------------------------------
+
+
+def _working_row(client: TestClient, *, age_s: float = 0.0) -> int:
+    from datetime import timedelta
+
+    from tsutae.config import now
+    from tsutae.db.connection import dt_to_db
+
+    with db_conn(client.app) as conn:
+        change_id = db.create_skill_change(conn, NAME, "作業中の依頼", 1)
+        created = dt_to_db(now() - timedelta(seconds=age_s))
+        with conn:
+            conn.execute(
+                "UPDATE skill_changes SET created_at = ? WHERE id = ?",
+                (created, change_id),
+            )
+    return change_id
+
+
+def test_request_while_working_is_409_busy(client: TestClient) -> None:
+    _working_row(client)
+    r = _request(client)
+    assert r.status_code == 409
+    assert r.json() == {"error": "busy"}
+    changes = client.get("/api/doctor/skill-changes").json()["skill_changes"]
+    assert [c["status"] for c in changes] == ["pending"]
+
+
+def test_list_keeps_working_rows_within_grace(client: TestClient) -> None:
+    from tsutae.skillchange.state import STALE_GRACE_S
+
+    timeout = client.app.state.settings.pipeline_timeout_s
+    working = _working_row(client, age_s=timeout + STALE_GRACE_S - 5)
+    changes = client.get("/api/doctor/skill-changes").json()["skill_changes"]
+    assert [(c["id"], c["status"]) for c in changes] == [(working, "pending")]
+
+
+def test_list_fails_stale_working_rows(client: TestClient) -> None:
+    from tsutae.skillchange.state import STALE_GRACE_S
+
+    timeout = client.app.state.settings.pipeline_timeout_s
+    stale = _working_row(client, age_s=timeout + STALE_GRACE_S + 1)
+    fresh_skill = "regimen-capox"
+    with db_conn(client.app) as conn:
+        fresh = db.create_skill_change(conn, fresh_skill, "作業中の依頼", 1)
+    changes = client.get("/api/doctor/skill-changes").json()["skill_changes"]
+    by_id = {c["id"]: c for c in changes}
+    assert by_id[stale]["status"] == "failed"
+    assert by_id[stale]["error_code"] == "stale_request"
+    assert by_id[stale]["decided_at"] is not None
+    assert by_id[fresh]["status"] == "pending"
+    r = _request(client)
+    assert r.status_code == 200
+    assert r.json()["status"] == "pending"

@@ -15,6 +15,12 @@ function setup(onConfirm: () => Promise<void> | void) {
 }
 
 describe("TwoStepButton", () => {
+  it("2段目に進むと確認のボタンへ focus を移す", async () => {
+    setup(vi.fn());
+    await userEvent.click(screen.getByRole("button", { name: "印刷済み" }));
+    expect(screen.getByRole("button", { name: "削除する" })).toHaveFocus();
+  });
+
   it("1回目の押下では確かめるだけで実行しない", async () => {
     const onConfirm = vi.fn();
     setup(onConfirm);

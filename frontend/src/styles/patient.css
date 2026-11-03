@@ -37,7 +37,7 @@
 }
 
 .patient-app h2 {
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   line-height: 1.4;
   margin-bottom: 12px;
 }
@@ -153,6 +153,24 @@
   border-radius: 12px;
 }
 
+/* 「つらくて書けない」: 代理のトグルと押し間違えないよう間をあける。
+   確認・送信中・失敗の知らせはこの枠の中（ボタンの直後）に出る */
+.patient-app .p-too-sick {
+  margin-top: 28px;
+  margin-bottom: 20px;
+}
+
+.patient-app .p-confirm {
+  padding: 16px;
+  margin: 0 0 12px;
+  border: 3px solid var(--p-too-sick);
+  border-radius: 12px;
+}
+
+.patient-app .p-confirm p {
+  font-weight: 700;
+}
+
 /* --- 質問 ------------------------------------------------------------- */
 
 .patient-app .p-question {
@@ -210,6 +228,12 @@
   background: var(--p-surface);
   border: 1px solid #8c8c8c;
   border-radius: 12px;
+}
+
+/* 自由記載の原文。改行を保ち、長い英数字（URL・型番など）も枠の中で折り返す */
+.patient-app .p-entry-free-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* --- 下部のナビゲーション（今日の記録／これまでの記録） --------------------- */

@@ -139,16 +139,21 @@ describe("Visits（D3 印刷待ち）", () => {
     expect(within(rowOf("A-023")).queryByText("AI変換なし")).toBeNull();
   });
 
-  it("印刷は reportUrl を新しいタブで開くリンク", async () => {
+  it("印刷は非表示の iframe で開くボタンと、別タブで開くリンク", async () => {
     mockApi({ [LIST]: { visits: VISITS } });
     renderVisits();
     await screen.findByText("A-023");
-    const link = within(rowOf("A-023")).getByRole("link", { name: "印刷" });
+    const row = within(rowOf("A-023"));
+    expect(row.getByRole("button", { name: "印刷" })).toBeInTheDocument();
+    const link = row.getByRole("link", { name: "レポートを開く" });
     expect(link).toHaveAttribute("href", "/api/doctor/visits/12/report");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link.getAttribute("rel")).toContain("noopener");
+    expect(row.getByText(/印刷ダイアログが開きます/)).toBeInTheDocument();
+    const generating = within(rowOf("A-024"));
+    expect(generating.queryByRole("button", { name: "印刷" })).toBeNull();
     expect(
-      within(rowOf("A-024")).queryByRole("link", { name: "印刷" }),
+      generating.queryByRole("link", { name: "レポートを開く" }),
     ).toBeNull();
   });
 
@@ -220,6 +225,48 @@ describe("Visits（D3 印刷待ち）", () => {
       expect(countOf(fetchMock, "POST /api/doctor/visits/12/printed")).toBe(1),
     );
     await waitFor(() => expect(countOf(fetchMock, LIST)).toBe(2));
+  });
+
+  it("印刷済みにできたら「受付 <番号> のレポートを削除しました」を status で出す", async () => {
+    mockApi({
+      [LIST]: { visits: VISITS },
+      "POST /api/doctor/visits/12/printed": { ok: true },
+    });
+    renderVisits();
+    await screen.findByText("A-023");
+    const u = user();
+    await u.click(
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+    );
+    await u.click(
+      within(rowOf("A-023")).getByRole("button", {
+        name: "削除する（印刷済み）",
+      }),
+    );
+    expect(
+      await screen.findByText("受付 A-023 のレポートを削除しました"),
+    ).toHaveAttribute("role", "status");
+  });
+
+  it("印刷済みにできなければ削除の知らせは出さない", async () => {
+    mockApi({
+      [LIST]: { visits: VISITS },
+      "POST /api/doctor/visits/12/printed": () =>
+        jsonResponse({ error: "visit_closed" }, 409),
+    });
+    renderVisits();
+    await screen.findByText("A-023");
+    const u = user();
+    await u.click(
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+    );
+    await u.click(
+      within(rowOf("A-023")).getByRole("button", {
+        name: "削除する（印刷済み）",
+      }),
+    );
+    await screen.findByRole("alert");
+    expect(screen.queryByText(/のレポートを削除しました/)).toBeNull();
   });
 
   it("印刷済みの確認は「やめる」で取り消せる", async () => {

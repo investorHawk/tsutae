@@ -4,21 +4,40 @@
 failed）を後から上書きしうる。ここでは `WHERE id = ? AND status = 'pending'` の
 UPDATE だけを使い、更新した行が無ければ False を返す（呼び出し側が not_pending にする）。
 書き込みは `db.write_transaction`（プロセス内ロック＋`with conn:`）の中で行う。
+
+作業中（pending で diff がまだ無い。editor が動いている）の行は、同じ Skill の新しい
+依頼を busy にする（`has_working`）。サーバーの再起動などで取り残された作業中の行が
+永遠に busy にしないよう、created_at から timeout を過ぎたものは
+`fail_stale_requests` で failed・`stale_request` にする（editor はその時間で打ち切られて
+いるので、まだ動いていることはない）。
 """
 
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
+from tsutae import db
 from tsutae.config import now
 from tsutae.db.connection import dt_to_db, write_transaction
-from tsutae.pipeline.logs import EventLogger, reason_code
+from tsutae.pipeline.logs import EventLogger, PipelineLogger, reason_code
 
-__all__ = ["RUN_KIND", "fail_pending", "transition"]
+__all__ = [
+    "RUN_KIND",
+    "STALE_GRACE_S",
+    "STALE_REQUEST",
+    "fail_pending",
+    "fail_stale_requests",
+    "has_working",
+    "transition",
+]
 
 RUN_KIND = "skill_change"
+# 作業中のまま timeout を過ぎた行の error_code
+STALE_REQUEST = "stale_request"
+# 別スレッド（一覧の GET）から取り残しを片付けるときの余裕（秒）
+STALE_GRACE_S = 30.0
 _COLUMNS = ("diff", "new_text", "new_version", "status", "error_code", "decided_at")
 _STATUSES = ("pending", "approved", "rejected", "failed")
 
@@ -63,3 +82,54 @@ def fail_pending(
     else:
         logger.event("decided_elsewhere", decision=reason_code("failed", code))
     return done
+
+
+def _working(conn: sqlite3.Connection, skill_name: str | None) -> list[dict[str, Any]]:
+    """作業中（pending・diff なし）の行。skill_name が None なら全ての Skill。"""
+    pending = db.list_skill_changes(conn, skill_name, ("pending",))
+    return [c for c in pending if c["diff"] is None]
+
+
+def has_working(conn: sqlite3.Connection, skill_name: str) -> bool:
+    """その Skill に作業中の行があるか。"""
+    return bool(_working(conn, skill_name))
+
+
+def _fail_if_still_working(conn: sqlite3.Connection, change_id: int) -> bool:
+    """まだ作業中（pending・diff なし）なら failed・stale_request にする。"""
+    with write_transaction(conn):
+        cur = conn.execute(
+            "UPDATE skill_changes SET status = 'failed', error_code = ?,"
+            " decided_at = ?"
+            " WHERE id = ? AND status = 'pending' AND diff IS NULL",
+            (STALE_REQUEST, dt_to_db(now()), change_id),
+        )
+    return cur.rowcount == 1
+
+
+def fail_stale_requests(
+    conn: sqlite3.Connection,
+    timeout_s: float,
+    skill_name: str | None = None,
+    *,
+    grace_s: float = 0.0,
+) -> list[int]:
+    """created_at から timeout_s（＋grace_s）を過ぎた作業中の行を failed にし、id を返す。
+
+    grace_s は別スレッドから呼ぶとき（`GET /skill-changes` は同期の経路でスレッドで動く）
+    の余裕。editor が打ち切りの直前に返り、diff を保存するまでの間に失敗にしない。
+    request_change の中（同じイベントループで、確かめてから行を作るまで await が無い）
+    では 0 でよい。
+    """
+    limit = now() - timedelta(seconds=timeout_s + grace_s)
+    failed: list[int] = []
+    for change in _working(conn, skill_name):
+        if change["created_at"] > limit:
+            continue
+        if _fail_if_still_working(conn, change["id"]):
+            PipelineLogger(conn, RUN_KIND, change["id"]).event(
+                "skill_change_failed",
+                decision=reason_code("failed", STALE_REQUEST),
+            )
+            failed.append(change["id"])
+    return failed

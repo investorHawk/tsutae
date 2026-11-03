@@ -39,11 +39,13 @@ describe("Today (P1): malformed 200 bodies", () => {
       { skill_version: "x", questions: [{ key: "a" }] },
     ],
   ])(
-    "GET questions (%s): error.generic, too_sick still offered",
+    "GET questions (%s): common.load_failed, too_sick still offered",
     async (_label, body) => {
       mockPatientApi({ questions: () => jsonResponse(body) });
       renderToday();
-      expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+      expect(
+        await screen.findByText(s("common.load_failed")),
+      ).toBeInTheDocument();
       expectPageShown();
       expect(
         screen.getByRole("button", { name: s("today.too_sick_button") }),

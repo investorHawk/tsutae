@@ -250,19 +250,25 @@ describe("Today (P1): temperature", () => {
     renderToday();
     await choose("fever", "answer.measured");
     const input = screen.getByRole("textbox", { name: s("temperature.label") });
-    for (const bad of ["", "50", "45.1", "abc"]) {
+    for (const [bad, key] of [
+      ["", "temperature.invalid"],
+      ["50", "temperature.out_of_range"],
+      ["45.1", "temperature.out_of_range"],
+      ["abc", "temperature.invalid"],
+    ] as const) {
       await userEvent.clear(input);
       if (bad) {
         await userEvent.type(input, bad);
       }
       await userEvent.click(submitButton());
-      expect(screen.getByText(s("temperature.invalid"))).toBeInTheDocument();
+      expect(screen.getByText(s(key))).toBeInTheDocument();
       expect(input).toHaveAttribute("aria-invalid", "true");
     }
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
     await userEvent.clear(input);
     await userEvent.type(input, "36.8");
     expect(screen.queryByText(s("temperature.invalid"))).toBeNull();
+    expect(screen.queryByText(s("temperature.out_of_range"))).toBeNull();
   });
 
   it("not measured sends without temperature", async () => {
@@ -422,12 +428,14 @@ describe("Today (P1): errors and starting over", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("questions 500: error.generic, too_sick still works", async () => {
+  it("questions 500: common.load_failed, too_sick still works", async () => {
     const fetchMock = mockPatientApi({
       questions: () => jsonResponse({ error: "boom" }, 500),
     });
     renderToday();
-    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(
+      await screen.findByText(s("common.load_failed")),
+    ).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: s("today.too_sick_button") }),
     );

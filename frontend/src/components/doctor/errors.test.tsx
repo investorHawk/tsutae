@@ -22,6 +22,16 @@ describe("describeError", () => {
     );
   });
 
+  it("busy は依頼（作業中の書き換え）にも承認・却下にも合う説明", () => {
+    expect(describeError("busy")).toContain("書き換え");
+    expect(describeError("busy")).toContain("承認・却下");
+  });
+
+  it("取り残し・時間切れ（D4 の error_code）にも説明がある", () => {
+    expect(describeError("stale_request")).toContain("中断");
+    expect(describeError("timeout")).toContain("時間内");
+  });
+
   it("知らない code は一般的な説明", () => {
     expect(describeError("something_new")).toBe("処理できませんでした");
   });

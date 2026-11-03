@@ -62,13 +62,16 @@ describe("Today (P1): free text length", () => {
     ]);
   });
 
-  it("2001 emoji: not sent, not cut, an approved message is shown", async () => {
+  it("2001 emoji: not sent, not cut, today.free_text_too_long is shown", async () => {
     const fetchMock = mockPatientApi();
     renderPatient([{ path: "/today", element: <Today /> }], "/today");
     const text = EMOJI.repeat(2001);
     const box = await pasteFreeText(text);
     await userEvent.click(submitButton());
-    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(
+      await screen.findByText(s("today.free_text_too_long")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
     expect(box).toHaveValue(text);
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
     expect(screen.queryByText(s("today.saved"))).toBeNull();

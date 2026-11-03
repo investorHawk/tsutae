@@ -3,7 +3,8 @@
 code と HTTP の対応（`status_for(code)`。API の router はこれを使う）:
 - 400: invalid_name・invalid_request
 - 404: unknown_skill・not_found
-- 409: not_pending・not_ready・stale・busy（別の承認が進行中）・version_conflict・
+- 409: not_pending・not_ready・stale・busy（別の承認が進行中。依頼では同じ Skill の
+  書き換えが作業中）・version_conflict・
   write_error ほか承認時の失敗
 - 500: base_invalid（今の SKILL.md が壊れている）
 """

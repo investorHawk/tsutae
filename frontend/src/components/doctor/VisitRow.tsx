@@ -2,12 +2,14 @@ import { Link } from "react-router-dom";
 import { reportUrl } from "../../api/doctor";
 import type { VisitSummary } from "../../api/types";
 import { formatDateTime } from "./format";
+import PrintButton from "./PrintButton";
 import StatusBadge from "./StatusBadge";
 import TwoStepButton from "./TwoStepButton";
 
 interface VisitRowProps {
   visit: VisitSummary;
-  onPrinted: (visitId: number) => Promise<void>;
+  /** 印刷済みの2段目で呼ぶ（受付番号の知らせのために受診ごと渡す） */
+  onPrinted: (visit: VisitSummary) => Promise<void>;
 }
 
 function Actions({ visit, onPrinted }: VisitRowProps) {
@@ -15,19 +17,12 @@ function Actions({ visit, onPrinted }: VisitRowProps) {
     case "ready":
       return (
         <div className="d-actions">
-          <a
-            className="d-linkbutton d-linkbutton--primary"
-            href={reportUrl(visit.id)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            印刷
-          </a>
+          <PrintButton url={reportUrl(visit.id)} />
           <TwoStepButton
             label="印刷済み"
             prompt="レポート・変換結果・受付番号を削除します。印刷は済みましたか？"
             confirmLabel="削除する（印刷済み）"
-            onConfirm={() => onPrinted(visit.id)}
+            onConfirm={() => onPrinted(visit)}
           />
           <Link className="d-sublink" to={`/doctor/pipeline/${visit.id}`}>
             変換ログ

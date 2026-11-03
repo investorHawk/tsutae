@@ -1,5 +1,6 @@
 /** P2 これまでの記録。期待する文は patient_strings.json のキーと API の質問文から引く。 */
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
@@ -79,6 +80,14 @@ describe("History (P2)", () => {
 
     expect(newest).toHaveTextContent(ENTRIES[2]!.free_text!);
     expect(newest).not.toHaveTextContent(s("history.proxy"));
+  });
+
+  it("the free text has the wrapping class (long letters and digits wrap)", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [newest] = await items();
+    const text = within(newest!).getByText(ENTRIES[2]!.free_text!);
+    expect(text).toHaveClass("p-entry-free-text");
   });
 
   it("is read only (no buttons or fields)", async () => {
@@ -174,11 +183,13 @@ describe("History (P2)", () => {
     ["answers null", { entries: [{ ...ENTRIES[1]!, answers: null }] }],
     ["entry is a string", { entries: ["x"] }],
   ])(
-    "malformed 200 body (%s): error.generic instead of a blank page",
+    "malformed 200 body (%s): common.load_failed instead of a blank page",
     async (_label, body) => {
       mockPatientApi({ entries: () => jsonResponse(body) });
       renderHistory();
-      expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+      expect(
+        await screen.findByText(s("common.load_failed")),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("heading", { level: 1, name: s("history.title") }),
       ).toBeInTheDocument();
@@ -201,10 +212,34 @@ describe("History (P2)", () => {
     ).toBeInTheDocument();
   });
 
-  it("500: error.generic", async () => {
-    mockPatientApi({ entries: () => jsonResponse({ error: "boom" }, 500) });
+  it("500: common.load_failed and a reload button that reads again", async () => {
+    let fail = true;
+    const fetchMock = mockPatientApi({
+      entries: () =>
+        fail
+          ? jsonResponse({ error: "boom" }, 500)
+          : jsonResponse({ entries: [] }),
+    });
     renderHistory();
-    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(
+      await screen.findByText(s("common.load_failed")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
+    fail = false;
+    await userEvent.click(
+      screen.getByRole("button", { name: s("common.reload") }),
+    );
+    expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
+    expect(screen.queryByText(s("common.load_failed"))).toBeNull();
+    expect(
+      callsTo(fetchMock, "GET", `/api/patient/${PID}/entries`),
+    ).toHaveLength(2);
+  });
+
+  it("while loading: common.loading", async () => {
+    mockPatientApi({ entries: () => new Promise<Response>(() => {}) });
+    renderHistory();
+    expect(screen.getByText(s("common.loading"))).toBeInTheDocument();
   });
 
   it("has the bottom navigation with history as the current page", async () => {

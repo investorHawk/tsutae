@@ -1,6 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { callOf, jsonResponse, mockFetch } from "../test/fetchMock";
+import {
+  callOf,
+  hangingFetch,
+  jsonResponse,
+  mockFetch,
+} from "../test/fetchMock";
 import { PATIENT_STRINGS_FIXTURE } from "../test/patientStringsFixture";
 import { BUNDLED_STRINGS, REQUIRED_KEYS } from "./bundledStrings";
 import {
@@ -145,5 +150,26 @@ describe("PatientStringsProvider", () => {
     expect(() => render(<Show k="today.title" />)).toThrow(
       /PatientStringsProvider/,
     );
+  });
+});
+
+describe("PatientStringsProvider: 応答が返らないとき", () => {
+  it("20 秒で打ち切って取り直し、それでも駄目なら同梱の文で描く", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = hangingFetch();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const { container } = renderShow();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000 * 3 + 10);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(container).not.toBeEmptyDOMElement();
+      expect(screen.getByTestId("out")).toHaveTextContent(
+        `[${BUNDLED_STRINGS["today.title"]}]`,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

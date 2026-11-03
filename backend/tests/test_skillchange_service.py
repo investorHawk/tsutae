@@ -11,6 +11,7 @@ import dataclasses
 import shutil
 import sqlite3
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -601,3 +602,96 @@ async def test_workdir_os_error_is_failed_and_cleaned(
         (r["event"], r["decision"]) for r in logs
     ]
     assert "秘密" not in repr(logs)
+
+
+# ---------------------------------------------------------------------------
+# 作業中（pending で diff の無い行）の扱い: 同じ Skill の二重の依頼は busy
+# ---------------------------------------------------------------------------
+
+
+def _working_row(conn: sqlite3.Connection, name: str = NAME) -> int:
+    """editor が作業中の行（pending・diff なし）を作る。"""
+    return db.create_skill_change(conn, name, "作業中の依頼", 1)
+
+
+def _age_row(conn: sqlite3.Connection, change_id: int, seconds: float) -> None:
+    """行の created_at を今から seconds 秒前にする。"""
+    from tsutae.config import now
+    from tsutae.db.connection import dt_to_db
+
+    created = dt_to_db(now() - timedelta(seconds=seconds))
+    with conn:
+        conn.execute(
+            "UPDATE skill_changes SET created_at = ? WHERE id = ?",
+            (created, change_id),
+        )
+
+
+async def test_request_while_same_skill_working_is_busy(conn, home, settings):
+    working = _working_row(conn)
+    editor = FakeEditor()
+    with pytest.raises(SkillChangeError) as info:
+        await _request(conn, home, settings, editor)
+    assert info.value.code == "busy"
+    assert editor.calls == []
+    assert [c["id"] for c in db.list_skill_changes(conn)] == [working]
+    assert db.get_skill_change(conn, working)["status"] == "pending"
+
+
+async def test_working_row_of_other_skill_does_not_block(conn, home, settings):
+    _working_row(conn, "regimen-capox")
+    change_id = await _request(conn, home, settings)
+    assert db.get_skill_change(conn, change_id)["status"] == "pending"
+
+
+async def test_pending_with_diff_does_not_block(conn, home, settings):
+    first = await _request(conn, home, settings)
+    assert db.get_skill_change(conn, first)["diff"]
+    second = await _request(conn, home, settings)
+    assert db.get_skill_change(conn, second)["status"] == "pending"
+
+
+async def test_stale_working_row_is_failed_then_request_goes_on(conn, home, settings):
+    stale = _working_row(conn)
+    _age_row(conn, stale, settings.pipeline_timeout_s + 1)
+    change_id = await _request(conn, home, settings)
+    row = db.get_skill_change(conn, stale)
+    assert row["status"] == "failed"
+    assert row["error_code"] == "stale_request"
+    assert row["decided_at"] is not None
+    assert db.get_skill_change(conn, change_id)["status"] == "pending"
+    events = [
+        (e["event"], e["decision"])
+        for e in db.list_pipeline_logs(conn, "skill_change", stale)
+    ]
+    assert ("skill_change_failed", "failed:stale_request") in events
+
+
+async def test_working_row_within_timeout_stays_busy(conn, home, settings):
+    working = _working_row(conn)
+    _age_row(conn, working, settings.pipeline_timeout_s - 1)
+    with pytest.raises(SkillChangeError) as info:
+        await _request(conn, home, settings)
+    assert info.value.code == "busy"
+    assert db.get_skill_change(conn, working)["status"] == "pending"
+
+
+async def test_invalid_name_is_checked_before_busy(conn, home, settings):
+    _working_row(conn)
+    with pytest.raises(SkillChangeError) as info:
+        await _request(conn, home, settings, name="Bad_Name")
+    assert info.value.code == "invalid_name"
+
+
+def test_fail_stale_requests_only_touches_old_working_rows(conn, settings):
+    from tsutae.skillchange.state import fail_stale_requests
+
+    old = _working_row(conn)
+    _age_row(conn, old, settings.pipeline_timeout_s + 5)
+    fresh = _working_row(conn, "regimen-capox")
+    waiting = db.create_skill_change(conn, NAME, "差分あり", 1, diff="--- a\n+++ b\n")
+    _age_row(conn, waiting, settings.pipeline_timeout_s + 5)
+    assert fail_stale_requests(conn, settings.pipeline_timeout_s) == [old]
+    assert db.get_skill_change(conn, old)["status"] == "failed"
+    assert db.get_skill_change(conn, fresh)["status"] == "pending"
+    assert db.get_skill_change(conn, waiting)["status"] == "pending"

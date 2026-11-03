@@ -352,6 +352,12 @@
   color: var(--d-primary);
 }
 
+/* 作業中（pending で diff がまだ無い） */
+.doctor-app .d-change--working {
+  color: var(--d-primary);
+  font-style: italic;
+}
+
 .doctor-app .d-change-code {
   display: block;
   font-size: 0.8rem;
@@ -390,4 +396,25 @@
 
 .d-skill-invalid .d-badge {
   margin-left: 0.25rem;
+}
+
+/* --- 印刷（D3）: 非表示の iframe に読み込んで親から print() --------------- */
+.d-print {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.d-print-hint {
+  flex-basis: 100%;
+  font-size: 0.85em;
+}
+
+/* display:none にしない（ブラウザによっては空白を印刷する） */
+.d-print-frame {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 0;
 }

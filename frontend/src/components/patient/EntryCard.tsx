@@ -50,7 +50,7 @@ export default function EntryCard({ entry }: { entry: PatientEntry }) {
       {entry.free_text && (
         <>
           <p>{t("history.free_text")}</p>
-          <p style={{ whiteSpace: "pre-wrap" }}>{entry.free_text}</p>
+          <p className="p-entry-free-text">{entry.free_text}</p>
         </>
       )}
     </li>

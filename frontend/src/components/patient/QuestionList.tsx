@@ -4,6 +4,7 @@ import {
   setAnswer,
   setTemperatureText,
   type EntryFormState,
+  type TemperatureProblem,
 } from "./entryForm";
 import QuestionField from "./QuestionField";
 
@@ -13,8 +14,8 @@ interface QuestionListProps {
   questions: readonly Question[];
   form: EntryFormState;
   onChange: FormUpdate;
-  /** 体温が不正と出す質問の key（送ろうとした後だけ中身がある） */
-  invalidTemperatureKeys: ReadonlySet<string>;
+  /** 体温が不正と出す質問の key → 問題（送ろうとした後だけ中身がある） */
+  temperatureErrors: ReadonlyMap<string, TemperatureProblem>;
   disabled: boolean;
 }
 
@@ -23,7 +24,7 @@ export default function QuestionList({
   questions,
   form,
   onChange,
-  invalidTemperatureKeys,
+  temperatureErrors,
   disabled,
 }: QuestionListProps) {
   const { t } = usePatientStrings();
@@ -42,7 +43,7 @@ export default function QuestionList({
           onTemperatureChange={(text) =>
             onChange((prev) => setTemperatureText(prev, question.key, text))
           }
-          temperatureInvalid={invalidTemperatureKeys.has(question.key)}
+          temperatureError={temperatureErrors.get(question.key) ?? null}
           disabled={disabled}
         />
       ))}

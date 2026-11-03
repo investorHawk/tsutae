@@ -42,3 +42,22 @@ export function callOf(
     init,
   };
 }
+
+/**
+ * 応答を返さない fetch（タイムアウトの検査用）。init.signal が abort されたら
+ * 本物の fetch と同じく AbortError で失敗する。
+ */
+export function hangingFetch(): FetchMock {
+  return mockFetch(
+    (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          return;
+        }
+        signal.addEventListener("abort", () =>
+          reject(new DOMException("The operation was aborted.", "AbortError")),
+        );
+      }),
+  );
+}

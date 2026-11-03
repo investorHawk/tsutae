@@ -2,6 +2,7 @@ import { useId } from "react";
 import type { AnswerValue, Question } from "../../api/types";
 import { FEVER_VALUES, THREE_LEVEL_VALUES } from "../../api/types";
 import ChoiceButtons from "./ChoiceButtons";
+import type { TemperatureProblem } from "./entryForm";
 import TemperatureField from "./TemperatureField";
 
 interface QuestionFieldProps {
@@ -10,7 +11,8 @@ interface QuestionFieldProps {
   onSelect: (value: AnswerValue) => void;
   temperatureText: string;
   onTemperatureChange: (value: string) => void;
-  temperatureInvalid: boolean;
+  /** 送ろうとして体温が不正だったときの問題。正しければ null */
+  temperatureError: TemperatureProblem | null;
   disabled?: boolean;
 }
 
@@ -21,7 +23,7 @@ export default function QuestionField({
   onSelect,
   temperatureText,
   onTemperatureChange,
-  temperatureInvalid,
+  temperatureError,
   disabled = false,
 }: QuestionFieldProps) {
   const labelId = useId();
@@ -41,7 +43,7 @@ export default function QuestionField({
         <TemperatureField
           value={temperatureText}
           onChange={onTemperatureChange}
-          invalid={temperatureInvalid}
+          problem={temperatureError}
           disabled={disabled}
         />
       )}

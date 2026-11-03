@@ -2,6 +2,7 @@ import type { SkillChange, SkillChangeStatus } from "../../api/types";
 import { isUsableDiff } from "./diff";
 import DiffView from "./DiffView";
 import { formatDateTime } from "./format";
+import { isWorking } from "./skillChangeWork";
 
 const STATUS_LABELS: Readonly<Record<SkillChangeStatus, string>> = {
   pending: "承認待ち",
@@ -9,6 +10,14 @@ const STATUS_LABELS: Readonly<Record<SkillChangeStatus, string>> = {
   rejected: "却下",
   failed: "失敗",
 };
+
+/** 状態の表示。pending で diff がまだ無ければ「生成中」（承認待ちではない）。 */
+function statusLabel(change: SkillChange): string {
+  if (isWorking(change)) {
+    return "生成中";
+  }
+  return STATUS_LABELS[change.status] ?? change.status;
+}
 
 function versionText(change: SkillChange): string {
   return change.status === "approved" && change.new_version !== null
@@ -52,8 +61,10 @@ export default function SkillChangeHistory({
             </td>
             <td>{change.requested_text}</td>
             <td>
-              <span className={`d-change d-change--${change.status}`}>
-                {STATUS_LABELS[change.status] ?? change.status}
+              <span
+                className={`d-change d-change--${isWorking(change) ? "working" : change.status}`}
+              >
+                {statusLabel(change)}
               </span>
               {change.error_code ? (
                 <code className="d-change-code">{change.error_code}</code>

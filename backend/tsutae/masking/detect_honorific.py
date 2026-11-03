@@ -47,7 +47,11 @@ _MIXED_HONORIFICS = frozenset({"さん", "ちゃん", "さま"})
 _SHORT_NAME_HONORIFICS = frozenset({"くん", "ちゃん", "君"})
 
 # 「〜くんです」が動詞（行くんです・長引くんです）かを見る
-_VERB_FORM_RE = re.compile("です|だ|で|じゃ|でしょ|か(?!ら)")
+# 「〜くん」の直後がこれなら「〜く＋ん（の）」の動詞の形とみなす（行くんです・効くんよ・
+# 書くん？・行くんや）。名＋くん の後に続く形（蓮くんが・蓮くんと）は含めない
+_VERB_FORM_RE = re.compile(
+    "です|だ|で|じゃ|でしょ|か(?!ら)|よ|や|ね|けど|けれど|なら|だろ|やろ|って|[？?！!。、]|$"
+)
 _KANA_VERB_STEMS = (
     "い",
     "ゆ",
@@ -163,6 +167,9 @@ def _word_offset(candidate: str) -> int:
 def _mixed_span(text: str, end: int, limit: int, honorific: str) -> int | None:
     start = run_start(text, end, is_japanese, limit)
     candidate = text[start:end]
+    if len(candidate) == 1 and is_kanji(candidate):
+        # 前置きの無い1字の名（翔さん・葵ちゃん）。続柄の1字（母さん・孫ちゃん）は許可語
+        return None if is_allowed(candidate, honorific) else start
     if len(candidate) < 2 or candidate[-1] in "をはがへ":
         return None
     if is_allowed(candidate, honorific):

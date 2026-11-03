@@ -68,6 +68,7 @@ export const RUN_TITLES: Readonly<Record<string, string>> = {
   run_end: "run_end 変換を終了",
   fallback: "fallback AI変換なしに切り替え",
   internal_error: "internal_error 想定外のエラー",
+  config_error: "config_error 設定の誤り（Skill・モデルなど）",
   visit_ready: "visit_ready レポートを作成",
   visit_failed: "visit_failed レポートを作れなかった",
   visit_closed: "visit_closed 印刷済み・期限切れ（何もしない）",

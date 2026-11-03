@@ -111,3 +111,33 @@ def test_one_kanji_name_with_kun_or_chan_is_detected(text: str) -> None:
 )
 def test_relation_words_and_verbs_are_not_names(text: str) -> None:
     assert detect_in_patient_text(text) == []
+
+
+@pytest.mark.parametrize(
+    "text", ["葵ちゃん", "葵ちゃんが来た", "翔さん", "翔さんが送ってくれた", "蓮くん"]
+)
+def test_bare_one_kanji_name_is_detected(text: str) -> None:
+    # 前置きの無い1字の名（Codex のレビューで見つかった見逃し）
+    assert [d.rule for d in detect_in_patient_text(text)] == [
+        "unknown_before_honorific"
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "行くん？",
+        "薬は効くんよ",
+        "何を書くん？",
+        "行くんや",
+        "効くんやろ",
+        "諸君",
+        "母さん",
+        "奥さん",
+        "皆さん",
+        "神さま",
+        "婿さん",
+    ],
+)
+def test_verb_forms_and_one_kanji_words_are_not_names(text: str) -> None:
+    assert detect_in_patient_text(text) == []

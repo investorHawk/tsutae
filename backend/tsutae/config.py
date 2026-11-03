@@ -1,0 +1,106 @@
+"""設定と時計。
+
+- `.env` はサンドボックス内では読み取りが拒否される（PermissionError）。その場合は
+  「キーなし」として扱い、例外を外へ出さない
+- 日付は全て Asia/Tokyo。デモ用に `TSUTAE_TODAY`（YYYY-MM-DD）で「今日」を固定できる
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from datetime import date, datetime, time
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+JST = ZoneInfo("Asia/Tokyo")
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = REPO_ROOT / "backend"
+PACKAGE_ROOT = Path(__file__).resolve().parent
+SKILLS_HOME = BACKEND_ROOT / "skills_home"
+SKILLS_DIR = SKILLS_HOME / ".claude" / "skills"
+DATA_DIR = REPO_ROOT / "data"
+SYNTHETIC_DIR = DATA_DIR / "synthetic"
+PATIENT_STRINGS_PATH = PACKAGE_ROOT / "patient_strings.json"
+
+DEFAULT_MODEL = "claude-opus-5-5"
+SUBAGENT_MODEL = "claude-sonnet-5-5"
+
+
+def load_env_file(path: Path | None = None) -> bool:
+    """`.env` を環境変数に読み込む。読めなければ False（例外は出さない）。"""
+    target = path or (REPO_ROOT / ".env")
+    try:
+        from dotenv import load_dotenv
+
+        return bool(load_dotenv(target, override=False))
+    except (PermissionError, OSError):
+        return False
+
+
+def has_api_key() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
+@dataclass(frozen=True)
+class Settings:
+    db_path: Path
+    doctor_password: str
+    secret_key: str
+    model: str
+    subagent_model: str
+    report_ttl_hours: int
+    pipeline_timeout_s: float
+    pipeline_max_turns: int
+    pipeline_max_budget_usd: float
+    skills_dir: Path
+    public_base_url: str
+
+
+def get_settings() -> Settings:
+    return Settings(
+        db_path=Path(os.environ.get("TSUTAE_DB", str(DATA_DIR / "tsutae.db"))),
+        doctor_password=os.environ.get("DOCTOR_PASSWORD", "demo-doctor"),
+        secret_key=os.environ.get("TSUTAE_SECRET", "dev-secret-change-me"),
+        model=os.environ.get("TSUTAE_MODEL", DEFAULT_MODEL),
+        subagent_model=os.environ.get("TSUTAE_SUBAGENT_MODEL", SUBAGENT_MODEL),
+        report_ttl_hours=int(os.environ.get("TSUTAE_REPORT_TTL_HOURS", "24")),
+        pipeline_timeout_s=float(os.environ.get("TSUTAE_PIPELINE_TIMEOUT_S", "600")),
+        pipeline_max_turns=int(os.environ.get("TSUTAE_PIPELINE_MAX_TURNS", "30")),
+        pipeline_max_budget_usd=float(
+            os.environ.get("TSUTAE_PIPELINE_MAX_BUDGET_USD", "3.0")
+        ),
+        skills_dir=Path(os.environ.get("TSUTAE_SKILLS_DIR", str(SKILLS_DIR))),
+        public_base_url=os.environ.get(
+            "TSUTAE_PUBLIC_BASE_URL", "http://localhost:5173"
+        ),
+    )
+
+
+def today() -> date:
+    """JST の今日。`TSUTAE_TODAY` があればそれを返す（デモ・テスト用）。"""
+    fixed = os.environ.get("TSUTAE_TODAY")
+    if fixed:
+        return date.fromisoformat(fixed)
+    return datetime.now(JST).date()
+
+
+def now() -> datetime:
+    """JST の現在時刻（tz-aware）。`TSUTAE_TODAY` があればその日の現在時刻。"""
+    current = datetime.now(JST)
+    fixed = os.environ.get("TSUTAE_TODAY")
+    if fixed:
+        return datetime.combine(date.fromisoformat(fixed), current.timetz())
+    return current
+
+
+def to_jst_date(value: datetime) -> date:
+    """tz-aware の日時を JST の日付に直す。naive は JST とみなす。"""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=JST)
+    return value.astimezone(JST).date()
+
+
+def jst_datetime(d: date, hh: int = 0, mm: int = 0) -> datetime:
+    return datetime.combine(d, time(hh, mm), tzinfo=JST)

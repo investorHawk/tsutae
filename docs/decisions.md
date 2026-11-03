@@ -62,7 +62,7 @@
 | PII の砦は `UserPromptSubmit`。`PreToolUse` では最初のプロンプトを検査できない | Agent SDK の仕様 | 仮置き（技術判断） |
 | パイプラインの出力はカスタムツール経由にし、`PreToolUse` で引用一致を機械検査 | サブエージェントがテキストを返すだけでは Hook で検査できない | 仮置き（技術判断） |
 | Skill 書き換えの `Write/Edit` は `.claude/skills/` 配下に限定する Hook を置く | 無いとエージェントがサーバーの任意ファイルを書ける | 仮置き（技術判断） |
-| 「患者に AI 文を出さない」はアーキテクチャ（患者 API がレポート表を読まない）＋ Hook の二層。Hook だけを根拠にしない | Python SDK に表示系 Hook（`MessageDisplay`）が無い。本質は経路の分離 | 仮置き（技術判断） |
+| 「患者に AI 文を出さない」はアーキテクチャ（患者 API がレポート表を読まない）＋ Hook の二層。Hook だけを根拠にしない | 表示系 Hook（SDK 0.2.177 には `MessageDisplay` 系の型がある）は Claude Code 側の表示を制御するもので、患者画面の経路とは無関係。本質は経路の分離 | 仮置き（技術判断） |
 
 ### 合成データ・評価
 | 決定 | 理由 | 出どころ |
@@ -106,6 +106,21 @@
 | SKILL.md は YAML frontmatter に `version` と `questions` を持ち、アプリは frontmatter だけを読む。書き換え後はバリデータを通す | アプリが質問画面を組み、エージェントが書き換えるため、機械が読める書式と壊れていない保証が要る | 仮置き（技術判断） |
 | D4 の書き換えは一時コピーに対して行い、承認時だけ本体に反映。却下は一時コピーを捨てる | spec v0.1 の「git checkout 相当で戻す」は作業ツリーの他の変更まで巻き戻す恐れがある | 仮置き（技術判断） |
 | 環境構築と API を叩く実行（`uv python install` `uv sync` `uv run scripts/smoke_agent_sdk.py` `make eval`）は先生が `! ...` で実行する。テストはキーが無ければ API を叩くものを skip し、Makefile は `.venv/bin/*` を直接呼ぶ | サンドボックスは `.env` の読み取りを拒否し、`uv` は SystemConfiguration 呼び出しで落ちる。サンドボックス内で回るものと先生が回すものを分ける | 技術確認 |
+
+## 2026-11-03 実装着手（ultracode）
+
+| 決定 | 理由 | 出どころ |
+|---|---|---|
+| アプリの Skill は `backend/skills_home/.claude/skills/` に置き、Agent SDK は `cwd=backend/skills_home` で読む（spec の `.claude/skills/` から変更） | リポジトリ直下の `.claude/skills/` は開発に使う Claude Code 自身の Skill と混ざり、サンドボックスで書き込みも禁止されている | 技術判断 |
+| venv は `python3.12 -m venv .venv` と pip で作る（uv は先生向けの手順として残す） | サンドボックス内の uv は SystemConfiguration の呼び出しで落ちる。pip はネットワーク許可つきで動く | 技術確認 |
+| pytest の基準ディレクトリを `backend/` にする（`backend/pytest.ini`） | リポジトリ直下を走査すると `.env` の stat がサンドボックスで拒否され、収集が止まる | 技術確認 |
+| `make` は `scripts/*.sh` の薄い包みにする | サンドボックス内では xcrun 経由の `make` が失敗する。エージェントは scripts を直接呼ぶ | 技術確認 |
+| `.env.example` は作らず、環境変数は README に書く | `.env.*` は読み書きとも禁止パターンに当たる | 技術確認 |
+| sol-implementer（Codex CLI）はサンドボックス外で codex を起動して使う | サンドボックス内では codex が起動しない。先生が使用を許可 | ユーザー |
+| サブエージェント3役はツールを持たず JSON テキストを返す。主エージェントがまとめて `emit_timeline` / `emit_report` を呼び、H2 はそこに掛ける | Hook の掛け所を1か所にし、サブエージェントにツール権限を与えない（H4 も単純になる） | 技術判断 |
+| 患者画面に出る文字列は `patient_strings.json` と、**医師が差分を見て承認した Skill の質問文**だけ | D4 で質問文をエージェントが書き換えるため。承認された文は医師の文として扱う。それ以外のモデル生成文が患者画面に届く経路は作らない | 技術判断（要確認） |
+| レポートの「要確認」に並べる発熱は 37.5℃ 以上（レポート形式 Skill の `fever_attention_celsius`）。患者画面の固定規則（38.0℃）とは別 | spec のデモ（Day8 37.9℃）を要確認に載せるため。コードの比較で、重さの判定ではない | 仮置き |
+| レポート HTML は `ReportData` から Jinja2 で決定的に描く。AI は HTML を書かない | 書式の崩れ・幻覚を防ぎ、テストできる形にする | 技術判断 |
 
 ## 未決（先生の判断待ち）
 なし

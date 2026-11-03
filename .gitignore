@@ -34,3 +34,8 @@ data/*.db
 
 # 非公開の参考資料
 docs/reference/event-rules.md
+
+# test output
+.coverage
+htmlcov/
+frontend/coverage/

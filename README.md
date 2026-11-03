@@ -9,7 +9,7 @@
 | 項目 | 値 |
 |---|---|
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
-| テスト件数 | 0（`make test` が自動更新） |
+| テスト件数 | 3件 通過 / 全3件（backend 3/3、frontend 0/0。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 未実施（`docs/eval/` に実測値と失敗例を残す予定） |
 
 ## なぜ作るか（執筆予定）
@@ -31,11 +31,19 @@
 ## Claude の使い方（執筆予定）
 Claude Agent SDK 上の変換パイプライン: サブエージェント3役、Hook 4本、Skill 3本。医師が自然言語で Skill を書き換えるループ。
 
+## 動かし方（開発）
+- Python 3.12 の venv: `.venv`（`uv python install 3.12` 後に `python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"`、または `uv sync`）
+- フロント: `cd frontend && npm install`
+- テスト / lint: `make test` / `make lint`
+- 環境変数（`.env` に書く）: `ANTHROPIC_API_KEY`（必須）、`DOCTOR_PASSWORD`（医師画面のパスワード、既定 `demo-doctor`）、`TSUTAE_SECRET`、`TSUTAE_TODAY`（デモ用に「今日」を固定。例 `2026-11-09`）
+- Agent SDK の動作確認: `make smoke`／精度評価: `make eval`（API を呼ぶ）
+
 ## 文書
 - 仕様: `docs/spec.md`
 - 決めたことと理由: `docs/decisions.md`
 - 日程: `docs/plan.md`
 - タスク: `docs/tasks.md`
+- 実装の契約: `docs/architecture.md`
 - 企画（正本）: `docs/reference/concept.md`
 
 ## 出典・利用条件

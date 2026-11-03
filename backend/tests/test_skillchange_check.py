@@ -81,12 +81,11 @@ def _post(tool: str, path: Path | str | None) -> dict[str, Any]:
 
 
 def _context(result: dict) -> str:
-    out = result["hookSpecificOutput"]
-    assert out["hookEventName"] == "PostToolUse"
+    # 理由は decision=block の reason だけで返す（additionalContext と二重にしない）
     assert result["decision"] == "block"
-    assert result["reason"] == out["additionalContext"]
+    assert "hookSpecificOutput" not in result
     assert "continue" not in result and "continue_" not in result
-    return out["additionalContext"]
+    return result["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -394,3 +393,29 @@ async def test_sdk_editor_hook_lets_model_fix_then_pending(
         "hook_skill_check_allow"
     )
     assert "Eating" not in repr(logs)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "  - {key: q_meal2, text: 食事はとれましたか, answer_type: three_level}\n",
+        "  - {key: meal, text: 架空野さんに相談しましたか, answer_type: three_level}\n",
+    ],
+)
+def test_question_that_trips_h1_is_rejected(line: str) -> None:
+    # 質問集は変換の依頼文に入る。H1 に掛かる key・text を承認すると以後の変換が止まる
+    text = _original().replace(STOMATITIS_LINE, STOMATITIS_LINE + line)
+    problem = check_skill_text(NAME, text, base_version=1)
+    assert problem is not None and problem[0] == "identifier_like"
+
+
+def test_demo_question_does_not_trip_h1() -> None:
+    assert check_skill_text(NAME, _add_eating_question(_original()), 1) is None
+
+
+def test_hook_reason_is_sent_once() -> None:
+    # decision=block の reason だけで届く（additionalContext と二重にしない）
+    from tsutae.skillchange.check import _context
+
+    out = _context("理由")
+    assert out == {"decision": "block", "reason": "理由"}

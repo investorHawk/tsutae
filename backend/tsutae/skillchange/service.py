@@ -46,7 +46,7 @@ from tsutae.pipeline.orchestrator import sdk_error_code
 from tsutae.pipeline.runner import RunFailedError
 from tsutae.schemas import RegimenSkill, ReportFormatSkill, RunStats
 from tsutae.skillchange.approve import approve_change, reject_change
-from tsutae.skillchange.check import baseline_of
+from tsutae.skillchange.check import baseline_of, identifier_like_question
 from tsutae.skillchange.diff import set_version, unified
 from tsutae.skillchange.editor import SkillEditor, build_prompt, logging_to
 from tsutae.skillchange.errors import SkillChangeError
@@ -188,6 +188,8 @@ def _checked_new_text(name: str, new: str, base: int) -> str:
     ここで version_line にする（pending になってから承認で失敗させない）。
     """
     result = new
+    if identifier_like_question(_validated(name, new)) is not None:
+        raise SkillChangeError("identifier_like")
     if _validated(name, new).version != base:
         result = set_version(new, base)
         if _validated(name, result).version != base:  # set_version の後は起きない

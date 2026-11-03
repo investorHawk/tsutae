@@ -17,6 +17,7 @@ visits の行そのものは残す（状態の履歴として）。
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from datetime import date, datetime
 from typing import Any
@@ -325,6 +326,7 @@ def mark_printed(conn: sqlite3.Connection, vid: int) -> None:
     with write_transaction(conn):
         _erase_results(conn, vid)
         conn.execute("UPDATE visits SET status = 'printed' WHERE id = ?", (vid,))
+    _checkpoint(conn)
 
 
 def purge_expired(conn: sqlite3.Connection, now: datetime) -> int:
@@ -346,4 +348,16 @@ def purge_expired(conn: sqlite3.Connection, now: datetime) -> int:
         ids = [int(r["id"]) for r in rows]
         for vid in ids:
             _erase_results(conn, vid)
+    if ids:
+        _checkpoint(conn)
     return len(ids)
+
+
+def _checkpoint(conn: sqlite3.Connection) -> None:
+    """消した行が WAL に残らないよう、本体へ書き戻して WAL を切り詰める（できる範囲で）。
+
+    secure_delete は本体の中身を消すが、WAL の古い記録は checkpoint まで残る。
+    他の接続が読んでいると全部は書き戻せないが、その場合も次の checkpoint で消える。
+    """
+    with contextlib.suppress(sqlite3.Error):
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()

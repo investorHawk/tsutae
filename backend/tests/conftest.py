@@ -37,4 +37,9 @@ def tmp_db_path(tmp_path: Path) -> Path:
 def fixed_today(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     """「今日」を固定する。値を変えたいときは monkeypatch.setenv で上書き。"""
     monkeypatch.setenv("TSUTAE_TODAY", "2026-11-09")
+    # 固定日の時計の起点はテストごとに取り直す（スイートが実時間の0時をまたいでも、
+    # 1つのテストの中でなければ日付が変わらない）
+    from tsutae import config
+
+    monkeypatch.setattr(config, "_FIXED_ANCHORS", {})
     yield "2026-11-09"

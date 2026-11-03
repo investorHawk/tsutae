@@ -98,9 +98,6 @@ def now() -> datetime:
     if not fixed:
         return current
     fixed_date = date.fromisoformat(fixed)
-    if current.date() >= fixed_date:
-        # 時計がすでに固定日以降を指している（差し替えた時計など）: そのまま使う
-        return current
     anchor = _FIXED_ANCHORS.setdefault(fixed, current)
     start = datetime.combine(fixed_date, anchor.timetz())
     return start + (current - anchor)

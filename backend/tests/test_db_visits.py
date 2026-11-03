@@ -505,3 +505,20 @@ def test_expiry_boundary_for_saves(
     with pytest.raises(VisitClosedError):
         set_visit_status(conn, vid, "ready")
     _assert_untouched(conn, vid, "generating")
+
+
+def test_mark_printed_leaves_no_text_in_wal(
+    conn: sqlite3.Connection, pid: str, tmp_db_path: Path
+) -> None:
+    # 印刷済みで消したレポートの文字列が WAL ファイルにも残らない
+    vid = _visit(conn, pid)
+    marker = "WALMARKER" * 20
+    conn.execute(
+        "INSERT INTO reports (visit_id, html, data_json) VALUES (?, ?, ?)",
+        (vid, marker, "{}"),
+    )
+    conn.commit()
+    mark_printed(conn, vid)
+    wal = Path(str(tmp_db_path) + "-wal")
+    if wal.exists():
+        assert marker.encode() not in wal.read_bytes()

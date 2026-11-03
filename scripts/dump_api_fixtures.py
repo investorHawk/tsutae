@@ -187,6 +187,8 @@ def _fixed_world() -> Iterator[None]:
     with ExitStack() as stack:
         stack.enter_context(mock.patch.dict(os.environ, {"TSUTAE_TODAY": FIXED_TODAY}))
         stack.enter_context(mock.patch("tsutae.config.datetime", _FrozenClock()))
+        # 固定日の時計の起点を、止めた時計で取り直す（実時計で取った起点を使わない）
+        stack.enter_context(mock.patch("tsutae.config._FIXED_ANCHORS", {}))
         stack.enter_context(
             mock.patch(
                 "tsutae.db.repo_patients._new_patient_id", return_value=NEW_PATIENT

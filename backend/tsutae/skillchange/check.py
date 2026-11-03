@@ -15,11 +15,13 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from tsutae.masking import detect_identifiers
 from tsutae.pipeline.hooks import H3_MATCHER
 from tsutae.pipeline.logs import EventLogger, reason_code
 from tsutae.schemas import QUESTION_KEY_PATTERN, RegimenSkill
@@ -129,6 +131,21 @@ def _validation_reason(skill_name: str, exc: SkillValidationError) -> str:
     return f"検査に通らない（{exc.code}）"
 
 
+def identifier_like_question(skill: Any) -> int | None:
+    """質問の key・text が依頼文の検査（H1）に掛かるなら、その番号。
+
+    質問集は変換の依頼文に JSON で入るので、掛かる形を承認すると以後の変換と D4 の
+    依頼文が全て h1_blocked になる（例: key `q_meal2` は id_like に掛かる）。
+    """
+    if not isinstance(skill, RegimenSkill):
+        return None
+    for i, q in enumerate(skill.questions):
+        probe = json.dumps({"key": q.key, "text": q.text}, ensure_ascii=False)
+        if detect_identifiers(probe):
+            return i
+    return None
+
+
 def check_skill_text(
     skill_name: str, text: str, base_version: int | None
 ) -> Problem | None:
@@ -137,6 +154,13 @@ def check_skill_text(
         skill = validate_skill_text(skill_name, text)
     except SkillValidationError as exc:
         return exc.code, _validation_reason(skill_name, exc)
+    flagged = identifier_like_question(skill)
+    if flagged is not None:
+        return "identifier_like", (
+            f"questions[{flagged}] の key か text が、伏せ字の検査（人名・番号・ID の疑い）に"
+            "掛かる。key は英小文字の単語を下線でつなぐ形（数字を付けない。例: "
+            "stomatitis_eating）にし、text に人名・施設名・番号を入れない"
+        )
     if base_version is not None and skill.version != base_version:
         return "version_changed", (
             f"version は {base_version} のまま変えない（版は承認の時にアプリが上げる）"
@@ -157,14 +181,9 @@ def check_skill_text(
 
 
 def _context(reason: str) -> dict[str, Any]:
-    return {
-        "decision": "block",
-        "reason": reason,
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": reason,
-        },
-    }
+    # decision=block の reason だけでモデルに届く（additionalContext も付けると同じ文が
+    # 2回届く。同梱 CLI の処理で確認済み）
+    return {"decision": "block", "reason": reason}
 
 
 def _get(data: Any, key: str) -> Any:

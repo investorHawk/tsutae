@@ -40,6 +40,35 @@
 電子カルテ連携なしで医師の手元に届く。患者は AI の文を見ない。レポートは `ReportData` から Jinja2 で**決定的に**描く（AI は HTML を書かない）。A4 一枚・モノクロで、通常版と「AI変換なし」版の両方が1ページに収まることを確かめている。
 
 ## Claude の使い方
+```mermaid
+flowchart LR
+  subgraph PT [患者のスマホ]
+    P1[毎日の記録<br/>3択・体温・自由記載] --> P3[受付番号を入れる]
+  end
+  subgraph SV [サーバー]
+    M1[一次 伏せ字<br/>人名・電話・住所・施設・ID] --> M2{二次 検出<br/>別の規則}
+    M2 -- 疑い --> D6[(未処理<br/>院内画面だけ)]
+    M2 -- 通過 --> H1{H1<br/>依頼文全体を検査}
+    H1 --> MAIN[主エージェント<br/>Skill を読む]
+    MAIN --> A1[date-normalizer]
+    MAIN --> A2[term-mapper]
+    MAIN --> A3[contradiction-finder]
+    A1 & A2 & A3 --> MAIN
+    MAIN --> T1[emit_timeline / emit_report]
+    T1 --> H2{H2 引用が原文にあるか<br/>＋ コードの検査}
+    H2 -- 拒否と理由 --> MAIN
+    H2 -- 受理 --> R[ReportData → Jinja2<br/>A4 一枚]
+    MAIN -. 失敗・時間切れ .-> FB[AI変換なし<br/>経過表と原文の引用]
+  end
+  P3 --> M1
+  R --> D3[医師: 印刷待ち → 印刷 → 印刷済みで削除]
+  FB --> D3
+  subgraph D4 [医師の設定 D4]
+    S1[一文で依頼] --> S2[Claude が SKILL.md の<br/>一時コピーを編集<br/>H3・検証の Hook]
+    S2 --> S3[差分を見て承認] --> S4[版が上がり<br/>次の記録から新しい質問]
+  end
+```
+
 **変換パイプライン（Claude Agent SDK、`backend/tsutae/pipeline/`）**
 - 主エージェント（統合役）が Skill を読み、サブエージェント3役を呼ぶ: `date-normalizer`（「おととい」等を暦日・Day に）、`term-mapper`（CTCAE v5.0 JCOG版の用語名の候補）、`contradiction-finder`（クローズ回答と自由記載の食い違いを**解決せずに**並べる）。3役はツールを持たない
 - 結果はカスタムツール `emit_timeline` / `emit_report`（同じプロセス内の MCP サーバー）で受け取り、pydantic とコードで検査する。不正なら理由を返して直させる（出来事の日付は記録日以前、Day は実投与日から数え直した値と一致、症状の行の欠け・順序違いは拒否）

@@ -39,6 +39,10 @@
 ## なぜ紙か
 電子カルテ連携なしで医師の手元に届く。患者は AI の文を見ない。レポートは `ReportData` から Jinja2 で**決定的に**描く（AI は HTML を書かない）。A4 一枚・モノクロで、通常版と「AI変換なし」版の両方が1ページに収まることを確かめている。
 
+![受診時レポートの見本（A4 一枚）](docs/images/sample-report.png)
+
+*見本: デモ患者（合成）の第3コース。**AI の出力ではなく、合成データの正解ラベルから組み立てた見本**（`scripts/render_sample_report.py`）。本物の Claude の出力は `scripts/run_demo_visit.py` で作る。*
+
 ## Claude の使い方
 ```mermaid
 flowchart LR

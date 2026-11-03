@@ -1,0 +1,62 @@
+/** 患者 API の偽物。経路とメソッドで応答を選ぶ。 */
+import {
+  jsonResponse,
+  mockFetch,
+  type FetchMock,
+} from "../../../test/fetchMock";
+import { ENTRIES, PID, QUESTIONS_RESPONSE } from "./fixtures";
+
+export type Reply = Response | Promise<Response>;
+
+export interface PatientApiReplies {
+  questions?: () => Reply;
+  createEntry?: (body: unknown) => Reply;
+  entries?: () => Reply;
+  visit?: (body: unknown) => Reply;
+}
+
+const DEFAULTS: Required<PatientApiReplies> = {
+  questions: () => jsonResponse(QUESTIONS_RESPONSE),
+  createEntry: () => jsonResponse({ entry_id: 1, notices: [] }),
+  entries: () => jsonResponse({ entries: ENTRIES }),
+  visit: () => jsonResponse({ ok: true, message_key: "visit.done" }),
+};
+
+function bodyOf(init?: RequestInit): unknown {
+  return typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+}
+
+export function mockPatientApi(replies: PatientApiReplies = {}): FetchMock {
+  const r = { ...DEFAULTS, ...replies };
+  const base = `/api/patient/${PID}`;
+  return mockFetch((url, init) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url === `${base}/questions`) {
+      return r.questions();
+    }
+    if (method === "POST" && url === `${base}/entries`) {
+      return r.createEntry(bodyOf(init));
+    }
+    if (method === "GET" && url === `${base}/entries`) {
+      return r.entries();
+    }
+    if (method === "POST" && url === "/api/visit") {
+      return r.visit(bodyOf(init));
+    }
+    return jsonResponse({ error: "not_found" }, 404);
+  });
+}
+
+/** fetch の呼び出しのうち、メソッドと経路が一致するもの。 */
+export function callsTo(
+  mock: FetchMock,
+  method: string,
+  url: string,
+): unknown[] {
+  return mock.mock.calls
+    .filter(
+      ([input, init]) =>
+        String(input) === url && (init?.method ?? "GET") === method,
+    )
+    .map(([, init]) => bodyOf(init));
+}

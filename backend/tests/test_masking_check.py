@@ -32,7 +32,7 @@ def test_check_text_masks_then_detects() -> None:
 def test_check_text_clean_record() -> None:
     check = check_text("となりの鈴木さんがりんごをむいてくれた。電話090-0000-0000")
     assert check.masked == "となりの○○さんがりんごをむいてくれた。電話[伏せ字]"
-    assert check.detections == []
+    assert check.detections == ()
     assert check.flagged is False
     assert check.reason is None
 
@@ -42,7 +42,7 @@ def test_check_text_matches_mask_then_detect() -> None:
     check = check_text(text)
     masked = mask_text(text).masked
     assert check.masked == masked
-    assert check.detections == detect_identifiers(masked)
+    assert check.detections == tuple(detect_identifiers(masked))
 
 
 def test_check_is_frozen() -> None:

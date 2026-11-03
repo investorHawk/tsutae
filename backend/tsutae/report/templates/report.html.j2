@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>つたえ レポート {{ header.reception_no }}</title>
+<style>
+{{ css }}
+</style>
+</head>
+<body>
+<div class="sheet">
+<div class="banner">
+<h1>つたえ　受診時レポート</h1>
+<span class="synthetic">症例は全て合成（架空）</span>
+</div>
+{% if fallback %}
+<div class="fallback-notice">AI変換なし　―　クローズ回答の経過表と原文の引用だけのレポート</div>
+{% endif %}
+{% for section in sections %}
+{% if section == "header" %}
+<section class="header">
+<table class="fields">
+<tr>
+<th>受付番号</th><td class="reception">{{ header.reception_no }}</td>
+<th>仮名ID</th><td>{{ header.patient_id }}</td>
+<th>レジメン</th><td>{{ header.regimen }}</td>
+</tr>
+<tr>
+<th>コース</th><td colspan="3">{{ header.course }}　{{ header.period }}{% if header.delay_note %}　<strong class="delay">{{ header.delay_note }}</strong>{% endif %}</td>
+<th>記録</th><td>{{ header.records }}（{{ header.breakdown }}）</td>
+</tr>
+</table>
+</section>
+{% elif section == "attention" %}
+<section class="attention">
+<h2>要確認</h2>
+{% if attention %}
+<ul>
+{% for item in attention %}
+<li class="att-{{ item.kind }}"><span class="att-mark">{{ item.mark }}</span><span class="att-title">{{ item.title }}</span>{% if item.day %}<span class="att-day">{{ item.day }}</span>{% endif %}<span class="att-detail">{{ item.detail }}</span></li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="empty">該当する項目はない</p>
+{% endif %}
+{% if fallback %}
+<p class="note">AI変換なしのため、クローズ回答と自由記載の食い違いは調べていない。</p>
+{% endif %}
+</section>
+{% elif section == "grid" %}
+<section class="grid">
+<h2>経過表（Day 別）</h2>
+<table class="grid">
+<colgroup><col class="label-col">{% for col in grid.columns %}<col>{% endfor %}</colgroup>
+<thead>
+<tr><th class="row-label corner">Day</th>{% for col in grid.columns %}<th class="col-head{{ ' slash' if col.slash }}" data-day="{{ col.day }}"><span class="day">{{ col.day }}</span><span class="date">{{ col.date }}</span>{% if col.proxy %}<span class="proxy-mark">代</span>{% endif %}</th>{% endfor %}</tr>
+</thead>
+{% for block in grid.blocks %}
+<tbody class="{{ 'previous' if block.key[1] else 'current' }}">
+<tr class="course-sep"><th colspan="{{ grid.span }}">{{ block.title }}</th></tr>
+{% for row in block.rows %}
+<tr><th class="row-label">{{ row.label }}</th>{% for cell in row.cells %}<td class="{{ cell.cls }}" data-row="{{ row.id }}" data-day="{{ cell.day }}">{% if cell.glyph %}<span class="glyph">{{ cell.glyph }}</span>{% endif %}{% if cell.temp %}<span class="temp">{{ cell.temp }}</span>{% endif %}{% if cell.mark %}<span class="mark">○</span>{% if cell.recalled %}<span class="recalled">回</span>{% endif %}{% endif %}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody>
+{% endfor %}
+</table>
+<div class="legend"><span class="legend-title">凡例</span><span class="item"><span class="swatch cell st-none"><span class="glyph">−</span></span>なし</span><span class="item"><span class="swatch cell st-present"></span>ある</span><span class="item"><span class="swatch cell st-hard"></span>つらい</span><span class="item"><span class="swatch cell st-no_input"></span>入力なし（空白）</span><span class="item"><span class="swatch cell st-not_asked"><span class="glyph">−−</span></span>未設問（その日の質問集に無い項目）</span><span class="item"><span class="swatch cell slash"></span>つらくて書けない（その日）</span><span class="item"><span class="swatch cell"><span class="mark">○</span></span>自由記載にその症状の記述あり</span><span class="item"><span class="swatch cell"><span class="mark">○</span><span class="recalled">回</span></span>回想（後日の記載から日付を戻した）</span><span class="item"><span class="proxy-mark">代</span>家族などが代わりに入力</span><span class="item">体温の行: 数値＝測った体温（℃）、−＝測っていない</span><span class="item"><span class="swatch cell out"></span>範囲外</span><span class="item">？＝用語の当てはめの確からしさが低い</span></div>
+</section>
+{% elif section == "per_symptom" %}
+<section class="per-symptom">
+<h2>症状別の時系列</h2>
+{% if per_symptom %}
+<table class="symptoms">
+<thead><tr><th class="term">用語名</th><th class="start">開始</th><th>代表引用（原文）</th></tr></thead>
+<tbody>
+{% for s in per_symptom %}
+<tr><td class="term">{{ s.term }}{% if s.low %}<span class="low">？</span>{% endif %}</td><td class="start">{{ s.start }}</td><td class="quote">「{{ s.quote }}」</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% elif fallback %}
+<p class="empty">AI変換なしのため、この欄は空。</p>
+{% else %}
+<p class="empty">AI が選んだ症状はない（症状が無いという意味ではない。経過表と引用を見る）</p>
+{% endif %}
+</section>
+{% elif section == "quotes" %}
+<section class="quotes{{ ' page-break' if quotes_page_break }}">
+<h2>引用（原文・伏せ字後）</h2>
+{% if quotes %}
+<table class="quote-list">
+{% for q in quotes %}
+<tr><td class="q-day">{{ q.day }}</td><td class="q-date">{{ q.date }}</td><td class="q-proxy">{% if q.proxy %}<span class="proxy-mark">代</span>{% endif %}</td><td class="q-text">{{ q.text }}</td></tr>
+{% endfor %}
+</table>
+{% if quotes_limit_note %}
+<p class="note quotes-limit">{{ quotes_limit_note }}</p>
+{% endif %}
+{% else %}
+<p class="empty">載せた引用はない（自由記載が無い場合と、引用の件数の上限で省いた場合がある）</p>
+{% endif %}
+</section>
+{% endif %}
+{% endfor %}
+<footer class="notes">
+<p>用語名: 有害事象共通用語規準 v5.0 日本語訳JCOG版より引用。用語名は AI が当てはめた候補で、医師が確定する。重さの判定・原因の推測・助言はしていない。</p>
+<p>経過表のセルは患者のクローズ回答そのまま（「つらい」は患者の主観）。○・要確認の食い違い・症状別の時系列が AI の変換による（記録と照合できたものだけを載せる）。形式: {{ report_skill_version }}　症例は全て合成（架空）。</p>
+</footer>
+</div>
+</body>
+</html>

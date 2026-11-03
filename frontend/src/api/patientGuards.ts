@@ -1,0 +1,135 @@
+/**
+ * 患者 API（§8 患者）の 2xx 応答の検査。契約で列挙された項目は全て存在を必須にする
+ * （nullable の項目は「存在して null」を許す。省略は不正）。ClosedAnswer の規則
+ * （measured のときだけ体温 30.0〜45.0）と、質問・回答の key の重複も見る。
+ * 合わなければ invalid_response（画面は error.generic を出す。真っ白にしない）。
+ */
+import {
+  type AnswerType,
+  type AnswerValue,
+  type EntryKind,
+  FEVER_VALUES,
+  TEMPERATURE_MAX,
+  TEMPERATURE_MIN,
+  THREE_LEVEL_VALUES,
+} from "./types";
+import {
+  type Item,
+  everyItem,
+  isBool,
+  isInt,
+  isString,
+  oneOf,
+} from "./validate";
+
+const ANSWER_TYPES: readonly AnswerType[] = ["three_level", "temperature"];
+const ANSWER_VALUES: readonly AnswerValue[] = [
+  ...THREE_LEVEL_VALUES,
+  ...FEVER_VALUES,
+];
+const ENTRY_KINDS: readonly EntryKind[] = [
+  "too_sick",
+  "answers",
+  "free_text",
+  "mixed",
+];
+
+const isStringList = (v: unknown): boolean =>
+  Array.isArray(v) && v.every(isString);
+
+/** 項目が存在する（値が null でもよい）。 */
+function has(v: Item, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(v, key);
+}
+
+/** 項目が存在し、値が null か文字列。 */
+function hasNullableString(v: Item, key: string): boolean {
+  return has(v, key) && (v[key] === null || isString(v[key]));
+}
+
+/** 配列の要素の key に重複が無い。 */
+function uniqueBy(items: readonly Item[], key: string): boolean {
+  const values = items.map((item) => item[key]);
+  return new Set(values).size === values.length;
+}
+
+const isListWithUniqueKeys =
+  (isItem: (item: Item) => boolean, key: string) =>
+  (v: unknown): boolean =>
+    everyItem(isItem)(v) && uniqueBy(v as Item[], key);
+
+function isQuestion(v: Item): boolean {
+  return (
+    isString(v.key) && isString(v.text) && oneOf(ANSWER_TYPES)(v.answer_type)
+  );
+}
+
+/** GET questions: {skill_version, questions: Question[]}（key は重複しない） */
+export function isQuestionsResponse(v: Item): boolean {
+  return (
+    isString(v.skill_version) &&
+    isListWithUniqueKeys(isQuestion, "key")(v.questions)
+  );
+}
+
+/** POST entries: {entry_id, notices: string[]} */
+export function isCreateEntryResponse(v: Item): boolean {
+  return isInt(v.entry_id) && isStringList(v.notices);
+}
+
+function isTemperature(v: unknown): boolean {
+  return (
+    typeof v === "number" &&
+    Number.isFinite(v) &&
+    v >= TEMPERATURE_MIN &&
+    v <= TEMPERATURE_MAX
+  );
+}
+
+/** ClosedAnswer の規則: measured なら体温（範囲内の数）、それ以外は null。 */
+function fitsTemperatureRule(v: Item): boolean {
+  if (!has(v, "temperature")) {
+    return false;
+  }
+  return v.value === "measured"
+    ? isTemperature(v.temperature)
+    : v.temperature === null;
+}
+
+/** 記録の回答。question_text は記録時点の質問文（見つからなければ null）。 */
+function isPatientAnswer(v: Item): boolean {
+  return (
+    isString(v.question_key) &&
+    oneOf(ANSWER_VALUES)(v.value) &&
+    fitsTemperatureRule(v) &&
+    hasNullableString(v, "question_text")
+  );
+}
+
+function isPatientEntry(v: Item): boolean {
+  return (
+    isInt(v.id) &&
+    isString(v.recorded_at) &&
+    isString(v.record_date) &&
+    oneOf(ENTRY_KINDS)(v.kind) &&
+    isBool(v.by_proxy) &&
+    isString(v.skill_version) &&
+    isListWithUniqueKeys(isPatientAnswer, "question_key")(v.answers) &&
+    hasNullableString(v, "free_text")
+  );
+}
+
+/** GET entries: {entries: PatientEntry[]} */
+export function isPatientEntriesResponse(v: Item): boolean {
+  return everyItem(isPatientEntry)(v.entries);
+}
+
+/** POST register: {ok: true} */
+export function isOkTrue(v: Item): boolean {
+  return v.ok === true;
+}
+
+/** POST visit: {ok: true, message_key} */
+export function isVisitResponse(v: Item): boolean {
+  return v.ok === true && isString(v.message_key);
+}

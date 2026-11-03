@@ -1,0 +1,383 @@
+/* 医師画面のページ部品（src/pages/doctor・src/components/doctor）。土台は styles/doctor.css。 */
+
+.doctor-app .d-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.doctor-app .d-field > span {
+  font-size: 0.9rem;
+}
+
+.doctor-app .d-field input,
+.doctor-app .d-field select,
+.doctor-app .d-field textarea {
+  font-weight: 400;
+}
+
+.doctor-app .d-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.doctor-app .d-field--wide {
+  grid-column: 1 / -1;
+}
+
+.doctor-app .d-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.doctor-app .d-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.doctor-app .d-summary {
+  margin: 0;
+  font-weight: 700;
+}
+
+.doctor-app .d-live {
+  font-size: 0.85rem;
+}
+
+.doctor-app .d-live--on::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  content: "";
+  background: var(--d-ok);
+  border-radius: 50%;
+  animation: d-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes d-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.doctor-app .d-ok {
+  color: var(--d-ok);
+  font-weight: 600;
+}
+
+.doctor-app .d-notice {
+  padding: 10px 14px;
+  background: #fff8e5;
+  border-left: 4px solid #c9a227;
+  border-radius: 4px;
+}
+
+/* リンクをボタンの見た目にする（印刷は新しいタブで開くリンク） */
+.doctor-app .d-linkbutton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  color: var(--d-text);
+  text-decoration: none;
+  background: var(--d-bg);
+  border: 1px solid var(--d-border);
+  border-radius: 6px;
+}
+
+.doctor-app .d-linkbutton--primary {
+  color: #ffffff;
+  font-weight: 700;
+  background: var(--d-primary);
+  border-color: var(--d-primary);
+}
+
+.doctor-app .d-sublink {
+  margin-left: 8px;
+  font-size: 0.9rem;
+  color: var(--d-primary);
+}
+
+.doctor-app .d-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.doctor-app .d-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+.doctor-app .d-badge--fallback {
+  color: #ffffff;
+  background: #4a4a4a;
+}
+
+.doctor-app .d-badge--warn {
+  color: #6b4e00;
+  background: #ffe9a8;
+  border: 1px solid #c9a227;
+}
+
+.doctor-app .d-reception {
+  font-size: 1.1rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.doctor-app .d-visit--printed td {
+  color: var(--d-muted);
+}
+
+/* 2段階のボタン（印刷済み） */
+.doctor-app .d-twostep {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #fbe1e1;
+  border-radius: 6px;
+}
+
+.doctor-app .d-twostep-prompt {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.doctor-app .d-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* 登録用QR（D1） */
+.doctor-app .d-qr-panel {
+  display: inline-block;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 8px;
+}
+
+.doctor-app .d-qr-panel h2 {
+  margin: 0;
+}
+
+.doctor-app .d-qr-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.doctor-app .d-qr {
+  margin: 0;
+  text-align: center;
+}
+
+.doctor-app .d-qr img {
+  display: block;
+  margin: 0 auto;
+  background: #ffffff;
+  image-rendering: pixelated;
+}
+
+.doctor-app .d-qr-url {
+  margin-top: 6px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+/* コース登録（D2） */
+.doctor-app .d-patient-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.doctor-app .d-course-form {
+  max-width: 760px;
+  padding: 16px;
+  margin-top: 16px;
+  background: var(--d-surface);
+  border-radius: 8px;
+}
+
+.doctor-app .d-course-form h2 {
+  margin-top: 0;
+}
+
+.doctor-app .d-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.doctor-app .d-row-editing td {
+  background: #e8f0fa;
+}
+
+/* 設定を変える（D4） */
+.doctor-app .d-skill-form {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+}
+
+.doctor-app .d-generating {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: #e8f0fa;
+  border-radius: 8px;
+}
+
+.doctor-app .d-spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #b9cce4;
+  border-top-color: var(--d-primary);
+  border-radius: 50%;
+  animation: d-spin 0.9s linear infinite;
+}
+
+@keyframes d-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.doctor-app .d-big-note {
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 1.05rem;
+  background: var(--d-surface);
+  border-radius: 8px;
+}
+
+.doctor-app .d-review {
+  padding: 16px;
+  margin: 16px 0;
+  border: 2px solid var(--d-primary);
+  border-radius: 8px;
+}
+
+.doctor-app .d-review h2 {
+  margin-top: 0;
+}
+
+.doctor-app .d-diffview {
+  margin: 0 0 12px;
+}
+
+.doctor-app .d-diffview-stats {
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-diff .d-diff-line {
+  padding: 0 8px;
+  border-left: 4px solid transparent;
+}
+
+.doctor-app .d-diff .d-diff-add {
+  color: #0f5132;
+  border-left-color: #2e7d32;
+}
+
+.doctor-app .d-diff .d-diff-del {
+  color: #842029;
+  border-left-color: #c62828;
+}
+
+.doctor-app .d-diff .d-diff-hunk {
+  color: var(--d-primary);
+  background: #e8f0fa;
+}
+
+.doctor-app .d-diff .d-diff-meta {
+  color: var(--d-muted);
+}
+
+.doctor-app .d-history td {
+  font-size: 0.9rem;
+}
+
+.doctor-app .d-history details {
+  margin-top: 4px;
+}
+
+.doctor-app .d-change {
+  font-weight: 700;
+}
+
+.doctor-app .d-change--approved {
+  color: var(--d-ok);
+}
+
+.doctor-app .d-change--rejected {
+  color: var(--d-muted);
+}
+
+.doctor-app .d-change--failed {
+  color: var(--d-danger);
+}
+
+.doctor-app .d-change--pending {
+  color: var(--d-primary);
+}
+
+.doctor-app .d-change-code {
+  display: block;
+  font-size: 0.8rem;
+}
+
+/* 未処理の記載（D6） */
+.doctor-app .d-unprocessed {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.doctor-app .d-unprocessed-meta {
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+}
+
+/* ログイン */
+.doctor-app .d-login {
+  max-width: 360px;
+  margin: 48px auto;
+}
+
+.doctor-app .d-login-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}

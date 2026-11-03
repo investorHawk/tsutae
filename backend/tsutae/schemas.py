@@ -180,7 +180,7 @@ class Course(Frozen):
     infusion_date: date  # 実投与日 = Day1
     planned_date: date | None = None  # 予定日（延期の注記に使う）
     next_visit: date | None = None
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=200)
 
 
 # ---------------------------------------------------------------------------

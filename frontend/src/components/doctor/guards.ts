@@ -1,0 +1,17 @@
+/**
+ * 医師 API の応答の検査。正本は api/doctorGuards.ts（API 関数の中で使う）。
+ * 画面側の既存の import のために同じものを出し直す。
+ */
+export {
+  VISIT_STATUSES,
+  isCourse,
+  isCreatePatientResponse,
+  isCreateSkillChangeResponse,
+  isDoctorPatient,
+  isPipelineEvent,
+  isSkillChange,
+  isSkillInfo,
+  isUnprocessedItem,
+  isVisitStatus,
+  isVisitSummary,
+} from "../../api/doctorGuards";

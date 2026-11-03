@@ -1,0 +1,197 @@
+/**
+ * 医師 API（docs/architecture.md §8 医師）。Cookie tsutae_doctor で認証される。
+ * 2xx の本文は全てここで検査し、契約と違えば ApiError(200, "invalid_response") を投げる
+ * （§9 W2b の決定。{ok:false} を成功として扱わない）。
+ */
+import {
+  isCoursesResponse,
+  isCreatePatientResponse,
+  isCreateSkillChangeResponse,
+  isDecideResponse,
+  isOkTrue,
+  isPatientsResponse,
+  isPipelineEventsResponse,
+  isSavedCourse,
+  isSkillChangesResponse,
+  isSkillsResponse,
+  isUnprocessedResponse,
+  isVisitsResponse,
+} from "./doctorGuards";
+import { getJson, isApiError, postJson, seg } from "./http";
+import type {
+  CoursesResponse,
+  Course,
+  CreatePatientRequest,
+  CreatePatientResponse,
+  CreateSkillChangeRequest,
+  CreateSkillChangeResponse,
+  DecideSkillChangeResponse,
+  LoginRequest,
+  OkResponse,
+  PatientsResponse,
+  PipelineEventsResponse,
+  Regimen,
+  SkillChangesResponse,
+  SkillsResponse,
+  UnprocessedResponse,
+  VisitsResponse,
+} from "./types";
+import { type Item, checked } from "./validate";
+
+type Guard = (body: Item) => boolean;
+
+async function getChecked<T>(path: string, isBody: Guard): Promise<T> {
+  return checked<T>(await getJson<unknown>(path), isBody);
+}
+
+async function postChecked<T>(
+  path: string,
+  isBody: Guard,
+  body?: unknown,
+): Promise<T> {
+  return checked<T>(await postJson<unknown>(path, body), isBody);
+}
+
+// --- ログイン -------------------------------------------------------------
+
+export function login(password: string): Promise<OkResponse> {
+  const body: LoginRequest = { password };
+  return postChecked<OkResponse>("/api/doctor/login", isOkTrue, body);
+}
+
+export function logout(): Promise<OkResponse> {
+  return postChecked<OkResponse>("/api/doctor/logout", isOkTrue);
+}
+
+/**
+ * ログイン済みかを確かめる。§8 に専用の経路が無いので、軽い GET（Skill 一覧）の
+ * 401 で判断する。401 以外の失敗（壊れた 2xx の invalid_response を含む）はそのまま投げる。
+ */
+export async function checkDoctorSession(): Promise<boolean> {
+  try {
+    await listSkills();
+    return true;
+  } catch (err) {
+    if (isApiError(err) && err.isUnauthorized) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+// --- 患者・コース（D1, D2） ------------------------------------------------
+
+export function listPatients(): Promise<PatientsResponse> {
+  return getChecked<PatientsResponse>(
+    "/api/doctor/patients",
+    isPatientsResponse,
+  );
+}
+
+export function createPatient(
+  regimen: Regimen,
+): Promise<CreatePatientResponse> {
+  const body: CreatePatientRequest = { regimen };
+  return postChecked<CreatePatientResponse>(
+    "/api/doctor/patients",
+    isCreatePatientResponse,
+    body,
+  );
+}
+
+export function listCourses(pid: string): Promise<CoursesResponse> {
+  return getChecked<CoursesResponse>(
+    `/api/doctor/patients/${seg(pid)}/courses`,
+    isCoursesResponse,
+  );
+}
+
+/** 実投与日の登録。矛盾は 400 {"error": code}。 */
+export function saveCourse(course: Course): Promise<Course> {
+  return postChecked<Course>(
+    "/api/doctor/courses",
+    isSavedCourse(course),
+    course,
+  );
+}
+
+// --- 受診（D3, D5, D6） ----------------------------------------------------
+
+export function listVisits(): Promise<VisitsResponse> {
+  return getChecked<VisitsResponse>("/api/doctor/visits", isVisitsResponse);
+}
+
+/** レポート（text/html、A4 印刷用）の URL。新しいタブや iframe で開く。 */
+export function reportUrl(visitId: number): string {
+  return `/api/doctor/visits/${seg(visitId)}/report`;
+}
+
+/** 印刷済み。レポート・変換結果・受付番号がサーバーから消える。 */
+export function markPrinted(visitId: number): Promise<OkResponse> {
+  return postChecked<OkResponse>(
+    `/api/doctor/visits/${seg(visitId)}/printed`,
+    isOkTrue,
+  );
+}
+
+export function listUnprocessed(visitId: number): Promise<UnprocessedResponse> {
+  return getChecked<UnprocessedResponse>(
+    `/api/doctor/visits/${seg(visitId)}/unprocessed`,
+    isUnprocessedResponse,
+  );
+}
+
+export function getPipelineEvents(
+  visitId: number,
+): Promise<PipelineEventsResponse> {
+  return getChecked<PipelineEventsResponse>(
+    `/api/doctor/pipeline/${seg(visitId)}/events`,
+    isPipelineEventsResponse,
+  );
+}
+
+// --- Skill の書き換え（D4） ------------------------------------------------
+
+export function listSkills(): Promise<SkillsResponse> {
+  return getChecked<SkillsResponse>("/api/doctor/skills", isSkillsResponse);
+}
+
+export function createSkillChange(
+  skillName: string,
+  requestText: string,
+): Promise<CreateSkillChangeResponse> {
+  const body: CreateSkillChangeRequest = {
+    skill_name: skillName,
+    request_text: requestText,
+  };
+  return postChecked<CreateSkillChangeResponse>(
+    "/api/doctor/skill-changes",
+    isCreateSkillChangeResponse,
+    body,
+  );
+}
+
+export function listSkillChanges(): Promise<SkillChangesResponse> {
+  return getChecked<SkillChangesResponse>(
+    "/api/doctor/skill-changes",
+    isSkillChangesResponse,
+  );
+}
+
+export function approveSkillChange(
+  id: number,
+): Promise<DecideSkillChangeResponse> {
+  return postChecked<DecideSkillChangeResponse>(
+    `/api/doctor/skill-changes/${seg(id)}/approve`,
+    isDecideResponse,
+  );
+}
+
+export function rejectSkillChange(
+  id: number,
+): Promise<DecideSkillChangeResponse> {
+  return postChecked<DecideSkillChangeResponse>(
+    `/api/doctor/skill-changes/${seg(id)}/reject`,
+    isDecideResponse,
+  );
+}

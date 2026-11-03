@@ -125,6 +125,13 @@ fixed_rules:
 - `check_text(text) -> MaskCheck(masked: str, detections: list[Detection])`（一次→二次をまとめて）
 - 該当した記録は、その記録だけ Claude への送信対象から外す（`UnprocessedEntry(reason=<規則名>)`）。原文は院内画面 D6 だけに出す
 
+**W2b の決定（2026-11-03、上より優先）**
+- 敬称は さん・先生・せんせい・くん・君・ちゃん・様・さま・氏・殿（一次・二次とも）
+- `normalize_text(text) -> str`: 改行（CRLF・CR・U+2028・U+2029）を `\n` に、タブを空白に、それ以外の制御文字（Cc）と書式文字（Cf: U+200B・U+00AD・U+FEFF・U+2060 等）を削除する。`check_text` は最初にこれを掛け、`masked` は正規化後の文から作る。**改行は残す**（引用は改行を含みうる）。規則は改行・空白をまたいで働く（「磯鷲\n南さん」「架空 病院」）が、形容詞・副詞・助詞の後の改行（「だるい\n医院へ」）では検出しない
+- 一次は仮名ID（`P-[A-Z0-9]{8}`、大文字小文字・全角を問わない）を「[ID]」に置き換える
+- 二次の規則は `unknown_before_honorific` `long_digits` `at_mark` `before_facility` `address_number`（番地・N-N-N の住所）`id_like`（英字1〜2字＋ハイフン類＋英数字3字以上。例 A-023・P-DEMO0001 の取り残し）
+- `detect_identifiers(text)` は**依頼文全体**（H1・convert②）用: JSON の文字列エスケープ（`\n` `\t` `\r` `\"` `\\` `\uXXXX`）を同じ長さの空白とみなして検出し、`"regimen_skill_version"`・`"report_skill_version"`・`"skill_version"` キーの値の `@` だけを数えない。`detect_in_patient_text(text)` は患者の文用で例外なし。`check_text` は後者を使う
+
 ## 6. 合成データ（W1-synthetic）
 - `data/synthetic/*.json` は `SyntheticPatient`、`labels_*.json` は `PatientLabels`（schemas.py）。`tsutae.synthetic` に `load_patient(path)`, `load_labels(path)`, `all_patients()`, `hard_case_counts(labels) -> dict[str, int]`, `validate_dataset() -> list[str]`（問題の一覧。空なら OK）
 - デモ患者 `demo_patient.json`（`patient_id: "P-DEMO0001"`, `visit_date: 2026-11-09`, 受付番号 `"A-023"`）:
@@ -170,6 +177,15 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 
 主エージェントの手順（SYSTEM_PROMPT と build_prompt に書く）: Skill（regimen と report-format）を読む → 3役を `Agent` ツールで呼ぶ（date-normalizer と contradiction-finder、その後 term-mapper。並行でよい）→ 結果をまとめ `emit_timeline`（events, contradictions）→ report-format に従い `emit_report`（per_symptom）。Grade・重さの語・助言・原因の推測を出さない。欠けた日を埋めない。食い違いを解決しない。
 
+**W2b の決定（2026-11-03、上より優先）**
+- `prepare_input(..., exclude_literals: Sequence[str] = ())`: 自由記載に `exclude_literals`（service が渡す仮名ID・受付番号。NFKC＋casefold で比べる、空文字は無視）を含む記録は外し `UnprocessedEntry(reason="known_identifier")`。自由記載の正規化は `masking.check_text` に任せる（pipeline 側で改行を空白にしない。`masked_texts` は改行を含みうる）
+- 範囲外（今コースの Day1 より前・最終日より後・visit_date より後）の記録は**黙って外す**（`UnprocessedEntry` にしない。unprocessed は「伏せ字漏れの疑い・識別子を含む」の意味だけ）。件数はログに `out_of_range_count` で残す
+- 自由記載の記録が1件も無い（`masked_texts` が空）なら Claude を呼ばず、空の Timeline（events・contradictions とも空、unprocessed だけ）で成功
+- `emit_timeline` の検査: event の `date` はその記録の記録日以前。`day` は `course.day_of(date, schedule, courses=...)` と一致（None ならば None のみ）。同じ (entry_no, term, date, status, source_quote) の重複・同じ食い違いの重複は拒否
+- `emit_report` の検査: 受け付けた timeline の present/improving の term ごとに per_symptom の行がちょうど1つ、開始 Day の早い順（同じなら term 名順）。行の欠け・余分・順序違いは拒否（理由は番号と短いコード）
+- `convert` が想定外の例外で `internal_error` にするとき、例外の**型名だけ**をログ（`error_type`）に残す
+
+
 ## 7b. レポート（W2-report、`tsutae.report`）
 
 | ファイル | 中身 |
@@ -210,7 +226,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
 | `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[]}` |
 | `POST /api/patient/{pid}/entries` | `EntryCreate` | `{entry_id, notices: string[]}`（notices は patient_strings のキー。例 `["fixed_rule.fever_38"]`） |
-| `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, answers, free_text}]}`（自分の記録のみ。AI の出力は含まない） |
+| `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}]}`（自分の記録のみ。AI の出力は含まない。`question_text` はその記録の skill_version の質問集の文で、見つからなければ null。フロントは null のとき `history.previous_question` を出す） |
 | `POST /api/visit` | `{reception_no}`（Cookie で患者識別） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |
 
 - Cookie の pid と経路の `{pid}` が違えば 403。患者 API のモジュールは `reports`・`timelines`・pipeline を import しない（アーキテクチャテスト）
@@ -233,12 +249,33 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `GET /api/doctor/skill-changes` | 一覧 |
 | `POST /api/doctor/skill-changes/{id}/approve` / `/reject` | `{ok, new_version?}` |
 
+### 8b. W3 の実装の形（2026-11-03 決定）
+| ファイル | 担当 | 中身 |
+|---|---|---|
+| `api/app.py` | W3-api | `create_app(settings: Settings \| None = None, *, runner_factory=None, skill_editor=None) -> FastAPI`。`app.state` に settings・runner_factory（既定は `SdkRunner`）・skill_editor（既定は `SdkSkillEditor`）。起動時に `init_db`・`ensure_skill_versions`・`purge_expired`。`backend/tsutae/api/__main__.py` は不要（`uvicorn tsutae.api.app:app`、`app = create_app()` は遅延でよい） |
+| `api/deps.py` | W3-api | 接続はリクエストごと（`Depends` で開いて閉じる）。患者 Cookie `tsutae_pid`、医師 Cookie `tsutae_doctor`（値は発行時刻＋HMAC-SHA256(secret_key)。12時間で失効。標準ライブラリの `hmac` で作る）。どちらも HttpOnly・SameSite=Lax。エラーは `{"error": code}`（401 `not_logged_in`・403 `forbidden`・404 `not_found`・422 `invalid_input`）。`RequestValidationError` も `{"error":"invalid_input"}` に変える（入力の文面を返さない） |
+| `api/patient.py` | W3-api | §8 の患者 API。**`tsutae.pipeline`・`tsutae.report`・`get_timeline`・`get_report` を import しない**。質問集は `skills.load_regimen_skill`、記録の `question_text` は `db.get_skill_version` の `questions_json` から引く。notices は `api/fixed_rules.py` の純関数 `notices_for(entry: EntryCreate, skill: RegimenSkill) -> list[str]`（体温 ≥ threshold で `patient_string_key`。コードの比較だけ） |
+| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（大文字化・ハイフンの統一はしない）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。自由記載が長すぎるときの患者向けキーは `today.free_text_too_long`。今コースが無ければ 409 `{"error":"no_course"}` |
+| `api/doctor.py` | W3-doctor | §8 の医師 API（skill-changes 以外）。`GET /visits` と `GET /visits/{id}/report` の前に `purge_expired`。レポートは `HTMLResponse` に `Cache-Control: no-store` と `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:`。`POST /courses` は保存前に `validate_courses`（既存＋新規）。events は `{status, events}`（ポーリング） |
+| `api/doctor_skills.py` | W3-doctor | `GET /api/doctor/skills`・`POST/GET /api/doctor/skill-changes`・approve・reject。`tsutae.skillchange` を呼ぶ |
+| `skillchange/`（`editor.py` `service.py` `diff.py`） | W3-skillchange | 下の 9b |
+| `scripts/seed_demo.py` | W3-api | `python scripts/seed_demo.py [--db PATH]`: 合成3人（`tsutae.dataset`）とコース・記録を入れ、`ensure_skill_versions`。既にいる患者は飛ばす（**DB を消さない**） |
+| `tests/test_api_*.py` `tests/test_architecture.py` | 各担当 | `fastapi.testclient.TestClient`。runner は `pipeline_fakes.FakeRunner`、editor は偽物。アーキテクチャテストは `ast` で `api/patient.py` の import を検査 |
+
+### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
+- `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=["project"]`、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_h3(work_root, logger)`）・H4、`max_turns` は 12、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
+- `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の同じ相対位置に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない
+- `approve_change(conn, change_id, *, skills_home) -> int`: pending のみ。`base_version` が今の版と違えば `failed`・`stale`。new_text の frontmatter の version を base+1 にして再検証 → 本体へ原子的に書く（同じディレクトリの一時ファイル → `os.replace`）→ `save_skill_version` → approved。**git commit はしない**（版の履歴は `skill_versions` に残す）
+- `reject_change(conn, change_id) -> None`: pending のみ rejected
+- ログは `PipelineLogger(conn, "skill_change", change_id)`（文面なし）
+
 ## 9. フロント（W1 骨組み → W4 画面）
 - React 18 + Vite 5 + TypeScript + react-router 6。vitest + Testing Library（jsdom）。Prettier（2 スペース、セミコロンあり）
 - 開発時は Vite の proxy で `/api` → `http://localhost:8000`
 - ルート: 患者 `/register` `/today` `/history` `/visit`、医師 `/doctor/login` `/doctor`（印刷待ち） `/doctor/patients` `/doctor/patients/:pid` `/doctor/settings` `/doctor/pipeline/:visitId` `/doctor/unprocessed/:visitId`
 - 患者画面の文字列は `usePatientStrings().t(key)` からのみ出す（直書きしない。テストで検査）。質問文は API の `questions[].text`
 - 型は `src/api/types.ts`（schemas.py の API に出る部分を写す）、呼び出しは `src/api/patient.ts` `src/api/doctor.ts`
+- **W2b の決定**: 患者 API・医師 API の 2xx 応答は実行時に形を検査し、違えば `error.network` 相当の表示にする（真っ白にしない）。患者側・医師側とも ErrorBoundary を置く。患者画面の直書き検査は「患者のファイルの文字列リテラルに日本語を含めない」「JSX のテキストに英字を書かない」の2つ（変数経由の英字は検査の外。既知の限界として README に書く）。Skill 変更の差分が空なら失敗として扱い承認させない。`Course.note` は200字まで（schemas.py で強制）
 
 ## 10. 時計・デモ
 - `TSUTAE_TODAY=2026-11-09` でデモの「今日」を固定。`scripts/seed_demo.py` が合成データを DB に入れる（W3）

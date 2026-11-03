@@ -12,7 +12,7 @@ import pytest
 from tsutae.masking import MaskResult, mask_text
 from tsutae.masking.replace import load_allow_words, load_surnames
 
-COUNT_KEYS = {"name", "phone", "email", "address", "hospital"}
+COUNT_KEYS = {"id", "name", "phone", "email", "address", "hospital"}
 
 
 # ---------------------------------------------------------------------------

@@ -30,11 +30,14 @@ def _spans(text: str) -> list[str]:
 
 
 def test_rule_names_match_contract() -> None:
+    # 契約 §5（W2b の決定）の6つ
     assert RULES == (
         "unknown_before_honorific",
         "long_digits",
         "at_mark",
         "before_facility",
+        "address_number",
+        "id_like",
     )
 
 
@@ -161,11 +164,15 @@ def test_allowed_words_and_placeholders_are_not_detected(text: str) -> None:
         "09000000000",
         "090 0000 0000",
         "０１２３４５６７",
-        "12-34-56-78",
     ],
 )
 def test_long_digit_string_is_detected(text: str) -> None:
     assert _rules(text) == [RULE_LONG_DIGITS]
+
+
+def test_hyphenated_long_digits_are_also_a_street_number() -> None:
+    # N-N-N（3組以上）は W2b の決定で address_number にも当たる
+    assert _rules("12-34-56-78") == [RULE_LONG_DIGITS, "address_number"]
 
 
 @pytest.mark.parametrize(
@@ -206,9 +213,10 @@ def test_full_width_at_mark_is_detected() -> None:
 
 
 @pytest.mark.parametrize("text", ["regimen-folfox@1", "report-format-default@2"])
-def test_skill_version_is_not_an_at_mark(text: str) -> None:
-    # PipelineInput の skill_version（プロンプトに入る）で H1 を止めない
-    assert detect_identifiers(text) == []
+def test_skill_version_like_text_is_an_at_mark(text: str) -> None:
+    # 例外を作らない（患者の文に同じ形があれば漏れる）。プロンプトには Skill の版を
+    # 入れず、`@` を落とした名前だけを入れる（pipeline/prompt.py）
+    assert [d.rule for d in detect_identifiers(text)] == [RULE_AT_MARK]
 
 
 # ---------------------------------------------------------------------------

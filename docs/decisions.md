@@ -122,5 +122,14 @@
 | レポートの「要確認」に並べる発熱は 37.5℃ 以上（レポート形式 Skill の `fever_attention_celsius`）。患者画面の固定規則（38.0℃）とは別 | spec のデモ（Day8 37.9℃）を要確認に載せるため。コードの比較で、重さの判定ではない | 仮置き |
 | レポート HTML は `ReportData` から Jinja2 で決定的に描く。AI は HTML を書かない | 書式の崩れ・幻覚を防ぎ、テストできる形にする | 技術判断 |
 
+### T03 Agent SDK スモークの結果（2026-11-03、claude-agent-sdk 0.2.177、先生が実行。`docs/eval/smoke-2026-11-03-1907.json`）
+| 確認 | 結果 | 設計への反映 |
+|---|---|---|
+| 1. `UserPromptSubmit` が最初のプロンプトで発火し止められるか | OK。`decision: "block"` で num_turns 0・費用 0、モデルは応答しない | H1 は spec どおり `UserPromptSubmit` に置く。加えて `query()` 前にコードでも同じ検査をする（二重） |
+| 2. サブエージェントのツール呼び出しに `PreToolUse` が掛かるか | OK。`agent_id` あり・`agent_type` に定義名 | H2/H4 はサブエージェント内の呼び出しにも効く |
+| 3. `cwd` 配下の Skill が読まれるか | OK（Skill ツール経由で本文を読んだ） | `cwd=backend/skills_home` と `skills=[...]` で読む |
+| 4. `max_turns` とタイムアウト | OK。`max_turns` 超過は `ResultError` 例外、`asyncio.wait_for` で打ち切れる | どちらもフォールバックに回す |
+| 5. サブエージェント起動ツールの名前 | init 一覧では `Task`、Hook では `Agent`。組み込みの `general-purpose` 等のエージェントと Bash/Write 等のツールも見えている | `allowed_tools` に両方の名前。H4 は許可外のツールと、3役以外の `subagent_type` を deny |
+
 ## 未決（先生の判断待ち）
 なし

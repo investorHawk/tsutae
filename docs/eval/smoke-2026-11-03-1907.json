@@ -1,0 +1,135 @@
+{
+  "1_user_prompt_submit": {
+    "ok": true,
+    "fired_on_blocked": 1,
+    "fired_total": 2,
+    "model_answered_blocked_prompt": false,
+    "blocked_result": {
+      "subtype": "success",
+      "is_error": false,
+      "num_turns": 0,
+      "terminal_reason": null,
+      "cost_usd": 0,
+      "result": "UserPromptSubmit operation blocked by hook:\nsmoke: blocked by UserPromptSubmit"
+    },
+    "blocked_error": null,
+    "passed_texts": [
+      "りんご"
+    ]
+  },
+  "2_pretooluse_on_subagent_tool": {
+    "ok": true,
+    "pretooluse_seen": [
+      {
+        "tool": "Agent",
+        "agent_id": false,
+        "agent_type": null
+      },
+      {
+        "tool": "mcp__smoke__ping",
+        "agent_id": true,
+        "agent_type": "pinger"
+      }
+    ],
+    "ping_calls": 1,
+    "result": {
+      "subtype": "success",
+      "is_error": false,
+      "num_turns": 2,
+      "terminal_reason": "completed",
+      "cost_usd": 0.0464757,
+      "result": "サブエージェント pinger に ping を呼ばせました。結果は `pong` でした。私自身は ping を呼んでいません。"
+    },
+    "error": null
+  },
+  "5_subagent_tool_name": {
+    "ok": true,
+    "spawn_tools_in_init": [
+      "Task"
+    ],
+    "spawn_tools_in_hooks": [
+      "Agent"
+    ],
+    "init_tools": [
+      "Task",
+      "Bash",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "DesignSync",
+      "Edit",
+      "EnterWorktree",
+      "ExitWorktree",
+      "ListAgents",
+      "Monitor",
+      "NotebookEdit",
+      "PushNotification",
+      "Read",
+      "ReportFindings",
+      "ScheduleWakeup",
+      "SendMessage",
+      "Skill",
+      "TaskStop",
+      "ToolSearch",
+      "WebFetch",
+      "WebSearch",
+      "Workflow",
+      "Write",
+      "mcp__smoke__ping"
+    ],
+    "init_agents": [
+      "claude",
+      "Explore",
+      "general-purpose",
+      "pinger",
+      "Plan",
+      "statusline-setup"
+    ]
+  },
+  "3_skill_loaded_from_cwd": {
+    "ok": true,
+    "init_skills": [
+      "smoke-probe",
+      "deep-research",
+      "design",
+      "design-sync",
+      "dataviz",
+      "update-config",
+      "verify",
+      "debug",
+      "code-review",
+      "simplify",
+      "batch",
+      "fewer-permission-prompts",
+      "doctor",
+      "loop",
+      "claude-api",
+      "workflow-authoring",
+      "run",
+      "run-skill-generator",
+      "plugin-authoring"
+    ],
+    "result": {
+      "subtype": "success",
+      "is_error": false,
+      "num_turns": 3,
+      "terminal_reason": "completed",
+      "cost_usd": 0.0507788,
+      "result": "HAMAGURI-42"
+    },
+    "error": null
+  },
+  "4_max_turns_and_timeout": {
+    "ok": true,
+    "max_turns_result": {
+      "subtype": "error_max_turns",
+      "is_error": true,
+      "num_turns": 3,
+      "terminal_reason": "max_turns",
+      "cost_usd": 0.014037999999999998,
+      "result": ""
+    },
+    "max_turns_error": "ResultError: Claude Code returned an error result: Reached maximum number of turns (2) (exit code: 1)",
+    "timeout_caught": true
+  }
+}

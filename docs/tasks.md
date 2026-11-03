@@ -11,9 +11,9 @@
 | ID | タスク | 完了条件 | 依存 | 担当 |
 |---|---|---|---|---|
 | T00 | 仕様承認と未決4件の判断（前コース行／削除条件／5問の文言／施設の案内文） | `spec.md` v1.0 ✅（2026-11-03） | — | 先生 ✅ |
-| T01 | API キーを `.env` に置く（`ANTHROPIC_API_KEY=...` の1行）。`.env.example` は T02 で用意 | リポジトリ直下に `.env` がある（`.gitignore` 済みなのでコミットされない）。2026-11-03 時点: キーは取得済みだが **`.env` は未作成** | — | 先生（未） |
-| T02 | 骨組み: uv で Python 3.12、`pyproject.toml`、ruff/black、pytest、`.env.example`、`Makefile`（`test` `lint` `eval`）、README のテスト件数自動更新スクリプト | `make lint && make test` が空のテストで通り、README の件数が書き換わる。**最初に `uv python install 3.12` がこの Mac で通ること**（サンドボックス内では uv が落ちるため、環境の節を参照） | T00 ✅ | opus |
-| T03 | **Agent SDK スモーク** `scripts/smoke_agent_sdk.py`。下の4点を実際に確かめる（ここが通らないと全部止まる） | 4点の結果（可否と根拠ログ）を `decisions.md` に追記 | T01, T02 | opus |
+| T01 | API キーを `.env` に置く（`ANTHROPIC_API_KEY=...` の1行） | ✅ 2026-11-03 | — | 先生 ✅ |
+| T02 | ✅ 骨組み: uv で Python 3.12、`pyproject.toml`、ruff/black、pytest、`.env.example`、`Makefile`（`test` `lint` `eval`）、README のテスト件数自動更新スクリプト | `make lint && make test` が空のテストで通り、README の件数が書き換わる。**最初に `uv python install 3.12` がこの Mac で通ること**（サンドボックス内では uv が落ちるため、環境の節を参照） | T00 ✅ | opus |
+| T03 | **Agent SDK スモーク** `scripts/smoke_agent_sdk.py`。5点を実際に確かめる | ✅ 2026-11-03 全て OK（`decisions.md`） | T01, T02 | opus |
 
 T03 で確かめる4点:
 1. `UserPromptSubmit` が `query()` に渡した**最初のプロンプト**で発火し、送信を止められるか（H1 の前提。止められなければ H1 を `query()` 呼び出し前のコード検査に置き換える）

@@ -70,7 +70,7 @@ const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
 
 const STOP_PATTERN = /(stop|end|done|finish|complete)/i;
 const START_PATTERN = /start/i;
-const WARN_PATTERN = /(fail|error|timeout|fallback|max_turns)/i;
+const WARN_PATTERN = /(fail|error|timeout|fallback|max_turns|max_budget)/i;
 
 export interface ViewEvent {
   index: number;

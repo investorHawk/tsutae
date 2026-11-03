@@ -1,6 +1,9 @@
 """医師 API: Skill の一覧と書き換え（D4。docs/architecture.md §8・§8b・§9b）。
 
 - 全経路で医師 Cookie を検査する（`require_doctor`）
+- `POST /skill-changes` は Content-Type が application/json でなければ 415
+  `{"error": "unsupported_media_type"}`（`require_json_body`。本文の無い approve・reject
+  は frontend が Content-Type を付けないので対象外）
 - 書き換えは `tsutae.skillchange`（editor は `app.state.skill_editor`、置き場所は
   `app.state.skills_home`）。依頼の受付前の失敗は `SkillChangeError` の code を
   `{"error": code}` にする（400 invalid_name・invalid_request／404 unknown_skill・
@@ -25,7 +28,13 @@ from fastapi import APIRouter, Depends, Path, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from tsutae import db
-from tsutae.api.deps import ApiError, AppSettings, Conn, require_doctor
+from tsutae.api.deps import (
+    ApiError,
+    AppSettings,
+    Conn,
+    require_doctor,
+    require_json_body,
+)
 from tsutae.skillchange import (
     BAD_REQUEST_CODES,
     NOT_FOUND_CODES,
@@ -125,7 +134,7 @@ def list_skills(settings: AppSettings) -> dict[str, Any]:
     return {"skills": skills, "invalid": sorted(invalid, key=lambda i: i["name"])}
 
 
-@router.post("/skill-changes")
+@router.post("/skill-changes", dependencies=[Depends(require_json_body)])
 async def create_skill_change(
     body: SkillChangeIn, request: Request, conn: Conn, settings: AppSettings
 ) -> dict[str, Any]:

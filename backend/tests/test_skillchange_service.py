@@ -485,6 +485,71 @@ async def test_sdk_editor_logs_reach_db_through_request(conn, home, settings):
     assert done["cost_usd"] == pytest.approx(0.05)
 
 
+def _failing_sdk_query(subtype: str | None, exc: Exception):
+    from claude_agent_sdk import ResultMessage
+
+    async def fake_query(*, prompt, options):
+        if subtype is not None:
+            yield ResultMessage(
+                subtype=subtype,
+                duration_ms=3000,
+                duration_api_ms=2500,
+                is_error=True,
+                num_turns=12,
+                session_id="s",
+                total_cost_usd=0.42,
+                usage={"input_tokens": 700, "output_tokens": 90},
+            )
+        raise exc
+
+    return fake_query
+
+
+@pytest.mark.parametrize(
+    ("subtype", "code"),
+    [
+        ("error_max_budget_usd", "max_budget"),
+        ("error_max_turns", "max_turns"),
+        ("error_during_execution", "sdk_error"),
+    ],
+)
+async def test_sdk_editor_failure_is_failed_with_code_and_cost(
+    conn, home, settings, subtype, code
+):
+    from claude_agent_sdk import ResultError
+
+    from tsutae.skillchange import SdkSkillEditor
+
+    exc = ResultError(
+        "Claude Code returned an error result: 秘密", {"subtype": subtype}
+    )
+    editor = SdkSkillEditor(settings, query_fn=_failing_sdk_query(subtype, exc))
+    cid = await _request(conn, home, settings, editor)
+    change = db.get_skill_change(conn, cid)
+    assert (change["status"], change["error_code"]) == ("failed", code)
+    logs = db.list_pipeline_logs(conn, "skill_change", cid)
+    (failed,) = [r for r in logs if r["event"] == "editor_failed"]
+    assert failed["decision"] == code
+    assert (failed["duration_ms"], failed["tokens_in"], failed["tokens_out"]) == (
+        3000,
+        700,
+        90,
+    )
+    assert failed["cost_usd"] == pytest.approx(0.42)
+    # editor_error の型名は包む前の例外のもの
+    (error,) = [r for r in logs if r["event"] == "editor_error"]
+    assert error["decision"] == "error_type:ResultError"
+    assert "秘密" not in repr(logs)
+
+
+async def test_bare_budget_result_error_is_max_budget(conn, home, settings):
+    from claude_agent_sdk import ResultError
+
+    err = ResultError("x", {"subtype": "error_max_budget_usd"})
+    cid = await _request(conn, home, settings, FakeEditor(raises=err))
+    assert db.get_skill_change(conn, cid)["error_code"] == "max_budget"
+
+
 # ---------------------------------------------------------------------------
 # 行を作った後の一時ディレクトリの失敗（mkdtemp・mkdir・open の OSError）
 # ---------------------------------------------------------------------------

@@ -62,6 +62,7 @@ __all__ = [
     "DOCTOR_TOKEN_TTL",
     "ERROR_ID_HEADER",
     "INTERNAL_ERROR_EVENT",
+    "JSON_MEDIA_TYPE",
     "PATIENT_COOKIE",
     "PATIENT_ID_PATTERN",
     "REGISTER_MAX_FAILURES",
@@ -74,12 +75,14 @@ __all__ = [
     "get_conn",
     "get_settings_dep",
     "install_error_handlers",
+    "is_json_media_type",
     "is_patient_id",
     "login_limiter",
     "make_doctor_token",
     "make_patient_token",
     "register_limiter",
     "require_doctor",
+    "require_json_body",
     "require_patient",
     "set_doctor_cookie",
     "set_patient_cookie",
@@ -329,6 +332,31 @@ def require_doctor(request: Request) -> None:
     token = request.cookies.get(DOCTOR_COOKIE)
     if not verify_doctor_token(token, settings.secret_key, now()):
         raise ApiError(401, "not_logged_in")
+
+
+# ---------------------------------------------------------------------------
+# Content-Type（CSRF の追加の守り）
+# ---------------------------------------------------------------------------
+
+JSON_MEDIA_TYPE = "application/json"
+
+
+def is_json_media_type(value: str | None) -> bool:
+    """Content-Type の値が application/json か（`; charset=...` などの引数は見ない）。"""
+    if not value:
+        return False
+    return value.split(";", 1)[0].strip().lower() == JSON_MEDIA_TYPE
+
+
+def require_json_body(request: Request) -> None:
+    """Depends 用。本文つきの POST で Content-Type が application/json でなければ 415。
+
+    フォームや text/plain は CORS の preflight なしに別サイトから送れる（SameSite=Lax の
+    Cookie に加えた守り）。経路の dependencies に置くと、ルーターの require_doctor の後・
+    本文の検証（422）の前に走る。本文の無い POST には付けない（frontend は付けない）。
+    """
+    if not is_json_media_type(request.headers.get("content-type")):
+        raise ApiError(415, "unsupported_media_type")
 
 
 # ---------------------------------------------------------------------------

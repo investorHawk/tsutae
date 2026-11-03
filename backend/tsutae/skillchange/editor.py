@@ -10,6 +10,10 @@
 - Hook が記録するロガーは、プロトコルの引数に無いので `logging_to(logger)` で渡す
   （contextvars。`request_change` が変更依頼ごとの PipelineLogger を設定する）。
   設定されていなければ捨てる（MemoryLogger）
+- SDK の失敗（ClaudeSDKError。max_turns・max_budget_usd の ResultError を含む）は、
+  直前の ResultMessage の費用・トークン数を `editor_failed`（decision は
+  `sdk_error_code` のコード）でログに残し、`RunFailedError`（cause・stats）に包んで
+  投げ直す（service が failed と max_turns / max_budget / sdk_error にする）
 """
 
 from __future__ import annotations
@@ -20,13 +24,19 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from claude_agent_sdk import ClaudeAgentOptions, HookMatcher, ResultMessage, query
+from claude_agent_sdk import (
+    ClaudeAgentOptions,
+    ClaudeSDKError,
+    HookMatcher,
+    ResultMessage,
+    query,
+)
 
 from tsutae.config import Settings, get_settings
 from tsutae.pipeline.hooks import H3_MATCHER, make_h1, make_h3, make_h4
 from tsutae.pipeline.logs import EventLogger, MemoryLogger, reason_code
-from tsutae.pipeline.orchestrator import NO_SESSION_PERSISTENCE
-from tsutae.pipeline.runner import stats_from_result
+from tsutae.pipeline.orchestrator import NO_SESSION_PERSISTENCE, sdk_error_code
+from tsutae.pipeline.runner import RunFailedError, stats_from_result
 from tsutae.schemas import RunStats
 from tsutae.skills import SKILL_FILE_NAME, is_valid_skill_name
 
@@ -238,10 +248,31 @@ class SdkSkillEditor:
         self, work_root: Path, skill_name: str, request_text: str
     ) -> RunStats:
         settings = self.settings if self.settings is not None else get_settings()
-        options = build_options(Path(work_root), settings, current_logger())
+        logger = current_logger()
+        options = build_options(Path(work_root), settings, logger)
         prompt = build_prompt(skill_name, request_text)
         result: ResultMessage | None = None
-        async for message in self.query_fn(prompt=prompt, options=options):
-            if isinstance(message, ResultMessage):
-                result = message
+        try:
+            async for message in self.query_fn(prompt=prompt, options=options):
+                if isinstance(message, ResultMessage):
+                    result = message
+        except ClaudeSDKError as exc:
+            raise _failed(exc, result, logger) from exc
         return stats_from_result(result)
+
+
+def _failed(
+    exc: ClaudeSDKError, result: ResultMessage | None, logger: EventLogger
+) -> RunFailedError:
+    """失敗の直前の ResultMessage の費用・トークン数をログに残し、添えて返す。
+
+    CLI は失敗（max_turns・max_budget_usd など）でも is_error の ResultMessage を
+    返してから ResultError を出す。例外の本文はログに入れない（コードだけ）。
+    """
+    stats = stats_from_result(result)
+    logger.event(
+        "editor_failed",
+        decision=sdk_error_code(exc),
+        **stats.model_dump(exclude={"num_turns"}),
+    )
+    return RunFailedError(exc, stats)

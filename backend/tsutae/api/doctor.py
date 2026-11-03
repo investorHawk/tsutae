@@ -12,6 +12,10 @@
 - レポートは `HTMLResponse` に `Cache-Control: no-store` と CSP
 - 未処理（D6）は記録の原文を返す（院内画面だけ。紙には載せない）
 - `POST /courses` は保存前に既存＋新規で `validate_courses`（矛盾は 400 `{"error": code}`）
+- 本文つきの `POST /patients`・`POST /courses` は Content-Type が application/json で
+  なければ 415 `{"error": "unsupported_media_type"}`（`require_json_body`。Cookie の検査の
+  後、本文の検証の前）。本文の無い POST（printed）は frontend が Content-Type を付けない
+  ので対象外
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from tsutae.api.deps import (
     is_patient_id,
     login_limiter,
     require_doctor,
+    require_json_body,
     set_doctor_cookie,
 )
 from tsutae.config import Settings, now
@@ -135,7 +140,7 @@ def list_patients(conn: Conn, settings: AppSettings) -> dict[str, Any]:
     }
 
 
-@_protected.post("/patients")
+@_protected.post("/patients", dependencies=[Depends(require_json_body)])
 def create_patient(
     body: PatientIn, conn: Conn, settings: AppSettings
 ) -> dict[str, str]:
@@ -150,7 +155,7 @@ def list_courses(pid: str, conn: Conn) -> dict[str, Any]:
     return {"courses": [c.model_dump(mode="json") for c in courses]}
 
 
-@_protected.post("/courses")
+@_protected.post("/courses", dependencies=[Depends(require_json_body)])
 def save_course(body: Course, conn: Conn) -> dict[str, Any]:
     """既存＋新規（同じ course_no は置き換え）で矛盾が無ければ保存する。"""
     patient = _patient_or_404(conn, body.patient_id)

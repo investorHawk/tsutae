@@ -44,15 +44,17 @@ from tsutae.pipeline.orchestrator import (
     DISALLOWED_TOOLS,
     build_options,
     convert,
+    sdk_error_code,
 )
 from tsutae.pipeline.prompt import SYSTEM_PROMPT, build_prompt
-from tsutae.pipeline.runner import SdkRunner
+from tsutae.pipeline.runner import RunFailedError, SdkRunner
 from tsutae.pipeline.tools import EMIT_REPORT_TOOL, EMIT_TIMELINE_TOOL, RunCollector
 from tsutae.schemas import (
     Contradiction,
     MaskedEntry,
     PreparedInput,
     ReportPicks,
+    RunStats,
     SymptomSummary,
     Timeline,
     TimelineEvent,
@@ -71,6 +73,7 @@ DEMO = "demo_patient"
 MAX_TURNS_MESSAGE = (
     "Claude Code returned an error result: Reached maximum number of turns (2)"
 )
+BUDGET_MESSAGE = "Claude Code returned an error result: Reached maximum budget ($1.5)"
 
 
 def _demo() -> tuple[PreparedInput, dict[str, Any], dict[str, Any]]:
@@ -436,6 +439,12 @@ async def test_timeout_falls_back() -> None:
         (ResultError(MAX_TURNS_MESSAGE), "max_turns"),
         (ClaudeSDKError("max turns reached"), "max_turns"),
         (ResultError("failed", {"subtype": "error_during_execution"}), "sdk_error"),
+        (
+            ResultError(BUDGET_MESSAGE, {"subtype": "error_max_budget_usd"}),
+            "max_budget",
+        ),
+        (ResultError(BUDGET_MESSAGE), "max_budget"),
+        (ClaudeSDKError("max budget exceeded"), "max_budget"),
         (CLIConnectionError("cannot connect"), "sdk_error"),
         (RuntimeError("bug"), "internal_error"),
     ],
@@ -489,6 +498,43 @@ async def test_failed_run_keeps_cost_and_tokens_in_run_end() -> None:
         0.83,
     )
     assert end["duration_ms"] == 90000
+
+
+async def test_max_budget_run_keeps_cost_in_run_end() -> None:
+    # max_budget_usd 超過は is_error の ResultMessage（error_max_budget_usd）の後に
+    # ResultError。max_turns と区別し、費用を残す
+    async def fake_query(*, prompt: str, options: ClaudeAgentOptions):
+        yield ResultMessage(
+            subtype="error_max_budget_usd",
+            duration_ms=50000,
+            duration_api_ms=40000,
+            is_error=True,
+            num_turns=9,
+            session_id="s",
+            total_cost_usd=1.52,
+            usage={"input_tokens": 80000, "output_tokens": 5000},
+        )
+        raise ResultError(BUDGET_MESSAGE, {"subtype": "error_max_budget_usd"})
+
+    prepared, _, _ = _demo()
+    result, logger = await _convert(prepared, SdkRunner(query_fn=fake_query))
+    assert result.fallback is True and result.error_code == "max_budget"
+    [end] = logger.find("run_end")
+    assert end["decision"] == "max_budget"
+    assert (end["tokens_in"], end["tokens_out"], end["cost_usd"]) == (
+        80000,
+        5000,
+        1.52,
+    )
+
+
+def test_sdk_error_code_is_shared_and_unwraps_run_failed() -> None:
+    err = ResultError("x", {"subtype": "error_max_budget_usd"})
+    assert sdk_error_code(err) == "max_budget"
+    assert sdk_error_code(RunFailedError(err, RunStats())) == "max_budget"
+    turns = ResultError("x", {"subtype": "error_max_turns"})
+    assert sdk_error_code(RunFailedError(turns, RunStats())) == "max_turns"
+    assert sdk_error_code(CLIConnectionError("cannot connect")) == "sdk_error"
 
 
 async def test_failed_run_without_result_uses_elapsed_time() -> None:

@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage
+from claude_agent_sdk import ClaudeAgentOptions, ResultError, ResultMessage
 
 from tsutae.config import get_settings
 from tsutae.masking import detect_identifiers
 from tsutae.pipeline.hooks import H3_MATCHER
 from tsutae.pipeline.logs import MemoryLogger
+from tsutae.pipeline.orchestrator import sdk_error_code
+from tsutae.pipeline.runner import RunFailedError
 from tsutae.schemas import RunStats
 from tsutae.skillchange.editor import (
     EDITOR_ALLOWED_TOOLS,
@@ -281,3 +283,85 @@ def test_cli_command_disables_session_persistence(work_root: Path) -> None:
     transport = SubprocessCLITransport(prompt="x", options=options)
     transport._cli_path = "claude"  # 起動はしない（引数を組み立てるだけ）
     assert "--no-session-persistence" in transport._build_command()
+
+
+# ---------------------------------------------------------------------------
+# SDK の失敗（ResultError など）でも費用・トークン数を残して投げ直す
+# ---------------------------------------------------------------------------
+
+
+def _error_result(subtype: str) -> ResultMessage:
+    return ResultMessage(
+        subtype=subtype,
+        duration_ms=4000,
+        duration_api_ms=3500,
+        is_error=True,
+        num_turns=12,
+        session_id="s",
+        total_cost_usd=0.61,
+        usage={"input_tokens": 9000, "output_tokens": 800},
+    )
+
+
+def _failing_query(result: ResultMessage | None, exc: Exception):
+    async def fake_query(*, prompt: str, options: ClaudeAgentOptions):
+        if result is not None:
+            yield result
+        raise exc
+
+    return fake_query
+
+
+@pytest.mark.parametrize(
+    ("subtype", "code"),
+    [("error_max_budget_usd", "max_budget"), ("error_max_turns", "max_turns")],
+)
+async def test_sdk_editor_failure_keeps_stats_and_reraises(
+    work_root: Path, subtype: str, code: str
+) -> None:
+    exc = ResultError(
+        "Claude Code returned an error result: 秘密", {"subtype": subtype}
+    )
+    editor = SdkSkillEditor(
+        get_settings(), query_fn=_failing_query(_error_result(subtype), exc)
+    )
+    logger = MemoryLogger()
+    with logging_to(logger), pytest.raises(RunFailedError) as info:
+        await editor.edit(work_root, NAME, "下痢の質問を短く")
+    assert info.value.cause is exc
+    assert info.value.stats == RunStats(
+        duration_ms=4000, num_turns=12, tokens_in=9000, tokens_out=800, cost_usd=0.61
+    )
+    assert sdk_error_code(info.value) == code
+    [failed] = logger.find("editor_failed")
+    assert failed["decision"] == code
+    assert (failed["duration_ms"], failed["tokens_in"], failed["tokens_out"]) == (
+        4000,
+        9000,
+        800,
+    )
+    assert failed["cost_usd"] == pytest.approx(0.61)
+    assert "秘密" not in repr(logger.records)
+
+
+async def test_sdk_editor_failure_without_result_logs_zero_stats(
+    work_root: Path,
+) -> None:
+    from claude_agent_sdk import CLIConnectionError
+
+    exc = CLIConnectionError("cannot connect")
+    editor = SdkSkillEditor(get_settings(), query_fn=_failing_query(None, exc))
+    logger = MemoryLogger()
+    with logging_to(logger), pytest.raises(RunFailedError) as info:
+        await editor.edit(work_root, NAME, "下痢の質問を短く")
+    assert info.value.stats == RunStats()
+    [failed] = logger.find("editor_failed")
+    assert failed["decision"] == "sdk_error" and failed["cost_usd"] == 0.0
+
+
+async def test_sdk_editor_does_not_wrap_other_exceptions(work_root: Path) -> None:
+    editor = SdkSkillEditor(
+        get_settings(), query_fn=_failing_query(None, RuntimeError("bug"))
+    )
+    with pytest.raises(RuntimeError):
+        await editor.edit(work_root, NAME, "下痢の質問を短く")

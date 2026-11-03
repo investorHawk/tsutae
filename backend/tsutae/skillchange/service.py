@@ -10,6 +10,8 @@ request_change の手順（本体の SKILL.md には触らない）:
 5. 写しを読み validate_skill_text。エージェントが version を変えていれば元の版に戻して
    検査し直す → unified diff（空なら no_change）→ diff・new_text を保存
 どこで失敗しても failed と短い error_code（取り消しは cancelled にしてから再送出）。
+editor の SDK の失敗は `sdk_error_code` で max_budget / max_turns / sdk_error（費用・
+トークン数は editor が `editor_failed` に残す）。
 行を作った後の一時ディレクトリの作成・写しの失敗（OSError）は `workdir_error`。
 
 後始末: 一時ディレクトリの削除に失敗したら、書き込み権を戻して1回だけやり直す。
@@ -34,12 +36,14 @@ import stat
 import tempfile
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeSDKError, ResultError
+from claude_agent_sdk import ClaudeSDKError
 
 from tsutae import db
 from tsutae.config import Settings
 from tsutae.masking import detect_identifiers
 from tsutae.pipeline.logs import EventLogger, PipelineLogger, reason_code
+from tsutae.pipeline.orchestrator import sdk_error_code
+from tsutae.pipeline.runner import RunFailedError
 from tsutae.schemas import RegimenSkill, ReportFormatSkill, RunStats
 from tsutae.skillchange.approve import approve_change, reject_change
 from tsutae.skillchange.diff import set_version, unified
@@ -129,11 +133,14 @@ def _read_base(name: str, skills_dir: Path) -> tuple[str, int]:
 def _editor_error_code(exc: BaseException) -> str:
     if isinstance(exc, TimeoutError):
         return "timeout"
-    if isinstance(exc, ResultError) and (
-        "max_turns" in (exc.subtype or "") or exc.terminal_reason == "max_turns"
-    ):
-        return "max_turns"
-    return "sdk_error" if isinstance(exc, ClaudeSDKError) else "editor_error"
+    # max_budget / max_turns / sdk_error（RunFailedError は中身で判定。pipeline と同じ）
+    return sdk_error_code(exc) if isinstance(exc, ClaudeSDKError) else "editor_error"
+
+
+def _error_type(exc: BaseException) -> str:
+    """ログに残す型名（RunFailedError は包む前の例外の型）。"""
+    cause = exc.cause if isinstance(exc, RunFailedError) else exc
+    return type(cause).__name__
 
 
 async def _run_editor(
@@ -152,7 +159,7 @@ async def _run_editor(
             )
     except Exception as exc:  # 取り消し（CancelledError）は通す
         logger.event(
-            "editor_error", decision=reason_code("error_type", type(exc).__name__)
+            "editor_error", decision=reason_code("error_type", _error_type(exc))
         )
         raise SkillChangeError(_editor_error_code(exc)) from exc
     if isinstance(stats, RunStats):

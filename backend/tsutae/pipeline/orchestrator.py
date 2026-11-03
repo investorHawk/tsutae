@@ -15,8 +15,9 @@ convert の手順:
    旧版のままモデルだけが新版の本文に従う競合になる。ログは `skill_check`（ok /
    mismatch:<名前> / load_error:<名前>）。照合から SDK の読み込みまでの短い間の更新は防げない
 5. `asyncio.wait_for(runner.run(...), settings.pipeline_timeout_s)`
-6. TimeoutError → timeout、ClaudeSDKError（ResultError を含む）→ max turns なら max_turns、
-   他は sdk_error、それ以外の例外 → internal_error、emit_timeline が来ない → no_timeline、
+6. TimeoutError → timeout、ClaudeSDKError（ResultError を含む）→ max_budget_usd 超過なら
+   max_budget、max turns なら max_turns、他は sdk_error（`sdk_error_code`）、
+   それ以外の例外 → internal_error、emit_timeline が来ない → no_timeline、
    emit_report が来ない → no_report（統合役は timeline と report の両方を出す。spec §7.1）
 7. 成功なら timeline に unprocessed を足して返す
 
@@ -67,6 +68,7 @@ __all__ = [
     "NO_SESSION_PERSISTENCE",
     "build_options",
     "convert",
+    "sdk_error_code",
 ]
 
 # サブエージェント起動ツールは init では Task、Hook では Agent（T03）
@@ -118,6 +120,7 @@ _log = logging.getLogger(__name__)
 _MAX_TURNS_RE = re.compile(
     r"max(?:imum)?[\s_-]*(?:number[\s_-]+of[\s_-]+)?turns", re.IGNORECASE
 )
+_MAX_BUDGET_RE = re.compile(r"budget", re.IGNORECASE)
 
 
 def _skill_name(skill_version: str) -> str:
@@ -207,14 +210,33 @@ def _fallback(code: str, stats: RunStats) -> ConversionResult:
     )
 
 
-def _sdk_error_code(exc: ClaudeSDKError) -> str:
+def _result_error_code(exc: ResultError) -> str | None:
+    """CLI の result の subtype・terminal_reason から（分からなければ None）。"""
+    subtype = exc.subtype or ""
+    reason = exc.terminal_reason or ""
+    if "max_budget" in subtype or "budget" in reason:
+        return "max_budget"
+    if "max_turns" in subtype or reason == "max_turns":
+        return "max_turns"
+    return None
+
+
+def sdk_error_code(exc: BaseException) -> str:
+    """ClaudeSDKError（RunFailedError は中身）の短いコード。
+
+    max_budget_usd 超過（subtype `error_max_budget_usd`、または本文に budget）は
+    max_budget、max_turns 超過は max_turns、他は sdk_error。D4（skillchange）も使う。
+    """
     if isinstance(exc, RunFailedError):
         exc = exc.cause
-    if isinstance(exc, ResultError) and (
-        "max_turns" in (exc.subtype or "") or exc.terminal_reason == "max_turns"
-    ):
-        return "max_turns"
-    return "max_turns" if _MAX_TURNS_RE.search(str(exc)) else "sdk_error"
+    if isinstance(exc, ResultError):
+        code = _result_error_code(exc)
+        if code is not None:
+            return code
+    text = str(exc)
+    if _MAX_BUDGET_RE.search(text):
+        return "max_budget"
+    return "max_turns" if _MAX_TURNS_RE.search(text) else "sdk_error"
 
 
 def _empty_result(prepared: PreparedInput) -> ConversionResult:
@@ -251,7 +273,7 @@ async def _run(
     except TimeoutError:
         return _fallback("timeout", _elapsed(started))
     except ClaudeSDKError as exc:
-        return _fallback(_sdk_error_code(exc), _failed_stats(exc, started))
+        return _fallback(sdk_error_code(exc), _failed_stats(exc, started))
     if collector.timeline is None:
         return _fallback("no_timeline", stats)
     if collector.picks is None:

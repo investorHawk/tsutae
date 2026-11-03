@@ -14,6 +14,8 @@
   lifespan を走らせず、表が無いまま（no such table）になる
 - DB は tmp_path の下。runner は `pipeline_fakes.FakeRunner`（既定は台本なし）、
   editor は `FakeEditor`（既定は何もしない）
+- 患者の Cookie は `set_patient_cookie(client, pid)`（`register` を使わず、deps の署名で
+  直接作る）
 - 医師の Cookie は `login_doctor(client)`（`POST /api/doctor/login` を使わず、deps の
   署名で直接作る。医師 API が無くても使える）
 """
@@ -36,7 +38,13 @@ from pipeline_fakes import FakeRunner
 
 from tsutae import db
 from tsutae.api.app import create_app
-from tsutae.api.deps import DOCTOR_COOKIE, PATIENT_COOKIE, make_doctor_token
+from tsutae.api.deps import (
+    DOCTOR_COOKIE,
+    PATIENT_COOKIE,
+    is_patient_id,
+    make_doctor_token,
+    make_patient_token,
+)
 from tsutae.config import REPO_ROOT, SKILLS_DIR, Settings, get_settings, now
 from tsutae.schemas import Course, EntryCreate, RunStats
 
@@ -167,7 +175,12 @@ def register(client: TestClient, pid: str) -> Any:
 
 
 def set_patient_cookie(client: TestClient, pid: str) -> None:
-    client.cookies.set(PATIENT_COOKIE, pid)
+    """患者の Cookie を deps の署名で直接付ける（仮名IDの形でなければ値をそのまま）。"""
+    if is_patient_id(pid):
+        value = make_patient_token(client.app.state.settings.secret_key, pid)
+    else:
+        value = pid
+    client.cookies.set(PATIENT_COOKIE, value)
 
 
 def login_doctor(client: TestClient) -> None:

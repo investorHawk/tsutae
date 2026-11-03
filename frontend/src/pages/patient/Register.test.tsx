@@ -74,6 +74,18 @@ describe("Register (P0)", () => {
     expect(loadPid()).toBeNull();
   });
 
+  it("too many attempts (429): error.too_many_attempts, pid not saved", async () => {
+    mockFetch(() => jsonResponse({ error: "too_many_attempts" }, 429));
+    renderPatient(ROUTES, "/register?pid=P-ZZZZ9999");
+    await userEvent.click(
+      screen.getByRole("button", { name: s("register.button") }),
+    );
+    expect(
+      await screen.findByText(s("error.too_many_attempts")),
+    ).toBeInTheDocument();
+    expect(loadPid()).toBeNull();
+  });
+
   it("server error: error.generic and the button stays", async () => {
     mockFetch(() => jsonResponse({ error: "boom" }, 500));
     renderPatient(ROUTES, `/register?pid=${PID}`);

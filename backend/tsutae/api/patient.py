@@ -4,6 +4,9 @@
 - 患者画面に出る文字列は patient_strings.json と、承認済み Skill の質問文だけ
 - 記録は今の regimen Skill の skill_version で保存する。回答は Skill の質問集に照らして
   検査する（未知の質問・回答の型違いは 422 invalid_input）
+- 登録（Cookie の発行はここだけ）は、クライアント（request.client.host）ごとに失敗
+  （unknown_patient）が 10 分で 10 回に達したら、以降の試行を 429 too_many_attempts
+  で断る（正しい pid でも断る。成功・422 は数えない）
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from tsutae.api.deps import (
     AppSettings,
     Conn,
     is_patient_id,
+    register_limiter,
     require_patient,
     set_patient_cookie,
 )
@@ -74,11 +78,26 @@ def _check_answers(entry: EntryCreate, skill: RegimenSkill) -> None:
             raise ApiError(422, "invalid_input")
 
 
+def _client_key(request: Request) -> str:
+    client = request.client
+    return client.host if client is not None and client.host else "unknown"
+
+
 @router.post("/register")
 def register(
-    body: RegisterIn, response: Response, conn: Conn, settings: AppSettings
+    body: RegisterIn,
+    request: Request,
+    response: Response,
+    conn: Conn,
+    settings: AppSettings,
 ) -> dict[str, bool]:
+    limiter = register_limiter(request.app)
+    key = _client_key(request)
+    at = now()
+    if limiter.is_blocked(key, at):
+        raise ApiError(429, "too_many_attempts")
     if not is_patient_id(body.pid) or db.get_patient(conn, body.pid) is None:
+        limiter.record_failure(key, at)
         raise ApiError(404, "unknown_patient")
     set_patient_cookie(response, body.pid, settings)
     return {"ok": True}

@@ -18,7 +18,12 @@ function pidProblem(pid: string): string | null {
   return isValidPid(pid) ? null : INVALID_KEY;
 }
 
+const TOO_MANY_KEY = "error.too_many_attempts";
+
 function errorKeyOf(err: unknown): string {
+  if (isApiError(err) && err.status === 429) {
+    return TOO_MANY_KEY;
+  }
   if (isApiError(err) && [400, 404, 422].includes(err.status)) {
     return INVALID_KEY;
   }

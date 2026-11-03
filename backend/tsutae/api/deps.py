@@ -8,19 +8,26 @@
   ヘッダでも返す）だけを残す（例外の文面・traceback・入力は残さない。患者の文面を
   含みうるため）。注意: Starlette の ServerErrorMiddleware はこの後で例外を投げ直す
   ので、サーバ（uvicorn）側のログには traceback が出うる
-- 患者 Cookie `tsutae_pid` = 仮名ID。医師 Cookie `tsutae_doctor` = `<発行時刻(秒)>.<HMAC-SHA256>`
-  （secret_key で署名、12時間で失効）。どちらも HttpOnly・SameSite=Lax。Secure は
-  public_base_url が https のときだけ
+- 患者 Cookie `tsutae_pid` = `<仮名ID>.<base64url(HMAC-SHA256(secret_key, "patient:" +
+  仮名ID))>`（パディングなし 43 字。署名が無い・違う・形が違えば 401）。発行は
+  `POST /api/patient/register` だけ。医師 Cookie `tsutae_doctor` =
+  `<発行時刻(秒)>.<HMAC-SHA256>`（secret_key で署名、12時間で失効）。どちらも
+  HttpOnly・SameSite=Lax。Secure は public_base_url が https のときだけ
+- 登録の試行回数の上限は `AttemptLimiter`（プロセス内。`register_limiter(app)` で
+  app.state に1つ置く）
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import logging
 import re
 import sqlite3
+import threading
 import uuid
+from collections import deque
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from typing import Annotated, Any
@@ -37,6 +44,7 @@ from tsutae.db import PATIENT_ID_PATTERN  # 仮名IDの形（db と同じもの�
 __all__ = [
     "AppSettings",
     "ApiError",
+    "AttemptLimiter",
     "Conn",
     "DOCTOR_COOKIE",
     "DOCTOR_TOKEN_TTL",
@@ -44,6 +52,8 @@ __all__ = [
     "INTERNAL_ERROR_EVENT",
     "PATIENT_COOKIE",
     "PATIENT_ID_PATTERN",
+    "REGISTER_MAX_FAILURES",
+    "REGISTER_WINDOW",
     "check_doctor_password",
     "clear_doctor_cookie",
     "clear_patient_cookie",
@@ -54,11 +64,14 @@ __all__ = [
     "install_error_handlers",
     "is_patient_id",
     "make_doctor_token",
+    "make_patient_token",
+    "register_limiter",
     "require_doctor",
     "require_patient",
     "set_doctor_cookie",
     "set_patient_cookie",
     "verify_doctor_token",
+    "verify_patient_token",
 ]
 
 PATIENT_COOKIE = "tsutae_pid"
@@ -69,6 +82,12 @@ ERROR_ID_HEADER = "X-Error-Id"
 INTERNAL_ERROR_EVENT = "api.internal_error"
 _log = logging.getLogger(__name__)
 _TOKEN_RE = re.compile(r"(?P<issued>[0-9]{1,12})\.(?P<sig>[0-9a-f]{64})")
+_PATIENT_TOKEN_RE = re.compile(r"(?P<pid>[^.]{1,64})\.(?P<sig>[A-Za-z0-9_-]{43})")
+REGISTER_MAX_FAILURES = 10
+REGISTER_WINDOW = timedelta(minutes=10)
+_LIMITER_SWEEP_AT = 1024  # 追う相手がこれより多くなったら古いものを掃除する
+_LIMITER_STATE = "register_limiter"
+_limiter_init_lock = threading.Lock()
 _HTTP_CODES = {
     400: "bad_request",
     401: "not_logged_in",
@@ -163,10 +182,36 @@ def is_patient_id(value: object) -> bool:
     return isinstance(value, str) and PATIENT_ID_PATTERN.fullmatch(value) is not None
 
 
+def _sign_patient(secret: str, pid: str) -> str:
+    message = f"patient:{pid}".encode()
+    digest = hmac.new(secret.encode(), message, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def make_patient_token(secret: str, pid: str) -> str:
+    """患者 Cookie の値 `<pid>.<base64url(HMAC-SHA256(secret, "patient:" + pid))>`。"""
+    if not is_patient_id(pid):
+        raise ValueError("pid の形が違う")
+    return f"{pid}.{_sign_patient(secret, pid)}"
+
+
+def verify_patient_token(token: str | None, secret: str) -> str | None:
+    """署名が正しければ仮名ID、そうでなければ None（旧形式の pid だけも None）。"""
+    if not isinstance(token, str):
+        return None
+    match = _PATIENT_TOKEN_RE.fullmatch(token)
+    if match is None or not is_patient_id(match["pid"]):
+        return None
+    expected = _sign_patient(secret, match["pid"])
+    if not hmac.compare_digest(expected.encode(), match["sig"].encode()):
+        return None
+    return match["pid"]
+
+
 def set_patient_cookie(response: Response, pid: str, settings: Settings) -> None:
     response.set_cookie(
         PATIENT_COOKIE,
-        pid,
+        make_patient_token(settings.secret_key, pid),
         max_age=PATIENT_COOKIE_MAX_AGE,
         path="/",
         httponly=True,
@@ -180,12 +225,12 @@ def clear_patient_cookie(response: Response) -> None:
 
 
 def cookie_patient_id(request: Request) -> str:
-    """Cookie の仮名ID。無い・形が違えば 401 not_logged_in。"""
-    value = request.cookies.get(PATIENT_COOKIE)
-    if not is_patient_id(value):
+    """署名つき Cookie の仮名ID。無い・署名が違う・形が違えば 401 not_logged_in。"""
+    secret = get_settings_dep(request).secret_key
+    pid = verify_patient_token(request.cookies.get(PATIENT_COOKIE), secret)
+    if pid is None:
         raise ApiError(401, "not_logged_in")
-    assert value is not None
-    return value
+    return pid
 
 
 def current_patient(request: Request, conn: sqlite3.Connection) -> dict[str, Any]:
@@ -266,3 +311,72 @@ def require_doctor(request: Request) -> None:
     token = request.cookies.get(DOCTOR_COOKIE)
     if not verify_doctor_token(token, settings.secret_key, now()):
         raise ApiError(401, "not_logged_in")
+
+
+# ---------------------------------------------------------------------------
+# 登録の試行回数の上限（プロセス内）
+# ---------------------------------------------------------------------------
+
+
+class AttemptLimiter:
+    """クライアントごとの失敗の時刻を窓の間だけ覚える。スレッドから呼んでよい。
+
+    失敗が窓の中で max_failures 回に達したら `is_blocked` が True（次の試行を断る）。
+    成功は数えない（記録しない）。
+    """
+
+    def __init__(self, max_failures: int, window: timedelta) -> None:
+        if max_failures < 1 or window <= timedelta(0):
+            raise ValueError("max_failures は 1 以上、window は正")
+        self._max = max_failures
+        self._window = window
+        self._failures: dict[str, deque[datetime]] = {}
+        self._lock = threading.Lock()
+
+    def _drop_old(self, key: str, at: datetime) -> deque[datetime] | None:
+        times = self._failures.get(key)
+        if times is None:
+            return None
+        cutoff = at - self._window
+        while times and times[0] <= cutoff:
+            times.popleft()
+        if not times:
+            del self._failures[key]
+            return None
+        return times
+
+    def is_blocked(self, key: str, at: datetime) -> bool:
+        with self._lock:
+            times = self._drop_old(key, at)
+            return times is not None and len(times) >= self._max
+
+    def record_failure(self, key: str, at: datetime) -> None:
+        with self._lock:
+            if len(self._failures) >= _LIMITER_SWEEP_AT:
+                self._prune_locked(at)
+            self._failures.setdefault(key, deque()).append(at)
+
+    def prune(self, at: datetime) -> None:
+        """窓の外の失敗だけになった相手を忘れる。"""
+        with self._lock:
+            self._prune_locked(at)
+
+    def _prune_locked(self, at: datetime) -> None:
+        for key in list(self._failures):
+            self._drop_old(key, at)
+
+    def tracked_clients(self) -> int:
+        with self._lock:
+            return len(self._failures)
+
+
+def register_limiter(app: FastAPI) -> AttemptLimiter:
+    """app.state の登録用の上限（無ければ作る。アプリごとに独立）。"""
+    limiter = getattr(app.state, _LIMITER_STATE, None)
+    if limiter is None:
+        with _limiter_init_lock:
+            limiter = getattr(app.state, _LIMITER_STATE, None)
+            if limiter is None:
+                limiter = AttemptLimiter(REGISTER_MAX_FAILURES, REGISTER_WINDOW)
+                setattr(app.state, _LIMITER_STATE, limiter)
+    return limiter

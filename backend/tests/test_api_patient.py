@@ -68,11 +68,13 @@ def test_register_sets_httponly_lax_cookie(client: TestClient) -> None:
     assert r.status_code == 200
     assert r.json() == {"ok": True}
     header = r.headers["set-cookie"]
-    assert header.startswith(f"{deps.PATIENT_COOKIE}={patient_id}")
+    assert header.startswith(f"{deps.PATIENT_COOKIE}={patient_id}.")  # 署名つき
     assert "HttpOnly" in header
     assert "samesite=lax" in header.lower()
     assert "secure" not in header.lower()  # http の開発環境では付けない
-    assert client.cookies.get(deps.PATIENT_COOKIE) == patient_id
+    secret = client.app.state.settings.secret_key
+    cookie = client.cookies.get(deps.PATIENT_COOKIE)
+    assert deps.verify_patient_token(cookie, secret) == patient_id
 
 
 def test_register_rejects_bad_body(client: TestClient) -> None:

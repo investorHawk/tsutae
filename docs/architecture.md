@@ -283,6 +283,9 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 「期限切れ」は `reception_no IS NULL` だけでなく `expires_at > now` も見る（purge 前でも保存・状態変更・Claude 呼び出しをしない）。§7d の手順5は `save_visit_result` を1回
 - フロントの契約は `scripts/dump_api_fixtures.py` が実 API から書き出す `frontend/src/test/fixtures/api/*.json` で検査する（`backend/tests/test_dump_api_fixtures.py` が古くなっていないことを確かめる）。API を変えたら fixture を書き直す
 
+### 2026-11-04 明け方の決定
+- 起動時（lifespan。purge の後に1回だけ）に、受付番号が残っていて期限内の status=generating の受診を `api/orphans.recover_orphans` で回収する: Claude を呼ばずにフォールバック（AI変換なし）のレポートを作って ready にする（変換は同じプロセスの BackgroundTasks で動くので、止まった・再起動したプロセスの生成中は二度と終わらない）。ログ `orphan_recovered`。単一プロセス（`--workers 1`）が前提
+
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=["project"]`、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_h3(work_root, logger)`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
 - `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の同じ相対位置に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない

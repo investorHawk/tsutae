@@ -8,6 +8,9 @@
 - 起動時（lifespan）に `init_db`・`ensure_skill_versions`・`purge_expired`。起動中は
   `PURGE_INTERVAL_S` ごとに `purge_once` を回す周期タスク（`app.state.purge_task`）を
   置き、終了時に止める（医師 API が呼ばれなくても期限切れの中身を消す）
+- 起動時（purge の後・リクエストを受ける前）に1回だけ `orphans.recover_orphans`:
+  生成中のまま残った受診（前のプロセスが変換中に止まった）を Claude を呼ばずに
+  AI 変換なしのレポートにする（周期タスクには入れない）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
 - 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`）は、モジュールがあれば
   `router` を載せる（無ければ飛ばす。中の import の失敗は隠さない）
@@ -30,7 +33,7 @@ from fastapi import FastAPI
 from starlette.types import ASGIApp
 
 from tsutae import db
-from tsutae.api import patient, visit
+from tsutae.api import orphans, patient, visit
 from tsutae.api.deps import install_error_handlers
 from tsutae.api.error_guard import SuppressServerErrors
 from tsutae.api.settings_check import check_settings
@@ -91,6 +94,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     purged = startup(app.state.settings)
     if purged:
         _log.info("期限切れの受診 %d 件を消した", purged)
+    recovered = await orphans.recover_orphans(app.state.settings)
+    if recovered:
+        _log.info("生成中のまま残った受診 %d 件を AI 変換なしにした", recovered)
     task = asyncio.create_task(_purge_loop(app.state.settings, PURGE_INTERVAL_S))
     app.state.purge_task = task
     try:

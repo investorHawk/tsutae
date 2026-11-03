@@ -23,6 +23,7 @@ import {
   login,
   logout,
   markPrinted,
+  regenerateVisit,
   rejectSkillChange,
   saveCourse,
 } from "./doctor";
@@ -77,6 +78,7 @@ const visits: Call = () => listVisits();
 const unprocessed: Call = (f) => listUnprocessed(idIn(f));
 const events: Call = (f) => getPipelineEvents(idIn(f));
 const printed: Call = (f) => markPrinted(idIn(f));
+const regenerate: Call = (f) => regenerateVisit(idIn(f));
 const skills: Call = () => listSkills();
 const change: Call = (f) =>
   createSkillChange(String(req(f).skill_name), String(req(f).request_text));
@@ -117,6 +119,9 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_pipeline_events_not_found: events,
   doctor_printed: printed,
   doctor_printed_not_found: printed,
+  doctor_regenerate: regenerate,
+  doctor_regenerate_not_regenerable: regenerate,
+  doctor_regenerate_not_found: regenerate,
   doctor_skills: skills,
   doctor_skills_invalid: skills,
   doctor_skill_change_create: change,

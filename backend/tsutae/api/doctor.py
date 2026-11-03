@@ -16,7 +16,12 @@
   なければ 415 `{"error": "unsupported_media_type"}`（`require_json_body`。Cookie の検査の
   後、本文の検証の前）。本文の無い POST（printed）は frontend が Content-Type を付けない
   ので対象外
-- 状態を変える POST（login を除く。本文の無い printed・logout も）は
+- `POST /visits/{id}/regenerate`（本文なし）: 受付番号が残っていて期限内の failed・
+  ready（fallback=True）だけを generating に戻し（`db.begin_regeneration`）、
+  `POST /api/visit` と同じ `visit.run_generation` をバックグラウンドで起動する。
+  ログ `regenerate_requested`（文面なし）。それ以外（generating・AI の結果で ready・
+  印刷済み・期限切れ）は 409 `{"error": "not_regenerable"}`、無い受診は 404
+- 状態を変える POST（login を除く。本文の無い printed・regenerate・logout も）は
   `require_same_origin`（Sec-Fetch-Site が cross-site・same-site、または Origin が
   Host・public_base_url の origin と違えば 403 `{"error": "cross_origin"}`。Cookie の
   検査の後、本文の検証の前）。GET は見ない
@@ -28,7 +33,7 @@ import sqlite3
 from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Path, Request, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,8 +52,10 @@ from tsutae.api.deps import (
     require_same_origin,
     set_doctor_cookie,
 )
+from tsutae.api.visit import run_generation
 from tsutae.config import Settings, now
 from tsutae.course import CourseValidationError, validate_courses
+from tsutae.pipeline.logs import PipelineLogger
 from tsutae.schemas import Course, Regimen
 
 __all__ = ["REPORT_HEADERS", "register_url", "router"]
@@ -74,6 +81,8 @@ _EVENT_FIELDS = (
     "duration_ms",
 )
 VisitId = Annotated[int, Path(ge=1, le=2**62)]
+REGENERATE_EVENT = "regenerate_requested"
+RUN_KIND = "visit"
 
 
 class LoginIn(BaseModel):
@@ -245,6 +254,26 @@ def mark_printed(vid: VisitId, conn: Conn) -> dict[str, bool]:
         db.mark_printed(conn, vid)
     except db.NotFoundError as exc:
         raise ApiError(404, "not_found") from exc
+    return {"ok": True}
+
+
+@_protected.post("/visits/{vid}/regenerate")
+def regenerate(
+    vid: VisitId,
+    background: BackgroundTasks,
+    request: Request,
+    conn: Conn,
+    settings: AppSettings,
+) -> dict[str, bool]:
+    """AI でもう一度変換する（failed・AI 変換なしの ready だけ。前のレポートは残す）。"""
+    try:
+        started = db.begin_regeneration(conn, vid)
+    except db.NotFoundError as exc:
+        raise ApiError(404, "not_found") from exc
+    if not started:
+        raise ApiError(409, "not_regenerable")
+    PipelineLogger(conn, RUN_KIND, vid).event(REGENERATE_EVENT)
+    background.add_task(run_generation, settings, request.app.state.runner_factory, vid)
     return {"ok": True}
 
 

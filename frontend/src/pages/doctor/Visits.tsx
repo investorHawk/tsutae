@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { listVisits, markPrinted } from "../../api/doctor";
+import { listVisits, markPrinted, regenerateVisit } from "../../api/doctor";
 import type { VisitStatus, VisitSummary } from "../../api/types";
 import ErrorNote from "../../components/doctor/ErrorNote";
 import { errorCode, isUnauthorized } from "../../components/doctor/errors";
@@ -31,10 +31,16 @@ function Summary({ visits }: { visits: readonly VisitSummary[] }) {
   return <p className="d-summary">{parts.join(" ・ ")}</p>;
 }
 
+interface ActionError {
+  /** 何が失敗したか（「印刷済みにできませんでした」など） */
+  prefix: string;
+  code: string;
+}
+
 /** D3 印刷待ち。5秒ごとに取り直す。 */
 export default function Visits() {
   const handleError = useDoctorApiError();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<ActionError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const polling = usePolling(fetchVisits, VISITS_POLL_MS, {
     onError: (err) => {
@@ -51,7 +57,25 @@ export default function Visits() {
       await markPrinted(visit.id);
       setNotice(`受付 ${visit.reception_no} のレポートを削除しました`);
     } catch (err) {
-      setActionError(handleError(err));
+      setActionError({
+        prefix: "印刷済みにできませんでした",
+        code: handleError(err),
+      });
+    }
+    polling.refresh();
+  }
+
+  async function handleRegenerate(visit: VisitSummary) {
+    setActionError(null);
+    setNotice(null);
+    try {
+      await regenerateVisit(visit.id);
+      setNotice(`受付 ${visit.reception_no} を AI でもう一度変換しています`);
+    } catch (err) {
+      setActionError({
+        prefix: "もう一度変換できませんでした",
+        code: handleError(err),
+      });
     }
     polling.refresh();
   }
@@ -75,7 +99,7 @@ export default function Visits() {
         {notice ?? ""}
       </p>
       {actionError ? (
-        <ErrorNote code={actionError} prefix="印刷済みにできませんでした" />
+        <ErrorNote code={actionError.code} prefix={actionError.prefix} />
       ) : null}
       {visits?.length === 0 ? (
         <p className="d-muted">受付はまだありません</p>
@@ -98,6 +122,7 @@ export default function Visits() {
                 key={visit.id}
                 visit={visit}
                 onPrinted={handlePrinted}
+                onRegenerate={handleRegenerate}
               />
             ))}
           </tbody>

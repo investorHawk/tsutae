@@ -20,6 +20,7 @@ import {
   login,
   logout,
   markPrinted,
+  regenerateVisit,
   rejectSkillChange,
   saveCourse,
 } from "./doctor";
@@ -73,6 +74,13 @@ describe("{ok} の応答の検査", () => {
     "markPrinted: %s は invalid_response",
     async (_l, b) => {
       await expectInvalid(b, () => markPrinted(12));
+    },
+  );
+
+  it.each(OK_BODIES_INVALID)(
+    "regenerateVisit: %s は invalid_response",
+    async (_l, b) => {
+      await expectInvalid(b, () => regenerateVisit(14));
     },
   );
 

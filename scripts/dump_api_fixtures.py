@@ -121,6 +121,7 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/doctor/courses"),
         ("GET", "/api/doctor/visits"),
         ("POST", "/api/doctor/visits/{}/printed"),
+        ("POST", "/api/doctor/visits/{}/regenerate"),
         ("GET", "/api/doctor/visits/{}/unprocessed"),
         ("GET", "/api/doctor/pipeline/{}/events"),
         ("GET", "/api/doctor/skills"),
@@ -444,7 +445,7 @@ def _doctor_session(rec: Recorder) -> None:
 def _visit_flow(rec: Recorder) -> None:
     app = rec.client.app
     ready = _ready_visit_id(app)
-    generating, _failed = _add_open_visits(app)
+    generating, failed = _add_open_visits(app)
     _check_open_reports(rec, ready, generating)
     rec.call("doctor_visits", "GET", "/api/doctor/visits")
     rec.call("doctor_unprocessed", "GET", f"/api/doctor/visits/{ready}/unprocessed")
@@ -477,6 +478,28 @@ def _visit_flow(rec: Recorder) -> None:
     rec.call("doctor_visits_after_printed", "GET", "/api/doctor/visits")
     rec.call(
         "doctor_pipeline_events_printed", "GET", f"/api/doctor/pipeline/{ready}/events"
+    )
+    _regenerate_flow(rec, generating, failed)
+
+
+def _regenerate_flow(rec: Recorder, generating: int, failed: int) -> None:
+    """AI でもう一度変換: 失敗の受診は受け付け、生成中・無い受診は断る。
+
+    一覧の fixture（doctor_visits）を変えないよう、一覧を取った後に流す。
+    """
+    base = "/api/doctor/visits"
+    rec.call("doctor_regenerate", "POST", f"{base}/{failed}/regenerate")
+    rec.call(
+        "doctor_regenerate_not_regenerable",
+        "POST",
+        f"{base}/{generating}/regenerate",
+        expect=409,
+    )
+    rec.call(
+        "doctor_regenerate_not_found",
+        "POST",
+        f"{base}/{MISSING_ID}/regenerate",
+        expect=404,
     )
 
 

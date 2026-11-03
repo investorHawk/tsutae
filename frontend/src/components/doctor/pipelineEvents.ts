@@ -73,6 +73,7 @@ export const RUN_TITLES: Readonly<Record<string, string>> = {
   visit_failed: "visit_failed レポートを作れなかった",
   visit_closed: "visit_closed 印刷済み・期限切れ（何もしない）",
   orphan_recovered: "orphan_recovered 再起動で止まった受診を回収",
+  regenerate_requested: "regenerate_requested 医師が AI でもう一度変換を依頼",
 };
 
 const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [

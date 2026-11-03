@@ -16,6 +16,7 @@ import {
   login,
   logout,
   markPrinted,
+  regenerateVisit,
   rejectSkillChange,
   reportUrl,
   saveCourse,
@@ -104,6 +105,13 @@ const cases: Case[] = [
     run: () => markPrinted(12),
     method: "POST",
     url: "/api/doctor/visits/12/printed",
+    response: { ok: true },
+  },
+  {
+    name: "regenerateVisit",
+    run: () => regenerateVisit(14),
+    method: "POST",
+    url: "/api/doctor/visits/14/regenerate",
     response: { ok: true },
   },
   {

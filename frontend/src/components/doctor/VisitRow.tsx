@@ -3,6 +3,7 @@ import { reportUrl } from "../../api/doctor";
 import type { VisitSummary } from "../../api/types";
 import { formatDateTime } from "./format";
 import PrintButton from "./PrintButton";
+import RegenerateButton from "./RegenerateButton";
 import StatusBadge from "./StatusBadge";
 import TwoStepButton from "./TwoStepButton";
 
@@ -10,9 +11,14 @@ interface VisitRowProps {
   visit: VisitSummary;
   /** 印刷済みの2段目で呼ぶ（受付番号の知らせのために受診ごと渡す） */
   onPrinted: (visit: VisitSummary) => Promise<void>;
+  /** 「AI でもう一度変換」で呼ぶ（AI変換なしの ready・failed の行だけに出す） */
+  onRegenerate: (visit: VisitSummary) => Promise<void>;
 }
 
-function Actions({ visit, onPrinted }: VisitRowProps) {
+function Actions({ visit, onPrinted, onRegenerate }: VisitRowProps) {
+  const regenerate = (
+    <RegenerateButton onRegenerate={() => onRegenerate(visit)} />
+  );
   switch (visit.status) {
     case "ready":
       return (
@@ -24,6 +30,7 @@ function Actions({ visit, onPrinted }: VisitRowProps) {
             confirmLabel="削除する（印刷済み）"
             onConfirm={() => onPrinted(visit)}
           />
+          {visit.fallback ? regenerate : null}
           <Link className="d-sublink" to={`/doctor/pipeline/${visit.id}`}>
             変換ログ
           </Link>
@@ -41,6 +48,7 @@ function Actions({ visit, onPrinted }: VisitRowProps) {
       return (
         <div className="d-actions">
           <span className="d-muted">レポートを作れませんでした</span>
+          {regenerate}
           <Link className="d-sublink" to={`/doctor/pipeline/${visit.id}`}>
             変換ログ
           </Link>
@@ -52,8 +60,13 @@ function Actions({ visit, onPrinted }: VisitRowProps) {
 /**
  * D3 の1行。受付番号・仮名ID・状態・AI変換なし・未処理・操作。
  * 一覧に出るのは generating・ready・failed だけ（印刷済み・期限切れは API が出さない）。
+ * AI変換なしの ready と failed には「AI でもう一度変換」を出す（Claude の一時的な失敗の後）。
  */
-export default function VisitRow({ visit, onPrinted }: VisitRowProps) {
+export default function VisitRow({
+  visit,
+  onPrinted,
+  onRegenerate,
+}: VisitRowProps) {
   return (
     <tr className={`d-visit d-visit--${visit.status}`}>
       <td className="d-reception">{visit.reception_no}</td>
@@ -82,7 +95,11 @@ export default function VisitRow({ visit, onPrinted }: VisitRowProps) {
         )}
       </td>
       <td>
-        <Actions visit={visit} onPrinted={onPrinted} />
+        <Actions
+          visit={visit}
+          onPrinted={onPrinted}
+          onRegenerate={onRegenerate}
+        />
       </td>
     </tr>
   );

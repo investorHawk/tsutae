@@ -36,6 +36,7 @@ from tsutae.db.repo_skills import (
     update_skill_change,
 )
 from tsutae.db.repo_visits import (
+    begin_regeneration,
     create_visit,
     create_visit_once,
     get_report,
@@ -57,6 +58,7 @@ __all__ = [
     "add_entry",
     "add_entry_once",
     "add_pipeline_log",
+    "begin_regeneration",
     "connect",
     "create_patient",
     "create_skill_change",

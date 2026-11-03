@@ -14,6 +14,8 @@ visits の行そのものは残す（状態の履歴として）。
   失敗すれば何も残らない）。生成の終わりはこれを使う
 - purge_expired は status を問わず、期限を過ぎて中身が残っている受診を全て消す
 - create_visit_once は同じ患者・日・受付番号の期限内の受診があれば作らない（送り直し）
+- begin_regeneration は開いている failed・ready（fallback=True）の受診だけを
+  generating に戻す（医師の「AI でもう一度変換」。確認と書き込みを1文で行う）
 """
 
 from __future__ import annotations
@@ -242,6 +244,33 @@ def _update_status(
             (status, int(bool(fallback)), vid, now_db),
         )
     return cur.rowcount > 0
+
+
+# やり直せるのは、生成が終わって AI の結果が無い受診（failed か、AI 変換なしの ready）
+_REGENERABLE = " AND (status = 'failed' OR (status = 'ready' AND fallback = 1))"
+
+
+def begin_regeneration(conn: sqlite3.Connection, vid: int) -> bool:
+    """開いている failed・ready（fallback=True）の受診を generating に戻し True を返す。
+
+    fallback は False に戻す（結果は次の save_visit_result が決める）。レポートと変換
+    結果は残す（新しい生成が上書きする）。それ以外（generating・AI の結果で ready・
+    印刷済み・期限切れ（purge 前を含む））は何も変えずに False。条件の確認と書き込みを
+    1つの UPDATE で行うので、二重に押されても generating にするのは1回だけ。
+    受診が無ければ NotFoundError。
+    """
+    with write_transaction(conn):
+        cur = conn.execute(
+            "UPDATE visits SET status = 'generating', fallback = 0 WHERE id = ?"
+            + _STATUS_GUARD
+            + _REGENERABLE,
+            (vid, _now_db()),
+        )
+    if cur.rowcount > 0:
+        return True
+    if get_visit(conn, vid) is None:
+        raise NotFoundError("visit not found")
+    return False
 
 
 def _raise_not_open(conn: sqlite3.Connection, vid: int) -> None:

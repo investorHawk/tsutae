@@ -57,6 +57,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_pipeline_events_generating: isPipelineEventsResponse,
   doctor_pipeline_events_printed: isPipelineEventsResponse,
   doctor_printed: isDoctorOk,
+  doctor_regenerate: isDoctorOk,
   doctor_skills: isSkillsResponse,
   doctor_skills_invalid: isSkillsResponse,
   doctor_skill_change_create: isCreateSkillChangeResponse,
@@ -210,6 +211,8 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ["doctor_course_save", "別のコース番号", (b) => (b.course_no = 9)],
   ["doctor_login", "ok が false", (b) => (b.ok = false)],
   ["doctor_printed", "ok が無い", (b) => delete b.ok],
+  ["doctor_regenerate", "ok が false", (b) => (b.ok = false)],
+  ["doctor_regenerate", "ok が無い", (b) => delete b.ok],
   // 患者 API
   ["patient_register", "ok が false", (b) => (b.ok = false)],
   [

@@ -147,6 +147,18 @@ export function markPrinted(visitId: number): Promise<OkResponse> {
   );
 }
 
+/**
+ * AI でもう一度変換（failed・AI変換なしの ready だけ）。受け付けたら generating に
+ * なり、変換はサーバーのバックグラウンドで動く（結果は一覧の取り直しで見る）。
+ * 生成中・AI の結果あり・印刷済み・期限切れは 409 {"error":"not_regenerable"}。
+ */
+export function regenerateVisit(visitId: number): Promise<OkResponse> {
+  return postChecked<OkResponse>(
+    `/api/doctor/visits/${seg(visitId)}/regenerate`,
+    isOkTrue,
+  );
+}
+
 export function listUnprocessed(visitId: number): Promise<UnprocessedResponse> {
   return getChecked<UnprocessedResponse>(
     `/api/doctor/visits/${seg(visitId)}/unprocessed`,

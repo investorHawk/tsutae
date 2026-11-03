@@ -22,6 +22,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   invalid_date: "日付は YYYY-MM-DD の形で、暦にある日を入れてください",
   note_too_long: "メモは200字までです",
   invalid_visit_id: "受診の番号が正しくありません",
+  not_regenerable:
+    "この受診は今はもう一度変換できません（生成中・AI の結果あり・印刷済み・期限切れ）",
   bad_password: "パスワードが違います",
   // Skill の書き換え（D4。409 は pending のまま、やり直せるものを含む）
   busy: "ほかの書き換え・承認・却下を処理中です。少し待ってからもう一度押してください",

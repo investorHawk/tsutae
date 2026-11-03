@@ -1,4 +1,7 @@
 import { useState } from "react";
+
+/** デモ患者の regimen。最初はこれを選んでおく（無ければ一覧の先頭） */
+const DEFAULT_SKILL = "regimen-folfox";
 import ErrorNote from "../../components/doctor/ErrorNote";
 import SkillChangeHistory from "../../components/doctor/SkillChangeHistory";
 import SkillInvalidList from "../../components/doctor/SkillInvalidList";
@@ -30,7 +33,9 @@ export default function Settings() {
   const { phase } = flow;
   const skillName = catalog.skills.some((s) => s.name === chosen)
     ? chosen
-    : (catalog.skills[0]?.name ?? "");
+    : (catalog.skills.find((s) => s.name === DEFAULT_SKILL)?.name ??
+      catalog.skills[0]?.name ??
+      "");
   const locked = phase.kind === "generating" || phase.kind === "review";
 
   return (

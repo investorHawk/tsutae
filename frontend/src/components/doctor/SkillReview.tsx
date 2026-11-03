@@ -33,7 +33,8 @@ export default function SkillReview({
       </p>
       <DiffView diff={target.diff} />
       <p className="d-muted">
-        承認すると Skill の version が上がり、翌日の記録から反映されます。
+        承認すると Skill の version
+        が上がり、次の記録から反映されます（それまでの記録は記録したときの質問集のまま）。
         却下すると一時コピーを捨てます（本体は変わりません）。
       </p>
       <div className="d-actions">

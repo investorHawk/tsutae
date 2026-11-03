@@ -291,7 +291,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 
 ## 9. フロント（W1 骨組み → W4 画面）
 - React 18 + Vite 5 + TypeScript + react-router 6。vitest + Testing Library（jsdom）。Prettier（2 スペース、セミコロンあり）
-- 開発時は Vite の proxy で `/api` → `http://localhost:8000`
+- 開発時は Vite の proxy で `/api` → `http://127.0.0.1:8000`（uvicorn の既定の待ち受け。macOS では localhost が ::1 に解決され届かないため）
 - ルート: 患者 `/register` `/today` `/history` `/visit`、医師 `/doctor/login` `/doctor`（印刷待ち） `/doctor/patients` `/doctor/patients/:pid` `/doctor/settings` `/doctor/pipeline/:visitId` `/doctor/unprocessed/:visitId`
 - 患者画面の文字列は `usePatientStrings().t(key)` からのみ出す（直書きしない。テストで検査）。質問文は API の `questions[].text`
 - 型は `src/api/types.ts`（schemas.py の API に出る部分を写す）、呼び出しは `src/api/patient.ts` `src/api/doctor.ts`

@@ -130,7 +130,7 @@ describe("Settings（D4 設定を変える）", () => {
     expect(screen.getByRole("button", { name: "却下する" })).toBeEnabled();
   });
 
-  it("承認で新しい version と「翌日の記録から反映されます」、一覧を取り直す", async () => {
+  it("承認で新しい version と「次の記録から反映されます」、一覧を取り直す", async () => {
     const fetchMock = api({
       [CREATE]: { id: 5, status: "pending", diff: DIFF },
       "POST /api/doctor/skill-changes/5/approve": { ok: true, new_version: 2 },
@@ -144,7 +144,7 @@ describe("Settings（D4 設定を変える）", () => {
       1,
     );
     const status = await screen.findByText(/version 2/);
-    expect(status).toHaveTextContent("翌日の記録から反映されます");
+    expect(status).toHaveTextContent("次の記録から反映されます");
     expect(status).toHaveTextContent("regimen-folfox");
     await waitFor(() => expect(countOf(fetchMock, SKILLS)).toBe(2));
     expect(countOf(fetchMock, CHANGES)).toBe(historyBefore + 1);

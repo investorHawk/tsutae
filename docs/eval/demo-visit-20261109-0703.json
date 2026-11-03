@@ -1,0 +1,1594 @@
+{
+  "timeline": {
+    "events": [
+      {
+        "entry_no": 2,
+        "date": "2026-10-28",
+        "day": 2,
+        "course_no": 3,
+        "term": "しゃっくり",
+        "question_key": null,
+        "status": "present",
+        "source_quote": "朝からしゃっくりがとまらない",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 3,
+        "date": "2026-10-28",
+        "day": 2,
+        "course_no": 3,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "点滴の次の日から冷たいものがだめになるのは前とおなじ。きょうも水道の水でピリピリ",
+        "confidence": 0.7,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 3,
+        "date": "2026-10-28",
+        "day": 2,
+        "course_no": 3,
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "status": "present",
+        "source_quote": "食欲もあまりない",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 7,
+        "date": "2026-10-31",
+        "day": 5,
+        "course_no": 3,
+        "term": "下痢",
+        "question_key": "diarrhea",
+        "status": "present",
+        "source_quote": "夕方から下痢が3回あった",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": true
+      },
+      {
+        "entry_no": 7,
+        "date": "2026-10-31",
+        "day": 5,
+        "course_no": 3,
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "status": "present",
+        "source_quote": "ほとんど食べてない",
+        "confidence": 0.7,
+        "recalled": false,
+        "by_proxy": true
+      },
+      {
+        "entry_no": 8,
+        "date": "2026-11-01",
+        "day": 6,
+        "course_no": 3,
+        "term": "下痢",
+        "question_key": "diarrhea",
+        "status": "improving",
+        "source_quote": "下痢は2回。きのうよりはまし",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 9,
+        "date": "2026-10-31",
+        "day": 5,
+        "course_no": 3,
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "status": "present",
+        "source_quote": "おとといの夜から口内炎がいたい",
+        "confidence": 0.85,
+        "recalled": true,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 10,
+        "date": "2026-11-03",
+        "day": 8,
+        "course_no": 3,
+        "term": "悪寒",
+        "question_key": null,
+        "status": "present",
+        "source_quote": "夕方さむけがして",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 10,
+        "date": "2026-11-03",
+        "day": 8,
+        "course_no": 3,
+        "term": "発熱",
+        "question_key": "fever",
+        "status": "present",
+        "source_quote": "熱をはかったら37.9",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 11,
+        "date": "2026-11-05",
+        "day": 10,
+        "course_no": 3,
+        "term": "発熱",
+        "question_key": "fever",
+        "status": "absent",
+        "source_quote": "熱はもう出ていない",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 11,
+        "date": "2026-11-05",
+        "day": 10,
+        "course_no": 3,
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "status": "present",
+        "source_quote": "口内炎はまだすこしいたい",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 12,
+        "date": "2026-11-07",
+        "day": 12,
+        "course_no": 3,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "improving",
+        "source_quote": "しびれはだいぶ楽",
+        "confidence": 0.75,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 12,
+        "date": "2026-11-07",
+        "day": 12,
+        "course_no": 3,
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "status": "improving",
+        "source_quote": "口内炎も少しまし",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 13,
+        "date": "2026-11-08",
+        "day": 13,
+        "course_no": 3,
+        "term": "悪心",
+        "question_key": "nausea_appetite",
+        "status": "absent",
+        "source_quote": "きょうは吐き気も下痢もなかった",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 13,
+        "date": "2026-11-08",
+        "day": 13,
+        "course_no": 3,
+        "term": "下痢",
+        "question_key": "diarrhea",
+        "status": "absent",
+        "source_quote": "きょうは吐き気も下痢もなかった",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      }
+    ],
+    "contradictions": [
+      {
+        "entry_no": 7,
+        "date": "2026-10-31",
+        "day": 5,
+        "question_key": "diarrhea",
+        "closed_answer": "none",
+        "free_text_quote": "夕方から下痢が3回あった"
+      }
+    ],
+    "unprocessed_entries": [
+      {
+        "entry_id": 38,
+        "reason": "unknown_before_honorific"
+      }
+    ]
+  },
+  "report_data": {
+    "header": {
+      "reception_no": "A-023",
+      "patient_id": "P-DEMO0001",
+      "regimen": "FOLFOX",
+      "course_no": 3,
+      "course_start": "2026-10-27",
+      "course_end": "2026-11-09",
+      "recorded_days": 11,
+      "total_days": 14,
+      "no_input_days": 3,
+      "too_sick_days": 3,
+      "delay_note": null,
+      "fallback": false
+    },
+    "attention": [
+      {
+        "kind": "contradiction",
+        "day": 5,
+        "question_key": "diarrhea",
+        "closed_answer": "none",
+        "quote": "夕方から下痢が3回あった",
+        "temperature": null,
+        "previous_course_same_day": false,
+        "count": null
+      },
+      {
+        "kind": "fever",
+        "day": 8,
+        "question_key": "fever",
+        "closed_answer": null,
+        "quote": null,
+        "temperature": 37.9,
+        "previous_course_same_day": false,
+        "count": null
+      },
+      {
+        "kind": "too_sick",
+        "day": 3,
+        "question_key": null,
+        "closed_answer": null,
+        "quote": null,
+        "temperature": null,
+        "previous_course_same_day": true,
+        "count": null
+      },
+      {
+        "kind": "too_sick",
+        "day": 4,
+        "question_key": null,
+        "closed_answer": null,
+        "quote": null,
+        "temperature": null,
+        "previous_course_same_day": true,
+        "count": null
+      },
+      {
+        "kind": "too_sick",
+        "day": 5,
+        "question_key": null,
+        "closed_answer": null,
+        "quote": null,
+        "temperature": null,
+        "previous_course_same_day": true,
+        "count": null
+      },
+      {
+        "kind": "unprocessed",
+        "day": null,
+        "question_key": null,
+        "closed_answer": null,
+        "quote": null,
+        "temperature": null,
+        "previous_course_same_day": false,
+        "count": 1
+      }
+    ],
+    "grid": {
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "columns": [
+        {
+          "day": 1,
+          "date": "2026-10-27",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 2,
+          "date": "2026-10-28",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 3,
+          "date": "2026-10-29",
+          "by_proxy": false,
+          "too_sick": true
+        },
+        {
+          "day": 4,
+          "date": "2026-10-30",
+          "by_proxy": false,
+          "too_sick": true
+        },
+        {
+          "day": 5,
+          "date": "2026-10-31",
+          "by_proxy": true,
+          "too_sick": true
+        },
+        {
+          "day": 6,
+          "date": "2026-11-01",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 7,
+          "date": "2026-11-02",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 8,
+          "date": "2026-11-03",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 9,
+          "date": "2026-11-04",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 10,
+          "date": "2026-11-05",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 11,
+          "date": "2026-11-06",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 12,
+          "date": "2026-11-07",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 13,
+          "date": "2026-11-08",
+          "by_proxy": false,
+          "too_sick": false
+        },
+        {
+          "day": 14,
+          "date": "2026-11-09",
+          "by_proxy": false,
+          "too_sick": false
+        }
+      ],
+      "rows": [
+        {
+          "course_no": 3,
+          "question_key": "numbness",
+          "label": "しびれ",
+          "is_previous_course": false,
+          "cells": [
+            {
+              "day": 1,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 3,
+          "question_key": "diarrhea",
+          "label": "下痢",
+          "is_previous_course": false,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "none",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 3,
+          "question_key": "stomatitis",
+          "label": "口内炎",
+          "is_previous_course": false,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": true,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 3,
+          "question_key": "nausea_appetite",
+          "label": "吐き気・食欲",
+          "is_previous_course": false,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "hard",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 3,
+          "question_key": "temperature",
+          "label": "体温",
+          "is_previous_course": false,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": true,
+              "recalled_mark": false,
+              "temperature": 37.9
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": 36.7
+            },
+            {
+              "day": 11,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 2,
+          "question_key": "numbness",
+          "label": "しびれ",
+          "is_previous_course": true,
+          "cells": [
+            {
+              "day": 1,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 2,
+          "question_key": "diarrhea",
+          "label": "下痢",
+          "is_previous_course": true,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "hard",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 2,
+          "question_key": "stomatitis",
+          "label": "口内炎",
+          "is_previous_course": true,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 2,
+          "question_key": "nausea_appetite",
+          "label": "吐き気・食欲",
+          "is_previous_course": true,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "hard",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 7,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 14,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        },
+        {
+          "course_no": 2,
+          "question_key": "temperature",
+          "label": "体温",
+          "is_previous_course": true,
+          "cells": [
+            {
+              "day": 1,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 2,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 3,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 4,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 5,
+              "state": "too_sick",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 6,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": 37.1
+            },
+            {
+              "day": 7,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 8,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": 36.6
+            },
+            {
+              "day": 9,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 10,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 11,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 12,
+              "state": "no_input",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            },
+            {
+              "day": 13,
+              "state": "present",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": 36.4
+            },
+            {
+              "day": 14,
+              "state": "none",
+              "free_text_mark": false,
+              "recalled_mark": false,
+              "temperature": null
+            }
+          ]
+        }
+      ]
+    },
+    "per_symptom": [
+      {
+        "term": "しゃっくり",
+        "question_key": null,
+        "start_day": 2,
+        "start_date": "2026-10-28",
+        "representative_quote": "朝からしゃっくりがとまらない",
+        "confidence": 0.9
+      },
+      {
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "start_day": 2,
+        "start_date": "2026-10-28",
+        "representative_quote": "点滴の次の日から冷たいものがだめになるのは前とおなじ。きょうも水道の水でピリピリ",
+        "confidence": 0.7
+      },
+      {
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "start_day": 2,
+        "start_date": "2026-10-28",
+        "representative_quote": "食欲もあまりない",
+        "confidence": 0.9
+      },
+      {
+        "term": "下痢",
+        "question_key": "diarrhea",
+        "start_day": 5,
+        "start_date": "2026-10-31",
+        "representative_quote": "夕方から下痢が3回あった",
+        "confidence": 0.9
+      },
+      {
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "start_day": 5,
+        "start_date": "2026-10-31",
+        "representative_quote": "おとといの夜から口内炎がいたい",
+        "confidence": 0.85
+      },
+      {
+        "term": "悪寒",
+        "question_key": null,
+        "start_day": 8,
+        "start_date": "2026-11-03",
+        "representative_quote": "夕方さむけがして",
+        "confidence": 0.9
+      },
+      {
+        "term": "発熱",
+        "question_key": "fever",
+        "start_day": 8,
+        "start_date": "2026-11-03",
+        "representative_quote": "熱をはかったら37.9",
+        "confidence": 0.9
+      },
+      {
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "start_day": 12,
+        "start_date": "2026-11-07",
+        "representative_quote": "しびれはだいぶ楽",
+        "confidence": 0.75
+      }
+    ],
+    "quotes": [
+      {
+        "entry_no": 2,
+        "day": 2,
+        "date": "2026-10-28",
+        "text": "朝からしゃっくりがとまらない",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 3,
+        "day": 2,
+        "date": "2026-10-28",
+        "text": "点滴の次の日から冷たいものがだめになるのは前とおなじ。きょうも水道の水でピリピリ。食欲もあまりない",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 7,
+        "day": 5,
+        "date": "2026-10-31",
+        "text": "妻が代わりに入力します。夕方から下痢が3回あった。ほとんど食べてない",
+        "by_proxy": true
+      },
+      {
+        "entry_no": 8,
+        "day": 6,
+        "date": "2026-11-01",
+        "text": "下痢は2回。きのうよりはまし",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 9,
+        "day": 7,
+        "date": "2026-11-02",
+        "text": "おとといの夜から口内炎がいたい。おかゆにした",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 10,
+        "day": 8,
+        "date": "2026-11-03",
+        "text": "夕方さむけがして熱をはかったら37.9。ねる前にもう一回はかる",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 11,
+        "day": 10,
+        "date": "2026-11-05",
+        "text": "熱はもう出ていない。口内炎はまだすこしいたい",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 12,
+        "day": 12,
+        "date": "2026-11-07",
+        "text": "しびれはだいぶ楽。口内炎も少しまし",
+        "by_proxy": false
+      },
+      {
+        "entry_no": 13,
+        "day": 13,
+        "date": "2026-11-08",
+        "text": "あしたは受診日。○○先生にきくことをメモした。きょうは吐き気も下痢もなかった",
+        "by_proxy": false
+      }
+    ],
+    "fallback": false,
+    "report_skill_version": "report-format-default@1"
+  }
+}

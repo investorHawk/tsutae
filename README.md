@@ -11,7 +11,7 @@
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
 | テスト件数 | 3879件 通過 / 全3879件（backend 2808/2808、frontend 1071/1071。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 未実施（`make eval` で `docs/eval/` に5指標の実測値と失敗例を残す） |
-| 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で4回。2026-11-04）。**本物の Claude での変換と D4 は未確認**（`scripts/run_demo_visit.py`・`scripts/run_demo_skill_change.py`・`make smoke` で確かめる） |
+| 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で5回）。**本物の Claude**: Agent SDK のスモーク7項目が全て OK、デモ患者の変換が1回で成功（ready・AI変換なしでない・H2 の拒否0回、2026-11-04）。D4 の本物の書き換えは未確認（`scripts/run_demo_skill_change.py`） |
 
 ## 何をするか
 
@@ -43,7 +43,7 @@
 
 ![受診時レポートの見本（A4 一枚）](docs/images/sample-report.png)
 
-*見本: デモ患者（合成）の第3コース。**AI の出力ではなく、合成データの正解ラベルから組み立てた見本**（`scripts/render_sample_report.py`）。本物の Claude の出力は `scripts/run_demo_visit.py` で作る。*
+*本物の Claude（主エージェント claude-opus-5-5、3役 claude-sonnet-5-5）が作ったデモ患者（合成）の第3コースのレポート（2026-11-04、`scripts/run_demo_visit.py`。所要83秒・約0.47ドル・H2 の拒否0回。結果は `docs/eval/demo-visit-20261109-0703.html|json`）。回想（11/2 の「おとといの夜から口内炎」を Day5 に戻す）・食い違い（Day5 の下痢）・否定と改善の区別を、医師が直さずに出力した。*
 
 ## Claude の使い方
 ```mermaid

@@ -20,6 +20,7 @@ from tsutae.schemas import RunStats
 from tsutae.skillchange.editor import (
     EDITOR_ALLOWED_TOOLS,
     EDITOR_MAX_TURNS,
+    EDITOR_SYSTEM_PROMPT,
     SdkSkillEditor,
     SkillEditor,
     build_options,
@@ -40,7 +41,9 @@ def work_root(tmp_path: Path) -> Path:
 
 
 def _options(work_root: Path, logger: MemoryLogger | None = None) -> Any:
-    return build_options(work_root, get_settings(), logger or MemoryLogger())
+    return build_options(
+        work_root, get_settings(), logger or MemoryLogger(), skill_name=NAME
+    )
 
 
 async def _call(options: ClaudeAgentOptions, event: str, data: dict) -> list[dict]:
@@ -69,7 +72,7 @@ def _denied(results: list[dict]) -> bool:
 
 def test_build_options_fields(work_root: Path) -> None:
     settings = dataclasses.replace(get_settings(), model="claude-test-model")
-    options = build_options(work_root, settings, MemoryLogger())
+    options = build_options(work_root, settings, MemoryLogger(), skill_name=NAME)
     assert options.cwd == str(work_root)
     assert options.setting_sources == ["project"]
     assert options.allowed_tools == ["Read", "Edit", "Write"]
@@ -78,7 +81,8 @@ def test_build_options_fields(work_root: Path) -> None:
         assert tool in options.disallowed_tools
     assert not set(options.allowed_tools) & set(options.disallowed_tools)
     assert options.permission_mode == "acceptEdits"
-    assert options.max_turns == EDITOR_MAX_TURNS == 12
+    # 読む1・書く1〜2・Hook の理由で直す数回（読み直しを含む）・締め1
+    assert options.max_turns == EDITOR_MAX_TURNS == 16
     assert options.model == "claude-test-model"
     assert options.max_budget_usd == settings.pipeline_max_budget_usd
     assert options.agents in (None, {})
@@ -87,7 +91,8 @@ def test_build_options_fields(work_root: Path) -> None:
 
 def test_build_options_hooks_shape(work_root: Path) -> None:
     hooks = _options(work_root).hooks
-    assert set(hooks) == {"UserPromptSubmit", "PreToolUse"}
+    assert set(hooks) == {"UserPromptSubmit", "PreToolUse", "PostToolUse"}
+    assert [m.matcher for m in hooks["PostToolUse"]] == [H3_MATCHER]
     matchers = [m.matcher for m in hooks["PreToolUse"]]
     assert None in matchers  # H4（全ツール）
     assert H3_MATCHER in matchers
@@ -203,6 +208,65 @@ def test_prompt_itself_passes_h1(name: str) -> None:
     assert detect_identifiers(build_prompt(name, "質問を1つ足して")) == []
 
 
+FOLFOX_KEYS = ("numbness", "diarrhea", "stomatitis", "nausea_appetite", "fever")
+
+
+def test_prompt_lists_current_keys_and_regimen_rules() -> None:
+    prompt = build_prompt(
+        NAME, "口内炎は、食事がとれたかも次から聞いて", question_keys=FOLFOX_KEYS
+    )
+    assert "numbness, diarrhea, stomatitis, nausea_appetite, fever" in prompt
+    assert "重ならない" in prompt
+    for word in (
+        "three_level",
+        "temperature",
+        "35.0〜42.0",
+        "pump_removal_day",
+        "fixed_rules",
+        "question_key",
+    ):
+        assert word in prompt, word
+    # 依頼文は最後（<<< >>> の中）
+    assert prompt.rstrip().endswith(">>>")
+
+
+def test_report_prompt_has_report_rules_and_no_question_rules() -> None:
+    prompt = build_prompt("report-format-default", "引用を20件までにして")
+    assert "sections" in prompt and "quotes_max_items" in prompt
+    assert "answer_type" not in prompt
+
+
+def test_system_prompt_has_common_rules() -> None:
+    for word in ("PRO-CTCAE", "本文", "name と version", "理由"):
+        assert word in EDITOR_SYSTEM_PROMPT, word
+
+
+@pytest.mark.parametrize(
+    "request_text",
+    ["口内炎は、食事がとれたかも次から聞いて", "質問を1つ足して", "下痢の質問を短く"],
+)
+def test_prompt_with_keys_passes_h1(request_text: str) -> None:
+    for name, keys in (
+        (NAME, FOLFOX_KEYS),
+        ("regimen-capox", (*FOLFOX_KEYS, "hand_foot")),
+        ("report-format-default", ()),
+    ):
+        prompt = build_prompt(name, request_text, question_keys=keys)
+        assert detect_identifiers(prompt) == [], name
+
+
+async def test_h1_hook_passes_demo_prompt_and_blocks_name(work_root: Path) -> None:
+    logger = MemoryLogger()
+    options = _options(work_root, logger)
+    demo = build_prompt(
+        NAME, "口内炎は、食事がとれたかも次から聞いて", question_keys=FOLFOX_KEYS
+    )
+    assert await _call(options, "UserPromptSubmit", {"prompt": demo}) == [{}]
+    bad = build_prompt(NAME, "磯鷲さんの口内炎の質問", question_keys=FOLFOX_KEYS)
+    [blocked] = await _call(options, "UserPromptSubmit", {"prompt": bad})
+    assert blocked["decision"] == "block"
+
+
 def test_prompt_rejects_bad_name() -> None:
     with pytest.raises(ValueError):
         build_prompt("../etc", "x")
@@ -279,7 +343,7 @@ def test_cli_command_disables_session_persistence(work_root: Path) -> None:
         SubprocessCLITransport,
     )
 
-    options = build_options(work_root, get_settings(), MemoryLogger())
+    options = build_options(work_root, get_settings(), MemoryLogger(), skill_name=NAME)
     transport = SubprocessCLITransport(prompt="x", options=options)
     transport._cli_path = "claude"  # 起動はしない（引数を組み立てるだけ）
     assert "--no-session-persistence" in transport._build_command()

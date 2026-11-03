@@ -46,6 +46,7 @@ from tsutae.pipeline.orchestrator import sdk_error_code
 from tsutae.pipeline.runner import RunFailedError
 from tsutae.schemas import RegimenSkill, ReportFormatSkill, RunStats
 from tsutae.skillchange.approve import approve_change, reject_change
+from tsutae.skillchange.check import baseline_of
 from tsutae.skillchange.diff import set_version, unified
 from tsutae.skillchange.editor import SkillEditor, build_prompt, logging_to
 from tsutae.skillchange.errors import SkillChangeError
@@ -263,8 +264,10 @@ def _remove_tree(root: Path, logger: EventLogger) -> bool:
     return False
 
 
-def _check_h1(name: str, request_text: str, logger: EventLogger) -> None:
-    found = detect_identifiers(build_prompt(name, request_text))
+def _check_h1(name: str, old: str, request_text: str, logger: EventLogger) -> None:
+    """editor が渡すのと同じ依頼文（今の質問の key を含む）に二次検出を掛ける。"""
+    keys = baseline_of(name, old).question_keys
+    found = detect_identifiers(build_prompt(name, request_text, question_keys=keys))
     if found:
         logger.event(
             "h1_check", hook_name="H1", decision=reason_code("block", found[0].rule)
@@ -283,7 +286,7 @@ async def _produce_diff(
     settings: Settings,
     logger: EventLogger,
 ) -> tuple[str, str]:
-    _check_h1(name, request_text, logger)
+    _check_h1(name, old, request_text, logger)
     edited = await _edit_in_copy(
         name, old, request_text, editor=editor, settings=settings, logger=logger
     )

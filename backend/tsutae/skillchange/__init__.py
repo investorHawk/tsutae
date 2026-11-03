@@ -1,6 +1,7 @@
 """Skill の書き換え（D4。docs/architecture.md §9b）。
 
 - editor: SkillEditor プロトコルと SdkSkillEditor（Agent SDK。H1・H3・H4）
+- check: 書き込みの直後の検査（PostToolUse の skill_check。理由をモデルに返して直させる）
 - service: request_change（写しを直させて差分を作る。一時ディレクトリの後始末）
 - approve: approve_change・reject_change（Skill のディレクトリの flock の内側で。
   途中で落ちた承認はもう一度の承認で再開する）

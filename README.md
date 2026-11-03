@@ -8,7 +8,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 仕様 | `docs/spec.md`（v0.1、承認待ち） |
+| 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
 | テスト件数 | 0（`make test` が自動更新） |
 | 精度評価 | 未実施（`docs/eval/` に実測値と失敗例を残す予定） |
 
@@ -35,6 +35,7 @@ Claude Agent SDK 上の変換パイプライン: サブエージェント3役、
 - 仕様: `docs/spec.md`
 - 決めたことと理由: `docs/decisions.md`
 - 日程: `docs/plan.md`
+- タスク: `docs/tasks.md`
 - 企画（正本）: `docs/reference/concept.md`
 
 ## 出典・利用条件

@@ -1,0 +1,39 @@
+{
+  "name": "tsutae-video",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "still": "remotion still",
+    "bundle": "remotion bundle",
+    "test": "vitest run",
+    "lint": "tsc --noEmit && prettier --check .",
+    "format": "prettier --write .",
+    "docs": "node --import tsx scripts/docs.mjs",
+    "manifest": "node scripts/footage-manifest.mjs",
+    "prestudio": "node scripts/footage-manifest.mjs",
+    "prerender": "node scripts/footage-manifest.mjs",
+    "prestill": "node scripts/footage-manifest.mjs",
+    "prebundle": "node scripts/footage-manifest.mjs",
+    "pretest": "node scripts/footage-manifest.mjs",
+    "stills": "node --import tsx scripts/stills.mjs",
+    "prestills": "node scripts/footage-manifest.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.540",
+    "@remotion/cli": "4.0.540",
+    "@remotion/renderer": "4.0.540",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.540"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.1",
+    "prettier": "3.3.3",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.9"
+  }
+}

@@ -44,3 +44,12 @@ frontend/coverage/
 
 # 撮影用の Skill の写し（docs/demo-script.md）
 data/skills-*/
+
+# remotion（動画）
+video/public/footage/*.mp4
+video/public/footage/*.mov
+video/public/audio/*.mp3
+video/public/audio/*.wav
+video/out/
+video/build/
+video/node_modules/.remotion/

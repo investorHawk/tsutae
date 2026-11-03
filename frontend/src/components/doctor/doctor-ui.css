@@ -138,6 +138,13 @@
   white-space: nowrap;
 }
 
+/* 仮名ID・受付の日時・未処理の件数は途中で折り返さない */
+.doctor-app .d-visit td code,
+.doctor-app .d-visit .d-badge,
+.doctor-app .d-visit td:nth-child(4) {
+  white-space: nowrap;
+}
+
 .doctor-app .d-visit--printed td {
   color: var(--d-muted);
 }

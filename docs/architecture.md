@@ -249,6 +249,13 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `GET /api/doctor/skill-changes` | 一覧 |
 | `POST /api/doctor/skill-changes/{id}/approve` / `/reject` | `{ok, new_version?}` |
 
+### W2b 後の決定（2026-11-04）
+- masking の `Detection`・`MaskResult`・`MaskCheck` は masking の中の dataclass のままでよい（§0「共通の型は schemas.py」の例外。masking の外へは `check_text` の結果として渡すだけ）
+- ログの `out_of_range_count`・`error_type` は `pipeline_logs.decision` に `key:value` の形で入れる（列は足さない）。`ConversionResult.error_code` には `skill_version_mismatch`・`skill_load_error` もある（convert は実行直前に Skill の版を照合する）
+- `exclude_literals` の照合は NFKC → ハイフン類を `-` → 空白・制御・書式を除く → casefold の部分一致。短い受付番号（数字2字など）で誤って外れても、D6 に回るだけなので受け入れる
+- `db.set_visit_status` は印刷済み・期限切れの受診を変えない（条件付き UPDATE。0 行なら `VisitClosedError`）
+- 依頼文は `json.dumps(..., ensure_ascii=False)` で作る（`detect_identifiers` の `\uXXXX` の扱いの前提）
+
 ### 8b. W3 の実装の形（2026-11-03 決定）
 | ファイル | 担当 | 中身 |
 |---|---|---|

@@ -140,22 +140,26 @@ def set_visit_status(
     """状態を変える。fallback=None なら fallback は変えない。
 
     printed は受け付けない（中身を消さずに印刷済みにしないよう mark_printed を使う）。
+    受診が無ければ NotFoundError、印刷済み・期限切れなら VisitClosedError。
     """
     if status == "printed":
         raise ValueError("printed にするのは mark_printed だけ")
     _validate_status(status)
+    # 印刷済み・期限切れ（受付番号を消した受診）は条件付き UPDATE で触らない。
+    # 別の接続の mark_printed と競合しても printed を ready に戻さない
+    guard = " AND reception_no IS NOT NULL AND status != 'printed'"
     with write_transaction(conn):
         if fallback is None:
             cur = conn.execute(
-                "UPDATE visits SET status = ? WHERE id = ?", (status, vid)
+                "UPDATE visits SET status = ? WHERE id = ?" + guard, (status, vid)
             )
         else:
             cur = conn.execute(
-                "UPDATE visits SET status = ?, fallback = ? WHERE id = ?",
+                "UPDATE visits SET status = ?, fallback = ? WHERE id = ?" + guard,
                 (status, int(bool(fallback)), vid),
             )
     if cur.rowcount == 0:
-        raise NotFoundError("visit not found")
+        _raise_not_open(conn, vid)
 
 
 def _raise_not_open(conn: sqlite3.Connection, vid: int) -> None:

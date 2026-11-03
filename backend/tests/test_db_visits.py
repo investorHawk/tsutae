@@ -401,3 +401,18 @@ def test_list_visits_active_only_hides_closed_visits(
     ]
     assert [v["id"] for v in list_visits(conn, active_only=True)] == [active]
     assert list_visits(conn, (), active_only=True) == []
+
+
+def test_set_visit_status_does_not_reopen_printed_visit(
+    conn: sqlite3.Connection, pid: str, tmp_db_path: Path
+) -> None:
+    # 生成が終わる前に別の接続で印刷済みにされても、ready に戻さない
+    vid = _visit(conn, pid)
+    other = connect(tmp_db_path)
+    try:
+        mark_printed(other, vid)
+    finally:
+        other.close()
+    with pytest.raises(VisitClosedError):
+        set_visit_status(conn, vid, "ready", fallback=False)
+    assert get_visit(conn, vid)["status"] == "printed"

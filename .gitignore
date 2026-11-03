@@ -41,3 +41,6 @@ htmlcov/
 frontend/coverage/
 *.db-wal
 *.db-shm
+
+# 撮影用の Skill の写し（docs/demo-script.md）
+data/skills-*/

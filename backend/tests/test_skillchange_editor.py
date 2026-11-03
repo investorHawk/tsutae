@@ -28,6 +28,7 @@ from tsutae.skillchange.editor import (
     current_logger,
     logging_to,
 )
+from tsutae.skillchange.workcopy import work_copy_path
 
 NAME = "regimen-folfox"
 
@@ -35,8 +36,8 @@ NAME = "regimen-folfox"
 @pytest.fixture
 def work_root(tmp_path: Path) -> Path:
     root = (tmp_path / "work").resolve()
-    (root / ".claude" / "skills" / NAME).mkdir(parents=True)
-    (root / ".claude" / "skills" / NAME / "SKILL.md").write_text("x", "utf-8")
+    work_copy_path(root, NAME).parent.mkdir(parents=True)
+    work_copy_path(root, NAME).write_text("x", "utf-8")
     return root
 
 
@@ -74,7 +75,8 @@ def test_build_options_fields(work_root: Path) -> None:
     settings = dataclasses.replace(get_settings(), model="claude-test-model")
     options = build_options(work_root, settings, MemoryLogger(), skill_name=NAME)
     assert options.cwd == str(work_root)
-    assert options.setting_sources == ["project"]
+    # Skill もファイルの設定も読まない（[] は SDK の分離モード。None は全部読む）
+    assert options.setting_sources == []
     assert options.allowed_tools == ["Read", "Edit", "Write"]
     assert list(EDITOR_ALLOWED_TOOLS) == ["Read", "Edit", "Write"]
     for tool in ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "Skill"):
@@ -141,7 +143,8 @@ async def test_h4_denies_other_tools(
 
 async def test_h3_allows_only_skill_file_in_work_root(work_root: Path) -> None:
     options = _options(work_root)
-    target = work_root / ".claude" / "skills" / NAME / "SKILL.md"
+    target = work_copy_path(work_root, NAME)
+    assert "/.claude/" not in str(target)  # CLI が acceptEdits でも保護する場所
     for tool in ("Edit", "Write"):
         ok = await _call(
             options,
@@ -151,9 +154,12 @@ async def test_h3_allows_only_skill_file_in_work_root(work_root: Path) -> None:
         assert not _denied(ok)
     for bad in (
         work_root / "other.md",
-        work_root / ".claude" / "skills" / NAME / ".." / ".." / "settings.json",
+        work_root / ".claude" / "skills" / NAME / "SKILL.md",  # 旧い配置
+        work_root / "skills" / "regimen-capox" / "SKILL.md",  # 別の Skill
+        work_root / "skills" / NAME / ".." / ".." / "settings.json",
+        work_root / "skills" / NAME / ".." / ".." / ".." / "skills" / NAME / "SKILL.md",
         work_root.parent / "skills_home" / ".claude" / "skills" / NAME / "SKILL.md",
-        Path(".claude/skills") / NAME / "SKILL.md",
+        Path("skills") / NAME / "SKILL.md",
     ):
         results = await _call(
             options,
@@ -165,7 +171,7 @@ async def test_h3_allows_only_skill_file_in_work_root(work_root: Path) -> None:
 
 async def test_read_is_confined_to_work_root(work_root: Path, tmp_path: Path) -> None:
     options = _options(work_root)
-    inside = work_root / ".claude" / "skills" / NAME / "SKILL.md"
+    inside = work_copy_path(work_root, NAME)
     ok = await _call(
         options,
         "PreToolUse",
@@ -199,7 +205,8 @@ async def test_read_is_confined_to_work_root(work_root: Path, tmp_path: Path) ->
 def test_prompt_contains_request_and_relative_path() -> None:
     prompt = build_prompt(NAME, "下痢の質問の文をやさしくして")
     assert "下痢の質問の文をやさしくして" in prompt
-    assert f".claude/skills/{NAME}/SKILL.md" in prompt
+    assert f"skills/{NAME}/SKILL.md" in prompt
+    assert ".claude" not in prompt
     assert "version" in prompt
 
 
@@ -346,7 +353,26 @@ def test_cli_command_disables_session_persistence(work_root: Path) -> None:
     options = build_options(work_root, get_settings(), MemoryLogger(), skill_name=NAME)
     transport = SubprocessCLITransport(prompt="x", options=options)
     transport._cli_path = "claude"  # 起動はしない（引数を組み立てるだけ）
-    assert "--no-session-persistence" in transport._build_command()
+    command = transport._build_command()
+    assert "--no-session-persistence" in command
+    # ファイルの設定（~/.claude/settings.json・.claude/settings.json）を読まない
+    assert "--setting-sources=" in command
+
+
+async def test_editor_h3_logs_as_h3(work_root: Path) -> None:
+    logger = MemoryLogger()
+    options = _options(work_root, logger)
+    target = work_copy_path(work_root, NAME)
+    for path in (target, work_root / ".claude" / "skills" / NAME / "SKILL.md"):
+        await _call(
+            options,
+            "PreToolUse",
+            {"tool_name": "Edit", "tool_input": {"file_path": str(path)}},
+        )
+    assert [r["decision"] for r in logger.find("hook_h3_allow")] == ["allow"]
+    [deny] = logger.find("hook_h3_deny")
+    assert deny["hook_name"] == "H3"
+    assert deny["decision"] == "deny:outside_work_copy"
 
 
 # ---------------------------------------------------------------------------

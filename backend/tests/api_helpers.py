@@ -47,6 +47,7 @@ from tsutae.api.deps import (
 )
 from tsutae.config import REPO_ROOT, SKILLS_DIR, Settings, get_settings, now
 from tsutae.schemas import Course, EntryCreate, RunStats
+from tsutae.skillchange.workcopy import work_copy_path
 
 TEST_PASSWORD = "test-doctor-password"
 TEST_SECRET = "test-secret-key"
@@ -92,7 +93,7 @@ class FakeEditor:
     ) -> RunStats:
         self.calls.append((Path(work_root), skill_name, request_text))
         if self.transform is not None:
-            path = Path(work_root) / ".claude" / "skills" / skill_name / "SKILL.md"
+            path = work_copy_path(Path(work_root), skill_name)
             path.write_text(self.transform(path.read_text(encoding="utf-8")), "utf-8")
         return self.stats
 

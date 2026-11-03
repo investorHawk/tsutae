@@ -25,6 +25,7 @@ from tsutae.skillchange import (
     reject_change,
     request_change,
 )
+from tsutae.skillchange.workcopy import work_copy_path
 from tsutae.skills import load_skill
 
 NAME = "regimen-folfox"
@@ -68,7 +69,7 @@ class FakeEditor:
             await asyncio.sleep(self.delay)
         if self.raises is not None:
             raise self.raises
-        path = work_root / ".claude" / "skills" / skill_name / "SKILL.md"
+        path = work_copy_path(work_root, skill_name)
         path.write_text(self.transform(path.read_text("utf-8")), "utf-8")
         if self.watch is not None:
             self.watched = self.watch.read_bytes()
@@ -136,7 +137,7 @@ async def test_request_makes_pending_with_unified_diff(
     assert f"\n+  - {{key: diarrhea, {NEW_Q}" in diff
     assert editor.calls[0][1:] == (NAME, REQUEST)
     # 写しは1つの SKILL.md だけ
-    assert editor.files == [f".claude/skills/{NAME}/SKILL.md"]
+    assert editor.files == [f"skills/{NAME}/SKILL.md"]
 
 
 async def test_request_restores_version_bumped_by_agent(conn, home, settings):
@@ -183,7 +184,7 @@ async def test_request_no_diff_is_failed(conn, home, settings):
 async def test_request_missing_output_is_failed(conn, home, settings):
     class Deleting(FakeEditor):
         async def edit(self, work_root, skill_name, request_text):
-            (work_root / ".claude" / "skills" / skill_name / "SKILL.md").unlink()
+            work_copy_path(work_root, skill_name).unlink()
             return RunStats()
 
     cid = await _request(conn, home, settings, Deleting())
@@ -311,6 +312,42 @@ async def test_request_logs_without_text(conn, home, settings):
     assert "editor_done" in names
     assert names[-1] == "skill_change_pending"
     assert "下痢" not in repr(logs)
+
+
+async def test_work_copy_is_outside_dot_claude_through_approve(
+    conn, home, settings, skill_file
+):
+    """回帰: CLI は .claude/ の下への書き込みを acceptEdits でも許可を求める。
+
+    写しは work_copy_path（`<work_root>/skills/<name>/SKILL.md`）にだけ置き、
+    request_change → pending → approve が通る。本体は承認まで変わらない。
+    """
+    old = skill_file.read_text("utf-8")
+    seen: dict[str, object] = {}
+
+    def transform(text: str) -> str:
+        assert text == old  # 写しは本体と同じ本文
+        return _change_question(text)
+
+    class Watching(FakeEditor):
+        async def edit(self, work_root, skill_name, request_text):
+            copy = work_copy_path(work_root, skill_name)
+            seen["copy"] = copy
+            seen["dot_claude"] = (work_root / ".claude").exists()
+            return await super().edit(work_root, skill_name, request_text)
+
+    editor = Watching(transform)
+    cid = await _request(conn, home, settings, editor)
+    copy = seen["copy"]
+    assert isinstance(copy, Path)
+    assert "/.claude/" not in str(copy)
+    assert seen["dot_claude"] is False
+    assert editor.files == [f"skills/{NAME}/SKILL.md"]
+    assert not copy.exists()  # 一時ディレクトリは消えている
+    assert db.get_skill_change(conn, cid)["status"] == "pending"
+    assert skill_file.read_text("utf-8") == old  # 本体は承認まで変えない
+    assert approve_change(conn, cid, skills_home=home) == 2
+    assert NEW_Q in skill_file.read_text("utf-8")
 
 
 # ---------------------------------------------------------------------------

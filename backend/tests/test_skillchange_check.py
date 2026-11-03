@@ -33,6 +33,7 @@ from tsutae.skillchange.check import (
     read_baseline,
 )
 from tsutae.skillchange.editor import build_options
+from tsutae.skillchange.workcopy import work_copy_path
 
 NAME = "regimen-folfox"
 REPORT = "report-format-default"
@@ -60,14 +61,14 @@ def _add_eating_question(text: str) -> str:
 def work_root(tmp_path: Path) -> Path:
     root = (tmp_path / "work").resolve()
     for name in (NAME, REPORT):
-        path = root / ".claude" / "skills" / name / "SKILL.md"
+        path = work_copy_path(root, name)
         path.parent.mkdir(parents=True)
         path.write_text(_original(name), "utf-8")
     return root
 
 
 def _copy(work_root: Path, name: str = NAME) -> Path:
-    return work_root / ".claude" / "skills" / name / "SKILL.md"
+    return work_copy_path(work_root, name)
 
 
 def _post(tool: str, path: Path | str | None) -> dict[str, Any]:
@@ -224,7 +225,8 @@ async def test_hook_returns_reason_for_broken_frontmatter(work_root: Path) -> No
     copy.write_text(broken, "utf-8")
     reason = _context(await hook(_post("Edit", copy), "t1", None))
     assert "questions.3.key" in reason and "questions.3.answer_type" in reason
-    assert ".claude/skills/regimen-folfox/SKILL.md" in reason
+    assert "skills/regimen-folfox/SKILL.md" in reason
+    assert "/.claude/" not in reason
     [record] = logger.find("hook_skill_check_retry")
     assert record["decision"] == "retry:schema"
     assert record["hook_name"] == "skill_check"
@@ -253,7 +255,7 @@ async def test_hook_tells_model_only_target_file_counts(work_root: Path) -> None
     logger = MemoryLogger()
     hook = make_skill_check(work_root, NAME, 1, logger)
     reason = _context(await hook(_post("Write", _copy(work_root, REPORT)), "t", None))
-    assert f".claude/skills/{NAME}/SKILL.md" in reason
+    assert f"skills/{NAME}/SKILL.md" in reason
     assert logger.find("hook_skill_check_retry")[0]["decision"] == ("retry:other_file")
 
 
@@ -325,7 +327,7 @@ class DemoEditor:
         self, work_root: Path, skill_name: str, request_text: str
     ) -> RunStats:
         self.requests.append(request_text)
-        path = work_root / ".claude" / "skills" / skill_name / "SKILL.md"
+        path = work_copy_path(work_root, skill_name)
         path.write_text(_add_eating_question(path.read_text("utf-8")), "utf-8")
         return RunStats(duration_ms=10, num_turns=3)
 
@@ -363,7 +365,7 @@ async def test_sdk_editor_hook_lets_model_fix_then_pending(
     async def fake_query(*, prompt: str, options):
         assert "stomatitis" in prompt and "nausea_appetite" in prompt
         [post] = options.hooks["PostToolUse"]
-        path = Path(options.cwd) / ".claude" / "skills" / NAME / "SKILL.md"
+        path = work_copy_path(Path(options.cwd), NAME)
         good = _add_eating_question(path.read_text("utf-8"))
         path.write_text(good.replace("key: stomatitis_eating", "key: Eating"), "utf-8")
         seen.append(await post.hooks[0](_post("Edit", path), "t1", None))

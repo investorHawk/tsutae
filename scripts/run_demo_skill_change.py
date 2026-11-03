@@ -58,7 +58,7 @@ from tsutae.skillchange import (
 from tsutae.skillchange.check import make_skill_check, read_baseline
 from tsutae.skillchange.editor import current_logger
 from tsutae.skillchange.state import RUN_KIND
-from tsutae.skills import SKILL_FILE_NAME
+from tsutae.skillchange.workcopy import work_copy_path
 
 DEFAULT_SKILL = "regimen-folfox"
 DEFAULT_REQUEST = "口内炎は、食事がとれたかも次から聞いて"
@@ -98,7 +98,7 @@ class DryRunSkillEditor:
     async def edit(
         self, work_root: Path, skill_name: str, request_text: str
     ) -> RunStats:
-        path = work_root / ".claude" / "skills" / skill_name / SKILL_FILE_NAME
+        path = work_copy_path(work_root, skill_name)
         old = path.read_text(encoding="utf-8")
         new = add_question_after_stomatitis(old)
         if new == old:

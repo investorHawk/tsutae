@@ -2,15 +2,19 @@
 
 - `SkillEditor` プロトコル: `async edit(work_root, skill_name, request_text) -> RunStats`。
   work_root は `request_change` が作った一時ディレクトリで、
-  `<work_root>/.claude/skills/<skill_name>/SKILL.md`（本体の写し）だけが置かれている
+  `<work_root>/skills/<skill_name>/SKILL.md`（本体の写し。場所は workcopy.py の
+  `work_copy_path`）だけが置かれている。`.claude/` の下に置かないのは、CLI が
+  そこへの書き込みを acceptEdits でも保護し、許可を出す人がいないと拒否されるため
 - `build_options` は純関数（query は呼ばない）。Hook は H1（依頼文の二次検出）・
   H4（Read・Edit・Write 以外を deny。サブエージェントは呼ばせない）・
-  H3（`make_h3(work_root, logger)`。書き込み先を写しの SKILL.md に限る）と、
+  H3（`make_work_copy_h3`。書き込み先を写しの SKILL.md ちょうど1つに限る）と、
   Read を work_root の中に限る read_guard（院内の DB 等を読ませない）、
   PostToolUse の skill_check（check.py。書き込みの直後に検査し、通らなければ
   理由をモデルに返して直させる）
 - 依頼文は frontmatter の決まり（Skill の種類ごと）と、regimen Skill なら今の質問の
   key の一覧を含む（新しい key を重ねさせない）。版・key は edit が写しから読む
+- `setting_sources=[]`（SDK の分離モード）。書き換えに Skill の読み込みは要らず、
+  ~/.claude/settings.json 等の Hook・許可の設定を混ぜない（None だと全部読む）
 - Hook が記録するロガーは、プロトコルの引数に無いので `logging_to(logger)` で渡す
   （contextvars。`request_change` が変更依頼ごとの PipelineLogger を設定する）。
   設定されていなければ捨てる（MemoryLogger）
@@ -37,7 +41,7 @@ from claude_agent_sdk import (
 )
 
 from tsutae.config import Settings, get_settings
-from tsutae.pipeline.hooks import H3_MATCHER, make_h1, make_h3, make_h4
+from tsutae.pipeline.hooks import H3_MATCHER, make_h1, make_h4
 from tsutae.pipeline.logs import EventLogger, MemoryLogger, reason_code
 from tsutae.pipeline.orchestrator import NO_SESSION_PERSISTENCE, sdk_error_code
 from tsutae.pipeline.runner import RunFailedError, stats_from_result
@@ -47,7 +51,11 @@ from tsutae.skillchange.check import (
     make_skill_check,
     read_baseline,
 )
-from tsutae.skills import SKILL_FILE_NAME, is_valid_skill_name
+from tsutae.skillchange.workcopy import (
+    make_work_copy_h3,
+    relative_work_copy_path,
+    work_copy_path,
+)
 
 __all__ = [
     "EDITOR_ALLOWED_TOOLS",
@@ -61,6 +69,7 @@ __all__ = [
     "current_logger",
     "logging_to",
     "relative_skill_path",
+    "work_copy_path",
 ]
 
 QueryFn = Callable[..., AsyncIterator[Any]]
@@ -148,9 +157,8 @@ def current_logger() -> EventLogger:
 
 
 def relative_skill_path(skill_name: str) -> str:
-    if not is_valid_skill_name(skill_name):
-        raise ValueError("Skill 名の書式が違う")
-    return f".claude/skills/{skill_name}/{SKILL_FILE_NAME}"
+    """依頼文に書く作業コピーの相対パス（`skills/<skill_name>/SKILL.md`）。"""
+    return relative_work_copy_path(skill_name)
 
 
 def _rules(skill_name: str, question_keys: Sequence[str]) -> str:
@@ -256,7 +264,7 @@ def build_hooks(
         "UserPromptSubmit": [_matcher(make_h1(logger))],
         "PreToolUse": [
             _matcher(make_h4(EDITOR_ALLOWED_TOOLS, (), logger)),
-            _matcher(make_h3(work_root, logger), H3_MATCHER),
+            _matcher(make_work_copy_h3(work_root, skill_name, logger), H3_MATCHER),
             _matcher(make_read_guard(work_root, logger), READ_MATCHER),
         ],
         # H3 が通した書き込みの直後に、写しの SKILL.md を検査する
@@ -281,7 +289,8 @@ def build_options(
     )
     return ClaudeAgentOptions(
         cwd=str(work_root),
-        setting_sources=["project"],
+        # ファイルの設定・Skill を読まない（[] は分離モード。None だと全部読む）
+        setting_sources=[],
         model=settings.model,
         allowed_tools=list(EDITOR_ALLOWED_TOOLS),
         disallowed_tools=list(EDITOR_DISALLOWED_TOOLS),

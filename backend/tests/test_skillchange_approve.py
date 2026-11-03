@@ -35,6 +35,7 @@ from tsutae.skillchange import (
 )
 from tsutae.skillchange import approve as approve_module
 from tsutae.skillchange import lock as lock_module
+from tsutae.skillchange.workcopy import work_copy_path
 
 NAME = "regimen-folfox"
 OLD_Q = "text: 下痢はありましたか"
@@ -60,7 +61,7 @@ class Editor:
 
     async def edit(self, work_root: Path, skill_name: str, request_text: str):
         self.roots.append(work_root)
-        path = work_root / ".claude" / "skills" / skill_name / "SKILL.md"
+        path = work_copy_path(work_root, skill_name)
         path.write_text(self.transform(path.read_text("utf-8")), "utf-8")
         if self.after is not None:
             self.after(work_root)

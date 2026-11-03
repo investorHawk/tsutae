@@ -1,6 +1,7 @@
 """書き換えの後の検査（PostToolUse の Hook）。docs/architecture.md §9b。
 
-エージェントが写しの SKILL.md を Write / Edit した直後に、request_change が後で掛ける
+エージェントが写しの SKILL.md（`work_copy_path`。`<work_root>/skills/<name>/SKILL.md`）を
+Write / Edit した直後に、request_change が後で掛ける
 検査（`validate_skill_text`・version が元のまま・承認で version 行を上げられる）と
 同じ合否を先に見て、通らなければ「どの項目が・どう違うか」をモデルに返して直させる。
 
@@ -27,9 +28,9 @@ from tsutae.pipeline.logs import EventLogger, reason_code
 from tsutae.schemas import QUESTION_KEY_PATTERN, RegimenSkill
 from tsutae.skillchange.diff import set_version
 from tsutae.skillchange.errors import SkillChangeError
+from tsutae.skillchange.workcopy import relative_work_copy_path, work_copy_path
 from tsutae.skills import (
     MAX_SKILL_CHARS,
-    SKILL_FILE_NAME,
     SkillValidationError,
     is_valid_skill_name,
     validate_skill_text,
@@ -87,16 +88,12 @@ def baseline_of(skill_name: str, text: str) -> Baseline:
     return Baseline(skill.version, keys)
 
 
-def _skill_file(work_root: Path, skill_name: str) -> Path:
-    return Path(work_root) / ".claude" / "skills" / skill_name / SKILL_FILE_NAME
-
-
 def read_baseline(work_root: Path, skill_name: str) -> Baseline:
     """editor を回す前の写しを読む（読めなければ Baseline(None, ())）。"""
     if not is_valid_skill_name(skill_name):
         return Baseline(None)
     try:
-        text = _skill_file(work_root, skill_name).read_text(encoding="utf-8")
+        text = work_copy_path(work_root, skill_name).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError, ValueError):
         return Baseline(None)
     return baseline_of(skill_name, text)
@@ -227,8 +224,8 @@ def make_skill_check(
     """写しの SKILL.md を Write / Edit した直後に検査する PostToolUse の Hook。"""
     if not is_valid_skill_name(skill_name):
         raise ValueError("Skill 名の書式が違う")
-    target = _skill_file(Path(work_root).resolve(), skill_name)
-    path_text = f"{target}（.claude/skills/{skill_name}/{SKILL_FILE_NAME}）"
+    target = work_copy_path(Path(work_root).resolve(), skill_name)
+    path_text = f"{target}（{relative_work_copy_path(skill_name)}）"
 
     async def skill_check(input_data: Any, tool_use_id: str | None, ctx: Any) -> dict:
         tool_name = _get(input_data, "tool_name")

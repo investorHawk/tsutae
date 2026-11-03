@@ -7,8 +7,9 @@ request_change の手順（本体の SKILL.md には触らない）:
    （ここまでの失敗は行を作らず SkillChangeError）
 2. skill_changes を pending で作る（diff・new_text はまだ無い。承認は not_ready で拒む）
 3. 依頼文（editor.build_prompt）に二次検出 → 掛かれば failed・h1_blocked（editor を呼ばない）
-4. 一時ディレクトリの `.claude/skills/<name>/SKILL.md` に写して editor を回す
-   （settings.pipeline_timeout_s で打ち切り）。一時ディレクトリは必ず消す
+4. 一時ディレクトリの `skills/<name>/SKILL.md`（`work_copy_path`。`.claude/` の下には
+   置かない。CLI がそこへの書き込みを acceptEdits でも保護するため）に写して editor を
+   回す（settings.pipeline_timeout_s で打ち切り）。一時ディレクトリは必ず消す
 5. 写しを読み validate_skill_text。エージェントが version を変えていれば元の版に戻して
    検査し直す → unified diff（空なら no_change）→ diff・new_text を保存
 どこで失敗しても failed と短い error_code（取り消しは cancelled にしてから再送出）。
@@ -59,6 +60,7 @@ from tsutae.skillchange.state import (
     has_working,
     transition,
 )
+from tsutae.skillchange.workcopy import work_copy_path
 from tsutae.skills import (
     SKILL_FILE_NAME,
     SkillNotFoundError,
@@ -75,6 +77,7 @@ __all__ = [
     "approve_change",
     "reject_change",
     "request_change",
+    "work_copy_path",
 ]  # approve_change・reject_change は approve.py（従来の import 先を保つ）
 
 MAX_REQUEST_CHARS = 2000
@@ -229,8 +232,8 @@ async def _edit_in_copy(
 
 
 def _write_copy(work_root: Path, name: str, old: str, logger: EventLogger) -> Path:
-    """work_root の `.claude/skills/<name>/SKILL.md` に今の本文を写し、その場所を返す。"""
-    copy = work_root / ".claude" / "skills" / name / SKILL_FILE_NAME
+    """work_copy_path（`<work_root>/skills/<name>/SKILL.md`）に今の本文を写し、返す。"""
+    copy = work_copy_path(work_root, name)
     try:
         copy.parent.mkdir(parents=True)
         with open(copy, "w", encoding="utf-8", newline="") as f:

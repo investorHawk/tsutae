@@ -62,6 +62,7 @@ from tsutae import db  # noqa: E402
 from tsutae.config import JST, SKILLS_HOME  # noqa: E402
 from tsutae.schemas import RunStats  # noqa: E402
 from tsutae.skillchange.lock import skill_lock  # noqa: E402
+from tsutae.skillchange.workcopy import work_copy_path  # noqa: E402
 
 __all__ = [
     "FIXED_NOW",
@@ -220,7 +221,7 @@ class ScriptedEditor:
     ) -> RunStats:
         self.calls.append(skill_name)
         if request_text != NO_CHANGE_REQUEST:
-            path = _skill_dir(Path(work_root), skill_name) / "SKILL.md"
+            path = work_copy_path(Path(work_root), skill_name)
             text = path.read_text(encoding="utf-8").rstrip("\n")
             path.write_text(f"{text}\n- 依頼: {request_text}\n", encoding="utf-8")
         return RunStats(duration_ms=1000, num_turns=2)

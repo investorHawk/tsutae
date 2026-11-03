@@ -163,5 +163,10 @@
 | 4コース中2コースが「AI変換なし」（`no_timeline`）。H1 が2回止めていたが、アプリの依頼文は二次検出に掛からない（保存した入力から作り直して確かめた）。UserPromptSubmit は主エージェントがサブエージェントに書いた依頼文にも発火し、そこで止めていた（デモ受診でも H1 は1回の変換で3回発火していた） | H1 はアプリが作った依頼文だけを止める（`make_h1(expected_prompt=…)`）。それ以外は規則のコードだけを `hook_h1_subagent_flag` で残して通す。サブエージェントへの依頼文は送信済みの（検査を通った）データからモデルが書いた文で、止めても何も守らない。アプリの依頼文はコードの検査と H1 の二重のまま |
 | AI変換できた2コースでは、日付 100%・93%、用語 73%・86%、食い違い 再現率 100%、引用 100%（H2 の拒否0回） | 用語の差の多くは「異常感覚」と「末梢性感覚ニューロパチー」「錯感覚」の当て分け。正解ラベルの臨床レビュー（T14）で先生が決める |
 
+### D4 の作業コピーの場所（2026-11-04、仮置き。本物の Claude では未確認）
+| 分かったこと | 対処 |
+|---|---|
+| `run_demo_skill_change.py --debug` の書き換えが `no_change` で終わった。Claude Code の CLI は `.claude/` の下への書き込みを `permission_mode="acceptEdits"` でも保護して許可を求め、サーバーには許可を出す人がいないので拒否されていた（作業コピーを `<work_root>/.claude/skills/<name>/SKILL.md` に置いていた） | 作業コピーを `<work_root>/skills/<name>/SKILL.md`（`workcopy.work_copy_path`。ドットで始まらない場所）に移す。H3 は `make_work_copy_h3` でその1ファイル（resolve 後）だけを許す。editor は `setting_sources=[]`（書き換えに Skill の読み込みは要らず、`~/.claude/settings.json` 等の Hook・許可も混ぜない）。本体の Skill の置き場所（`backend/skills_home/.claude/skills/`）は変えない。効果は `--debug` の再実行で確かめる |
+
 ## 未決（先生の判断待ち）
 なし

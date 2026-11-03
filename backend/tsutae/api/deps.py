@@ -138,8 +138,18 @@ async def _api_error(_request: Request, exc: Exception) -> JSONResponse:
     return error_response(exc.status_code, exc.code)
 
 
-async def _validation_error(_request: Request, _exc: Exception) -> JSONResponse:
-    return error_response(422, "invalid_input")
+def _validation_code(exc: Exception) -> str:
+    """入力エラーのコード。自由記載が長すぎるときだけ専用のコードにする（文面は返さない）。"""
+    errors = exc.errors() if isinstance(exc, RequestValidationError) else []
+    for err in errors:
+        loc = err.get("loc") or ()
+        if loc and loc[-1] == "free_text" and err.get("type") == "string_too_long":
+            return "free_text_too_long"
+    return "invalid_input"
+
+
+async def _validation_error(_request: Request, exc: Exception) -> JSONResponse:
+    return error_response(422, _validation_code(exc))
 
 
 async def _http_error(_request: Request, exc: Exception) -> JSONResponse:

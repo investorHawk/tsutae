@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { isApiError } from "../../api/http";
 import { createEntry, getQuestions } from "../../api/patient";
 import type { EntryCreate, Question } from "../../api/types";
 import { usePatientStrings } from "../../strings/PatientStrings";
@@ -33,7 +34,7 @@ type Phase =
   | { name: "done"; messageKey: string; notices: readonly string[] }
   | { name: "not_registered" };
 
-/** 自由記載が長すぎる（送る前の検査。サーバーの 422 は原因を返さないので error.generic のまま）。 */
+/** 自由記載が長すぎる（送る前の検査と、サーバーの 422 free_text_too_long）。 */
 const FREE_TEXT_TOO_LONG_KEY = "today.free_text_too_long";
 
 const NO_QUESTIONS: readonly Question[] = [];
@@ -93,7 +94,11 @@ export default function TodayForm({ pid }: { pid: string }) {
         setPhase({ name: "not_registered" });
         return;
       }
-      setError({ key: GENERIC_ERROR_KEY, at: from });
+      const tooLong = isApiError(err) && err.code === "free_text_too_long";
+      setError({
+        key: tooLong ? FREE_TEXT_TOO_LONG_KEY : GENERIC_ERROR_KEY,
+        at: from,
+      });
       setPhase({ name: "editing" });
     }
   }

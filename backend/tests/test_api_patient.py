@@ -205,7 +205,6 @@ def test_post_too_sick(client: TestClient, pid: str) -> None:
         {},
         {"free_text": "   "},
         {"too_sick": True, "free_text": SENTINEL},
-        {"free_text": SENTINEL * 200},
         {"free_text": SENTINEL, "unexpected": 1},
         {"free_text": SENTINEL, "answers": [{"question_key": "fever"}]},
         {"answers": [{"question_key": "fever", "value": "measured"}]},
@@ -647,3 +646,12 @@ def test_doctor_route_check_finds_unprotected_route(
         sys.modules.pop("tsutae_fake_doctor_router", None)
     assert len(bad) == 4
     assert all("/api/doctor/visits/{visit_id}/printed -> 200" in b for b in bad)
+
+
+def test_too_long_free_text_has_its_own_code(client: TestClient, pid: str) -> None:
+    # 患者画面が「2000字までに」と案内できるよう、長すぎる自由記載だけは専用のコード
+    for text in ("あ" * 2001, SENTINEL * 200):
+        r = client.post(f"/api/patient/{pid}/entries", json={"free_text": text})
+        assert r.status_code == 422
+        assert r.json() == {"error": "free_text_too_long"}
+        assert text[:50] not in r.text

@@ -7,6 +7,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
+import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
 import { PID, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
@@ -75,5 +76,19 @@ describe("Today (P1): free text length", () => {
     expect(box).toHaveValue(text);
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
     expect(screen.queryByText(s("today.saved"))).toBeNull();
+  });
+
+  it("server 422 free_text_too_long: today.free_text_too_long, input kept", async () => {
+    mockPatientApi({
+      createEntry: () => jsonResponse({ error: "free_text_too_long" }, 422),
+    });
+    renderPatient([{ path: "/today", element: <Today /> }], "/today");
+    const box = await pasteFreeText("abc");
+    await userEvent.click(submitButton());
+    expect(
+      await screen.findByText(s("today.free_text_too_long")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
+    expect(box).toHaveValue("abc");
   });
 });

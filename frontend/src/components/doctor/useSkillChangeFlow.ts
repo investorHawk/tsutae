@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   approveSkillChange,
   createSkillChange,
+  listSkillChanges,
   rejectSkillChange,
 } from "../../api/doctor";
 import type { CreateSkillChangeResponse, SkillChange } from "../../api/types";
@@ -10,6 +11,8 @@ import { isUsableDiff } from "./diff";
 import { isCreateSkillChangeResponse } from "./guards";
 import {
   SKILL_CHANGE_FAILED,
+  decidedPhase,
+  isLostDecision,
   settleWatched,
   watchStartedAt,
 } from "./skillChangeWork";
@@ -46,6 +49,25 @@ interface FlowOptions {
   onCreated: () => void;
   /** 承認・却下が通った後 */
   onDecided: (approved: boolean) => void;
+}
+
+/**
+ * 承認・却下の応答を失った（通信の失敗・打ち切り・409 not_pending）とき、履歴を
+ * 取り直して、その変更がすでに承認・却下されていればその段階。そうでなければ null。
+ */
+async function recoverDecision(
+  changeId: number,
+  err: unknown,
+): Promise<SkillPhase | null> {
+  if (!isLostDecision(err)) {
+    return null;
+  }
+  try {
+    const { skill_changes: history } = await listSkillChanges();
+    return decidedPhase(changeId, history);
+  } catch {
+    return null; // 取り直しも失敗したら元のエラーを出す
+  }
 }
 
 function reviewOf(
@@ -103,7 +125,16 @@ export function useSkillChangeFlow({
       }
       onDecided(approve);
     } catch (err) {
-      // 409 busy（別の承認・却下がロックを握っている）は確認画面のまま。もう一度押せる
+      // 応答を失ったかもしれない（通信の失敗・打ち切り・not_pending）なら履歴で確かめる。
+      // 済んでいればその結果を出す（押したボタンではなく履歴の状態に従う）
+      const recovered = await recoverDecision(target.id, err);
+      if (recovered !== null) {
+        setPhase(recovered);
+        onDecided(recovered.kind === "approved");
+        return;
+      }
+      // まだ pending・409 busy（別の承認・却下がロックを握っている）などは確認画面のまま。
+      // もう一度押せる
       setPhase(reviewOf(target, handleError(err)));
     }
   }

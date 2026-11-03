@@ -224,3 +224,32 @@ describe("Today: while sending", () => {
     expect(screen.queryByText(s("today.sending"))).toBeNull();
   });
 });
+
+describe("Today: a network failure while sending", () => {
+  it("keeps the input, shows error.generic, and the same entry can be sent again", async () => {
+    let fail = true;
+    const fetchMock = mockPatientApi({
+      createEntry: () =>
+        fail
+          ? Promise.reject(new TypeError("Failed to fetch"))
+          : jsonResponse({ entry_id: 1, notices: [] }),
+    });
+    renderToday();
+    await choose("diarrhea", "answer.present");
+    await userEvent.click(submitButton());
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      s("error.generic"),
+    );
+    const group = screen.getByRole("group", { name: questionText("diarrhea") });
+    expect(
+      within(group).getByRole("button", { name: s("answer.present") }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fail = false;
+    await userEvent.click(submitButton());
+    await screen.findByText(s("today.saved"));
+    // 送り直しは同じ内容（サーバーが直近の同じ記録を返すので二重にならない）
+    const sent = callsTo(fetchMock, "POST", ENTRIES_URL);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+  });
+});

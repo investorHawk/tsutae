@@ -290,6 +290,9 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - フロントの通信のタイムアウト: 患者 API 20秒、医師 API 30秒、D4 の依頼 10分（打ち切りは通信の失敗と同じ扱い）
 - 医師画面の「印刷」は、同じオリジンの非表示 iframe にレポートを読み込んで親から `print()` を呼ぶ（レポートの CSP は script を止めるため）。失敗したら「レポートを開く」から ⌘P
 
+- 医師 API の状態を変える POST（login 以外。logout を含む）は `require_same_origin`: `Sec-Fetch-Site` が cross-site/same-site、または `Origin` が「要求の Host の origin」とも `public_base_url` の origin とも違えば 403 `cross_origin`（どちらのヘッダも無ければ通す）。リバースプロキシが Host を書き換える構成では `public_base_url` を正しく設定する。frontend を別のサブドメインに置く構成は使えない
+- 送り直しの重複防止: 同じ患者・同じ内容の記録が120秒以内にあれば新しく作らずその記録を返す（`db.add_entry_once`）。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）
+
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=["project"]`、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_h3(work_root, logger)`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
 - `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の同じ相対位置に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない

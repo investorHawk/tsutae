@@ -22,6 +22,13 @@
   上限（max_total）も掛ける（あふれたら全員を断る。追う相手の数もこれで抑えられる）。
   公開するときは、信用するプロキシが XFF を上書きする（追記しない）こと、または
   uvicorn を `--no-proxy-headers` / `--forwarded-allow-ips` で絞ることが前提
+- 医師 API の状態を変える POST（login を除く）は `require_same_origin`（CSRF の守り）:
+  `Sec-Fetch-Site` が cross-site・same-site なら 403 `{"error": "cross_origin"}`。
+  `Origin` があり、要求の Host から作った origin（scheme は request.url.scheme）とも
+  public_base_url の origin とも違えば 403（`null` も）。どちらのヘッダも無ければ通す
+  （TestClient・curl・古いブラウザ）。GET・HEAD・OPTIONS は見ない。開発の Vite proxy
+  は Host を書き換えない（changeOrigin なし）ので Origin と Host が一致して通る。
+  患者 API には付けない（SameSite=Lax の Cookie と署名で足りる）
 """
 
 from __future__ import annotations
@@ -38,6 +45,7 @@ from collections import deque
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -84,6 +92,7 @@ __all__ = [
     "require_doctor",
     "require_json_body",
     "require_patient",
+    "require_same_origin",
     "set_doctor_cookie",
     "set_patient_cookie",
     "verify_doctor_token",
@@ -367,6 +376,55 @@ def require_json_body(request: Request) -> None:
     """
     if not is_json_media_type(request.headers.get("content-type")):
         raise ApiError(415, "unsupported_media_type")
+
+
+# ---------------------------------------------------------------------------
+# 同じ origin からの要求か（医師 API の CSRF の守り）
+# ---------------------------------------------------------------------------
+
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+_CROSS_FETCH_SITES = frozenset({"cross-site", "same-site"})
+
+
+def _origin_of(url: str) -> str | None:
+    """`scheme://host[:port]`（小文字）。scheme か host が無ければ None。"""
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:
+        return None
+    if not parts.scheme or not parts.netloc:
+        return None
+    return f"{parts.scheme}://{parts.netloc}".lower()
+
+
+def _allowed_origins(request: Request) -> set[str]:
+    allowed: set[str] = set()
+    host = request.headers.get("host")
+    if host:
+        allowed.add(f"{request.url.scheme}://{host}".lower())
+    public = _origin_of(get_settings_dep(request).public_base_url)
+    if public is not None:
+        allowed.add(public)
+    return allowed
+
+
+def require_same_origin(request: Request) -> None:
+    """Depends 用。別サイトからの状態を変える要求なら 403 cross_origin。
+
+    Sec-Fetch-Site が cross-site・same-site なら断る。Origin があり、要求の Host から
+    作った origin とも public_base_url の origin とも違えば断る（`null` も）。どちらの
+    ヘッダも無ければ通す。GET・HEAD・OPTIONS は見ない（ルーター全体に付けてよい）。
+    """
+    if request.method.upper() in _SAFE_METHODS:
+        return
+    site = request.headers.get("sec-fetch-site")
+    if site is not None and site.strip().lower() in _CROSS_FETCH_SITES:
+        raise ApiError(403, "cross_origin")
+    origin = request.headers.get("origin")
+    if origin is None:
+        return
+    if origin.strip().lower() not in _allowed_origins(request):
+        raise ApiError(403, "cross_origin")
 
 
 # ---------------------------------------------------------------------------

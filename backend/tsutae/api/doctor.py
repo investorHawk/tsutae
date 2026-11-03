@@ -16,6 +16,10 @@
   なければ 415 `{"error": "unsupported_media_type"}`（`require_json_body`。Cookie の検査の
   後、本文の検証の前）。本文の無い POST（printed）は frontend が Content-Type を付けない
   ので対象外
+- 状態を変える POST（login を除く。本文の無い printed・logout も）は
+  `require_same_origin`（Sec-Fetch-Site が cross-site・same-site、または Origin が
+  Host・public_base_url の origin と違えば 403 `{"error": "cross_origin"}`。Cookie の
+  検査の後、本文の検証の前）。GET は見ない
 """
 
 from __future__ import annotations
@@ -40,6 +44,7 @@ from tsutae.api.deps import (
     login_limiter,
     require_doctor,
     require_json_body,
+    require_same_origin,
     set_doctor_cookie,
 )
 from tsutae.config import Settings, now
@@ -49,7 +54,10 @@ from tsutae.schemas import Course, Regimen
 __all__ = ["REPORT_HEADERS", "register_url", "router"]
 
 router = APIRouter(prefix="/api/doctor")
-_protected = APIRouter(dependencies=[Depends(require_doctor)])
+# require_same_origin は GET を見ないので、ルーター全体に付ける（POST の付け忘れを防ぐ）
+_protected = APIRouter(
+    dependencies=[Depends(require_doctor), Depends(require_same_origin)]
+)
 
 REPORT_HEADERS = {
     "Cache-Control": "no-store",
@@ -101,7 +109,7 @@ def login(
     return {"ok": True}
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(require_same_origin)])
 def logout(response: Response) -> dict[str, bool]:
     clear_doctor_cookie(response)
     return {"ok": True}

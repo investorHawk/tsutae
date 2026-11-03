@@ -1,6 +1,8 @@
 """医師 API: Skill の一覧と書き換え（D4。docs/architecture.md §8・§8b・§9b）。
 
-- 全経路で医師 Cookie を検査する（`require_doctor`）
+- 全経路で医師 Cookie を検査する（`require_doctor`）。POST（依頼・承認・却下）は
+  その後で `require_same_origin`（別サイトからの要求は 403 `{"error": "cross_origin"}`。
+  GET は見ない）
 - `POST /skill-changes` は Content-Type が application/json でなければ 415
   `{"error": "unsupported_media_type"}`（`require_json_body`。本文の無い approve・reject
   は frontend が Content-Type を付けないので対象外）
@@ -38,6 +40,7 @@ from tsutae.api.deps import (
     Conn,
     require_doctor,
     require_json_body,
+    require_same_origin,
 )
 from tsutae.skillchange import (
     BAD_REQUEST_CODES,
@@ -59,7 +62,10 @@ from tsutae.skills import (
 
 __all__ = ["error_status", "router"]
 
-router = APIRouter(prefix="/api/doctor", dependencies=[Depends(require_doctor)])
+router = APIRouter(
+    prefix="/api/doctor",
+    dependencies=[Depends(require_doctor), Depends(require_same_origin)],
+)
 
 ChangeId = Annotated[int, Path(ge=1, le=2**62)]
 _CHANGE_FIELDS = (

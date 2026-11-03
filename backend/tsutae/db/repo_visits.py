@@ -13,6 +13,7 @@ visits の行そのものは残す（状態の履歴として）。
 - save_visit_result は timeline・report・status を1つのトランザクションで書く（途中で
   失敗すれば何も残らない）。生成の終わりはこれを使う
 - purge_expired は status を問わず、期限を過ぎて中身が残っている受診を全て消す
+- create_visit_once は同じ患者・日・受付番号の期限内の受診があれば作らない（送り直し）
 """
 
 from __future__ import annotations
@@ -82,24 +83,70 @@ def create_visit(
     course_no: int | None,
 ) -> int:
     """受診を status=generating で作り、id を返す。"""
+    cleaned = _check_new_visit(conn, pid, reception_no, course_no)
+    with write_transaction(conn):
+        return _insert_visit(conn, pid, cleaned, visit_date, expires_at, course_no)
+
+
+def create_visit_once(
+    conn: sqlite3.Connection,
+    pid: str,
+    reception_no: str,
+    visit_date: date,
+    expires_at: datetime,
+    course_no: int | None,
+) -> tuple[int, bool]:
+    """同じ患者・同じ日・同じ受付番号で、受付番号が残り期限内の受診があればその id と
+    False を、無ければ作って (id, True) を返す（送り直しで二重にしない）。
+
+    探すのと入れるのを1つの write_transaction で行う。期限内は `expires_at > 今`
+    （`config.now()`）。印刷済み・期限切れ（受付番号を消した受診）は使わない。
+    """
+    cleaned = _check_new_visit(conn, pid, reception_no, course_no)
+    with write_transaction(conn):
+        row = conn.execute(
+            "SELECT id FROM visits WHERE patient_id = ? AND reception_no = ?"
+            " AND visit_date = ? AND expires_at > ? ORDER BY id LIMIT 1",
+            (pid, cleaned, date_to_db(visit_date), dt_to_db(clock_now())),
+        ).fetchone()
+        if row is not None:
+            return int(row["id"]), False
+        vid = _insert_visit(conn, pid, cleaned, visit_date, expires_at, course_no)
+    return vid, True
+
+
+def _check_new_visit(
+    conn: sqlite3.Connection, pid: str, reception_no: str, course_no: int | None
+) -> str:
     cleaned = _clean_reception_no(reception_no)
     if course_no is not None and (not isinstance(course_no, int) or course_no < 1):
         raise ValueError("course_no は1以上の整数")
     require_exists(conn, "patients", pid, "patient")
-    with write_transaction(conn):
-        cur = conn.execute(
-            "INSERT INTO visits (patient_id, reception_no, visit_date, created_at,"
-            " status, expires_at, fallback, course_no)"
-            " VALUES (?, ?, ?, ?, 'generating', ?, 0, ?)",
-            (
-                pid,
-                cleaned,
-                date_to_db(visit_date),
-                dt_to_db(clock_now()),
-                dt_to_db(expires_at),
-                course_no,
-            ),
-        )
+    return cleaned
+
+
+def _insert_visit(
+    conn: sqlite3.Connection,
+    pid: str,
+    cleaned: str,
+    visit_date: date,
+    expires_at: datetime,
+    course_no: int | None,
+) -> int:
+    """write_transaction の内側で呼ぶ。"""
+    cur = conn.execute(
+        "INSERT INTO visits (patient_id, reception_no, visit_date, created_at,"
+        " status, expires_at, fallback, course_no)"
+        " VALUES (?, ?, ?, ?, 'generating', ?, 0, ?)",
+        (
+            pid,
+            cleaned,
+            date_to_db(visit_date),
+            dt_to_db(clock_now()),
+            dt_to_db(expires_at),
+            course_no,
+        ),
+    )
     return int(cur.lastrowid)
 
 

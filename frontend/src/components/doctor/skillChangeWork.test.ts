@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SkillChange } from "../../api/types";
+import { ApiError, NETWORK_ERROR } from "../../api/http";
 import {
+  decidedPhase,
   elapsedSeconds,
   findWorking,
+  isLostDecision,
   watchStartedAt,
   isWorking,
   settleWatched,
@@ -125,5 +128,51 @@ describe("watchStartedAt", () => {
     expect(watchStartedAt("2026-11-12T10:00:00+09:00", NOW)).toBe(NOW);
     expect(watchStartedAt("2026-11-01T10:00:00+09:00", NOW)).toBe(NOW);
     expect(watchStartedAt("not a date", NOW)).toBe(NOW);
+  });
+});
+
+describe("isLostDecision", () => {
+  it("通信の失敗・打ち切り（status 0）と 409 not_pending は応答を失ったかもしれない", () => {
+    expect(isLostDecision(new ApiError(0, NETWORK_ERROR))).toBe(true);
+    expect(isLostDecision(new ApiError(409, "not_pending"))).toBe(true);
+  });
+
+  it("それ以外（busy・stale_base・invalid_response・401・ApiError でない）は違う", () => {
+    expect(isLostDecision(new ApiError(409, "busy"))).toBe(false);
+    expect(isLostDecision(new ApiError(409, "stale_base"))).toBe(false);
+    expect(isLostDecision(new ApiError(200, "invalid_response"))).toBe(false);
+    expect(isLostDecision(new ApiError(401, "not_logged_in"))).toBe(false);
+    expect(isLostDecision(new Error("x"))).toBe(false);
+  });
+});
+
+describe("decidedPhase", () => {
+  it("履歴で approved なら承認の表示（version は履歴の new_version）", () => {
+    const history = [
+      change({ status: "approved", diff: DIFF, new_version: 2 }),
+    ];
+    expect(decidedPhase(7, history)).toEqual({
+      kind: "approved",
+      skillName: "regimen-folfox",
+      newVersion: 2,
+    });
+  });
+
+  it("履歴で rejected なら却下の表示", () => {
+    const history = [change({ status: "rejected", diff: DIFF })];
+    expect(decidedPhase(7, history)).toEqual({
+      kind: "rejected",
+      skillName: "regimen-folfox",
+    });
+  });
+
+  it("まだ pending・failed・履歴に無い・approved で new_version が無いなら null", () => {
+    expect(decidedPhase(7, [change({ diff: DIFF })])).toBeNull();
+    expect(decidedPhase(7, [change({ status: "failed" })])).toBeNull();
+    expect(decidedPhase(7, [change({ id: 8, status: "approved" })])).toBeNull();
+    expect(
+      decidedPhase(7, [change({ status: "approved", new_version: null })]),
+    ).toBeNull();
+    expect(decidedPhase(7, [])).toBeNull();
   });
 });

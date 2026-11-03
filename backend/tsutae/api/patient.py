@@ -4,6 +4,9 @@
 - 患者画面に出る文字列は patient_strings.json と、承認済み Skill の質問文だけ
 - 記録は今の regimen Skill の skill_version で保存する。回答は Skill の質問集に照らして
   検査する（未知の質問・回答の型違いは 422 invalid_input）
+- 記録の送り直し（タイムアウトの後など）: 同じ患者・同じ内容（EntryCreate を正規化した
+  形が一致）の記録が直近 120 秒以内にあれば、新しく作らずその entry_id と notices を
+  返す（`db.add_entry_once`）
 - 登録（Cookie の発行はここだけ）は、クライアント（request.client.host）ごとに失敗
   （unknown_patient）が 10 分で 10 回に達したら、以降の試行を 429 too_many_attempts
   で断る（正しい pid でも断る。成功・422 は数えない）。全クライアントの合計が 10 分で
@@ -15,6 +18,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from datetime import timedelta
 from functools import lru_cache
 from typing import Any
 
@@ -45,6 +49,7 @@ _VALUES: dict[AnswerType, frozenset[str]] = {
     "three_level": frozenset({"none", "present", "hard"}),
     "temperature": frozenset({"not_measured", "measured"}),
 }
+RESEND_WINDOW = timedelta(seconds=120)  # 同じ内容の記録を送り直しとみなす長さ
 _VERSION_RE = re.compile(r"(?P<name>[a-z0-9][a-z0-9-]*)@(?P<version>[1-9][0-9]{0,8})")
 
 
@@ -124,7 +129,9 @@ def create_entry(
     patient = require_patient(pid, request, conn)
     skill = _regimen_skill(patient, settings)
     _check_answers(entry, skill)
-    saved = db.add_entry(conn, patient["id"], entry, now(), skill.skill_version)
+    saved = db.add_entry_once(
+        conn, patient["id"], entry, now(), skill.skill_version, RESEND_WINDOW
+    )
     return {"entry_id": saved.id, "notices": notices_for(entry, skill)}
 
 

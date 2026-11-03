@@ -3,6 +3,10 @@
 - Cookie の患者で受診を作る（status=generating、course_no は今コース、
   expires_at = now + report_ttl_hours）。今コースが無ければ 409 no_course
 - 受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（制御文字は不可）
+- 送り直し（タイムアウトの後など）: 同じ患者で、受付番号が残っていて期限内の受診が
+  今日すでにあり、正規化した受付番号が同じなら、新しく作らず生成も起動しないで同じ
+  応答を返す（`db.create_visit_once`。status は問わない: failed でも作り直さない）。
+  受付番号が違えば新しく作る
 - 変換は BackgroundTasks で。新しい接続を開き、`app.state.runner_factory()` の runner で
   `tsutae.pipeline.service.generate_visit_report` を呼ぶ（呼ぶときに属性を引くので
   テストで差し替えられる）。例外は外へ出さず（型名だけログ）、生成中のままなら failed
@@ -74,7 +78,7 @@ def create_visit(
     if reception_no is None:
         raise ApiError(422, "invalid_input")
     course_no = _current_course_no(conn, patient["id"])
-    visit_id = db.create_visit(
+    visit_id, created = db.create_visit_once(
         conn,
         patient["id"],
         reception_no,
@@ -82,9 +86,10 @@ def create_visit(
         now() + timedelta(hours=settings.report_ttl_hours),
         course_no,
     )
-    background.add_task(
-        run_generation, settings, request.app.state.runner_factory, visit_id
-    )
+    if created:
+        background.add_task(
+            run_generation, settings, request.app.state.runner_factory, visit_id
+        )
     return {"ok": True, "message_key": "visit.done"}
 
 

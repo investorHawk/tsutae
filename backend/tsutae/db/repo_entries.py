@@ -1,6 +1,8 @@
 """患者の記録（クローズ回答・自由記載の原文）。
 
 recorded_at は JST で保存し、record_date は config.to_jst_date(recorded_at)。
+`add_entry_once` は同じ患者・同じ内容（`entry_content` が一致）の記録が直近 window
+以内にあれば、新しく作らずそれを返す（送り直しで二重にしない）。
 """
 
 from __future__ import annotations
@@ -8,7 +10,8 @@ from __future__ import annotations
 import re
 import sqlite3
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from typing import Any
 
 from tsutae.config import to_jst_date
 from tsutae.db.connection import (
@@ -46,6 +49,65 @@ def add_entry(
     if saved is None:  # pragma: no cover - 直前に書いた行が無いのは異常
         raise RuntimeError("entry was not saved")
     return saved
+
+
+def add_entry_once(
+    conn: sqlite3.Connection,
+    pid: str,
+    entry: EntryCreate,
+    recorded_at: datetime,
+    skill_version: str,
+    window: timedelta,
+) -> Entry:
+    """同じ内容の記録が recorded_at の前 window 以内にあればそれを、無ければ保存して返す。
+
+    探すのと入れるのを1つの write_transaction で行う（同時の送り直しでも1件）。
+    内容の比較に skill_version は使わない（返すのは保存済みの記録そのもの）。
+    """
+    validate_skill_version(skill_version)
+    if window < timedelta(0):
+        raise ValueError("window は 0 以上")
+    require_exists(conn, "patients", pid, "patient")
+    wanted = entry_content(entry)
+    since = dt_to_db(recorded_at - window)
+    with write_transaction(conn):
+        recent = _load_entries(
+            conn, "e.patient_id = ? AND e.recorded_at >= ?", (pid, since)
+        )
+        found = next((e for e in recent if saved_content(e) == wanted), None)
+        if found is not None:
+            return found
+        entry_id = insert_entry_rows(conn, pid, entry, recorded_at, skill_version)
+    saved = get_entry(conn, entry_id)
+    if saved is None:  # pragma: no cover - 直前に書いた行が無いのは異常
+        raise RuntimeError("entry was not saved")
+    return saved
+
+
+def _content(
+    too_sick: bool, by_proxy: bool, answers: list[ClosedAnswer], free_text: str | None
+) -> dict[str, Any]:
+    ordered = sorted(answers, key=lambda a: a.question_key)
+    return {
+        "too_sick": too_sick,
+        "by_proxy": by_proxy,
+        "answers": [a.model_dump(mode="json") for a in ordered],
+        "free_text": free_text,
+    }
+
+
+def entry_content(entry: EntryCreate) -> dict[str, Any]:
+    """記録の内容の正規化した形（回答は question_key 順。JSON にできる値だけ）。"""
+    return _content(
+        entry.too_sick, entry.by_proxy, list(entry.answers), entry.free_text
+    )
+
+
+def saved_content(entry: Entry) -> dict[str, Any]:
+    """保存済みの記録の内容（`entry_content` と比べられる形）。"""
+    return _content(
+        entry.kind == "too_sick", entry.by_proxy, list(entry.answers), entry.free_text
+    )
 
 
 def validate_skill_version(skill_version: str) -> None:

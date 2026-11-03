@@ -3,6 +3,7 @@
  * 判定と、見張っている変更が終わったときの次の段階（純関数）。
  */
 import { SKILL_CHANGE_TIMEOUT_MS } from "../../api/doctor";
+import { isApiError } from "../../api/http";
 import type { SkillChange } from "../../api/types";
 import { isUsableDiff } from "./diff";
 import type { SkillPhase } from "./useSkillChangeFlow";
@@ -80,4 +81,38 @@ export function watchStartedAt(createdAt: string, nowMs: number): number {
     created <= nowMs &&
     nowMs - created <= SKILL_CHANGE_TIMEOUT_MS;
   return plausible ? created : nowMs;
+}
+
+/**
+ * 承認・却下の要求の失敗が「サーバーでは済んだかもしれない」ものか。通信の失敗・
+ * 打ち切り（status 0）と 409 not_pending（もう pending でない）だけ。busy・stale_base・
+ * invalid_response などは済んでいないので違う。
+ */
+export function isLostDecision(err: unknown): boolean {
+  if (!isApiError(err)) {
+    return false;
+  }
+  return err.status === 0 || (err.status === 409 && err.code === "not_pending");
+}
+
+/**
+ * 取り直した履歴で、その変更がすでに承認・却下されていればその段階。まだ pending・
+ * failed・履歴に無い・approved で new_version が無いなら null（エラーのまま）。
+ */
+export function decidedPhase(
+  changeId: number,
+  history: readonly SkillChange[],
+): SkillPhase | null {
+  const found = history.find((c) => c.id === changeId);
+  if (found?.status === "approved" && found.new_version !== null) {
+    return {
+      kind: "approved",
+      skillName: found.skill_name,
+      newVersion: found.new_version,
+    };
+  }
+  if (found?.status === "rejected") {
+    return { kind: "rejected", skillName: found.skill_name };
+  }
+  return null;
 }

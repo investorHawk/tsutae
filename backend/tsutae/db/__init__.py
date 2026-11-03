@@ -15,7 +15,7 @@ from tsutae.db.connection import (
     init_db,
     write_transaction,
 )
-from tsutae.db.repo_entries import add_entry, get_entry, list_entries
+from tsutae.db.repo_entries import add_entry, add_entry_once, get_entry, list_entries
 from tsutae.db.repo_logs import add_pipeline_log, list_pipeline_logs
 from tsutae.db.repo_patients import (
     PATIENT_ID_PATTERN,
@@ -37,6 +37,7 @@ from tsutae.db.repo_skills import (
 )
 from tsutae.db.repo_visits import (
     create_visit,
+    create_visit_once,
     get_report,
     get_timeline,
     get_visit,
@@ -54,11 +55,13 @@ __all__ = [
     "PATIENT_ID_PATTERN",
     "VisitClosedError",
     "add_entry",
+    "add_entry_once",
     "add_pipeline_log",
     "connect",
     "create_patient",
     "create_skill_change",
     "create_visit",
+    "create_visit_once",
     "get_entry",
     "get_patient",
     "get_report",

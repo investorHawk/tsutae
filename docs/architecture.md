@@ -269,6 +269,14 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `scripts/seed_demo.py` | W3-api | `python scripts/seed_demo.py [--db PATH]`: 合成3人（`tsutae.dataset`）とコース・記録を入れ、`ensure_skill_versions`。既にいる患者は飛ばす（**DB を消さない**） |
 | `tests/test_api_*.py` `tests/test_architecture.py` | 各担当 | `fastapi.testclient.TestClient`。runner は `pipeline_fakes.FakeRunner`、editor は偽物。アーキテクチャテストは `ast` で `api/patient.py` の import を検査 |
 
+### W3 後の決定（2026-11-04）
+- `GET /api/doctor/visits` に出すのは受付番号のある generating・ready・failed だけ（印刷済み・期限切れは出さない）
+- `GET /api/doctor/skills` は `{skills: [{name, version}], invalid: [{name, code, required}]}`（壊れた Skill があっても医師画面を止めない。設定画面は `invalid` を表示する）
+- Skill の承認・却下はどちらも Skill ごとのファイルロック（flock）の中で行い、握られていれば 409 `{"error":"busy"}`。`reject_change(conn, id, *, skills_home=None)`（API は skills_home を渡す）
+- `SdkSkillEditor(settings=None, query_fn=None)`。医師 API のルーターは login/logout 以外に `Depends(require_doctor)` を付ける
+- 想定外の例外は 500 `{"error":"internal_error"}` と `X-Error-Id` ヘッダ。ログには型名と相関IDだけ
+- `/docs`・`/redoc`・`/openapi.json` は無効
+
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=["project"]`、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_h3(work_root, logger)`）・H4、`max_turns` は 12、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
 - `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の同じ相対位置に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない

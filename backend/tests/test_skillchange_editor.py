@@ -1,0 +1,271 @@
+"""tsutae.skillchange.editor（SdkSkillEditor の組み立て。API は呼ばない）。"""
+
+from __future__ import annotations
+
+import dataclasses
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from claude_agent_sdk import ClaudeAgentOptions, ResultMessage
+
+from tsutae.config import get_settings
+from tsutae.masking import detect_identifiers
+from tsutae.pipeline.hooks import H3_MATCHER
+from tsutae.pipeline.logs import MemoryLogger
+from tsutae.schemas import RunStats
+from tsutae.skillchange.editor import (
+    EDITOR_ALLOWED_TOOLS,
+    EDITOR_MAX_TURNS,
+    SdkSkillEditor,
+    SkillEditor,
+    build_options,
+    build_prompt,
+    current_logger,
+    logging_to,
+)
+
+NAME = "regimen-folfox"
+
+
+@pytest.fixture
+def work_root(tmp_path: Path) -> Path:
+    root = (tmp_path / "work").resolve()
+    (root / ".claude" / "skills" / NAME).mkdir(parents=True)
+    (root / ".claude" / "skills" / NAME / "SKILL.md").write_text("x", "utf-8")
+    return root
+
+
+def _options(work_root: Path, logger: MemoryLogger | None = None) -> Any:
+    return build_options(work_root, get_settings(), logger or MemoryLogger())
+
+
+async def _call(options: ClaudeAgentOptions, event: str, data: dict) -> list[dict]:
+    """event の HookMatcher のうち、matcher が tool_name に合うものを順に呼ぶ。"""
+    results = []
+    for m in options.hooks[event]:  # type: ignore[index]
+        tool = data.get("tool_name")
+        if m.matcher is not None and tool not in m.matcher.split("|"):
+            continue
+        for hook in m.hooks:
+            results.append(await hook(data, None, None))
+    return results
+
+
+def _denied(results: list[dict]) -> bool:
+    return any(
+        r.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+        for r in results
+    )
+
+
+# ---------------------------------------------------------------------------
+# build_options
+# ---------------------------------------------------------------------------
+
+
+def test_build_options_fields(work_root: Path) -> None:
+    settings = dataclasses.replace(get_settings(), model="claude-test-model")
+    options = build_options(work_root, settings, MemoryLogger())
+    assert options.cwd == str(work_root)
+    assert options.setting_sources == ["project"]
+    assert options.allowed_tools == ["Read", "Edit", "Write"]
+    assert list(EDITOR_ALLOWED_TOOLS) == ["Read", "Edit", "Write"]
+    for tool in ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "Skill"):
+        assert tool in options.disallowed_tools
+    assert not set(options.allowed_tools) & set(options.disallowed_tools)
+    assert options.permission_mode == "acceptEdits"
+    assert options.max_turns == EDITOR_MAX_TURNS == 12
+    assert options.model == "claude-test-model"
+    assert options.max_budget_usd == settings.pipeline_max_budget_usd
+    assert options.agents in (None, {})
+    assert not options.mcp_servers
+
+
+def test_build_options_hooks_shape(work_root: Path) -> None:
+    hooks = _options(work_root).hooks
+    assert set(hooks) == {"UserPromptSubmit", "PreToolUse"}
+    matchers = [m.matcher for m in hooks["PreToolUse"]]
+    assert None in matchers  # H4（全ツール）
+    assert H3_MATCHER in matchers
+    assert "Read" in matchers
+    for group in hooks.values():
+        for m in group:
+            assert m.on_failure == "block"
+            assert len(m.hooks) == 1
+
+
+async def test_h1_blocks_prompt_with_name(work_root: Path) -> None:
+    logger = MemoryLogger()
+    options = _options(work_root, logger)
+    blocked = await _call(
+        options, "UserPromptSubmit", {"prompt": build_prompt(NAME, "磯鷲さんの件")}
+    )
+    assert blocked[0]["decision"] == "block"
+    ok = await _call(
+        options, "UserPromptSubmit", {"prompt": build_prompt(NAME, "下痢の質問を短く")}
+    )
+    assert ok == [{}]
+    assert logger.names() == ["hook_h1_block", "hook_h1_allow"]
+
+
+@pytest.mark.parametrize(
+    "tool, tool_input",
+    [
+        ("Bash", {"command": "ls"}),
+        ("Agent", {"subagent_type": "general-purpose"}),
+        ("Task", {"subagent_type": "general-purpose"}),
+        ("WebFetch", {"url": "https://example.com"}),
+        ("MultiEdit", {"file_path": "/x"}),
+        ("Skill", {"skill": NAME}),
+    ],
+)
+async def test_h4_denies_other_tools(
+    work_root: Path, tool: str, tool_input: dict
+) -> None:
+    results = await _call(
+        _options(work_root),
+        "PreToolUse",
+        {"tool_name": tool, "tool_input": tool_input},
+    )
+    assert _denied(results)
+
+
+async def test_h3_allows_only_skill_file_in_work_root(work_root: Path) -> None:
+    options = _options(work_root)
+    target = work_root / ".claude" / "skills" / NAME / "SKILL.md"
+    for tool in ("Edit", "Write"):
+        ok = await _call(
+            options,
+            "PreToolUse",
+            {"tool_name": tool, "tool_input": {"file_path": str(target)}},
+        )
+        assert not _denied(ok)
+    for bad in (
+        work_root / "other.md",
+        work_root / ".claude" / "skills" / NAME / ".." / ".." / "settings.json",
+        work_root.parent / "skills_home" / ".claude" / "skills" / NAME / "SKILL.md",
+        Path(".claude/skills") / NAME / "SKILL.md",
+    ):
+        results = await _call(
+            options,
+            "PreToolUse",
+            {"tool_name": "Write", "tool_input": {"file_path": str(bad)}},
+        )
+        assert _denied(results), bad
+
+
+async def test_read_is_confined_to_work_root(work_root: Path, tmp_path: Path) -> None:
+    options = _options(work_root)
+    inside = work_root / ".claude" / "skills" / NAME / "SKILL.md"
+    ok = await _call(
+        options,
+        "PreToolUse",
+        {"tool_name": "Read", "tool_input": {"file_path": str(inside)}},
+    )
+    assert not _denied(ok)
+    outside = tmp_path / "secret.db"
+    outside.write_text("x", "utf-8")
+    link = work_root / "link.db"
+    link.symlink_to(outside)
+    for bad in (
+        str(outside),
+        str(link),
+        str(work_root / ".." / "secret.db"),
+        "rel.md",
+        None,
+    ):
+        results = await _call(
+            options,
+            "PreToolUse",
+            {"tool_name": "Read", "tool_input": {"file_path": bad}},
+        )
+        assert _denied(results), bad
+
+
+# ---------------------------------------------------------------------------
+# build_prompt
+# ---------------------------------------------------------------------------
+
+
+def test_prompt_contains_request_and_relative_path() -> None:
+    prompt = build_prompt(NAME, "下痢の質問の文をやさしくして")
+    assert "下痢の質問の文をやさしくして" in prompt
+    assert f".claude/skills/{NAME}/SKILL.md" in prompt
+    assert "version" in prompt
+
+
+@pytest.mark.parametrize("name", [NAME, "regimen-capox", "report-format-default"])
+def test_prompt_itself_passes_h1(name: str) -> None:
+    assert detect_identifiers(build_prompt(name, "質問を1つ足して")) == []
+
+
+def test_prompt_rejects_bad_name() -> None:
+    with pytest.raises(ValueError):
+        build_prompt("../etc", "x")
+
+
+# ---------------------------------------------------------------------------
+# SdkSkillEditor（偽の query）
+# ---------------------------------------------------------------------------
+
+
+def _result() -> ResultMessage:
+    return ResultMessage(
+        subtype="success",
+        duration_ms=900,
+        duration_api_ms=800,
+        is_error=False,
+        num_turns=4,
+        session_id="s",
+        total_cost_usd=0.12,
+        usage={"input_tokens": 30, "output_tokens": 7},
+    )
+
+
+class FakeQuery:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, ClaudeAgentOptions]] = []
+
+    def __call__(self, *, prompt: str, options: ClaudeAgentOptions) -> AsyncIterator:
+        self.calls.append((prompt, options))
+
+        async def gen() -> AsyncIterator[Any]:
+            yield object()
+            yield _result()
+
+        return gen()
+
+
+async def test_sdk_editor_runs_query_with_options(work_root: Path) -> None:
+    fake = FakeQuery()
+    editor = SdkSkillEditor(get_settings(), query_fn=fake)
+    assert isinstance(editor, SkillEditor)
+    logger = MemoryLogger()
+    with logging_to(logger):
+        stats = await editor.edit(work_root, NAME, "下痢の質問を短く")
+    assert stats == RunStats(
+        duration_ms=900, num_turns=4, tokens_in=30, tokens_out=7, cost_usd=0.12
+    )
+    prompt, options = fake.calls[0]
+    assert prompt == build_prompt(NAME, "下痢の質問を短く")
+    assert options.cwd == str(work_root)
+    # Hook の記録は logging_to で渡したロガーに入る
+    await _call(options, "PreToolUse", {"tool_name": "Bash", "tool_input": {}})
+    assert "hook_h4_deny" in logger.names()
+
+
+async def test_sdk_editor_without_logger_uses_memory_logger(work_root: Path) -> None:
+    fake = FakeQuery()
+    await SdkSkillEditor(query_fn=fake).edit(work_root, NAME, "下痢の質問を短く")
+    assert len(fake.calls) == 1
+
+
+def test_logging_to_restores_previous_logger() -> None:
+    outer, inner = MemoryLogger(), MemoryLogger()
+    with logging_to(outer):
+        with logging_to(inner):
+            assert current_logger() is inner
+        assert current_logger() is outer
+    assert current_logger() is not outer

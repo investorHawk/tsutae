@@ -7,13 +7,62 @@
   --d-surface: #f4f5f7;
   --d-border: #c4c8cf;
   --d-primary: #1a4f8b;
+  --d-primary-strong: #0f3563;
   --d-danger: #9b0000;
   --d-ok: #1d5e20;
+  /* 色の意味は患者画面とそろえる（医師画面の UX の見直し。doctorCss.test.ts で比を検査）:
+     ある = 淡い青の地に紺、つらい = 紺の地に白、なし = 薄い灰、受診日 = 緑、
+     要確認・注意 = 橙、代理 = 紫 */
+  --d-yes-bg: #e6eefa;
+  --d-yes-text: #00448f;
+  --d-hard-bg: #00448f;
+  --d-hard-text: #ffffff;
+  --d-none-text: #6b6b6b;
+  --d-visit: #1b7a3a;
+  --d-warn-bg: #fff1e0;
+  --d-warn-border: #b85c00;
+  --d-warn-text: #9a4a00;
+  --d-proxy-bg: #f1ecfa;
+  --d-proxy-text: #6b4fa0;
 
   min-height: 100vh;
   font-size: 15px;
   color: var(--d-text);
   background: var(--d-bg);
+}
+
+/* 架空の注記: 全ページの上端に貼りつく細い帯（DC-1） */
+.doctor-synthetic {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px 24px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4a3500;
+  text-align: center;
+  background: #fff4d0;
+  border-bottom: 1px solid #e3c766;
+}
+
+/* リンクは紺に揃える（DC-2）。訪問済みも同じ色、hover で濃く、キーボードの focus は枠。
+   :where() で詳細度を a だけに保ち、.d-linkbutton・.d-sublink・.doctor-nav a の色に勝たない
+   （ヘッダーのリンクの規則はこの後に置く） */
+.doctor-app a,
+.doctor-app a:where(:visited) {
+  color: var(--d-primary);
+  text-underline-offset: 2px;
+}
+
+.doctor-app a:where(:hover) {
+  color: var(--d-primary-strong);
+}
+
+.doctor-app a:focus-visible {
+  outline: 2px solid var(--d-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .doctor-header {
@@ -46,6 +95,10 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
+.doctor-nav a:focus-visible {
+  outline-color: #ffffff;
+}
+
 .doctor-nav a.active {
   background: rgba(255, 255, 255, 0.22);
   font-weight: 700;
@@ -71,6 +124,11 @@
 .doctor-app h2 {
   font-size: 1.15rem;
   margin: 24px 0 8px;
+}
+
+.doctor-app h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
 }
 
 /* --- 部品 -------------------------------------------------------------- */
@@ -127,6 +185,13 @@
   background: var(--d-surface);
 }
 
+/* 1行の表（ボタン・リンクの入る一覧）は文字とボタンの縦の位置を揃える（D3-3）。
+   複数行のセルがある表（変更の履歴など）は上寄せのまま */
+.doctor-app .d-table--middle th,
+.doctor-app .d-table--middle td {
+  vertical-align: middle;
+}
+
 .doctor-app .d-status {
   display: inline-block;
   padding: 2px 8px;
@@ -151,6 +216,17 @@
 .doctor-app .d-status--failed {
   color: var(--d-danger);
   font-weight: 700;
+}
+
+/* 状態の副の注記（AI変換なし・期限切れ）。主の状態のバッジより控えめにする（D2-2） */
+.doctor-app .d-status-note {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.8rem;
+  color: var(--d-muted);
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 4px;
 }
 
 .doctor-app .d-error {
@@ -189,6 +265,16 @@
   background: #fff8e5;
   border: 1px solid #c9a227;
   border-radius: 6px;
+}
+
+/* 疑われた語（D7-2）。原文の地の黄より濃くし、下線でも分かるようにする */
+.doctor-app .d-raw .d-suspect {
+  padding: 0 2px;
+  font-weight: 700;
+  color: inherit;
+  background: #ffcf4d;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 #a37800;
 }
 
 @media print {

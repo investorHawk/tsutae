@@ -6,18 +6,23 @@ interface CourseFormProps {
   busy: boolean;
   onChange: (values: CourseFormValues) => void;
   onSubmit: () => void;
-  onCancelEdit: () => void;
+  /** 「やめる」で欄を閉じる（入力は捨てる） */
+  onCancel: () => void;
 }
 
 type TextField = Exclude<keyof CourseFormValues, "id">;
 
-/** D2 の実投与日の登録・修正フォーム。修正中はコース番号を変えられない。 */
+/**
+ * D2 の実投与日の登録・修正フォーム。修正中はコース番号を変えられない。
+ * 「コース」の節（h2）の下に置くので見出しは h3。延期の説明は入力欄の上（D4-2）。
+ * 普段は閉じている（PatientCourseEditor が「＋ コースを追加」・「修正」で開く）。
+ */
 export default function CourseForm({
   values,
   busy,
   onChange,
   onSubmit,
-  onCancelEdit,
+  onCancel,
 }: CourseFormProps) {
   const editing = values.id !== null;
 
@@ -36,7 +41,11 @@ export default function CourseForm({
 
   return (
     <form className="d-course-form" onSubmit={handleSubmit} noValidate>
-      <h2>{editing ? `第${values.course_no}コースを修正` : "コースを追加"}</h2>
+      <h3>{editing ? `第${values.course_no}コースを修正` : "コースを追加"}</h3>
+      <p className="d-muted d-form-help">
+        延期があれば、実投与日を実際の日に直し、予定日に元の日を入れます。Day
+        は実投与日から数え直します。
+      </p>
       <div className="d-form-grid">
         <label className="d-field">
           <span>コース番号</span>
@@ -70,16 +79,10 @@ export default function CourseForm({
         <button type="submit" className="d-primary" disabled={busy}>
           保存
         </button>
-        {editing ? (
-          <button type="button" onClick={onCancelEdit} disabled={busy}>
-            修正をやめる
-          </button>
-        ) : null}
+        <button type="button" onClick={onCancel} disabled={busy}>
+          {editing ? "修正をやめる" : "やめる"}
+        </button>
       </div>
-      <p className="d-muted">
-        延期があれば、実投与日を実際の日に直し、予定日に元の日を入れます。Day
-        は実投与日から数え直します。
-      </p>
     </form>
   );
 }

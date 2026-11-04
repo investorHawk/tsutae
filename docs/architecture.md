@@ -57,6 +57,7 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | visits | id INTEGER PK, patient_id FK, reception_no TEXT NULL（印刷済み・期限切れで NULL にする）, visit_date, created_at, status CHECK(generating/ready/printed/failed), expires_at, fallback INT DEFAULT 0, course_no INT NULL |
 | timelines | visit_id PK FK ON DELETE CASCADE, json TEXT（`Timeline`） |
 | reports | visit_id PK FK ON DELETE CASCADE, html TEXT, data_json TEXT（`ReportData`） |
+| doctor_masks | visit_id FK ON DELETE CASCADE, entry_id FK ON DELETE CASCADE, spans_json TEXT（原文の伏せる区間 `[[start, end], …]`）, confirmed_clear INT CHECK(0/1), allowed_json TEXT（確かめた時に許す区間。伏せた後の文の位置）, created_at, PK(visit_id, entry_id) — D6 の医師の伏せ字。**位置と真偽だけで文面は入れない**。印刷済み・期限切れで reports と一緒に消す（2026-11-04 夜） |
 | pipeline_logs | id PK, run_kind CHECK(visit/skill_change), run_id INT, ts, event TEXT, hook_name NULL, agent_type NULL, tool_name NULL, decision NULL, duration_ms NULL, tokens_in NULL, tokens_out NULL, cost_usd NULL — **文面は入れない** |
 | skill_changes | id PK, skill_name, requested_text, diff TEXT NULL, new_text TEXT NULL, base_version INT, new_version INT NULL, status CHECK(pending/approved/rejected/failed), error_code TEXT NULL, created_at, decided_at NULL |
 | skill_versions | skill_name, version INT, content TEXT（SKILL.md 全文）, questions_json TEXT NULL（regimen のみ）, approved_at, PK(skill_name, version) |
@@ -225,9 +226,9 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|---|
 | `POST /api/patient/register` | `{pid}` | `{ok: true}` + Cookie。未知の pid は 404 `{"error":"unknown_patient"}` |
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
-| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[]}` |
+| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない） |
 | `POST /api/patient/{pid}/entries` | `EntryCreate` | `{entry_id, notices: string[]}`（notices は patient_strings のキー。例 `["fixed_rule.fever_38"]`） |
-| `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}]}`（自分の記録のみ。AI の出力は含まない。`question_text` はその記録の skill_version の質問集の文で、見つからなければ null。フロントは null のとき `history.previous_question` を出す） |
+| `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}], visits: [{visit_date, received_at}]}`（自分の記録のみ。AI の出力は含まない。`question_text` はその記録の skill_version の質問集の文で、見つからなければ null。フロントは null のとき `history.previous_question` を出す。`visits` は下の「UI の見直しで足した経路」） |
 | `POST /api/visit` | `{reception_no}`（Cookie で患者識別） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |
 
 - Cookie の pid と経路の `{pid}` が違えば 403。患者 API のモジュールは `reports`・`timelines`・pipeline を import しない（アーキテクチャテスト）
@@ -294,6 +295,44 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 送り直しの重複防止: 同じ患者・同じ内容の記録が120秒以内にあれば新しく作らずその記録を返す（`db.add_entry_once`）。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）
 
 - `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
+
+### UI の見直しで足した経路（2026-11-04 午後、修正ボード）
+| 経路 | 応答 |
+|---|---|
+| `POST /api/patient/{pid}/entries/{entry_id}/undo` | `{ok: true}`。本人の「つらくて書けない」の記録で、作ってから10分以内（`UNDO_WINDOW`）・その後に受付が無いものだけ消す（`db.undo_too_sick_entry`）。他人の記録・無い記録は 404 `not_found`、条件に合わなければ 409 `not_undoable`（P2-5） |
+| `GET /api/doctor/patients`（追加項目） | 各患者に `last_record_date`・`current_course_no`（`config.today()` の今コース）・`next_visit`（今コースの次回受診予定日。今日より前なら null）。無ければ null（D3-2） |
+| `GET /api/patient/{pid}/entries`（追加項目） | `visits: [{visit_date, received_at}]`: 本人の受診日（受付のあった日。状態・印刷済み・期限切れを問わない）と、その日の最初の受付の時刻（+09:00）を新しい順。1日1件（`db.list_visit_days`）。受付番号・状態・id・レポート・未処理の件数は返さない。P2 は受付の時刻の位置に「受診日 11月9日（月）」の区切り（`history.visit_day`）を入れる（受付と同じ時刻の記録は受付の前とみなす） |
+| `GET /api/doctor/patients/{pid}/visits` | その患者の受診を新しい順（印刷済み・期限切れも）。受付番号は消えていれば null、`report_available` は開ける ready か（D4-1） |
+| `GET /api/doctor/patients/{pid}/entries` | 直近30件と総数。クローズ回答はコードのまま、自由記載は有無（`has_free_text`）だけで原文は返さない（D4-1） |
+| `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | 各記録に `marks: [{start, end}]`（原文の中の疑われた語の位置、code point）。原文の中で見つからない区間には付けない（D7-2） |
+| `GET /api/doctor/skills/{name}` | `{name, version, description, questions, text}`（読み取り専用）。書式違いは 400 `invalid_name`、`GET /skills` と同じ一覧に無ければ 404 `unknown_skill`、`skills_dir` の外へのシンボリックリンクは 400、壊れた SKILL.md はその code（D5-2） |
+
+### 医師画面の UX の見直しで足した項目（2026-11-04 夜。経路は増やしていない）
+Day は `course.course_for_date` のコースの実投与日を Day1 として数える（次のコースが未登録なら cycle_days を過ぎても数え続ける。`day_of` と同じ）。今日は `config.today()`。コースに矛盾がある患者は、その値だけ null にして応答は止めない（`doctor_records`）。
+
+| 経路 | 足した項目 |
+|---|---|
+| `GET /api/doctor/patients` | 各患者に `current_day`（今日の今のコースでの Day。今コースが無い・矛盾は null）・`days_since_last_record`（今日 − 最後の記録日の日数。記録が無ければ null）・`record_stale`（最後の記録が今日から3日以上前（今日を含めず3日前以前）、または記録が1件も無い） |
+| `GET /api/doctor/patients/{pid}/entries` | 各記録に `course_no`・`day`（記録日のコースと Day。最初の投与の前・矛盾は null） |
+| `GET /api/doctor/visits/{id}/unprocessed` | `visit: {id, reception_no, patient_id, visit_date, created_at, status, fallback, report_available}`（見出しと、確かめた後の印刷に使う。`report_available` は受付番号が残っていて期限内の ready）と、各記録に `course_no`・`day` |
+| `GET /api/doctor/pipeline/{id}/events` | 同じ `visit`（印刷済み・期限切れは `reception_no` が null） |
+
+### 未処理の記載を伏せ字にして変換し直す（2026-11-04 夜、先生の指示）
+医師は文を書かない。原文（生の自由記載）の中の伏せる区間だけを送る。位置は Python の str の位置（code point）の [start, end)（`marks` と同じ。画面は Selection の UTF-16 の位置を code point に直す）。サーバーが区間を検査（範囲内・空でない・昇順・重ならない。`masking.manual.validate_spans`）し、自分で伏せた文を作る。
+
+| 経路 | 入力 | 応答 |
+|---|---|---|
+| `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | — | 各記録に `doctor_mask: {spans: [{start, end}], confirmed_clear} \| null`（保存済みの医師の伏せ字。許す区間は返さない） |
+| `POST /api/doctor/visits/{id}/masks/check` | `{entry_id, spans: [{start, end}]}` | `{entry_id, masked_text, suspects: [{start, end, rule}], reason, sendable, confirmable}`。保存しない。masked_text は送られる文（区間を `[伏せ字]` にしてから正規化・一次）、suspects はその文の位置（start の順。規則が違えば重なりうる）。confirmable は疑いが残り、全ての位置が分かり、仮名ID・受付番号（known_identifier）でない。区間の誤り 422 `invalid_spans`、今の未処理（timeline の unprocessed）にも保存済みの伏せ字にも無い記録は 404 `unknown_entry`、印刷済み・期限切れは 404 |
+| `POST /api/doctor/visits/{id}/masks` | `{entries: [{entry_id, send, spans, confirmed_clear}]}`（1〜200件、同じ記録は1回） | `{ok: true, sendable}`（保存した記録のうち変換で送られる件数）。send=true は保存（置き換え）、false は削除。confirmed_clear で確かめて送れない記録は 422 `not_confirmable`。印刷済み・期限切れは 409 `visit_closed`、生成中は 409 `generating`。ログ `doctor_mask_saved`・`doctor_mask_confirmed`・`doctor_mask_removed`（decision `entry:<entries.id>`） |
+| `POST /api/doctor/visits/{id}/regenerate`（条件の追加） | — | 開いている ready で医師の伏せ字が1件以上あれば、AI の結果でもやり直せる（`db.begin_regeneration` の1つの条件付き UPDATE。二重に押しても1回だけ） |
+
+- 順序: 生の原文に医師の区間を当てて `[伏せ字]` → 仮名ID・受付番号の照合（当てた後の文で）→ `check_text`（正規化 → 一次 → 二次）→ 依頼文の形（JSON）での二次。`pipeline.inputs.mask_entry_text` が正本で、`prepare_input(doctor_masks=...)` と `report.gate.check_inputs(doctor_masks=...)`（`build_report_data` 経由）の両方が使う（`service._gather` が `db.list_doctor_masks` を読み、両方に同じものを渡す）。H2 は伏せた後の文（masked_texts）と照合する
+- 確かめて送る（confirmed_clear）: 保存の時にサーバーが「伏せた後にまだ疑われている区間」を `allowed`（伏せた後の文の位置）として記録する（`pipeline.manual_review.confirmed_mask`）。変換では、その記録のその区間に完全に含まれる検出だけを許し、許した部分文字列を `PreparedInput.allowed_suspects` に入れる。H1（`make_h1(..., allowed=...)`）と convert のコードの段（`masking.manual.detect_in_prompt`）は依頼文全体でその語（JSON の形に直したもの）の出現に完全に含まれる検出だけを無視する（ログ `hook_h1_confirmed`、decision `confirmed:<数>`）。**許す一覧が空なら H1 は今と同じ**。gate は allowed_suspects も記録から作り直して照合する
+- `[伏せ字]さん`・`[伏せ字]先生` などの伏せた後の文は二次に掛からない（`tests/test_masking_manual.py`。検出側は変えていない）
+- 変換の入力のログ: 医師の伏せ字を使って送った記録があれば `doctor_masks_applied`（`sent:N`）、確かめて許した記録があれば `doctor_confirmed_sent`（`sent:M`）。無ければ何も足さない
+- 保持: `doctor_masks` は印刷済み・期限切れでレポートと同じトランザクションで消す（`_erase_results`。purge は doctor_masks だけが残った受診も消す）。生の記録（entries・free_texts）は変えない（spec 13.3）
+- 画面（D6）: 記録ごとに「送らない（未処理のまま）」（初め）／「送る（伏せて）」。送る記録は疑われた区間（marks）を初めから伏せ、黒い「伏せ字」の印（button）を押すと戻す。ほかの所は選んで「伏せ字にする」（伏せた区間と重なる・隣り合う選択は1つにまとめる）。「伏せ字を確かめる」で送られる文とまだ疑われる語を出し、確かめて送れるならチェックを出す。下の「伏せ字を保存して AI で変換し直す」で保存 → regenerate → 変換ログへ（送れる記録が0件なら変換しない）。「確かめたらこの画面から印刷」の欄は残す
 
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=[]`（分離モード。書き換えに Skill の読み込みは要らず、ファイルの設定も混ぜない）、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_work_copy_h3(work_root, skill_name, logger)`。書き込みを作業コピーの SKILL.md ちょうど1つに限る。`workcopy.py`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）

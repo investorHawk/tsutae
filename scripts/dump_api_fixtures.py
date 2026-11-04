@@ -113,19 +113,25 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/patient/{}/questions"),
         ("POST", "/api/patient/{}/entries"),
         ("GET", "/api/patient/{}/entries"),
+        ("POST", "/api/patient/{}/entries/{}/undo"),
         ("POST", "/api/visit"),
         ("POST", "/api/doctor/login"),
         ("POST", "/api/doctor/logout"),
         ("GET", "/api/doctor/patients"),
         ("POST", "/api/doctor/patients"),
         ("GET", "/api/doctor/patients/{}/courses"),
+        ("GET", "/api/doctor/patients/{}/visits"),
+        ("GET", "/api/doctor/patients/{}/entries"),
         ("POST", "/api/doctor/courses"),
         ("GET", "/api/doctor/visits"),
         ("POST", "/api/doctor/visits/{}/printed"),
         ("POST", "/api/doctor/visits/{}/regenerate"),
         ("GET", "/api/doctor/visits/{}/unprocessed"),
+        ("POST", "/api/doctor/visits/{}/masks/check"),
+        ("POST", "/api/doctor/visits/{}/masks"),
         ("GET", "/api/doctor/pipeline/{}/events"),
         ("GET", "/api/doctor/skills"),
+        ("GET", "/api/doctor/skills/{}"),
         ("POST", "/api/doctor/skill-changes"),
         ("GET", "/api/doctor/skill-changes"),
         ("POST", "/api/doctor/skill-changes/{}/approve"),
@@ -135,6 +141,10 @@ JSON_ROUTES = frozenset(
 
 _PID_SEGMENT = re.compile(r"/P-[A-Z0-9]{8}(?=/|$)")
 _INT_SEGMENT = re.compile(r"/[0-9]+(?=/|$)")
+# GET /api/doctor/skills/{name} の Skill 名（SKILL_NAME_PATTERN の形）
+_SKILL_SEGMENT = re.compile(
+    r"(?<=/api/doctor/skills)/(?:regimen|report-format)-[a-z0-9-]+$"
+)
 _PARAM_SEGMENT = re.compile(r"/\{[^/}]+\}(?=/|$)")
 
 
@@ -143,8 +153,9 @@ class DumpError(RuntimeError):
 
 
 def route_template(path: str) -> str:
-    """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id も `{}`）。"""
-    return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", path))
+    """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id・Skill 名も `{}`）。"""
+    named = _SKILL_SEGMENT.sub("/{}", path)
+    return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", named))
 
 
 def app_routes(app: FastAPI) -> set[tuple[str, str]]:
@@ -386,7 +397,9 @@ def _patient_flow(rec: Recorder) -> None:
         ],
         "free_text": None,
     }
-    rec.call("patient_entry_create", "POST", f"/api/patient/{DEMO}/entries", entry)
+    saved = rec.call(
+        "patient_entry_create", "POST", f"/api/patient/{DEMO}/entries", entry
+    )
     bad = {"answers": [{"question_key": "unknown_question", "value": "none"}]}
     rec.call(
         "patient_entry_create_invalid",
@@ -396,6 +409,7 @@ def _patient_flow(rec: Recorder) -> None:
         expect=422,
     )
     rec.call("patient_entries", "GET", f"/api/patient/{DEMO}/entries")
+    _undo_flow(rec, saved["entry_id"])
     with rec.without_cookies():
         rec.call(
             "patient_entries_not_logged_in",
@@ -408,6 +422,30 @@ def _patient_flow(rec: Recorder) -> None:
         "visit_no_course", "POST", "/api/visit", {"reception_no": "B-7"}, expect=409
     )
     set_patient_cookie(rec.client, DEMO)
+
+
+def _undo_flow(rec: Recorder, answers_entry_id: int) -> None:
+    """取り消し（P2-5）。回答の記録は 409、受付の無い評価A の「つらくて書けない」は消せる。
+
+    デモ患者は受付済みなので、取り消しは評価A で試す。消した id は次の記録で使い直される
+    （AUTOINCREMENT なし）ので、後の fixture の id は変わらない。
+    """
+    rec.call(
+        "patient_entry_undo_not_undoable",
+        "POST",
+        f"/api/patient/{DEMO}/entries/{answers_entry_id}/undo",
+        expect=409,
+    )
+    with rec.without_cookies():
+        set_patient_cookie(rec.client, EVAL_A)
+        created = rec.client.post(
+            f"/api/patient/{EVAL_A}/entries", json={"too_sick": True}
+        )
+        if created.status_code != 200:
+            raise DumpError(f"too_sick の記録: status {created.status_code}")
+        path = f"/api/patient/{EVAL_A}/entries/{created.json()['entry_id']}/undo"
+        rec.call("patient_entry_undo", "POST", path)
+        rec.call("patient_entry_undo_not_found", "POST", path, expect=404)
 
 
 def _add_open_visits(app: FastAPI) -> tuple[int, int]:
@@ -468,6 +506,7 @@ def _visit_flow(rec: Recorder) -> None:
         f"/api/doctor/pipeline/{MISSING_ID}/events",
         expect=404,
     )
+    entry_id = _masks_flow(rec, ready)
     rec.call("doctor_printed", "POST", f"/api/doctor/visits/{ready}/printed")
     rec.call(
         "doctor_printed_not_found",
@@ -476,11 +515,71 @@ def _visit_flow(rec: Recorder) -> None:
         expect=404,
     )
     _check_printed_report(rec, ready)
+    rec.call(
+        "doctor_masks_save_closed",
+        "POST",
+        f"/api/doctor/visits/{ready}/masks",
+        _mask_body(entry_id, [(0, 2)]),
+        expect=409,
+    )
     rec.call("doctor_visits_after_printed", "GET", "/api/doctor/visits")
     rec.call(
         "doctor_pipeline_events_printed", "GET", f"/api/doctor/pipeline/{ready}/events"
     )
     _regenerate_flow(rec, generating, failed)
+
+
+def _mask_body(entry_id: int, spans: Sequence[tuple[int, int]]) -> dict[str, Any]:
+    return {
+        "entries": [
+            {
+                "entry_id": entry_id,
+                "send": True,
+                "spans": [{"start": s, "end": e} for s, e in spans],
+                "confirmed_clear": False,
+            }
+        ]
+    }
+
+
+def _masks_flow(rec: Recorder, ready: int) -> int:
+    """D6 の伏せ字: 確かめる（疑いが残る・消えた・区間の誤り）→ 保存 → 一覧に出る。
+
+    変換ログ（doctor_pipeline_events）の fixture を変えないよう、それを取った後に流す。
+    返すのは未処理の記録の id（印刷済みの後の 409 にも使う）。
+    """
+    base = f"/api/doctor/visits/{ready}"
+    entries = rec.fixtures["doctor_unprocessed"]["body"]["entries"]
+    if len(entries) != 1:
+        raise DumpError("デモ患者の未処理の記録が1件でない")
+    entry_id = int(entries[0]["entry_id"])
+    check = f"{base}/masks/check"
+    rec.call("doctor_masks_check", "POST", check, {"entry_id": entry_id, "spans": []})
+    rec.call(
+        "doctor_masks_check_clean",
+        "POST",
+        check,
+        {"entry_id": entry_id, "spans": [{"start": 0, "end": 2}]},
+    )
+    rec.call(
+        "doctor_masks_check_invalid_spans",
+        "POST",
+        check,
+        {"entry_id": entry_id, "spans": [{"start": 0, "end": 999}]},
+        expect=422,
+    )
+    rec.call(
+        "doctor_masks_check_unknown_entry",
+        "POST",
+        check,
+        {"entry_id": MISSING_ID, "spans": []},
+        expect=404,
+    )
+    rec.call(
+        "doctor_masks_save", "POST", f"{base}/masks", _mask_body(entry_id, [(0, 2)])
+    )
+    rec.call("doctor_unprocessed_masked", "GET", f"{base}/unprocessed")
+    return entry_id
 
 
 def _regenerate_flow(rec: Recorder, generating: int, failed: int) -> None:
@@ -504,12 +603,33 @@ def _regenerate_flow(rec: Recorder, generating: int, failed: int) -> None:
     )
 
 
+def _patient_records_flow(rec: Recorder) -> None:
+    """患者の画面（D2）の受診と記録。デモ患者の受診は印刷済み、評価A は生成中。"""
+    base = "/api/doctor/patients"
+    rec.call("doctor_patient_visits", "GET", f"{base}/{DEMO}/visits")
+    rec.call("doctor_patient_visits_open", "GET", f"{base}/{EVAL_A}/visits")
+    rec.call(
+        "doctor_patient_visits_unknown_patient",
+        "GET",
+        f"{base}/{UNKNOWN}/visits",
+        expect=404,
+    )
+    rec.call("doctor_patient_entries", "GET", f"{base}/{DEMO}/entries")
+    rec.call(
+        "doctor_patient_entries_unknown_patient",
+        "GET",
+        f"{base}/{UNKNOWN}/entries",
+        expect=404,
+    )
+
+
 def _patient_admin_flow(rec: Recorder) -> None:
     rec.call("doctor_patients", "GET", "/api/doctor/patients")
     rec.call(
         "doctor_patient_create", "POST", "/api/doctor/patients", {"regimen": "CAPOX"}
     )
     rec.call("doctor_courses", "GET", f"/api/doctor/patients/{DEMO}/courses")
+    _patient_records_flow(rec)
     rec.call(
         "doctor_courses_unknown_patient",
         "GET",
@@ -544,6 +664,13 @@ def _request_change(rec: Recorder, name: str | None, skill: str, text: str) -> i
 def _skill_flow(rec: Recorder, home: Path) -> None:
     base = "/api/doctor/skill-changes"
     rec.call("doctor_skills", "GET", "/api/doctor/skills")
+    rec.call("doctor_skill", "GET", f"/api/doctor/skills/{REGIMEN_SKILL}")
+    rec.call(
+        "doctor_skill_unknown",
+        "GET",
+        "/api/doctor/skills/regimen-nope",
+        expect=404,
+    )
     first = _request_change(
         rec,
         "doctor_skill_change_create",

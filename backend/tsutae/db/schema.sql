@@ -76,6 +76,19 @@ CREATE TABLE IF NOT EXISTS reports (
     data_json TEXT NOT NULL
 );
 
+-- 医師の伏せ字（D6）。受診ごと・記録ごと。位置（原文の区間・許す区間）と確かめの真偽
+-- だけを持ち、文面は持たない。生の記録（entries・free_texts）は変えない。印刷済み・
+-- 期限切れでレポートと同じトランザクションで消す（spec 13.3）
+CREATE TABLE IF NOT EXISTS doctor_masks (
+    visit_id INTEGER NOT NULL REFERENCES visits (id) ON DELETE CASCADE,
+    entry_id INTEGER NOT NULL REFERENCES entries (id) ON DELETE CASCADE,
+    spans_json TEXT NOT NULL,
+    confirmed_clear INTEGER NOT NULL DEFAULT 0 CHECK (confirmed_clear IN (0, 1)),
+    allowed_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (visit_id, entry_id)
+);
+
 -- 文面（プロンプト・記録・引用・出力）は入れない。識別子と数値だけ
 CREATE TABLE IF NOT EXISTS pipeline_logs (
     id INTEGER PRIMARY KEY,

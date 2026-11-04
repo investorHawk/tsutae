@@ -1,6 +1,9 @@
 """変換パイプラインの Hook（docs/architecture.md §7、spec §8）。
 
-- H1 UserPromptSubmit: 依頼文に二次検出（detect_identifiers）が掛かれば全体を止める
+- H1 UserPromptSubmit: 依頼文に二次検出（detect_identifiers）が掛かれば全体を止める。
+  医師が「個人を特定する語は無いことを確かめた」記録の語（allowed。D6）に完全に含まれる
+  検出だけは無視する（`hook_h1_confirmed`、decision `confirmed:<無視した数>`）。許す
+  一覧が空なら今と全く同じ
 - H2 PreToolUse（emit_timeline / emit_report）: 引用が伏せ字後の原文の部分文字列で
   なければ deny（理由は項目の番号だけ。原文は入れない）
 - H3 PreToolUse（Write / Edit / MultiEdit）: D4 の Skill 書き換え先を
@@ -19,13 +22,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Collection, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import HookMatcher
 
 from tsutae.masking import detect_identifiers
+from tsutae.masking.manual import detect_in_prompt
 from tsutae.pipeline.logs import EventLogger, reason_code
 from tsutae.pipeline.tools import EMIT_REPORT_TOOL, EMIT_TIMELINE_TOOL
 from tsutae.skills import SKILL_FILE_NAME, is_valid_skill_name
@@ -77,7 +81,12 @@ def _deny(reason: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def make_h1(logger: EventLogger, expected_prompt: str | None = None) -> HookFn:
+def make_h1(
+    logger: EventLogger,
+    expected_prompt: str | None = None,
+    *,
+    allowed: Collection[str] = (),
+) -> HookFn:
     """H1（UserPromptSubmit）。依頼文全体に二次検出が掛かれば止める。
 
     expected_prompt を渡すと、止めるのはその依頼文（アプリが作って送る文）だけにする。
@@ -85,12 +94,26 @@ def make_h1(logger: EventLogger, expected_prompt: str | None = None) -> HookFn:
     それは送信済みの（検査を通った）データからモデルが書いた文で、止めても何も守らず
     変換が no_timeline で失敗するだけ（2026-11-04 の評価で2コースがこれで失敗した）。
     その場合は規則のコードだけをログに残して通す（`hook_h1_subagent_flag`）。
+
+    allowed は医師が確かめて許した語（PreparedInput.allowed_suspects）。その語の出現に
+    完全に含まれる検出だけを無視する。空なら detect_identifiers そのもの（今と同じ）。
     """
+    allowed_words = tuple(allowed)
 
     async def h1(input_data: Any, tool_use_id: str | None, context: Any) -> dict:
         prompt = _get(input_data, "prompt")
         if isinstance(prompt, str):
-            found = detect_identifiers(prompt)
+            if allowed_words:
+                found = detect_in_prompt(prompt, allowed_words)
+                ignored = len(detect_identifiers(prompt)) - len(found)
+                if ignored:
+                    logger.event(
+                        "hook_h1_confirmed",
+                        hook_name="H1",
+                        decision=f"confirmed:{ignored}",
+                    )
+            else:
+                found = detect_identifiers(prompt)
             if not found:
                 logger.event("hook_h1_allow", hook_name="H1", decision=ALLOW)
                 return {}
@@ -368,14 +391,18 @@ def build_hooks(
     allowed_tools: Iterable[str],
     allowed_subagents: Iterable[str],
     expected_prompt: str | None = None,
+    allowed_suspects: Collection[str] = (),
 ) -> dict[str, list[HookMatcher]]:
     """変換1回分の Hook（H1・H4・H2・trace）。H3 は D4 の書き換えで使う。
 
     expected_prompt はアプリが送る依頼文（H1 はこれだけを止める。make_h1 を参照）。
+    allowed_suspects は医師が確かめて許した語（H1 の allowed。空なら今と同じ）。
     """
     trace = make_trace_hooks(logger)
     return {
-        "UserPromptSubmit": [_matcher(make_h1(logger, expected_prompt))],
+        "UserPromptSubmit": [
+            _matcher(make_h1(logger, expected_prompt, allowed=allowed_suspects))
+        ],
         "PreToolUse": [
             _matcher(make_h4(allowed_tools, allowed_subagents, logger)),
             _matcher(make_h2(masked_texts, logger), H2_MATCHER),

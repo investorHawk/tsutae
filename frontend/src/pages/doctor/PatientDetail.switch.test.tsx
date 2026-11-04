@@ -59,6 +59,10 @@ function GoTo({ pid }: { pid: string }) {
 function renderAt(routes: Record<string, RouteValue>) {
   const fetchMock = mockApi({
     "GET /api/doctor/patients": { patients: [] },
+    [`GET /api/doctor/patients/${A}/visits`]: { visits: [] },
+    [`GET /api/doctor/patients/${A}/entries`]: { entries: [], total: 0 },
+    [`GET /api/doctor/patients/${B}/visits`]: { visits: [] },
+    [`GET /api/doctor/patients/${B}/entries`]: { entries: [], total: 0 },
     ...routes,
   });
   render(
@@ -70,6 +74,12 @@ function renderAt(routes: Record<string, RouteValue>) {
     </MemoryRouter>,
   );
   return fetchMock;
+}
+
+async function openAdd() {
+  await userEvent.click(
+    screen.getByRole("button", { name: "＋ コースを追加" }),
+  );
 }
 
 function goToB() {
@@ -90,7 +100,8 @@ describe("PatientDetail の患者の切り替え", () => {
       slowA.resolve(jsonResponse({ courses: A_COURSES }));
     });
     expect(screen.queryByText("第3コース")).toBeNull();
-    expect(screen.queryByText("2026-09-01")).toBeNull();
+    expect(screen.queryByText("9月1日（火）")).toBeNull();
+    await openAdd();
     expect(screen.getByLabelText("コース番号")).toHaveValue(2);
   });
 
@@ -104,13 +115,16 @@ describe("PatientDetail の患者の切り替え", () => {
     const row = (await screen.findByText("第2コース")).closest("tr");
     await userEvent.click(within(row!).getByRole("button", { name: "修正" }));
     expect(
-      screen.getByRole("heading", { level: 2, name: "第2コースを修正" }),
+      screen.getByRole("heading", { level: 3, name: "第2コースを修正" }),
     ).toBeInTheDocument();
     goToB();
     expect(screen.getByText(B)).toBeInTheDocument();
     expect(screen.queryByText("第2コース")).toBeNull();
+    // 修正中の欄は閉じる（前の患者の入力を引き継がない）
+    expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+    await openAdd();
     expect(
-      screen.getByRole("heading", { level: 2, name: "コースを追加" }),
+      screen.getByRole("heading", { level: 3, name: "コースを追加" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("コース番号")).toHaveValue(1);
     expect(screen.getByLabelText("実投与日（Day1）")).toHaveValue("");
@@ -146,6 +160,7 @@ describe("PatientDetail の患者の切り替え", () => {
     goToB();
     await screen.findByText("第1コース");
     expect(screen.queryByText("第3コース")).toBeNull();
+    await openAdd();
     fireEvent.change(screen.getByLabelText("実投与日（Day1）"), {
       target: { value: "2026-11-10" },
     });

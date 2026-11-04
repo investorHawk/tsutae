@@ -42,6 +42,7 @@ from tsutae.schemas import (
     AttentionItem,
     ConversionResult,
     Course,
+    DoctorMask,
     Entry,
     Grid,
     PreparedInput,
@@ -94,6 +95,7 @@ def _context(
     prepared: PreparedInput,
     result: ConversionResult,
     questions_by_version: Mapping[str, Sequence[Question]],
+    doctor_masks: Mapping[int, DoctorMask],
 ) -> _Context:
     checked = check_inputs(
         patient_id=patient_id,
@@ -104,6 +106,7 @@ def _context(
         visit_date=visit_date,
         prepared=prepared,
         questions_by_version=questions_by_version,
+        doctor_masks=doctor_masks,
     )
     ordered = checked.courses
     course_no = prepared.input.schedule.course_no
@@ -318,11 +321,13 @@ def build_report_data(
     prepared: PreparedInput,
     result: ConversionResult,
     questions_by_version: Mapping[str, Sequence[Question]],
+    doctor_masks: Mapping[int, DoctorMask] | None = None,
 ) -> ReportData:
     """レポートの中身を組み立てる。
 
     入力が食い違えば ReportBuildError、courses の矛盾は CourseValidationError
-    （どちらも ValueError）。
+    （どちらも ValueError）。doctor_masks は prepare_input に渡した医師の伏せ字
+    （entries.id → DoctorMask。無ければ空）。
     """
     ctx = _context(
         patient_id=patient_id,
@@ -334,6 +339,7 @@ def build_report_data(
         prepared=prepared,
         result=result,
         questions_by_version=questions_by_version,
+        doctor_masks=dict(doctor_masks or {}),
     )
     grid = _grid(ctx, regimen_skill, report_skill, questions_by_version)
     unprocessed = _unprocessed_ids(ctx)

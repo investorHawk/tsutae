@@ -3,6 +3,7 @@
 recorded_at は JST で保存し、record_date は config.to_jst_date(recorded_at)。
 `add_entry_once` は同じ患者・同じ内容（`entry_content` が一致）の記録が直近 window
 以内にあれば、新しく作らずそれを返す（送り直しで二重にしない）。
+`undo_too_sick_entry` は患者が押し間違えた「つらくて書けない」を消す（取り消し。P2-5）。
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ import re
 import sqlite3
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from tsutae.config import to_jst_date
 from tsutae.db.connection import (
@@ -26,6 +27,8 @@ from tsutae.db.connection import (
 from tsutae.schemas import ClosedAnswer, Entry, EntryCreate
 
 SKILL_VERSION_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]*@[1-9][0-9]*")
+
+UndoResult = Literal["deleted", "not_found", "not_undoable"]
 
 _ENTRY_COLUMNS = (
     "e.id, e.patient_id, e.recorded_at, e.record_date, e.kind, e.by_proxy,"
@@ -93,6 +96,37 @@ def add_entry_once(
     if saved is None:  # pragma: no cover - 直前に書いた行が無いのは異常
         raise RuntimeError("entry was not saved")
     return saved
+
+
+def undo_too_sick_entry(
+    conn: sqlite3.Connection, pid: str, entry_id: int, since: datetime
+) -> UndoResult:
+    """本人の「つらくて書けない」の記録を1件消す（取り消し）。
+
+    消すのは pid の記録で、kind が too_sick、recorded_at が since 以降、その記録の後に
+    その患者の受診の受付（visits）が無いものだけ（受付の後はレポートの材料になりうる）。
+    pid の記録でなければ "not_found"（他人の記録の有る無しを明かさない）、条件に
+    合わなければ "not_undoable"。調べるのと消すのを1つの write_transaction で行う。
+    回答・自由記載の行は ON DELETE CASCADE で一緒に消える（too_sick には無い）。
+    """
+    with write_transaction(conn):
+        row = conn.execute(
+            "SELECT kind, recorded_at FROM entries WHERE id = ? AND patient_id = ?",
+            (entry_id, pid),
+        ).fetchone()
+        if row is None:
+            return "not_found"
+        if row["kind"] != "too_sick" or row["recorded_at"] < dt_to_db(since):
+            return "not_undoable"
+        # 日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する
+        visited = conn.execute(
+            "SELECT 1 FROM visits WHERE patient_id = ? AND created_at >= ? LIMIT 1",
+            (pid, row["recorded_at"]),
+        ).fetchone()
+        if visited is not None:
+            return "not_undoable"
+        conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+    return "deleted"
 
 
 def _content(
@@ -188,6 +222,14 @@ def list_entries(
         clauses.append("e.record_date <= ?")
         params.append(date_to_db(end))
     return _load_entries(conn, " AND ".join(clauses), tuple(params))
+
+
+def last_record_dates(conn: sqlite3.Connection) -> dict[str, date]:
+    """患者ごとの最後の記録日（record_date の最大）。記録の無い患者は含まない。"""
+    rows = conn.execute(
+        "SELECT patient_id, MAX(record_date) AS last FROM entries GROUP BY patient_id"
+    ).fetchall()
+    return {r["patient_id"]: date_from_db(r["last"]) for r in rows}
 
 
 def _load_entries(

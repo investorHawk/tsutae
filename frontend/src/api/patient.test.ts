@@ -52,6 +52,7 @@ describe("患者 API", () => {
           answer_type: "three_level",
         },
       ],
+      today: "2026-11-09",
     };
     const fetchMock = mockFetch(() => jsonResponse(body));
     await expect(getQuestions("P-DEMO0001")).resolves.toEqual(body);
@@ -108,6 +109,12 @@ describe("患者 API", () => {
           free_text: null,
         },
       ],
+      visits: [
+        {
+          visit_date: "2026-11-09",
+          received_at: "2026-11-09T09:40:00+09:00",
+        },
+      ],
     };
     const fetchMock = mockFetch(() => jsonResponse(body));
     await expect(listEntries("P-DEMO0001")).resolves.toEqual(body);
@@ -131,7 +138,9 @@ describe("患者 API", () => {
   });
 
   it("pid は経路用にエンコードする", async () => {
-    const fetchMock = mockFetch(() => jsonResponse({ entries: [] }));
+    const fetchMock = mockFetch(() =>
+      jsonResponse({ entries: [], visits: [] }),
+    );
     await listEntries("../doctor/x");
     expect(callOf(fetchMock).url).toBe("/api/patient/..%2Fdoctor%2Fx/entries");
   });

@@ -5,7 +5,9 @@
 import rawStrings from "../../../../../backend/tsutae/patient_strings.json?raw";
 import type {
   PatientEntry,
+  PatientEntriesResponse,
   PatientStrings,
+  PatientVisitDay,
   Question,
   QuestionsResponse,
 } from "../../../api/types";
@@ -56,6 +58,8 @@ export const QUESTIONS: readonly Question[] = [
 export const QUESTIONS_RESPONSE: QuestionsResponse = {
   skill_version: "regimen-folfox@1",
   questions: [...QUESTIONS],
+  /** サーバーの今日（2026-11-09 は月曜） */
+  today: "2026-11-09",
 };
 
 export function questionText(key: string): string {
@@ -115,3 +119,19 @@ export const ENTRIES: readonly PatientEntry[] = [
     free_text: "しびれはだいぶ楽になった",
   },
 ];
+
+/**
+ * 自分の受診日（合成）。2026-10-30（金）9:20 の受付は、10-29 と 10-31 の記録の間に入る。
+ * 既定の偽物の API（testing/api.ts）は受診を返さない（visits: []）。
+ */
+export const VISITS: readonly PatientVisitDay[] = [
+  { visit_date: "2026-10-30", received_at: "2026-10-30T09:20:00+09:00" },
+];
+
+/** GET entries の本文（visits は既定で空）。 */
+export function entriesBody(
+  entries: readonly PatientEntry[],
+  visits: readonly PatientVisitDay[] = [],
+): PatientEntriesResponse {
+  return { entries: [...entries], visits: [...visits] };
+}

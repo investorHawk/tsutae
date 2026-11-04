@@ -289,12 +289,23 @@ def _ai_markers(runner: Any) -> tuple[set[str], set[str]]:
     return terms, words
 
 
+def _without_visits(view: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in view["entries"].items() if k != "visits"}
+
+
 def _check_patient_view_unchanged(
     client: TestClient, before: dict[str, Any], runner: Any
 ) -> None:
-    """生成の後も、患者画面の応答は生成の前と同じで、AI の結果を含まない。"""
+    """生成の後も、患者画面の応答は生成の前と同じで、AI の結果を含まない。
+
+    受付で増えるのは受診日（visits）の1件だけで、日付と受付の時刻しか持たない。
+    """
     after = _patient_view(client)
-    assert after == before  # 履歴・質問集は生成で変わらない
+    visits = after["entries"].pop("visits")
+    assert before["entries"]["visits"] == []
+    assert [set(v) for v in visits] == [{"visit_date", "received_at"}]
+    assert visits[0]["visit_date"] == "2026-11-09"
+    assert after == {**before, "entries": _without_visits(before)}  # 生成で変わらない
     terms, words = _ai_markers(runner)
     plain = json.dumps(before, ensure_ascii=False)
     ai_only = {t for t in terms | words if t not in plain}
@@ -312,6 +323,7 @@ def test_visit_report_d6_d5_and_printed(client: TestClient) -> None:
     assert visit["patient_id"] == DEMO_PID and visit["unprocessed_count"] == 1
     _check_prompt(runner, before["questions"]["questions"])
     _check_patient_view_unchanged(client, before, runner)
+    received = _patient_view(client)
     html = report_html(client, visit["id"])
     _check_header_and_words(html)
     _check_attention(html)
@@ -321,7 +333,8 @@ def test_visit_report_d6_d5_and_printed(client: TestClient) -> None:
     _check_events(client, visit["id"])
     _check_doctor_auth(client, visit["id"], html)
     _check_printed(client, visit["id"])
-    assert _patient_view(client) == before  # 印刷済みでも生の記録は残る
+    # 印刷済みでも生の記録と受診日は残る
+    assert _patient_view(client) == received
 
 
 def _check_doctor_auth(client: TestClient, visit_id: int, html: str) -> None:
@@ -346,16 +359,23 @@ def _check_doctor_auth(client: TestClient, visit_id: int, html: str) -> None:
 def _check_unprocessed(client: TestClient, visit_id: int) -> None:
     r = client.get(f"/api/doctor/visits/{visit_id}/unprocessed")
     assert r.status_code == 200
-    assert r.json() == {
-        "entries": [
-            {
-                "entry_id": UNPROCESSED_SEQ,
-                "record_date": "2026-11-05",
-                "reason": "unknown_before_honorific",
-                "text": UNPROCESSED_TEXT,
-            }
-        ]
-    }
+    body = r.json()
+    assert body["visit"]["reception_no"] == DEMO_RECEPTION
+    assert body["visit"]["patient_id"] == DEMO_PID
+    assert body["entries"] == [
+        {
+            "entry_id": UNPROCESSED_SEQ,
+            "record_date": "2026-11-05",
+            # 第3コース（Day1 = 2026-10-27）の Day10
+            "course_no": 3,
+            "day": 10,
+            "reason": "unknown_before_honorific",
+            "text": UNPROCESSED_TEXT,
+            # 疑われた語「磯鷲さん」の原文の中の位置（D7-2）
+            "marks": [{"start": 0, "end": 4}],
+            "doctor_mask": None,  # 医師の伏せ字はまだ無い
+        }
+    ]
     assert "磯鷲" not in report_html(client, visit_id)  # 紙には載せない
 
 

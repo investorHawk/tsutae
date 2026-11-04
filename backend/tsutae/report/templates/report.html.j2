@@ -50,21 +50,28 @@
 {% elif section == "grid" %}
 <section class="grid">
 <h2>経過表（Day 別）</h2>
-<table class="grid">
-<colgroup><col class="label-col">{% for col in grid.columns %}<col>{% endfor %}</colgroup>
+{% for seg in grid.segments %}
+<div class="grid-segment" data-segment="{{ seg.no }}"{% if seg.first %} data-days="{{ seg.first }}-{{ seg.last }}"{% endif %}>
+<table class="grid{{ ' dense' if grid.dense }}"{% if seg.width %} style="width: {{ seg.width }}"{% endif %}>
+{% if seg.title %}
+<caption class="segment-title">{{ seg.title }}</caption>
+{% endif %}
+<colgroup><col class="label-col">{% for col in seg.columns %}<col>{% endfor %}</colgroup>
 <thead>
-<tr><th class="row-label corner">Day</th>{% for col in grid.columns %}<th class="col-head{{ ' slash' if col.slash }}" data-day="{{ col.day }}"><span class="day">{{ col.day }}</span><span class="date">{{ col.date }}</span>{% if col.proxy %}<span class="proxy-mark">代</span>{% endif %}</th>{% endfor %}</tr>
+<tr><th class="row-label corner">Day</th>{% for col in seg.columns %}<th class="col-head{{ ' slash' if col.slash }}" data-day="{{ col.day }}"><span class="day">{{ col.day }}</span><span class="date">{{ col.date }}</span>{% if col.proxy %}<span class="proxy-mark">代</span>{% endif %}</th>{% endfor %}</tr>
 </thead>
-{% for block in grid.blocks %}
+{% for block in seg.blocks %}
 <tbody class="{{ 'previous' if block.key[1] else 'current' }}">
-<tr class="course-sep"><th colspan="{{ grid.span }}">{{ block.title }}</th></tr>
+<tr class="course-sep"><th colspan="{{ seg.span }}">{{ block.title }}</th></tr>
 {% for row in block.rows %}
 <tr><th class="row-label">{{ row.label }}</th>{% for cell in row.cells %}<td class="{{ cell.cls }}" data-row="{{ row.id }}" data-day="{{ cell.day }}">{% if cell.glyph %}<span class="glyph">{{ cell.glyph }}</span>{% endif %}{% if cell.temp %}<span class="temp">{{ cell.temp }}</span>{% endif %}{% if cell.mark %}<span class="mark">○</span>{% if cell.recalled %}<span class="recalled">回</span>{% endif %}{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
 </tbody>
 {% endfor %}
 </table>
-<div class="legend"><span class="legend-title">凡例</span><span class="item"><span class="swatch cell st-none"><span class="glyph">−</span></span>なし</span><span class="item"><span class="swatch cell st-present"></span>ある</span><span class="item"><span class="swatch cell st-hard"></span>つらい</span><span class="item"><span class="swatch cell st-no_input"></span>入力なし（空白）</span><span class="item"><span class="swatch cell st-not_asked"><span class="glyph">−−</span></span>未設問（その日の質問集に無い項目）</span><span class="item"><span class="swatch cell slash"></span>つらくて書けない（その日）</span><span class="item"><span class="swatch cell"><span class="mark">○</span></span>自由記載にその症状の記述あり</span><span class="item"><span class="swatch cell"><span class="mark">○</span><span class="recalled">回</span></span>回想（後日の記載から日付を戻した）</span><span class="item"><span class="proxy-mark">代</span>家族などが代わりに入力</span><span class="item">体温の行: 数値＝測った体温（℃）、−＝測っていない</span><span class="item"><span class="swatch cell out"></span>範囲外</span><span class="item">？＝用語の当てはめの確からしさが低い</span></div>
+</div>
+{% endfor %}
+<div class="legend"><span class="legend-title">凡例</span><span class="item"><span class="swatch cell st-none"><span class="glyph">−</span></span>なし</span><span class="item"><span class="swatch cell st-present"></span>ある</span><span class="item"><span class="swatch cell st-hard"></span>つらい</span><span class="item"><span class="swatch cell st-no_input"></span>入力なし（空白）</span><span class="item"><span class="swatch cell st-not_asked"><span class="glyph">−−</span></span>未設問（その日の質問集に無い項目）</span><span class="item"><span class="swatch cell slash"></span>つらくて書けない（その日）</span><span class="item"><span class="swatch cell"><span class="mark">○</span></span>自由記載にその症状の記述あり</span><span class="item"><span class="swatch wide cell"><span class="mark">○</span><span class="recalled">回</span></span>回想（後日の記載から日付を戻した）</span><span class="item"><span class="proxy-mark">代</span>家族などが代わりに入力</span><span class="item">体温の行: 数値＝測った体温（℃）、−＝測っていない</span><span class="item"><span class="swatch cell out"></span>範囲外</span><span class="item">？＝用語の当てはめの確からしさが低い</span></div>
 </section>
 {% elif section == "per_symptom" %}
 <section class="per-symptom">

@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/skills/regimen-nope",
+  "request": null,
+  "status": 404,
+  "body": {
+    "error": "unknown_skill"
+  }
+}

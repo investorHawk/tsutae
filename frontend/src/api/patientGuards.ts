@@ -64,11 +64,15 @@ function isQuestion(v: Item): boolean {
   );
 }
 
-/** GET questions: {skill_version, questions: Question[]}（key は重複しない） */
+/**
+ * GET questions: {skill_version, questions: Question[], today}（key は重複しない。
+ * today はサーバーの今日の YYYY-MM-DD）
+ */
 export function isQuestionsResponse(v: Item): boolean {
   return (
     isString(v.skill_version) &&
-    isListWithUniqueKeys(isQuestion, "key")(v.questions)
+    isListWithUniqueKeys(isQuestion, "key")(v.questions) &&
+    isIsoDate(v.today)
   );
 }
 
@@ -119,9 +123,20 @@ function isPatientEntry(v: Item): boolean {
   );
 }
 
-/** GET entries: {entries: PatientEntry[]} */
+/** 受診日: {visit_date, received_at}（日付と受付の時刻だけ） */
+function isPatientVisitDay(v: Item): boolean {
+  return isIsoDate(v.visit_date) && isIsoDateTime(v.received_at);
+}
+
+/**
+ * GET entries: {entries: PatientEntry[], visits: PatientVisitDay[]}（受診日は1日1件。
+ * visit_date は重複しない）
+ */
 export function isPatientEntriesResponse(v: Item): boolean {
-  return everyItem(isPatientEntry)(v.entries);
+  return (
+    everyItem(isPatientEntry)(v.entries) &&
+    isListWithUniqueKeys(isPatientVisitDay, "visit_date")(v.visits)
+  );
 }
 
 /** POST register: {ok: true} */

@@ -262,27 +262,33 @@ def test_unprocessed_returns_original_text(client: TestClient) -> None:
     vid = _visit(client)["id"]
     r = client.get(f"/api/doctor/visits/{vid}/unprocessed")
     assert r.status_code == 200
-    assert r.json() == {
-        "entries": [
-            {
-                "entry_id": leaked,
-                "record_date": "2026-11-09",
-                "reason": "known_identifier",
-                "text": raw,  # 伏せ字前の原文（○○さん にしていない）
-            }
-        ]
-    }
+    body = r.json()
+    assert body["visit"]["id"] == vid  # 見出しの受診（test_api_doctor_days.py）
+    assert body["entries"] == [
+        {
+            "entry_id": leaked,
+            "record_date": "2026-11-09",
+            "course_no": 3,
+            "day": 14,
+            "reason": "known_identifier",
+            "text": raw,  # 伏せ字前の原文（○○さん にしていない）
+            # 疑われた語（仮名ID）の原文の中の位置。田中は一次で伏せる辞書の姓
+            "marks": [{"start": 2, "end": 2 + len(pid)}],
+            "doctor_mask": None,  # 医師の伏せ字はまだ無い
+        }
+    ]
 
 
 def test_unprocessed_empty_when_none(client: TestClient) -> None:
     _pid, visit = _ready_visit(client)
     r = client.get(f"/api/doctor/visits/{visit['id']}/unprocessed")
-    assert r.json() == {"entries": []}
+    assert r.json()["entries"] == []
 
 
 def test_unprocessed_of_generating_visit_is_empty(client: TestClient) -> None:
     vid = _bare_visit(client)
-    assert client.get(f"/api/doctor/visits/{vid}/unprocessed").json() == {"entries": []}
+    body = client.get(f"/api/doctor/visits/{vid}/unprocessed").json()
+    assert body["entries"] == []
 
 
 def test_unprocessed_of_expired_visit_is_404(tmp_path: Path, fixed_today: str) -> None:
@@ -343,8 +349,9 @@ def test_pipeline_events_while_generating(client: TestClient) -> None:
             cost_usd=0.01,
             ts=jst_datetime(date(2026, 11, 9), 9, 30),
         )
-    r = client.get(f"/api/doctor/pipeline/{vid}/events")
-    assert r.json() == {
+    body = client.get(f"/api/doctor/pipeline/{vid}/events").json()
+    assert body.pop("visit")["id"] == vid  # 見出しの受診（test_api_doctor_days.py）
+    assert body == {
         "status": "generating",
         "events": [
             {

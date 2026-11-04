@@ -422,6 +422,28 @@ class PatientLabels(Frozen):
 # ---------------------------------------------------------------------------
 
 
+class TextSpan(Frozen):
+    """文の中の区間 [start, end)（Python の str の位置 = code point）。"""
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=1)
+
+
+class DoctorMask(Frozen):
+    """医師の伏せ字（受診ごと・記録ごと。D6）。生の記録は変えない（spec 13.3）。
+
+    - spans: 生の自由記載の中で `[伏せ字]` にする区間（医師が選んだ位置だけ）
+    - confirmed_clear: 医師が「個人を特定する語は無いことを確かめた」
+    - allowed: confirmed_clear のとき、保存の時点で伏せた後もまだ疑われていた区間
+      （伏せた後の文 = check_text の masked の位置。サーバーが計算する）。変換では
+      ちょうどこの区間の語だけを許す
+    """
+
+    spans: list[TextSpan] = Field(default_factory=list)
+    confirmed_clear: bool = False
+    allowed: list[TextSpan] = Field(default_factory=list)
+
+
 class PreparedInput(Frozen):
     """伏せ字・選別を済ませた変換の入力。レポート組み立てとフォールバックも使う。"""
 
@@ -429,6 +451,9 @@ class PreparedInput(Frozen):
     entry_ids: dict[int, int]  # entry_no -> entries.id
     masked_texts: dict[int, str]  # entry_no -> 一次置換後の自由記載
     unprocessed: list[UnprocessedEntry] = Field(default_factory=list)
+    # 医師が確かめて許した部分文字列（送る記録のもの。重複なし・昇順）。H1 に渡す。
+    # Claude には送らない（PipelineInput の外）
+    allowed_suspects: list[str] = Field(default_factory=list)
 
 
 class RunStats(Frozen):

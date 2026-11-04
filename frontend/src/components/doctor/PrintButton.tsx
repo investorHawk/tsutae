@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 /** iframe の読み込みを待つ上限（ms）。過ぎたら別タブで開く案内に戻す。 */
 export const PRINT_LOAD_TIMEOUT_MS = 15_000;
 
+/** 印刷の案内。行ごとにくり返さず、印刷待ちの表の上に1回だけ出す（D2-1）。 */
 export const PRINT_HINT =
   "印刷ダイアログが開きます。開かなければ『レポートを開く』から ⌘P";
 
@@ -14,6 +15,8 @@ type Status = "idle" | "loading" | "opened" | "failed";
  * JSON 等）・print が投げた・時間切れなら、別タブで開くリンクから印刷するよう案内する。
  * iframe は display:none にしない（ブラウザによっては空白を印刷する）。印刷の後も残す
  * （print の直後に消すと印刷が取り消されるブラウザがある）。
+ * 別タブで開くリンクは持たない（呼び出し側が ReportLink を同じ行に並べる。D3 では操作の右の
+ * 小さなリンクにまとめるため）。
  */
 export default function PrintButton({
   url,
@@ -69,15 +72,6 @@ export default function PrintButton({
       >
         印刷
       </button>
-      <a
-        className="d-sublink"
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        レポートを開く
-      </a>
-      <span className="d-muted d-print-hint">{PRINT_HINT}</span>
       {status === "failed" ? (
         <span role="alert" className="d-error">
           印刷ダイアログを開けませんでした。『レポートを開く』から ⌘P

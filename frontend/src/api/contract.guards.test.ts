@@ -12,11 +12,16 @@ import {
   isCoursesResponse,
   isCreatePatientResponse,
   isCreateSkillChangeResponse,
+  isMaskCheckResponse,
+  isMaskSaveResponse,
   isOkTrue as isDoctorOk,
+  isPatientEntriesSummaryResponse,
+  isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
   isSavedCourse,
   isSkillChangesResponse,
+  isSkillContentResponse,
   isSkillsResponse,
   isUnprocessedResponse,
   isVisitsResponse,
@@ -42,6 +47,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   patient_questions: isQuestionsResponse,
   patient_entry_create: isCreateEntryResponse,
   patient_entries: isPatientEntriesResponse,
+  patient_entry_undo: isPatientOk,
   patient_strings: (body) => validatePatientStrings(body) !== null,
   visit: isVisitResponse,
   doctor_login: isDoctorOk,
@@ -49,10 +55,17 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_patients: isPatientsResponse,
   doctor_patient_create: isCreatePatientResponse,
   doctor_courses: isCoursesResponse,
+  doctor_patient_visits: isPatientVisitsResponse,
+  doctor_patient_visits_open: isPatientVisitsResponse,
+  doctor_patient_entries: isPatientEntriesSummaryResponse,
   doctor_course_save: savedCourse,
   doctor_visits: isVisitsResponse,
   doctor_visits_after_printed: isVisitsResponse,
   doctor_unprocessed: isUnprocessedResponse,
+  doctor_unprocessed_masked: isUnprocessedResponse,
+  doctor_masks_check: isMaskCheckResponse,
+  doctor_masks_check_clean: isMaskCheckResponse,
+  doctor_masks_save: isMaskSaveResponse,
   doctor_pipeline_events: isPipelineEventsResponse,
   doctor_pipeline_events_generating: isPipelineEventsResponse,
   doctor_pipeline_events_printed: isPipelineEventsResponse,
@@ -60,6 +73,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_regenerate: isDoctorOk,
   doctor_skills: isSkillsResponse,
   doctor_skills_invalid: isSkillsResponse,
+  doctor_skill: isSkillContentResponse,
   doctor_skill_change_create: isCreateSkillChangeResponse,
   doctor_skill_change_create_failed: isCreateSkillChangeResponse,
   doctor_skill_changes: isSkillChangesResponse,
@@ -114,6 +128,15 @@ const BROKEN: Array<[string, string, Mutate]> = [
     (b) => delete b.visits[0].unprocessed_count,
   ],
   ["doctor_visits", "visits が無い", (b) => delete b.visits],
+  // Skill の中身（GET skills/{name}）
+  ["doctor_skill", "text が無い", (b) => delete b.text],
+  ["doctor_skill", "questions が配列でない", (b) => (b.questions = {})],
+  [
+    "doctor_skill",
+    "質問の answer_type が知らない値",
+    (b) => (b.questions[0].answer_type = "free"),
+  ],
+  ["doctor_skill", "version が文字列", (b) => (b.version = "1")],
   // Skill の一覧（invalid）
   ["doctor_skills", "invalid が無い", (b) => delete b.invalid],
   ["doctor_skills", "invalid が配列でない", (b) => (b.invalid = {})],
@@ -186,7 +209,151 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "entry_id が文字列",
     (b) => (b.entries[0].entry_id = "38"),
   ],
+  ["doctor_unprocessed", "marks が無い", (b) => delete b.entries[0].marks],
+  [
+    "doctor_unprocessed",
+    "印の終わりが文の外",
+    (b) => (b.entries[0].marks = [{ start: 0, end: 999 }]),
+  ],
+  [
+    "doctor_unprocessed",
+    "印が空（start = end）",
+    (b) => (b.entries[0].marks = [{ start: 2, end: 2 }]),
+  ],
+  [
+    "doctor_unprocessed",
+    "印が重なる",
+    (b) =>
+      (b.entries[0].marks = [
+        { start: 0, end: 4 },
+        { start: 3, end: 5 },
+      ]),
+  ],
+  [
+    "doctor_unprocessed",
+    "印の start が負",
+    (b) => (b.entries[0].marks = [{ start: -1, end: 4 }]),
+  ],
+  // 医師の伏せ字（D6 で伏せて変換し直す）
+  [
+    "doctor_unprocessed",
+    "doctor_mask が無い",
+    (b) => delete b.entries[0].doctor_mask,
+  ],
+  [
+    "doctor_unprocessed_masked",
+    "doctor_mask の区間が文の外",
+    (b) => (b.entries[0].doctor_mask.spans = [{ start: 0, end: 999 }]),
+  ],
+  [
+    "doctor_unprocessed_masked",
+    "doctor_mask の confirmed_clear が無い",
+    (b) => delete b.entries[0].doctor_mask.confirmed_clear,
+  ],
+  [
+    "doctor_masks_check",
+    "suspects の区間が文の外",
+    (b) => (b.suspects[0].end = 999),
+  ],
+  [
+    "doctor_masks_check",
+    "suspects の rule が無い",
+    (b) => delete b.suspects[0].rule,
+  ],
+  ["doctor_masks_check", "masked_text が無い", (b) => delete b.masked_text],
+  ["doctor_masks_check", "reason が無い", (b) => delete b.reason],
+  ["doctor_masks_check", "confirmable が文字列", (b) => (b.confirmable = "1")],
+  ["doctor_masks_save", "ok が false", (b) => (b.ok = false)],
+  ["doctor_masks_save", "sendable が負", (b) => (b.sendable = -1)],
+  // 見出しの受診（医師画面の UX の見直し）
+  ["doctor_unprocessed", "visit が無い", (b) => delete b.visit],
+  [
+    "doctor_unprocessed",
+    "visit の仮名IDが無い",
+    (b) => delete b.visit.patient_id,
+  ],
+  [
+    "doctor_unprocessed",
+    "visit の report_available が文字列",
+    (b) => (b.visit.report_available = "yes"),
+  ],
+  ["doctor_unprocessed", "記録の Day が 0", (b) => (b.entries[0].day = 0)],
+  [
+    "doctor_unprocessed",
+    "記録のコースが文字列",
+    (b) => (b.entries[0].course_no = "3"),
+  ],
+  ["doctor_pipeline_events", "visit が無い", (b) => delete b.visit],
+  [
+    "doctor_pipeline_events_printed",
+    "visit の受付番号が数",
+    (b) => (b.visit.reception_no = 23),
+  ],
+  [
+    "doctor_pipeline_events",
+    "visit の状態が未知",
+    (b) => (b.visit.status = "done"),
+  ],
+  ["doctor_patient_entries", "記録の Day が負", (b) => (b.entries[0].day = -1)],
+  // 患者の画面の受診・記録（D2）
+  [
+    "doctor_patient_visits",
+    "report_available が無い",
+    (b) => delete b.visits[0].report_available,
+  ],
+  [
+    "doctor_patient_visits",
+    "受付番号が無い（null でなく省略）",
+    (b) => delete b.visits[0].reception_no,
+  ],
+  [
+    "doctor_patient_visits_open",
+    "状態が未知",
+    (b) => (b.visits[0].status = "done"),
+  ],
+  ["doctor_patient_entries", "total が無い", (b) => delete b.total],
+  [
+    "doctor_patient_entries",
+    "has_free_text が無い",
+    (b) => delete b.entries[0].has_free_text,
+  ],
+  [
+    "doctor_patient_entries",
+    "measured なのに体温が null",
+    (b) => (b.entries[0].answers[0].temperature = null),
+  ],
+  [
+    "doctor_patient_entries",
+    "回答の値が未知",
+    (b) => (b.entries[0].answers[1].value = "maybe"),
+  ],
   // 患者・コース
+  [
+    "doctor_patients",
+    "最後の記録日が無い（null でなく省略）",
+    (b) => delete b.patients[0].last_record_date,
+  ],
+  [
+    "doctor_patients",
+    "今のコースが 0",
+    (b) => (b.patients[0].current_course_no = 0),
+  ],
+  ["doctor_patients", "今の Day が 0", (b) => (b.patients[0].current_day = 0)],
+  [
+    "doctor_patients",
+    "途切れが文字列",
+    (b) => (b.patients[0].record_stale = "true"),
+  ],
+  [
+    "doctor_patients",
+    "記録からの日数が小数",
+    (b) => (b.patients[0].days_since_last_record = 1.5),
+  ],
+  [
+    "doctor_patients",
+    "次回受診が無い（null でなく省略）",
+    (b) => delete b.patients[0].next_visit,
+  ],
   [
     "doctor_patients",
     "regimen が未知",
@@ -226,6 +393,7 @@ const BROKEN: Array<[string, string, Mutate]> = [
     (b) => (b.questions[1].key = b.questions[0].key),
   ],
   ["patient_questions", "skill_version が無い", (b) => delete b.skill_version],
+  ["patient_questions", "today が無い", (b) => delete b.today],
   ["patient_entry_create", "notices に数", (b) => (b.notices = [1])],
   ["patient_entry_create", "entry_id が無い", (b) => delete b.entry_id],
   ["patient_entries", "kind が未知", (b) => (b.entries[0].kind = "other")],
@@ -240,6 +408,23 @@ const BROKEN: Array<[string, string, Mutate]> = [
     (b) => (lastEntry(b).answers[0].temperature = null),
   ],
   ["patient_entries", "free_text が無い", (b) => delete b.entries[0].free_text],
+  ["patient_entries", "visits が無い", (b) => delete b.visits],
+  ["patient_entries", "visits の要素が文字列", (b) => (b.visits = ["x"])],
+  [
+    "patient_entries",
+    "visit_date が重複",
+    (b) => (b.visits = [b.visits[0], { ...b.visits[0] }]),
+  ],
+  [
+    "patient_entries",
+    "visit_date が無い",
+    (b) => delete b.visits[0].visit_date,
+  ],
+  [
+    "patient_entries",
+    "received_at が無い",
+    (b) => delete b.visits[0].received_at,
+  ],
   ["visit", "message_key が無い", (b) => delete b.message_key],
   ["patient_strings", "必須の定型文が無い", (b) => delete b["visit.done"]],
 ];
@@ -262,6 +447,16 @@ describe("壊した fixture は guard に拒まれる", () => {
 });
 
 describe("fixture の前提", () => {
+  it("patient_entries には受診日が1件以上あり、日付と受付の時刻だけを持つ", () => {
+    const body = fixtureBody("patient_entries") as {
+      visits: Array<Record<string, unknown>>;
+    };
+    expect(body.visits.length).toBeGreaterThanOrEqual(1);
+    for (const visit of body.visits) {
+      expect(Object.keys(visit).sort()).toEqual(["received_at", "visit_date"]);
+    }
+  });
+
   it("patient_entries の最後の記録は measured の体温を持つ（壊す操作の前提）", () => {
     const body = fixtureBody("patient_entries") as {
       entries: Array<{ answers: Array<{ value: string }> }>;

@@ -3,6 +3,7 @@ import { isUsableDiff } from "./diff";
 import DiffView from "./DiffView";
 import { formatDateTime } from "./format";
 import { isWorking } from "./skillChangeWork";
+import { skillDisplayName } from "./skillLabels";
 
 const STATUS_LABELS: Readonly<Record<SkillChangeStatus, string>> = {
   pending: "承認待ち",
@@ -57,7 +58,9 @@ export default function SkillChangeHistory({
             <td>#{change.id}</td>
             <td>{formatDateTime(change.created_at)}</td>
             <td>
-              <code>{change.skill_name}</code>
+              {skillDisplayName(change.skill_name)}
+              <br />
+              <code className="d-skill-code">{change.skill_name}</code>
             </td>
             <td>{change.requested_text}</td>
             <td>

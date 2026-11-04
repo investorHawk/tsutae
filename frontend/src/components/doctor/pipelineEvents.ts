@@ -8,8 +8,11 @@
  * - event 名に subagent を含む、または 3役の agent_type でツールなし → サブエージェント
  * - tool_name あり → ツール、それ以外 → 変換全体の出来事
  * レーンは agent_type が3役ならその役、それ以外は主エージェント。
+ *
+ * 題名（title）は医師・審査員が読む日本語の一行にし、内部のコード（event 名・
+ * tool_name・役の名前）は codes に分けて小さく添える（D6-4）。
  */
-import type { PipelineEvent } from "../../api/types";
+import type { PipelineEvent, VisitStatus } from "../../api/types";
 
 export const ROLES = [
   "date-normalizer",
@@ -34,46 +37,71 @@ export const HOOK_LABELS: Readonly<Record<HookId, string>> = {
   H4: "許可外のツール・役の拒否",
 };
 
+/** レーンの題名（日本語）・内部名（code。主エージェントは空）・役目の説明。 */
 export const LANE_LABELS: Readonly<
-  Record<Lane, { title: string; description: string }>
+  Record<Lane, { title: string; code: string; description: string }>
 > = {
   main: {
     title: "主エージェント（統合役）",
-    description: "3役を呼び、emit_timeline / emit_report を出す",
+    code: "",
+    description:
+      "3人の担当を呼び、結果をまとめて時系列とレポートの項目を提出する",
   },
   "date-normalizer": {
-    title: "date-normalizer",
-    description: "相対時間の表現を暦日・Day に直す",
+    title: "日付の担当",
+    code: "date-normalizer",
+    description: "「昨日」「点滴の次の日」などを暦日・Day に直す",
   },
   "term-mapper": {
-    title: "term-mapper",
+    title: "用語の担当",
+    code: "term-mapper",
     description: "症状を CTCAE v5.0 JCOG版の用語名に当てはめる",
   },
   "contradiction-finder": {
-    title: "contradiction-finder",
-    description: "クローズ回答と自由記載の食い違いを解決せずに並べる",
+    title: "食い違いの担当",
+    code: "contradiction-finder",
+    description: "質問への回答と自由記載の食い違いを、解決せずに並べる",
   },
 };
 
 const EMIT_TITLES: Readonly<Record<string, string>> = {
-  emit_timeline: "emit_timeline 時系列を提出",
-  emit_report: "emit_report レポートの項目を提出",
+  emit_timeline: "時系列を提出",
+  emit_report: "レポートの項目を提出",
+};
+
+/** ツール（tool_name）の名前（名詞の形）。知らないツールは「ツール「X」の実行」。 */
+export const TOOL_LABELS: Readonly<Record<string, string>> = {
+  Skill: "Skill（質問集・レポートの形式）の読み込み",
+  Agent: "担当（サブエージェント）の呼び出し",
+  mcp__tsutae__emit_timeline: "時系列の提出",
+  mcp__tsutae__emit_report: "レポートの項目の提出",
 };
 
 /** 変換全体の出来事（ログの event 名）の見出し。知らない名前はそのまま出す。 */
 export const RUN_TITLES: Readonly<Record<string, string>> = {
-  input_prepared: "input_prepared 入力を準備（伏せ字・範囲）",
-  run_start: "run_start 変換を開始",
-  skill_check: "skill_check Skill の版を照合",
-  run_end: "run_end 変換を終了",
-  fallback: "fallback AI変換なしに切り替え",
-  internal_error: "internal_error 想定外のエラー",
-  config_error: "config_error 設定の誤り（Skill・モデルなど）",
-  visit_ready: "visit_ready レポートを作成",
-  visit_failed: "visit_failed レポートを作れなかった",
-  visit_closed: "visit_closed 印刷済み・期限切れ（何もしない）",
-  orphan_recovered: "orphan_recovered 再起動で止まった受診を回収",
-  regenerate_requested: "regenerate_requested 医師が AI でもう一度変換を依頼",
+  input_prepared: "入力を準備（伏せ字・範囲）",
+  run_start: "変換を開始",
+  skill_check: "Skill の版を照合",
+  run_end: "変換を終了",
+  fallback: "AI変換なしに切り替え",
+  internal_error: "想定外のエラー",
+  config_error: "設定の誤り（Skill・モデルなど）",
+  visit_ready: "レポートを作成",
+  visit_failed: "レポートを作れなかった",
+  visit_closed: "印刷済み・期限切れ（何もしない）",
+  orphan_recovered: "再起動で止まった受診を回収",
+  regenerate_requested: "医師が AI でもう一度変換を依頼",
+  // 未処理の記載（D6）を医師が伏せ字にして変換し直す
+  doctor_mask_saved: "医師が未処理の記載を伏せ字にして保存",
+  doctor_mask_confirmed: "医師が「個人を特定する語は無い」と確かめた",
+  doctor_mask_removed: "医師が伏せ字をやめた（未処理のまま）",
+  doctor_masks_applied: "医師が伏せ字にした記録を入力に入れた",
+  doctor_confirmed_sent: "人が確かめてから送った記録を入力に入れた",
+};
+
+/** Hook の出来事のうち、題名に一言を添えるもの（event 名 → 添える語）。 */
+const HOOK_EVENT_TITLES: Readonly<Record<string, string>> = {
+  hook_h1_confirmed: "医師が確かめた語だけを通した",
 };
 
 const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
@@ -82,6 +110,9 @@ const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
   [/^reject/i, "差し戻し", "deny"],
   [/^(allow|allowed|pass)\b/i, "許可", "ok"],
   [/^(accept|accepted|ok)\b/i, "受理", "ok"],
+  [/^confirmed\b/i, "人が確認済み", "ok"],
+  [/^sent\b/i, "送った記録", "neutral"],
+  [/^entry\b/i, "記録", "neutral"],
 ];
 
 const STOP_PATTERN = /(stop|end|done|finish|complete)/i;
@@ -95,7 +126,10 @@ export interface ViewEvent {
   lane: Lane;
   kind: EventKind;
   hookId: HookId | null;
+  /** 日本語の一行（内部のコードを混ぜない） */
   title: string;
+  /** 小さく添える内部のコード（event 名・tool_name・役の名前）。題名と同じものは除く */
+  codes: string[];
   tone: Tone;
   /** "拒否" "受理" など。decision が無ければ空 */
   decisionLabel: string;
@@ -107,9 +141,15 @@ export interface ViewEvent {
 export interface LaneSummary {
   lane: Lane;
   title: string;
+  /** 内部名（3役の agent_type）。主エージェントは空 */
+  code: string;
   description: string;
   state: LaneState;
   events: ViewEvent[];
+  /** events の件数 */
+  count: number;
+  /** 最後の出来事。無ければ null */
+  last: ViewEvent | null;
   denied: number;
 }
 
@@ -164,24 +204,47 @@ function splitDecision(decision: string | null): [string, string, Tone] {
   return found ? [found[1], code, found[2]] : [decision, "", "neutral"];
 }
 
+function toolLabel(toolName: string): string {
+  return TOOL_LABELS[toolName] ?? `ツール「${toolName}」の実行`;
+}
+
+function subagentTitle(e: PipelineEvent): string {
+  const who = isRole(e.agent_type)
+    ? LANE_LABELS[e.agent_type].title
+    : "サブエージェント";
+  if (STOP_PATTERN.test(e.event)) {
+    return `${who}が作業を終了`;
+  }
+  return START_PATTERN.test(e.event) ? `${who}が作業を開始` : `${who}の出来事`;
+}
+
 function titleOf(e: PipelineEvent, kind: EventKind, hookId: HookId | null) {
   switch (kind) {
-    case "hook":
-      return `${hookId} ${HOOK_LABELS[hookId as HookId]}`;
+    case "hook": {
+      const base = `${hookId} ${HOOK_LABELS[hookId as HookId]}`;
+      const extra = HOOK_EVENT_TITLES[e.event];
+      if (extra) {
+        return `${base}：${extra}`;
+      }
+      return e.tool_name ? `${base}：${toolLabel(e.tool_name)}` : base;
+    }
     case "emit":
       return EMIT_TITLES[emitName(e) as string];
-    case "subagent": {
-      const who = e.agent_type ?? "サブエージェント";
-      if (STOP_PATTERN.test(e.event)) {
-        return `${who} 完了`;
-      }
-      return START_PATTERN.test(e.event) ? `${who} 開始` : `${who} ${e.event}`;
-    }
+    case "subagent":
+      return subagentTitle(e);
     case "tool":
-      return `ツール ${e.tool_name}`;
+      return `${toolLabel(e.tool_name as string)}が終わった`;
     default:
       return RUN_TITLES[e.event] ?? e.event;
   }
+}
+
+/** 題名に添える内部のコード（event 名・tool_name・サブエージェントの役の名前）。 */
+function codesOf(e: PipelineEvent, kind: EventKind, title: string): string[] {
+  const role = kind === "subagent" ? e.agent_type : null;
+  return [e.event, e.tool_name, role].filter(
+    (c): c is string => c !== null && c !== "" && c !== title,
+  );
 }
 
 function elapsedFrom(start: number, ts: string): number | null {
@@ -201,6 +264,7 @@ export function toViewEvents(events: readonly PipelineEvent[]): ViewEvent[] {
       decisionTone === "neutral" && WARN_PATTERN.test(e.event)
         ? "warn"
         : decisionTone;
+    const title = titleOf(e, kind, hookId);
     return {
       index,
       ts: e.ts,
@@ -208,7 +272,8 @@ export function toViewEvents(events: readonly PipelineEvent[]): ViewEvent[] {
       lane: isRole(e.agent_type) ? e.agent_type : "main",
       kind,
       hookId,
-      title: titleOf(e, kind, hookId),
+      title,
+      codes: codesOf(e, kind, title),
       tone,
       decisionLabel,
       decisionCode,
@@ -248,6 +313,8 @@ export function laneSummaries(
       ...LANE_LABELS[lane],
       state: laneState(lane, events, finished),
       events,
+      count: events.length,
+      last: events.length > 0 ? events[events.length - 1] : null,
       denied: events.filter((v) => v.tone === "deny").length,
     };
   });
@@ -272,4 +339,30 @@ export function runSummary(views: readonly ViewEvent[]): RunSummary {
     denied: views.filter((v) => v.tone === "deny").length,
     elapsedMs: last,
   };
+}
+
+export interface LiveStatus {
+  text: string;
+  /** true なら更新中（点滅の印を付ける） */
+  on: boolean;
+}
+
+/**
+ * 画面上部の「更新中／止めました」。受診の状態（最後に取れたもの。無ければ null）と、
+ * ポーリングが止まったかから決める。変換が終わった状態を見たら、最後の1回の取り直し
+ * （遅れて記録される出来事を拾う）を待たずに止めた表示にする（D6-2）。
+ */
+export function liveStatus(
+  status: VisitStatus | null,
+  stopped: boolean,
+): LiveStatus {
+  if (status === "ready" || status === "printed") {
+    return { text: "更新を止めました（完了）", on: false };
+  }
+  if (status === "failed") {
+    return { text: "更新を止めました（失敗で終了）", on: false };
+  }
+  return stopped
+    ? { text: "更新を止めました", on: false }
+    : { text: "2秒ごとに更新中", on: true };
 }

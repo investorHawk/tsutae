@@ -1,30 +1,63 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { listUnprocessed } from "../../api/doctor";
-import type { UnprocessedItem } from "../../api/types";
+import { listUnprocessed, reportUrl } from "../../api/doctor";
+import type {
+  MaskCheckResponse,
+  UnprocessedItem,
+  VisitHeader,
+} from "../../api/types";
 import ErrorNote from "../../components/doctor/ErrorNote";
 import { isUnprocessedItem } from "../../components/doctor/guards";
 import { listOf, parseVisitId } from "../../components/doctor/input";
+import MaskSubmitPanel from "../../components/doctor/MaskSubmitPanel";
+import { sameSpans, type Span } from "../../components/doctor/maskSpans";
+import {
+  type EntryMaskState,
+  type MaskStates,
+  initialMaskState,
+  initialMaskStates,
+  withCheck,
+  withSpans,
+} from "../../components/doctor/maskState";
+import PrintButton from "../../components/doctor/PrintButton";
+import ReportLink from "../../components/doctor/ReportLink";
+import UnprocessedEntryCard from "../../components/doctor/UnprocessedEntryCard";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
+import VisitHeading from "../../components/doctor/VisitHeading";
 import "../../components/doctor/doctor-ui.css";
+import "../../components/doctor/board.css";
+import "../../components/doctor/mask.css";
 
-/** 二次検出（H1 の規則）の名前と説明。tsutae.masking.detect_identifiers の規則名。 */
-const RULE_LABELS: Readonly<Record<string, string>> = {
-  unknown_before_honorific: "敬称の前に、辞書にない語がある（人名の疑い）",
-  long_digits: "7桁以上の数字列がある（電話番号・番号の疑い）",
-  at_mark: "@ がある（メールアドレスの疑い）",
-  before_facility: "施設名らしき語がある（病院名の疑い）",
-  address_number: "番地らしき数字の並びがある（住所の疑い）",
-  id_like: "英字とハイフンと番号の並びがある（ID・受付番号の疑い）",
-  known_identifier: "この患者の仮名ID か受付番号が書かれている",
-};
+interface Loaded {
+  visit: VisitHeader;
+  items: UnprocessedItem[];
+}
 
-function ruleLabel(reason: string): string {
-  return RULE_LABELS[reason] ?? "伏せ字漏れの疑い";
+/**
+ * 確かめたらそのまま印刷する（印刷待ちの画面と同じ PrintButton）。変換し直さない時の
+ * ため。レポートを開けない（生成中・失敗・印刷済み・期限切れ）なら出さない。
+ */
+function PrintAfterCheck({ visit }: { visit: VisitHeader }) {
+  if (!visit.report_available) {
+    return null;
+  }
+  return (
+    <section className="d-unprocessed-print" aria-label="この受診のレポート">
+      <p>確かめたら、この受診のレポートをそのまま印刷できます。</p>
+      <div className="d-actions">
+        <PrintButton url={reportUrl(visit.id)} />
+        <ReportLink visitId={visit.id} />
+      </div>
+    </section>
+  );
 }
 
 /**
  * D6 未処理の記載。伏せ字漏れの疑いで Claude に送らなかった記録の原文（院内画面だけ）。
+ * 疑われた語は <mark> で強調する（位置は API の marks）。規則は日本語の説明だけを出し、
+ * 規則名は title に残す。見出しは受付番号・仮名ID・受付の日時（内部の番号は出さない）。
+ * 記録ごとに「送る（伏せて）」を選ぶと、伏せる所を選んで確かめ、下のボタンで保存して
+ * Claude で変換し直せる（医師は文を書かず、伏せる区間だけを送る）。
  * 受診ごとに描き直す（別の受診へ移ったら前の受診の原文・失敗を引き継がない）。
  */
 export default function Unprocessed() {
@@ -35,7 +68,8 @@ export default function Unprocessed() {
 function UnprocessedView({ visitId }: { visitId: string | undefined }) {
   const id = parseVisitId(visitId);
   const handleError = useDoctorApiError();
-  const [items, setItems] = useState<UnprocessedItem[] | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [states, setStates] = useState<MaskStates>({});
   const [error, setError] = useState<string | null>(
     id === null ? "invalid_visit_id" : null,
   );
@@ -48,7 +82,13 @@ function UnprocessedView({ visitId }: { visitId: string | undefined }) {
     listUnprocessed(id)
       .then((res) => {
         if (active) {
-          setItems(listOf<UnprocessedItem>(res, "entries", isUnprocessedItem));
+          const items = listOf<UnprocessedItem>(
+            res,
+            "entries",
+            isUnprocessedItem,
+          );
+          setLoaded({ visit: res.visit, items });
+          setStates(initialMaskStates(items));
         }
       })
       .catch((err: unknown) => {
@@ -62,34 +102,60 @@ function UnprocessedView({ visitId }: { visitId: string | undefined }) {
     };
   }, [id, handleError]);
 
+  const update = useCallback(
+    (item: UnprocessedItem, fn: (s: EntryMaskState) => EntryMaskState) => {
+      setStates((prev) => ({
+        ...prev,
+        [item.entry_id]: fn(prev[item.entry_id] ?? initialMaskState(item)),
+      }));
+    },
+    [],
+  );
+
+  const items = loaded?.items;
   return (
     <section className="page">
       <h1>未処理の記載</h1>
       <p className="d-notice">
         伏せ字漏れの疑いがあるため、Claude
-        に送らなかった記録の原文です。紙には載りません（レポートには「未処理の記載あり」と件数だけが出ます）。この画面でだけ確認してください。
+        に送らなかった記録の原文です。紙には載りません（レポートには「未処理の記載あり」と件数だけが出ます）。この画面でだけ確認してください。伏せ字にすれば、Claude
+        で変換し直して紙に載せられます。
       </p>
-      <p>
-        <Link to="/doctor">← 印刷待ちへ戻る</Link>
-        {id !== null ? <span className="d-muted">　受診 #{id}</span> : null}
+      <p className="d-toolbar">
+        {loaded ? <VisitHeading visit={loaded.visit} /> : null}
+        <Link className="d-sublink" to="/doctor">
+          ← 印刷待ちへ戻る
+        </Link>
       </p>
       {error ? <ErrorNote code={error} /> : null}
       {items?.length === 0 ? (
         <p className="d-muted">未処理の記載はありません</p>
       ) : null}
-      {items && items.length > 0 ? (
-        <ol className="d-unprocessed">
-          {items.map((item) => (
-            <li key={item.entry_id} className="d-unprocessed-item">
-              <p className="d-unprocessed-meta">
-                記録日 {item.record_date} ・ 記録 #{item.entry_id} ・ 規則{" "}
-                <code>{item.reason}</code>（{ruleLabel(item.reason)}）
-              </p>
-              <p className="d-raw">{item.text}</p>
-            </li>
-          ))}
-        </ol>
+      {loaded && items && items.length > 0 ? (
+        <>
+          <ol className="d-unprocessed">
+            {items.map((item) => (
+              <UnprocessedEntryCard
+                key={item.entry_id}
+                visitId={loaded.visit.id}
+                item={item}
+                state={states[item.entry_id] ?? initialMaskState(item)}
+                onUpdate={(fn) => update(item, fn)}
+                onSpans={(spans: Span[]) =>
+                  update(item, (s) => withSpans(s, spans))
+                }
+                onChecked={(requested: Span[], check: MaskCheckResponse) =>
+                  update(item, (s) =>
+                    sameSpans(s.spans, requested) ? withCheck(s, check) : s,
+                  )
+                }
+              />
+            ))}
+          </ol>
+          <MaskSubmitPanel visit={loaded.visit} items={items} states={states} />
+        </>
       ) : null}
+      {loaded ? <PrintAfterCheck visit={loaded.visit} /> : null}
     </section>
   );
 }

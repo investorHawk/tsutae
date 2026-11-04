@@ -58,6 +58,7 @@ def test_init_db_is_idempotent(conn: sqlite3.Connection) -> None:
         "reports",
         "pipeline_logs",
         "skill_changes",
+        "doctor_masks",
         "skill_versions",
     }
     assert expected <= _tables(conn)

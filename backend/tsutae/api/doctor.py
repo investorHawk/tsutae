@@ -10,14 +10,22 @@
   `purge_expired`。印刷済み・期限切れ（受付番号を消した受診）は一覧に載せず、
   レポートと未処理は 404
 - レポートは `HTMLResponse` に `Cache-Control: no-store` と CSP
-- 未処理（D6）は記録の原文を返す（院内画面だけ。紙には載せない）
+- 未処理（D6）は記録の原文と、疑われた語の原文の中の位置 marks と、保存済みの医師の
+  伏せ字 doctor_mask（区間と確かめ。無ければ null）を返す（院内画面だけ。紙には
+  載せない。位置は `doctor_marks`）。伏せ字の確かめ・保存は `unprocessed_masks`
+- 患者一覧は最後の記録日（と今日からの日数・途切れ）・今のコースと Day・次回受診も
+  返す。患者の画面（D2）には、その患者の
+  受診（`GET /patients/{pid}/visits`。印刷済み・期限切れも。前に `purge_expired`）と
+  直近の記録（`GET /patients/{pid}/entries`。自由記載は有無だけ。記録日のコースと Day
+  つき）を返す（`doctor_records`）。未処理・変換ログは見出しの受診（visit）も返す
 - `POST /courses` は保存前に既存＋新規で `validate_courses`（矛盾は 400 `{"error": code}`）
 - 本文つきの `POST /patients`・`POST /courses` は Content-Type が application/json で
   なければ 415 `{"error": "unsupported_media_type"}`（`require_json_body`。Cookie の検査の
   後、本文の検証の前）。本文の無い POST（printed）は frontend が Content-Type を付けない
   ので対象外
 - `POST /visits/{id}/regenerate`（本文なし）: 受付番号が残っていて期限内の failed・
-  ready（fallback=True）だけを generating に戻し（`db.begin_regeneration`）、
+  ready（fallback=True、または医師の伏せ字が1件以上ある）だけを generating に戻し
+  （`db.begin_regeneration`）、
   `POST /api/visit` と同じ `visit.run_generation` をバックグラウンドで起動する。
   ログ `regenerate_requested`（文面なし）。それ以外（generating・AI の結果で ready・
   印刷済み・期限切れ）は 409 `{"error": "not_regenerable"}`、無い受診は 404
@@ -38,6 +46,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from tsutae import db
+from tsutae.api import unprocessed_masks
 from tsutae.api.deps import (
     ApiError,
     AppSettings,
@@ -52,8 +61,18 @@ from tsutae.api.deps import (
     require_same_origin,
     set_doctor_cookie,
 )
+from tsutae.api.doctor_marks import suspect_marks
+from tsutae.api.doctor_records import (
+    RECENT_ENTRIES_MAX,
+    course_summary,
+    day_fields,
+    entry_summary,
+    patient_visit,
+    record_gap,
+    visit_header,
+)
 from tsutae.api.visit import run_generation
-from tsutae.config import Settings, now
+from tsutae.config import Settings, now, today
 from tsutae.course import CourseValidationError, validate_courses
 from tsutae.pipeline.logs import PipelineLogger
 from tsutae.schemas import Course, Regimen
@@ -144,17 +163,23 @@ def _patient_or_404(conn: sqlite3.Connection, pid: str) -> dict[str, Any]:
 
 @_protected.get("/patients")
 def list_patients(conn: Conn, settings: AppSettings) -> dict[str, Any]:
-    return {
-        "patients": [
+    last_dates = db.last_record_dates(conn)
+    day = today()
+    patients = []
+    for p in db.list_patients(conn):
+        last = last_dates.get(p["id"])
+        patients.append(
             {
                 "id": p["id"],
                 "regimen": p["regimen"],
                 "created_at": p["created_at"].isoformat(),
                 "register_url": register_url(settings, p["id"]),
+                "last_record_date": None if last is None else last.isoformat(),
+                **record_gap(last, day),
+                **course_summary(db.list_courses(conn, p["id"]), day),
             }
-            for p in db.list_patients(conn)
-        ]
-    }
+        )
+    return {"patients": patients}
 
 
 @_protected.post("/patients", dependencies=[Depends(require_json_body)])
@@ -170,6 +195,32 @@ def list_courses(pid: str, conn: Conn) -> dict[str, Any]:
     patient = _patient_or_404(conn, pid)
     courses = db.list_courses(conn, patient["id"])
     return {"courses": [c.model_dump(mode="json") for c in courses]}
+
+
+@_protected.get("/patients/{pid}/visits")
+def list_patient_visits(pid: str, conn: Conn) -> dict[str, Any]:
+    """D2 の患者の受診（新しい順）。印刷済み・期限切れも載せる（受付番号は null）。"""
+    patient = _patient_or_404(conn, pid)
+    db.purge_expired(conn, now())
+    visits = db.list_visits(conn, patient_id=patient["id"])
+    return {
+        "visits": [
+            patient_visit(v, len(_unprocessed(conn, v["id"]))) for v in reversed(visits)
+        ]
+    }
+
+
+@_protected.get("/patients/{pid}/entries")
+def list_patient_entries(pid: str, conn: Conn) -> dict[str, Any]:
+    """D2 の患者の直近の記録（新しい順）。自由記載は有無だけ（原文は D6 だけ）。"""
+    patient = _patient_or_404(conn, pid)
+    entries = db.list_entries(conn, patient["id"])
+    courses = db.list_courses(conn, patient["id"])
+    recent = sorted(entries, key=lambda e: (e.recorded_at, e.id), reverse=True)
+    return {
+        "entries": [entry_summary(e, courses) for e in recent[:RECENT_ENTRIES_MAX]],
+        "total": len(entries),
+    }
 
 
 @_protected.post("/courses", dependencies=[Depends(require_json_body)])
@@ -275,7 +326,8 @@ def regenerate(
     conn: Conn,
     settings: AppSettings,
 ) -> dict[str, bool]:
-    """AI でもう一度変換する（failed・AI 変換なしの ready だけ。前のレポートは残す）。"""
+    """AI でもう一度変換する（failed・AI 変換なしの ready・医師の伏せ字のある ready。
+    前のレポートは残す）。"""
     try:
         started = db.begin_regeneration(conn, vid)
     except db.NotFoundError as exc:
@@ -289,31 +341,45 @@ def regenerate(
 
 @_protected.get("/visits/{vid}/unprocessed")
 def list_unprocessed(vid: VisitId, conn: Conn) -> dict[str, Any]:
-    """D6: 送信から外した記録の原文（伏せ字前）と規則名。"""
+    """D6: 送信から外した記録の原文（伏せ字前）・規則名・疑われた語の位置。
+
+    見出しの受診（visit）と、各記録の記録日のコースと Day も返す。
+    """
     visit = _open_visit(conn, vid)
+    literals = [visit["patient_id"], visit["reception_no"]]
+    courses = db.list_courses(conn, visit["patient_id"])
+    masks = db.list_doctor_masks(conn, vid)
     entries = []
     for item in _unprocessed(conn, vid):
         entry = db.get_entry(conn, item.entry_id)
         if entry is None or entry.patient_id != visit["patient_id"]:
             continue
+        text = entry.free_text or ""
         entries.append(
             {
                 "entry_id": entry.id,
                 "record_date": entry.record_date.isoformat(),
+                **day_fields(courses, entry.record_date),
                 "reason": item.reason,
-                "text": entry.free_text or "",
+                "text": text,
+                "marks": suspect_marks(text, literals),
+                "doctor_mask": unprocessed_masks.doctor_mask_view(masks.get(entry.id)),
             }
         )
-    return {"entries": entries}
+    return {"visit": visit_header(visit, now()), "entries": entries}
 
 
 @_protected.get("/pipeline/{vid}/events")
 def pipeline_events(vid: VisitId, conn: Conn) -> dict[str, Any]:
-    """D5（ポーリング）。ログには文面が無い。トークン・費用は返さない。"""
+    """D5（ポーリング）。ログには文面が無い。トークン・費用は返さない。
+
+    見出しの受診（visit）も返す（印刷済み・期限切れなら受付番号は null）。
+    """
     visit = _visit_or_404(conn, vid)
     logs = db.list_pipeline_logs(conn, "visit", vid)
     return {
         "status": visit["status"],
+        "visit": visit_header(visit, now()),
         "events": [
             {"ts": log["ts"].isoformat(), **{k: log[k] for k in _EVENT_FIELDS}}
             for log in logs
@@ -322,3 +388,5 @@ def pipeline_events(vid: VisitId, conn: Conn) -> dict[str, Any]:
 
 
 router.include_router(_protected)
+# 未処理の記載（D6）の伏せ字（確かめる・保存）。医師 Cookie・同じオリジン・JSON の検査つき
+router.include_router(unprocessed_masks.router)

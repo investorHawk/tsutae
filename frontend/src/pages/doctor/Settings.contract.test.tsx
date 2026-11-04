@@ -15,6 +15,7 @@ import {
 } from "../../components/doctor/testing";
 import { apiFixture, fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
+import { skillContentRoutes } from "../../components/doctor/skillTesting";
 import Settings from "./Settings";
 
 afterEach(() => {
@@ -45,6 +46,11 @@ function sequence(...names: string[]): RouteValue {
 
 function api(extra: Record<string, RouteValue> = {}) {
   return mockApi({
+    ...skillContentRoutes([
+      "regimen-capox",
+      "regimen-folfox",
+      "report-format-default",
+    ]),
     [SKILLS]: fixtureBody("doctor_skills") as object,
     [CHANGES]: { skill_changes: [] },
     [CREATE]: () => replay("doctor_skill_change_create"),
@@ -57,7 +63,7 @@ function renderSettings() {
 }
 
 async function openReview() {
-  await screen.findByRole("option", { name: /regimen-folfox/ });
+  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
   // fixture の一覧は名前順（regimen-capox が先）。依頼の fixture と同じ Skill を選ぶ
   await userEvent.selectOptions(screen.getByRole("combobox"), "regimen-folfox");
   await userEvent.type(
@@ -74,7 +80,7 @@ describe("Settings: 読めない Skill（GET skills の invalid）", () => {
   it("invalid が空なら何も出さない", async () => {
     api();
     renderSettings();
-    await screen.findByRole("option", { name: /regimen-folfox/ });
+    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
     expect(screen.queryByRole("alert", { name: "読めない Skill" })).toBeNull();
   });
 
@@ -89,9 +95,9 @@ describe("Settings: 読めない Skill（GET skills の invalid）", () => {
     expect(within(note).queryByText("必須")).toBeNull();
     // 読める Skill は今までどおり選べる（読めない Skill は選択肢に出さない）
     expect(
-      screen.getByRole("option", { name: /regimen-folfox/ }),
+      screen.getByRole("option", { name: /FOLFOX の質問集/ }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /regimen-extra/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /EXTRA の質問集/ })).toBeNull();
   });
 
   it("必須の Skill が読めなければ「必須」と、記録・レポートが作れない旨を出す", async () => {
@@ -156,7 +162,7 @@ describe("Settings: 承認・却下の 409 busy", () => {
     const again = within(review).getByRole("button", { name: "承認する" });
     expect(again).toBeEnabled();
     await userEvent.click(again);
-    const done = await screen.findByText(/version 2 になりました/);
+    const done = await screen.findByText(/第2版（version 2）になりました/);
     expect(done).toHaveTextContent("regimen-folfox");
     expect(screen.queryByRole("region", { name: "差分の確認" })).toBeNull();
   });

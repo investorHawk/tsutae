@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/visits/1/masks/check",
+  "request": {
+    "entry_id": 999,
+    "spans": []
+  },
+  "status": 404,
+  "body": {
+    "error": "unknown_entry"
+  }
+}

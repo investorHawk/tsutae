@@ -7,7 +7,9 @@ import {
   countOf,
   mockApi,
   renderRoute,
+  type RouteValue,
 } from "../../components/doctor/testing";
+import { doctorPatientStub } from "../../test/doctorStubs";
 import { jsonResponse } from "../../test/fetchMock";
 import PatientDetail from "./PatientDetail";
 
@@ -42,14 +44,33 @@ const COURSES: Course[] = [
 
 const PATIENTS = {
   patients: [
-    {
+    doctorPatientStub({
       id: PID,
-      regimen: "FOLFOX",
-      created_at: "2026-09-20T10:00:00+09:00",
-      register_url: "http://localhost:5173/register?pid=P-DEMO0001",
-    },
+      last_record_date: null,
+      days_since_last_record: null,
+      record_stale: true,
+      current_course_no: null,
+      current_day: null,
+      next_visit: null,
+    }),
   ],
 };
+
+/** 「＋ コースを追加」で入力の欄を開く。 */
+async function openAdd() {
+  await userEvent.click(
+    screen.getByRole("button", { name: "＋ コースを追加" }),
+  );
+}
+
+/** 記録・受診の節（D4-1）の経路を既定で空にして mockApi に渡す。 */
+function mockDetail(routes: Record<string, RouteValue>) {
+  return mockApi({
+    [`GET /api/doctor/patients/${PID}/visits`]: { visits: [] },
+    [`GET /api/doctor/patients/${PID}/entries`]: { entries: [], total: 0 },
+    ...routes,
+  });
+}
 
 function renderDetail() {
   return renderRoute(
@@ -73,13 +94,13 @@ function setDate(label: string, value: string) {
 
 describe("PatientDetail（D2 コース登録）", () => {
   it("仮名ID・レジメンとコースを course_no 順に並べ、延期を出す", async () => {
-    mockApi({
+    mockDetail({
       [LIST]: { courses: COURSES },
       "GET /api/doctor/patients": PATIENTS,
     });
     renderDetail();
     expect(
-      screen.getByRole("heading", { level: 1, name: "コース登録" }),
+      screen.getByRole("heading", { level: 1, name: `患者 ${PID}` }),
     ).toBeInTheDocument();
     expect(screen.getByText(PID)).toBeInTheDocument();
     await screen.findByText("第1コース");
@@ -104,12 +125,13 @@ describe("PatientDetail（D2 コース登録）", () => {
       note: null,
     };
     const lists = [COURSES, [...COURSES, saved]];
-    const fetchMock = mockApi({
+    const fetchMock = mockDetail({
       [LIST]: () => jsonResponse({ courses: lists.shift() ?? [] }),
       [SAVE]: saved,
     });
     renderDetail();
     await screen.findByText("第1コース");
+    await openAdd();
     expect(screen.getByLabelText("コース番号")).toHaveValue(3);
     setDate("実投与日（Day1）", "2026-10-27");
     setDate("次回受診予定日", "2026-11-09");
@@ -129,11 +151,14 @@ describe("PatientDetail（D2 コース登録）", () => {
     );
     expect(await screen.findByText("第3コース")).toBeInTheDocument();
     expect(countOf(fetchMock, LIST)).toBe(2);
+    // 保存できたら欄を閉じる。次に開くと次の番号から
+    expect(screen.queryByLabelText("コース番号")).toBeNull();
+    await openAdd();
     expect(screen.getByLabelText("コース番号")).toHaveValue(4);
   });
 
   it("「修正」でそのコースをフォームに入れ、id つきで送る", async () => {
-    const fetchMock = mockApi({
+    const fetchMock = mockDetail({
       [LIST]: { courses: COURSES },
       [SAVE]: COURSES[0],
     });
@@ -143,7 +168,7 @@ describe("PatientDetail（D2 コース登録）", () => {
       within(rowOf("第2コース")).getByRole("button", { name: "修正" }),
     );
     expect(
-      screen.getByRole("heading", { level: 2, name: "第2コースを修正" }),
+      screen.getByRole("heading", { level: 3, name: "第2コースを修正" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("コース番号")).toHaveValue(2);
     expect(screen.getByLabelText("コース番号")).toHaveAttribute("readonly");
@@ -167,28 +192,74 @@ describe("PatientDetail（D2 コース登録）", () => {
     ]);
   });
 
-  it("修正をやめると新しいコースの入力に戻る", async () => {
-    mockApi({ [LIST]: { courses: COURSES } });
+  it("修正をやめると欄を閉じ、次に開くと新しいコースの入力になる", async () => {
+    mockDetail({ [LIST]: { courses: COURSES } });
     renderDetail();
     await screen.findByText("第2コース");
     await userEvent.click(
       within(rowOf("第2コース")).getByRole("button", { name: "修正" }),
     );
     await userEvent.click(screen.getByRole("button", { name: "修正をやめる" }));
+    expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+    await openAdd();
     expect(
-      screen.getByRole("heading", { level: 2, name: "コースを追加" }),
+      screen.getByRole("heading", { level: 3, name: "コースを追加" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("コース番号")).toHaveValue(3);
     expect(screen.getByLabelText("実投与日（Day1）")).toHaveValue("");
   });
 
-  it("API の 400 の code を出す", async () => {
-    mockApi({
+  it("入力の欄は普段は閉じていて、「やめる」で閉じると入力を捨てる", async () => {
+    mockDetail({ [LIST]: { courses: COURSES } });
+    renderDetail();
+    await screen.findByText("第1コース");
+    expect(screen.queryByLabelText("コース番号")).toBeNull();
+    await openAdd();
+    expect(
+      screen.queryByRole("button", { name: "＋ コースを追加" }),
+    ).toBeNull();
+    setDate("実投与日（Day1）", "2026-10-27");
+    await userEvent.click(screen.getByRole("button", { name: "やめる" }));
+    expect(screen.queryByLabelText("コース番号")).toBeNull();
+    await openAdd();
+    expect(screen.getByLabelText("実投与日（Day1）")).toHaveValue("");
+  });
+
+  it("保存に失敗したら入力を残して開いたまま", async () => {
+    mockDetail({
       [LIST]: { courses: COURSES },
       [SAVE]: () => jsonResponse({ error: "course_order" }, 400),
     });
     renderDetail();
     await screen.findByText("第1コース");
+    await openAdd();
+    setDate("実投与日（Day1）", "2026-09-01");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("実投与日（Day1）")).toHaveValue("2026-09-01");
+  });
+
+  it("延期の説明は入力欄の上にある（保存ボタンの下ではない。D4-2）", async () => {
+    mockDetail({ [LIST]: { courses: COURSES } });
+    renderDetail();
+    await screen.findByText("第1コース");
+    await openAdd();
+    const help = screen.getByText(/延期があれば、実投与日を実際の日に直し/);
+    const input = screen.getByLabelText("実投与日（Day1）");
+    const save = screen.getByRole("button", { name: "保存" });
+    const before = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(help.compareDocumentPosition(input) & before).toBeTruthy();
+    expect(help.compareDocumentPosition(save) & before).toBeTruthy();
+  });
+
+  it("API の 400 の code を出す", async () => {
+    mockDetail({
+      [LIST]: { courses: COURSES },
+      [SAVE]: () => jsonResponse({ error: "course_order" }, 400),
+    });
+    renderDetail();
+    await screen.findByText("第1コース");
+    await openAdd();
     setDate("実投与日（Day1）", "2026-09-01");
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
     const alert = await screen.findByRole("alert");
@@ -201,9 +272,10 @@ describe("PatientDetail（D2 コース登録）", () => {
     ["本文が空", {}],
     ["course_no が無い", { patient_id: PID, infusion_date: "2026-11-10" }],
   ])("保存の応答が 200 %s なら invalid_response を出す", async (_l, body) => {
-    mockApi({ [LIST]: { courses: COURSES }, [SAVE]: body });
+    mockDetail({ [LIST]: { courses: COURSES }, [SAVE]: body });
     renderDetail();
     await screen.findByText("第1コース");
+    await openAdd();
     setDate("実投与日（Day1）", "2026-11-10");
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
     const alert = await screen.findByRole("alert");
@@ -212,9 +284,10 @@ describe("PatientDetail（D2 コース登録）", () => {
   });
 
   it("実投与日が空なら送らずに知らせる", async () => {
-    const fetchMock = mockApi({ [LIST]: { courses: COURSES } });
+    const fetchMock = mockDetail({ [LIST]: { courses: COURSES } });
     renderDetail();
     await screen.findByText("第1コース");
+    await openAdd();
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       "missing_infusion_date",
@@ -223,16 +296,17 @@ describe("PatientDetail（D2 コース登録）", () => {
   });
 
   it("コースが無ければその旨と、番号 1 から", async () => {
-    mockApi({ [LIST]: { courses: [] } });
+    mockDetail({ [LIST]: { courses: [] } });
     renderDetail();
     expect(
       await screen.findByText("まだコースが登録されていません"),
     ).toBeInTheDocument();
+    await openAdd();
     expect(screen.getByLabelText("コース番号")).toHaveValue(1);
   });
 
   it("コースが取れなければ code を出す", async () => {
-    mockApi({});
+    mockDetail({});
     renderDetail();
     expect(await screen.findByRole("alert")).toHaveTextContent("not_found");
   });
@@ -243,7 +317,7 @@ describe("PatientDetail（D2 コース登録）", () => {
   ])(
     "応答が契約と違えば（%s）invalid_response（0件と言わない）",
     async (_l, b) => {
-      mockApi({ [LIST]: b });
+      mockDetail({ [LIST]: b });
       renderDetail();
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "invalid_response",

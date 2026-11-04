@@ -24,10 +24,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** 見出しが出ている（質問集を読めた後は、右に今日の日付も付く）。 */
 function expectPageShown() {
-  expect(
-    screen.getByRole("heading", { level: 1, name: s("today.title") }),
-  ).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    s("today.title"),
+  );
 }
 
 describe("Today (P1): malformed 200 bodies", () => {
@@ -85,6 +86,9 @@ describe("Today (P1): malformed 200 bodies", () => {
     renderToday();
     await userEvent.click(
       await screen.findByRole("button", { name: s("today.too_sick_button") }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: s("today.too_sick_confirm_yes") }),
     );
     expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
     expect(screen.queryByText(s("today.too_sick_done"))).toBeNull();

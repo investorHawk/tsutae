@@ -57,6 +57,22 @@ export async function createEntry(
   return checked(body, isCreateEntryResponse);
 }
 
+/**
+ * 「つらくて書けない」の取り消し（P2-5）。本人の・作ってすぐの・その記録だけを消す。
+ * 条件に合わなければ 409 not_undoable、他人の記録・消した後は 404 not_found。
+ */
+export async function undoEntry(
+  pid: string,
+  entryId: number,
+): Promise<OkResponse> {
+  const body = await postJson(
+    `/api/patient/${seg(pid)}/entries/${seg(entryId)}/undo`,
+    undefined,
+    OPTIONS,
+  );
+  return checked(body, isOkTrue);
+}
+
 export async function listEntries(
   pid: string,
 ): Promise<PatientEntriesResponse> {

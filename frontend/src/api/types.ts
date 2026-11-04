@@ -97,6 +97,8 @@ export type PatientStrings = Readonly<Record<string, string>>;
 export interface QuestionsResponse {
   skill_version: string;
   questions: Question[];
+  /** サーバーの今日（JST の YYYY-MM-DD。今日の記録の見出しの日付） */
+  today: string;
 }
 
 export interface CreateEntryResponse {
@@ -129,8 +131,19 @@ export interface PatientEntry {
   free_text: string | null;
 }
 
+/**
+ * 自分の受診日（受付のあった日。状態を問わない）。返るのは日付と、その日の最初の受付の
+ * 時刻だけ（受付番号・状態・レポートは無い）。これまでの記録の区切りに使う。
+ */
+export interface PatientVisitDay {
+  visit_date: IsoDate;
+  received_at: IsoDateTime;
+}
+
 export interface PatientEntriesResponse {
   entries: PatientEntry[];
+  /** 新しい順 */
+  visits: PatientVisitDay[];
 }
 
 export interface VisitRequest {
@@ -151,11 +164,24 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * 患者一覧の1件。last_record_date・current_course_no・next_visit は無ければ null
+ * （項目は必ずある）。今のコースは今日（サーバーの config.today()）で決め、次回受診は
+ * 今のコースの次回受診予定日。current_day は今日の今のコースでの Day、
+ * days_since_last_record は今日 − 最後の記録日（記録が無ければ null）、record_stale は
+ * 最後の記録が3日以上前か記録が無い（判定はサーバー）。
+ */
 export interface DoctorPatient {
   id: string;
   regimen: Regimen;
   created_at: IsoDateTime;
   register_url: string;
+  last_record_date: IsoDate | null;
+  days_since_last_record: number | null;
+  record_stale: boolean;
+  current_course_no: number | null;
+  current_day: number | null;
+  next_visit: IsoDate | null;
 }
 
 export interface PatientsResponse {
@@ -177,6 +203,54 @@ export interface CoursesResponse {
 }
 
 /**
+ * 患者の画面（D2）の受診1件（新しい順）。印刷済み・期限切れも出る（受付番号は null）。
+ * report_available はレポートを開ける（受付番号が残っている ready）とき true。
+ */
+export interface PatientVisit {
+  id: number;
+  reception_no: string | null;
+  visit_date: IsoDate;
+  created_at: IsoDateTime;
+  status: VisitStatus;
+  fallback: boolean;
+  report_available: boolean;
+  unprocessed_count: number;
+}
+
+export interface PatientVisitsResponse {
+  visits: PatientVisit[];
+}
+
+/** 患者の画面の記録のクローズ回答（コードのまま。表示名は画面で引く）。 */
+export interface DoctorEntryAnswer {
+  question_key: string;
+  value: AnswerValue;
+  temperature: number | null;
+}
+
+/**
+ * 患者の画面の記録1件。自由記載は有無だけ（原文は D6 だけに出る）。
+ * course_no・day は記録日のコースと Day（サーバーで計算。コース外・矛盾は null）。
+ */
+export interface DoctorEntry {
+  id: number;
+  recorded_at: IsoDateTime;
+  record_date: IsoDate;
+  course_no: number | null;
+  day: number | null;
+  kind: EntryKind;
+  by_proxy: boolean;
+  answers: DoctorEntryAnswer[];
+  has_free_text: boolean;
+}
+
+/** 直近の記録（新しい順、上限あり）と、その患者の記録の総数。 */
+export interface PatientEntriesSummaryResponse {
+  entries: DoctorEntry[];
+  total: number;
+}
+
+/**
  * 印刷待ち一覧の1件（W3 後の決定）。出るのは受付番号のある generating・ready・failed だけ
  * （印刷済み・期限切れは一覧から消える）。
  */
@@ -195,16 +269,91 @@ export interface VisitsResponse {
   visits: VisitSummary[];
 }
 
-/** D6。原文。紙には載せない。 */
+/**
+ * 未処理・変換ログの見出しの受診。受付番号は印刷済み・期限切れで null。
+ * report_available はレポートを開ける（受付番号が残っていて期限内の ready）とき true。
+ */
+export interface VisitHeader {
+  id: number;
+  reception_no: string | null;
+  patient_id: string;
+  visit_date: IsoDate;
+  /** 受付の時刻 */
+  created_at: IsoDateTime;
+  status: VisitStatus;
+  fallback: boolean;
+  report_available: boolean;
+}
+
+/** D6。原文。紙には載せない。course_no・day は記録日のコースと Day（無ければ null）。 */
 export interface UnprocessedItem {
   entry_id: number;
   record_date: IsoDate;
+  course_no: number | null;
+  day: number | null;
   /** 検出規則名（例 "unknown_before_honorific"） */
   reason: string;
   text: string;
+  /** 疑われた語の text の中の位置（code point の [start, end)。位置順・重なりなし） */
+  marks: TextMark[];
+  /** 保存済みの医師の伏せ字（無ければ null）。区間は text の位置 */
+  doctor_mask: DoctorMaskView | null;
+}
+
+/** 医師の伏せ字（D6）。spans は原文（text）の伏せる区間、confirmed_clear は確かめた印。 */
+export interface DoctorMaskView {
+  spans: TextMark[];
+  confirmed_clear: boolean;
+}
+
+/** POST /visits/{id}/masks/check の本文（医師は文を書かない。区間だけを送る）。 */
+export interface MaskCheckRequest {
+  entry_id: number;
+  spans: TextMark[];
+}
+
+/** まだ疑われる区間（masked_text の code point の位置）と規則名。 */
+export interface MaskSuspect extends TextMark {
+  rule: string;
+}
+
+/** 区間を当てた後の、送られる文とまだ疑われる区間。保存はしない。 */
+export interface MaskCheckResponse {
+  entry_id: number;
+  masked_text: string;
+  suspects: MaskSuspect[];
+  /** 送れない理由の規則名（無ければ null = そのまま送れる） */
+  reason: string | null;
+  sendable: boolean;
+  /** 「個人を特定する語は無いことを確かめた」で送れる */
+  confirmable: boolean;
+}
+
+export interface MaskSaveEntry {
+  entry_id: number;
+  /** false なら未処理のまま（保存済みの伏せ字も消す） */
+  send: boolean;
+  spans: TextMark[];
+  confirmed_clear: boolean;
+}
+
+export interface MaskSaveRequest {
+  entries: MaskSaveEntry[];
+}
+
+/** 保存の応答。sendable は保存した記録のうち変換で送られる件数。 */
+export interface MaskSaveResponse {
+  ok: true;
+  sendable: number;
+}
+
+export interface TextMark {
+  start: number;
+  end: number;
 }
 
 export interface UnprocessedResponse {
+  visit: VisitHeader;
   entries: UnprocessedItem[];
 }
 
@@ -221,6 +370,7 @@ export interface PipelineEvent {
 
 export interface PipelineEventsResponse {
   status: VisitStatus;
+  visit: VisitHeader;
   events: PipelineEvent[];
 }
 
@@ -244,6 +394,18 @@ export interface InvalidSkill {
 export interface SkillsResponse {
   skills: SkillInfo[];
   invalid: InvalidSkill[];
+}
+
+/**
+ * GET /api/doctor/skills/{name}: 1つの Skill の今の中身（設定画面で依頼の前に見せる。
+ * 読み取り専用）。questions は regimen の質問（report-format は空）、text は SKILL.md の全文。
+ */
+export interface SkillContentResponse {
+  name: string;
+  version: number;
+  description: string;
+  questions: Question[];
+  text: string;
 }
 
 export interface CreateSkillChangeRequest {

@@ -49,6 +49,14 @@ describe("実際のイベント（ready の受診）", () => {
     expect(Object.values(hooks).every((h) => h.denied === 0)).toBe(true);
   });
 
+  it("題名は日本語の一行で、内部のコード（hook_h4_allow・mcp__ 等）は codes にだけある", () => {
+    for (const v of VIEWS) {
+      expect(v.title).toMatch(/[ぁ-んァ-ヶ一-龠]/);
+      expect(v.title).not.toMatch(/mcp__|hook_h\d|tool_use|subagent_|_ready/);
+      expect(v.codes).toContain(v.source.event);
+    }
+  });
+
   it("emit_timeline・emit_report の受理は emit として出る", () => {
     const emits = VIEWS.filter(
       (v) => v.kind === "emit" && v.decisionLabel === "受理",
@@ -74,6 +82,10 @@ describe("実際のイベント（生成中・印刷済み）", () => {
       "doctor_pipeline_events_printed",
     ) as PipelineEventsResponse;
     expect(body.status).toBe("printed");
-    expect(body.events).toEqual(BODY.events);
+    // 印刷の前に D6 で伏せ字を保存している（dump_api_fixtures.py の流れ）。その分だけ多い
+    expect(body.events.slice(0, BODY.events.length)).toEqual(BODY.events);
+    expect(body.events.slice(BODY.events.length).map((e) => e.event)).toEqual([
+      "doctor_mask_saved",
+    ]);
   });
 });

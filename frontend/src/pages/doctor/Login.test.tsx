@@ -33,6 +33,13 @@ describe("Login", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("アプリ名と、院内の医師用の画面である一文を出す（D1-1）", () => {
+    mockApi({});
+    renderLogin();
+    expect(screen.getByText("つたえ")).toBeInTheDocument();
+    expect(screen.getByText(/院内の医師用の画面です/)).toBeInTheDocument();
+  });
+
   it("パスワードを POST して /doctor へ", async () => {
     const fetchMock = mockApi({ "POST /api/doctor/login": { ok: true } });
     renderLogin();

@@ -3,9 +3,12 @@
 `generate_visit_report` の手順:
 1. 受診を読む。無い・受付番号が消えている（印刷済み・期限切れ）・expires_at を
    過ぎている（purge 前）なら何もしない（Claude を呼ばない）
-2. 患者・コース・記録・Skill（今の SKILL.md）・版ごとの質問集（skill_versions）を集め、
-   `prepare_input(exclude_literals=(仮名ID, 受付番号))`。受付番号・仮名IDは Claude に
-   送らない（自由記載に含む記録は known_identifier で外れる。§7 W2b）
+2. 患者・コース・記録・Skill（今の SKILL.md）・版ごとの質問集（skill_versions）・
+   その受診の医師の伏せ字（doctor_masks。D6）を集め、
+   `prepare_input(exclude_literals=(仮名ID, 受付番号), doctor_masks=...)`。受付番号・
+   仮名IDは Claude に送らない（自由記載に含む記録は known_identifier で外れる。§7 W2b）。
+   医師の伏せ字は手順4の `build_report_data` にも同じものを渡す（片方だけだと
+   entry_mismatch）
 3. `convert`（例外を出さず、失敗は fallback の ConversionResult）。run_start・run_end・
    fallback のログは convert が書く
 4. `build_report_data` → `render_report_html`。AI の結果で組み立てられなければ
@@ -52,6 +55,7 @@ from tsutae.report import build_report_data, render_report_html
 from tsutae.schemas import (
     ConversionResult,
     Course,
+    DoctorMask,
     Entry,
     PreparedInput,
     Question,
@@ -103,6 +107,7 @@ class _VisitInputs:
     courses: tuple[Course, ...]
     entries: tuple[Entry, ...]
     questions_by_version: Mapping[str, Sequence[Question]]
+    doctor_masks: Mapping[int, DoctorMask]
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +238,7 @@ def _gather(
         courses=tuple(db.list_courses(conn, patient_id)),
         entries=entries,
         questions_by_version=questions_by_version(conn, versions=sorted(used)),
+        doctor_masks=db.list_doctor_masks(conn, int(visit["id"])),
     )
 
 
@@ -244,6 +250,7 @@ def _prepare(inputs: _VisitInputs, logger: EventLogger) -> PreparedInput:
         report_skill=inputs.report_skill,
         visit_date=inputs.visit_date,
         exclude_literals=(inputs.patient_id, inputs.reception_no),
+        doctor_masks=inputs.doctor_masks,
         logger=logger,
     )
 
@@ -277,6 +284,7 @@ def _render(
         prepared=prepared,
         result=result,
         questions_by_version=inputs.questions_by_version,
+        doctor_masks=inputs.doctor_masks,
     )
     skill = inputs.report_skill
     html = render_report_html(

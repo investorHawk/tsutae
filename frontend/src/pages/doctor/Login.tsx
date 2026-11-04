@@ -39,8 +39,9 @@ export default function Login() {
 
   return (
     <section className="page d-login">
+      <p className="d-login-brand">つたえ</p>
       <h1>ログイン</h1>
-      <p className="d-muted">つたえ 医師画面（院内）</p>
+      <p className="d-muted">院内の医師用の画面です。</p>
       <form className="d-login-form" onSubmit={(e) => void handleSubmit(e)}>
         <label className="d-field">
           <span>パスワード</span>

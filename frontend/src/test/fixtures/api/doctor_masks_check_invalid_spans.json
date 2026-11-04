@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/visits/1/masks/check",
+  "request": {
+    "entry_id": 38,
+    "spans": [
+      {
+        "start": 0,
+        "end": 999
+      }
+    ]
+  },
+  "status": 422,
+  "body": {
+    "error": "invalid_spans"
+  }
+}

@@ -11,7 +11,35 @@
   --p-border: #333333;
   --p-primary: #00448f; /* 白文字とのコントラスト約 9:1 */
   --p-primary-text: #ffffff;
-  --p-too-sick: #4a2373; /* 白文字とのコントラスト約 12:1 */
+  /* 「つらくて書けない」: 他のボタンと同じ紺の系統。文字・枠・確認中の地の濃い紺
+     （白文字とのコントラスト約 17:1） */
+  --p-too-sick: #001a40;
+  /* 「つらくて書けない」の初めの地: 淡い紺（--p-too-sick の文字とのコントラスト約 14:1） */
+  --p-too-sick-bg: #e3ebf7;
+  /* まだ何も選んでいない質問のボタンの地: 薄い橙（黒文字とのコントラスト約 17:1） */
+  --p-choice-prompt: #fff1e0;
+  /* その枠: 濃い橙（白い画面 約 4.6:1・代理入力の紫 約 4.0:1・自分の地 約 4.1:1） */
+  --p-choice-prompt-border: #b85c00;
+  /* 家族が代わりに入力している間の画面の地: 薄い紫（黒文字 約 16:1・--p-muted 約 9.4:1・
+     --p-error 約 7.6:1・--p-primary 約 8.2:1）。未入力の橙・お知らせの黄とは別の色 */
+  --p-proxy-bg: #f1ecfa;
+  /* 代理入力のチェック欄の太枠: 濃い紫（--p-proxy-bg に対して約 5.6:1・白に約 6.5:1） */
+  --p-proxy-border: #6b4fa0;
+  /* 記録の一覧の要約のタグ「ある」の地: 淡い青（--p-primary の文字と約 8:1） */
+  --p-tag-present-bg: #e6eefa;
+  /* 中立のタグ（体温・書いたこと・代理など）の枠: 灰（一覧の地 --p-surface に約 4.8:1） */
+  --p-tag-neutral-border: #6b6b6b;
+  /* これまでの記録の受診日の区切り（線と文字）: 緑。白に約 5.4:1・一覧の地 --p-surface に
+     約 4.8:1。答え・タグの青、未入力の橙、代理の紫、お知らせの黄とは別の色 */
+  --p-visit: #1b7a3a;
+  /* 回答の表で選ばれていない欄の小さな○ */
+  --p-dot: #9a9a9a;
+  /* 回答の表の行の間の細い線 */
+  --p-rule: #c8c8c8;
+  --p-disabled-border: #8c8c8c;
+  --p-focus: #111111;
+  /* 下のタブの高さ（タブ 56px ＋ 上下の余白 ＋ 上の線） */
+  --p-nav-h: 80px;
   --p-error: #9b0000;
   --p-notice-bg: #fff3cc;
   --p-notice-border: #7a5200;
@@ -30,10 +58,45 @@
   padding: 16px 16px 48px;
 }
 
+/* 本文の外の「症例は全て架空」の注記。本文と同じ幅・左右の余白（PC-1） */
+.patient-footer {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+
+/* 下のタブのある画面: 最後（架空の注記）がタブに隠れないよう下をあける（PC-2） */
+.patient-app--with-nav {
+  padding-bottom: calc(var(--p-nav-h) + env(safe-area-inset-bottom, 0px));
+}
+
+/* focus で画面の下へ送られた要素が、固定したタブの裏に隠れないようにする */
+.patient-app--with-nav :is(a, button, input, textarea, select, summary) {
+  scroll-margin-bottom: calc(
+    var(--p-nav-h) + env(safe-area-inset-bottom, 0px) + 16px
+  );
+}
+
+/* focus の輪（キーボードで動かした時）。押せないボタンの見た目とは別の太い実線 */
+.patient-app :focus-visible {
+  outline: 4px solid var(--p-focus);
+  outline-offset: 3px;
+}
+
 .patient-app h1 {
   font-size: 1.5rem;
   line-height: 1.4;
   margin-bottom: 20px;
+}
+
+/* 今日の記録の見出しの右の日付（h1 の中）。見出しより小さい灰色。幅が足りない時は
+   日付ごと次の行へ回す（「11月9日（／月）」と途中で折らない） */
+.patient-app .p-title-date {
+  display: inline-block;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--p-muted);
+  white-space: nowrap;
 }
 
 .patient-app h2 {
@@ -71,10 +134,12 @@
   touch-action: manipulation;
 }
 
+/* 押せないボタン: 灰色の塗りと細い灰色の実線（点線は focus の輪と紛らわしいので使わない）。
+   押せない理由は直前の p-hint に出す（P2-2） */
 .patient-app button:disabled {
   color: var(--p-muted);
   background: var(--p-surface);
-  border-style: dashed;
+  border-color: var(--p-disabled-border);
 }
 
 .patient-app .p-button--primary {
@@ -83,12 +148,19 @@
   border-color: var(--p-primary);
 }
 
+/* 「つらくて書けない」: 淡い紺の地＋紺の文字＋紺の太枠。他のボタンより大きい（P2-6） */
 .patient-app .p-button--too-sick {
   min-height: 80px;
   font-size: 1.25rem;
+  color: var(--p-too-sick);
+  background: var(--p-too-sick-bg);
+  border: 3px solid var(--p-too-sick);
+}
+
+/* 確認を出している間は押された見た目（濃い紺の地＋白文字） */
+.patient-app .p-button--too-sick[aria-expanded="true"] {
   color: #ffffff;
   background: var(--p-too-sick);
-  border-color: var(--p-too-sick);
 }
 
 /* 選択肢（なし／ある／つらい）。選ばれたものは色と太枠の両方で分かる */
@@ -100,14 +172,38 @@
 }
 
 .patient-app .p-choices > button {
+  position: relative;
   margin: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
 }
 
+/* 選んだボタン: 太枠と ✓ はどの答えでも同じ（色に頼らず選んだことが分かる） */
 .patient-app button[aria-pressed="true"] {
   color: var(--p-primary-text);
   background: var(--p-primary);
   border-color: var(--p-text);
   border-width: 4px;
+}
+
+/* ✓ は文字の前に並べず左端に重ねる（3列のボタンで「つらい」が折れて行の高さが
+   変わらないように） */
+.patient-app .p-choice[aria-pressed="true"]::before {
+  content: "\2713";
+  content: "\2713" / "";
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  font-size: 0.85em;
+}
+
+/* まだ何も選んでいない質問: 全てのボタンを薄い橙の地＋濃い橙の枠にして入力を促す
+   （枠は同じ太さ。文字は黒のまま）。選んだら、選んだボタンは青（上の aria-pressed）、
+   選ばなかったボタンは白 */
+.patient-app .p-choices--unanswered > .p-choice:not(:disabled) {
+  background: var(--p-choice-prompt);
+  border-color: var(--p-choice-prompt-border);
 }
 
 /* --- 入力欄 ------------------------------------------------------------ */
@@ -149,8 +245,24 @@
   min-height: var(--p-tap);
   padding: 8px 12px;
   margin: 0 0 16px;
+  background: var(--p-bg);
   border: 2px solid var(--p-border);
   border-radius: 12px;
+}
+
+/* 代理で入力している間: チェック欄は紫の太枠、画面全体（下のタブも）の地は薄い紫 */
+.patient-app .p-toggle--on {
+  font-weight: 700;
+  border: 4px solid var(--p-proxy-border);
+}
+
+.patient-app .p-toggle--on input {
+  accent-color: var(--p-proxy-border);
+}
+
+.patient-app:has(.p-toggle--on),
+.patient-app:has(.p-toggle--on) .p-nav {
+  background: var(--p-proxy-bg);
 }
 
 /* 「つらくて書けない」: 代理のトグルと押し間違えないよう間をあける。
@@ -171,6 +283,55 @@
   font-weight: 700;
 }
 
+/* 自動で記録するまでの残り秒数（role=status） */
+.patient-app .p-confirm .p-countdown {
+  font-weight: 400;
+  color: var(--p-muted);
+}
+
+/* 何も入れていない時の「はい」: 淡い地から、紺の地が左から右へ3秒で満ちる。
+   満ちた部分は白い文字の写し（aria-hidden）を重ねるので、文字はどこでも読める */
+.patient-app .p-confirm-yes--auto {
+  position: relative;
+  overflow: hidden;
+  color: var(--p-primary);
+  background: var(--p-too-sick-bg);
+  border-color: var(--p-primary);
+}
+
+.patient-app .p-countdown-fill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  color: var(--p-primary-text);
+  background: var(--p-primary);
+  clip-path: inset(0 100% 0 0);
+  animation-name: p-countdown-fill;
+  animation-duration: 3s;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes p-countdown-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* 動きを減らす設定: 満ちていく表示は出さず、残り秒数の文だけにする */
+@media (prefers-reduced-motion: reduce) {
+  .patient-app .p-countdown-fill {
+    display: none;
+    animation: none;
+  }
+}
+
 /* --- 質問 ------------------------------------------------------------- */
 
 .patient-app .p-question {
@@ -181,6 +342,33 @@
 .patient-app .p-question-text {
   font-weight: 700;
   margin-bottom: 12px;
+}
+
+/* 体温: 「体温 [ 36.8 ] ℃」を1行に。入力欄は数字5桁ほどの幅で、文字を大きく */
+.patient-app .p-temperature {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.patient-app .p-temperature label {
+  font-weight: 700;
+}
+
+.patient-app .p-temperature input {
+  flex: none;
+  width: calc(5ch + 32px);
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.patient-app .p-temperature-unit {
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 /* --- 知らせ・エラー ------------------------------------------------------ */
@@ -209,9 +397,98 @@
   color: var(--p-error);
 }
 
+/* 登録画面の説明: 1文ずつ2行に（間はあけない） */
+.patient-app .p-about {
+  margin-bottom: 0;
+}
+
+.patient-app .p-about + .p-about {
+  margin-bottom: 16px;
+}
+
 .patient-app .p-synthetic {
   font-size: 18px;
   color: var(--p-muted);
+}
+
+/* 入力の補足（押せない理由・入力例）。押せないボタン・入力欄の直前に出す */
+.patient-app .p-hint {
+  margin: 0 0 8px;
+  color: var(--p-muted);
+}
+
+/* --- 記録した後（要約・取り消し・追加で記録する） ------------------------- */
+
+/* 記録した内容: これまでの記録の詳しい表示と同じ見た目（白い地・回答の表） */
+.patient-app .p-saved {
+  padding: 12px;
+  margin: 0 0 20px;
+  background: var(--p-bg);
+  border: 1px solid #8c8c8c;
+  border-radius: 12px;
+}
+
+/* 見出しは小さめの灰色（中身の表と区別する） */
+.patient-app .p-saved-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--p-muted);
+  margin-bottom: 4px;
+}
+
+.patient-app .p-button--undo {
+  margin-bottom: 20px;
+}
+
+/* 一行の要約: 日時の下にタグ（小さな角丸のラベル）を折り返して並べる。
+   読み上げの答え（「ある」「つらい」）と区切りの「／」は visually-hidden */
+.patient-app .p-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+
+/* 1つのタグ。長い質問文（短い症状名が無いもの）でも横にはみ出さず中で折る */
+.patient-app .p-tag {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 10px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  border: 2px solid;
+  border-radius: 8px;
+}
+
+/* 「ある」: 淡い青の地＋紺の文字＋紺の細い枠 */
+.patient-app .p-tag--present {
+  color: var(--p-primary);
+  background: var(--p-tag-present-bg);
+  border-color: var(--p-primary);
+}
+
+/* 「つらい」: 濃い紺の地＋白の文字。印は付けない（「ある」の淡い地とは明るさで分かれる。
+   読み上げは答えまで読む） */
+.patient-app .p-tag--hard {
+  color: var(--p-primary-text);
+  background: var(--p-primary);
+  border-color: var(--p-primary);
+}
+
+/* 体温・書いたこと・つらくて書けない・代理: 白い地＋黒の文字＋灰の枠（症状のタグと別） */
+.patient-app .p-tag--neutral {
+  color: var(--p-text);
+  background: var(--p-bg);
+  border-color: var(--p-tag-neutral-border);
+  font-weight: 400;
+}
+
+/* 全て「なし」の時はタグにせず文で出す */
+.patient-app .p-tags-none {
+  font-weight: 700;
 }
 
 /* --- 記録一覧 ----------------------------------------------------------- */
@@ -223,29 +500,205 @@
 }
 
 .patient-app .p-entry {
-  padding: 16px;
   margin: 0 0 12px;
   background: var(--p-surface);
   border: 1px solid #8c8c8c;
   border-radius: 12px;
 }
 
-/* 自由記載の原文。改行を保ち、長い英数字（URL・型番など）も枠の中で折り返す */
-.patient-app .p-entry-free-text {
-  white-space: pre-wrap;
+/* 受診日の区切り（院内の QR で受付をした日。受付の時刻の位置に入る）: 左右に伸びる
+   緑の水平線（3px）の中央に「受診日 11月9日（月）」。線は飾りで、読み上げは文字だけ。
+   帯（地の塗り・角丸）にはしない。390px でも文字は中で折れ、横にはみ出さない */
+.patient-app .p-visit-day {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--p-visit);
+}
+
+.patient-app .p-visit-day::before,
+.patient-app .p-visit-day::after {
+  content: "";
+  flex: 1 1 16px;
+  min-width: 16px;
+  border-top: 3px solid var(--p-visit);
+}
+
+.patient-app .p-visit-day-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+/* 1件1行（P3-1）。押す面は行全体・高さ 56px 以上。開くと p-entry-detail が出る */
+.patient-app .p-entry-summary {
+  position: relative;
+  display: block;
+  min-height: var(--p-tap);
+  padding: 12px 48px 12px 16px;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+/* 開けることを示す右端の矢印（閉じているとき下向き、開くと上向き）。文字ではなく線で描く */
+.patient-app .p-entry-summary::after {
+  content: "";
+  position: absolute;
+  top: 24px;
+  right: 20px;
+  width: 10px;
+  height: 10px;
+  border-right: 3px solid var(--p-text);
+  border-bottom: 3px solid var(--p-text);
+  transform: rotate(45deg);
+}
+
+.patient-app details[open] > .p-entry-summary::after {
+  top: 30px;
+  transform: rotate(-135deg);
+}
+
+/* 日時は1行目に置き、要約は次の行から */
+.patient-app .p-entry-time {
+  display: block;
+  font-weight: 700;
+}
+
+.patient-app .p-entry-detail {
+  padding: 12px 12px 16px;
+  background: var(--p-bg);
+  border-top: 1px solid #8c8c8c;
+  border-radius: 0 0 12px 12px;
+}
+
+/* 「家族が代わりに入力」「つらくて書けない」: 表の上に、枠つきの印として */
+.patient-app .p-entry-flag {
+  display: inline-block;
+  padding: 2px 12px;
+  margin: 0 8px 8px 0;
+  font-weight: 700;
+  border: 2px solid var(--p-text);
+  border-radius: 999px;
+}
+
+/* 回答の表: 行は症状名、列は なし／ある／つらい。3列は全ての行で縦にそろえる */
+.patient-app .p-answers {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  font-size: max(18px, 1em);
+  line-height: 1.4;
+}
+
+.patient-app .p-answers-col {
+  width: 76px;
+}
+
+.patient-app .p-answers th,
+.patient-app .p-answers td {
+  padding: 8px 2px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--p-rule);
+}
+
+.patient-app .p-answers thead th {
+  font-size: 18px;
+  color: var(--p-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 行の名前。長い質問文（短い名前が無いもの）は折り返す */
+.patient-app .p-answers tbody th {
+  padding-right: 8px;
+  text-align: left;
   overflow-wrap: anywhere;
 }
 
-/* --- 下部のナビゲーション（今日の記録／これまでの記録） --------------------- */
+.patient-app .p-answer-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 選ばれていない欄: 淡い灰の小さな○（読み上げない） */
+.patient-app .p-answer-cell:not(.p-answer-cell--chosen)::before {
+  content: "\25CB";
+  content: "\25CB" / "";
+  font-size: 0.8em;
+  color: var(--p-dot);
+}
+
+/* 選ばれた欄: 青地に白い太字と濃い枠（色だけに頼らない） */
+.patient-app .p-answer-cell--chosen strong {
+  display: inline-block;
+  padding: 2px 4px;
+  font-weight: 700;
+  color: var(--p-primary-text);
+  background: var(--p-primary);
+  border: 2px solid var(--p-text);
+  border-radius: 8px;
+}
+
+/* 体温の行（3列をまたぐ「測った 36.8℃」・「測っていない」） */
+.patient-app .p-answer-wide {
+  text-align: center;
+}
+
+/* 書いたこと: 見出しは小さめの灰色、本文は淡い地の枠で囲む */
+.patient-app .p-entry-free {
+  margin-top: 4px;
+}
+
+.patient-app .p-entry-label {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--p-muted);
+}
+
+.patient-app .p-entry-label-value {
+  color: var(--p-text);
+}
+
+/* 自由記載の原文。改行を保ち、長い英数字（URL・型番など）も枠の中で折り返す */
+.patient-app .p-entry-free-text {
+  padding: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--p-surface);
+  border: 1px solid #8c8c8c;
+  border-radius: 8px;
+}
+
+/* --- 下のタブ（今日の記録／これまでの記録）。画面の下に固定（PC-2） ------------ */
 
 .patient-app .p-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--p-bg);
+  border-top: 2px solid var(--p-border);
+}
+
+.patient-app .p-nav-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin: 24px 0 0;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .patient-app .p-nav a {
+  text-decoration: none;
   display: flex;
   align-items: center;
   justify-content: center;

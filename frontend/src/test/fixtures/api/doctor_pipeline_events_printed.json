@@ -5,6 +5,16 @@
   "status": 200,
   "body": {
     "status": "printed",
+    "visit": {
+      "id": 1,
+      "reception_no": null,
+      "patient_id": "P-DEMO0001",
+      "visit_date": "2026-11-09",
+      "created_at": "2026-11-09T10:00:00+09:00",
+      "status": "printed",
+      "fallback": false,
+      "report_available": false
+    },
     "events": [
       {
         "ts": "2026-11-09T10:00:00+09:00",
@@ -274,6 +284,15 @@
         "agent_type": null,
         "tool_name": null,
         "decision": "ok",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "doctor_mask_saved",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "entry:38",
         "duration_ms": null
       }
     ]

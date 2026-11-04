@@ -1,0 +1,101 @@
+/* 未処理の記載（D6）の伏せ字。色は styles/doctor.css の --d-*（要確認・注意 = 橙）にそろえる */
+
+.doctor-app .d-mask-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 0;
+  margin: 10px 0 0;
+  border: 0;
+}
+
+.doctor-app .d-mask-choice legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-mask-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doctor-app .d-mask-editor,
+.doctor-app .d-mask-check {
+  margin-top: 10px;
+}
+
+.doctor-app .d-mask-label {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-mask-text,
+.doctor-app .d-sent {
+  padding: 12px;
+  margin: 0;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  background: var(--d-bg);
+  border: 1px solid var(--d-border);
+  border-radius: 6px;
+}
+
+/* 伏せた区間: 黒い塗りの「伏せ字」の印。押すと戻す */
+.doctor-app .d-mask-text .d-mask {
+  padding: 0 6px;
+  margin: 0 1px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #ffffff;
+  vertical-align: baseline;
+  background: #111111;
+  border: 1px solid #111111;
+  border-radius: 3px;
+}
+
+.doctor-app .d-mask-text .d-mask:hover {
+  background: #444444;
+}
+
+/* 送られる文の中の、まだ疑われる語（原文の印と同じ強調） */
+.doctor-app .d-sent .d-suspect {
+  padding: 0 2px;
+  font-weight: 700;
+  color: inherit;
+  background: #ffcf4d;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 #a37800;
+}
+
+.doctor-app .d-mask-warn {
+  padding: 6px 10px;
+  margin: 8px 0 0;
+  color: var(--d-warn-text);
+  background: var(--d-warn-bg);
+  border-left: 4px solid var(--d-warn-border);
+}
+
+.doctor-app .d-mask-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.doctor-app .d-mask-submit {
+  padding: 12px 14px;
+  margin-top: 16px;
+  background: var(--d-surface);
+  border: 2px solid var(--d-primary);
+  border-radius: 8px;
+}
+
+.doctor-app .d-mask-submit p {
+  margin: 0 0 8px;
+}

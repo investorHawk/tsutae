@@ -9,11 +9,16 @@ import {
   isCreatePatientResponse,
   isCreateSkillChangeResponse,
   isOkTrue,
+  isPatientEntriesSummaryResponse,
+  isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
   isSavedCourse,
   isSkillChangesResponse,
+  isSkillContentResponse,
   isSkillsResponse,
+  isMaskCheckResponse,
+  isMaskSaveResponse,
   isUnprocessedResponse,
   isVisitsResponse,
 } from "./doctorGuards";
@@ -27,12 +32,20 @@ import type {
   CreateSkillChangeRequest,
   CreateSkillChangeResponse,
   LoginRequest,
+  MaskCheckRequest,
+  MaskCheckResponse,
+  MaskSaveEntry,
+  MaskSaveRequest,
+  MaskSaveResponse,
   OkResponse,
+  PatientEntriesSummaryResponse,
+  PatientVisitsResponse,
   PatientsResponse,
   PipelineEventsResponse,
   Regimen,
   RejectSkillChangeResponse,
   SkillChangesResponse,
+  SkillContentResponse,
   SkillsResponse,
   UnprocessedResponse,
   VisitsResponse,
@@ -119,6 +132,24 @@ export function listCourses(pid: string): Promise<CoursesResponse> {
   );
 }
 
+/** 患者の受診（新しい順。印刷済み・期限切れも。受付番号は消えていれば null）。 */
+export function listPatientVisits(pid: string): Promise<PatientVisitsResponse> {
+  return getChecked<PatientVisitsResponse>(
+    `/api/doctor/patients/${seg(pid)}/visits`,
+    isPatientVisitsResponse,
+  );
+}
+
+/** 患者の直近の記録（新しい順）と総数。自由記載は有無だけ。 */
+export function listPatientEntries(
+  pid: string,
+): Promise<PatientEntriesSummaryResponse> {
+  return getChecked<PatientEntriesSummaryResponse>(
+    `/api/doctor/patients/${seg(pid)}/entries`,
+    isPatientEntriesSummaryResponse,
+  );
+}
+
 /** 実投与日の登録。矛盾は 400 {"error": code}。 */
 export function saveCourse(course: Course): Promise<Course> {
   return postChecked<Course>(
@@ -148,9 +179,10 @@ export function markPrinted(visitId: number): Promise<OkResponse> {
 }
 
 /**
- * AI でもう一度変換（failed・AI変換なしの ready だけ）。受け付けたら generating に
- * なり、変換はサーバーのバックグラウンドで動く（結果は一覧の取り直しで見る）。
- * 生成中・AI の結果あり・印刷済み・期限切れは 409 {"error":"not_regenerable"}。
+ * AI でもう一度変換（failed・AI変換なしの ready、医師の伏せ字を保存した ready）。
+ * 受け付けたら generating になり、変換はサーバーのバックグラウンドで動く（結果は
+ * 一覧の取り直しで見る）。それ以外（生成中・医師の伏せ字の無い AI の結果あり・
+ * 印刷済み・期限切れ）は 409 {"error":"not_regenerable"}。
  */
 export function regenerateVisit(visitId: number): Promise<OkResponse> {
   return postChecked<OkResponse>(
@@ -163,6 +195,40 @@ export function listUnprocessed(visitId: number): Promise<UnprocessedResponse> {
   return getChecked<UnprocessedResponse>(
     `/api/doctor/visits/${seg(visitId)}/unprocessed`,
     isUnprocessedResponse,
+  );
+}
+
+/**
+ * D6: 伏せる区間（原文の code point の位置）を当てた後の、送られる文とまだ疑われる区間を
+ * サーバーに出させる（保存しない）。医師は文を書かず、区間だけを送る。
+ */
+export function checkMasks(
+  visitId: number,
+  entryId: number,
+  spans: MaskCheckRequest["spans"],
+): Promise<MaskCheckResponse> {
+  const body: MaskCheckRequest = { entry_id: entryId, spans };
+  return postChecked<MaskCheckResponse>(
+    `/api/doctor/visits/${seg(visitId)}/masks/check`,
+    isMaskCheckResponse,
+    body,
+  );
+}
+
+/**
+ * D6: 医師の伏せ字を保存する（send=false の記録は未処理のまま。保存済みなら消す）。
+ * この後に regenerateVisit を呼ぶと、伏せた記録を入れて変換し直す。閉じた受診は
+ * 409 visit_closed、生成中は 409 generating。
+ */
+export function saveMasks(
+  visitId: number,
+  entries: MaskSaveEntry[],
+): Promise<MaskSaveResponse> {
+  const body: MaskSaveRequest = { entries };
+  return postChecked<MaskSaveResponse>(
+    `/api/doctor/visits/${seg(visitId)}/masks`,
+    isMaskSaveResponse,
+    body,
   );
 }
 
@@ -179,6 +245,14 @@ export function getPipelineEvents(
 
 export function listSkills(): Promise<SkillsResponse> {
   return getChecked<SkillsResponse>("/api/doctor/skills", isSkillsResponse);
+}
+
+/** 1つの Skill の今の中身（読み取り専用）。無い Skill は 404 unknown_skill。 */
+export function getSkill(name: string): Promise<SkillContentResponse> {
+  return getChecked<SkillContentResponse>(
+    `/api/doctor/skills/${seg(name)}`,
+    isSkillContentResponse,
+  );
 }
 
 export function createSkillChange(

@@ -18,7 +18,10 @@ interface PipelineBoardProps {
   finished: boolean;
 }
 
-/** D5 の盤面: Hook のタイル → 3役のレーン → 時系列のカード。 */
+/**
+ * D5 の盤面: Hook（検問）のタイル → 役ごとの要約のレーン → すべての出来事（折りたたみ）。
+ * 一目で「3人の担当が分担し、検問が通した／止めた」が分かることを先にする。
+ */
 export default function PipelineBoard({
   events,
   finished,
@@ -39,10 +42,18 @@ export default function PipelineBoard({
           ? ` ・ 経過 ${formatElapsed(summary.elapsedMs)}`
           : ""}
       </p>
+      <h2 className="d-pl-heading">検問（Hook）</h2>
       <PipelineHooks hooks={hooks} />
-      <PipelineLanes lanes={lanes} />
-      <h2>時系列</h2>
-      <PipelineTimeline views={views} />
+      <h2 className="d-pl-heading">担当の分担</h2>
+      <PipelineLanes lanes={lanes} finished={finished} />
+      {views.length === 0 ? (
+        <p className="d-muted">まだ出来事はありません</p>
+      ) : (
+        <details className="d-pl-all">
+          <summary>すべての出来事（{views.length} 件）</summary>
+          <PipelineTimeline views={views} />
+        </details>
+      )}
     </div>
   );
 }

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPatient, listPatients } from "../../api/doctor";
-import {
-  REGIMENS,
-  type CreatePatientResponse,
-  type DoctorPatient,
-  type Regimen,
+import type {
+  CreatePatientResponse,
+  DoctorPatient,
+  Regimen,
 } from "../../api/types";
 import { checked } from "../../api/validate";
 import ErrorNote from "../../components/doctor/ErrorNote";
@@ -13,22 +12,29 @@ import {
   isDoctorPatient,
 } from "../../components/doctor/guards";
 import { listOf } from "../../components/doctor/input";
+import PatientCreateForm from "../../components/doctor/PatientCreateForm";
 import PatientTable from "../../components/doctor/PatientTable";
 import RegisterQrPanel from "../../components/doctor/RegisterQrPanel";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
 import "../../components/doctor/doctor-ui.css";
+import "../../components/doctor/board.css";
 
 interface Shown {
   id: string;
   url: string;
 }
 
-/** D1 患者一覧。仮名IDだけを扱う（氏名は扱わない）。登録用QRを描く。 */
+/**
+ * D1 患者一覧。仮名IDだけを扱う（氏名は扱わない）。登録用QRを描く。
+ * 一覧には最後の記録日（途切れの印）・今のコースと Day・次回受診も出す（API が今日で計算する）。
+ * 一覧をいちばん上に置き、追加の欄は見出しの右の「＋ 患者を追加」で開く。追加したら欄を
+ * 閉じ、その患者の登録用QRを出す（QR の出方は前と同じ）。
+ */
 export default function Patients() {
   const handleError = useDoctorApiError();
   const [patients, setPatients] = useState<DoctorPatient[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [regimen, setRegimen] = useState<Regimen>("FOLFOX");
+  const [formOpen, setFormOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -53,8 +59,7 @@ export default function Patients() {
     void load();
   }, [load]);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleCreate(regimen: Regimen) {
     setCreating(true);
     setCreateError(null);
     try {
@@ -64,6 +69,7 @@ export default function Patients() {
       );
       setCreatedId(created.id);
       setShown({ id: created.id, url: created.register_url });
+      setFormOpen(false);
       await load();
     } catch (err) {
       setCreateError(handleError(err));
@@ -82,35 +88,37 @@ export default function Patients() {
 
   return (
     <section className="page">
-      <h1>患者一覧</h1>
-      <form className="d-inline-form" onSubmit={(e) => void handleCreate(e)}>
-        <label className="d-field d-field--inline">
-          <span>レジメン</span>
-          <select
-            value={regimen}
-            onChange={(e) => setRegimen(e.target.value as Regimen)}
-          >
-            {REGIMENS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="d-primary" disabled={creating}>
-          新規作成
+      <div className="d-page-head">
+        <h1>患者一覧</h1>
+        <button
+          type="button"
+          className="d-head-action"
+          aria-expanded={formOpen}
+          aria-controls={formOpen ? "d-patient-add-form" : undefined}
+          onClick={() => {
+            setCreateError(null);
+            setFormOpen((open) => !open);
+          }}
+        >
+          ＋ 患者を追加
         </button>
-        <span className="d-muted">
-          仮名IDは無作為に作られます。対応表は院内の紙で管理します。
-        </span>
-      </form>
+      </div>
+      {formOpen ? (
+        <div id="d-patient-add-form">
+          <PatientCreateForm
+            busy={creating}
+            onCreate={(regimen) => void handleCreate(regimen)}
+            onCancel={() => setFormOpen(false)}
+          />
+        </div>
+      ) : null}
       {createdId ? (
         <p role="status" className="d-ok">
-          {createdId} を作りました。登録用QRを患者に読み取ってもらいます。
+          {createdId} を追加しました。登録用QRを患者に読み取ってもらいます。
         </p>
       ) : null}
       {createError ? (
-        <ErrorNote code={createError} prefix="作れませんでした" />
+        <ErrorNote code={createError} prefix="追加できませんでした" />
       ) : null}
       {shown ? (
         <RegisterQrPanel

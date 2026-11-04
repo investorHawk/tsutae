@@ -95,7 +95,9 @@ describe("Visits: AI でもう一度変換", () => {
     await screen.findByText("A-025");
     const row = within(rowOf("A-025"));
     expect(row.getByRole("button", { name: "印刷" })).toBeInTheDocument();
-    expect(row.getByRole("button", { name: "印刷済み" })).toBeInTheDocument();
+    expect(
+      row.getByRole("button", { name: "印刷済みにする" }),
+    ).toBeInTheDocument();
   });
 
   it("実際の API の応答（fixture）の失敗の行に出す", async () => {
@@ -150,7 +152,7 @@ describe("Visits: AI でもう一度変換", () => {
     // 依頼中は同じ行の印刷・印刷済みも押せない（前のレポートで印刷済みにしない）
     const row = within(rowOf("A-025"));
     expect(row.getByRole("button", { name: "印刷" })).toBeDisabled();
-    expect(row.getByRole("button", { name: "印刷済み" })).toBeDisabled();
+    expect(row.getByRole("button", { name: "印刷済みにする" })).toBeDisabled();
     await u.click(busy);
     expect(countOf(fetchMock, REGEN_14)).toBe(1);
     await act(async () => {
@@ -169,7 +171,7 @@ describe("Visits: AI でもう一度変換", () => {
     await screen.findByText("A-025");
     const u = user();
     const row = within(rowOf("A-025"));
-    await u.click(row.getByRole("button", { name: "印刷済み" }));
+    await u.click(row.getByRole("button", { name: "印刷済みにする" }));
     await u.click(buttonIn("A-025"));
     expect(
       row.getByRole("button", { name: "削除する（印刷済み）" }),

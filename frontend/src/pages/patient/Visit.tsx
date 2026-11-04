@@ -28,7 +28,8 @@ function errorKeyOf(err: unknown): string {
 }
 
 /**
- * P3 受診時（/visit。院内QRで開く）。受付番号を送り、届いたら visit.done だけを出す。
+ * P3 受診時（/visit。院内QRで開く）。送ると何が起きるか（visit.about）と番号の例
+ * （visit.example）を出し、受付番号を送り、届いたら visit.done だけを出す。
  * 患者は Cookie で識別される（経路に仮名ID を入れない）。
  * native の maxLength は UTF-16 単位で数え貼り付けを黙って切るので付けない。
  * 長さは送る前に normalizeReceptionNo（code point で 1〜32 字）で検査する。
@@ -36,6 +37,7 @@ function errorKeyOf(err: unknown): string {
 export default function Visit() {
   const { t } = usePatientStrings();
   const inputId = useId();
+  const exampleId = useId();
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("editing");
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -79,9 +81,14 @@ export default function Visit() {
         <ErrorMessage messageKey={NOT_REGISTERED_KEY} />
       ) : (
         <form onSubmit={handleSubmit} noValidate>
+          <p>{t("visit.about")}</p>
           <label htmlFor={inputId}>{t("visit.reception_label")}</label>
+          <p id={exampleId} className="p-hint">
+            {t("visit.example")}
+          </p>
           <input
             id={inputId}
+            aria-describedby={exampleId}
             type="text"
             autoComplete="off"
             autoCapitalize="characters"

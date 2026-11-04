@@ -8,13 +8,15 @@ import { fixtureBody } from "../test/apiFixtures";
 import {
   isCoursesResponse,
   isCreateSkillChangeResponse,
+  isPatientEntriesSummaryResponse,
+  isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
   isSkillChangesResponse,
   isUnprocessedResponse,
   isVisitsResponse,
 } from "./doctorGuards";
-import { isPatientEntriesResponse } from "./patientGuards";
+import { isPatientEntriesResponse, isQuestionsResponse } from "./patientGuards";
 import { type Item, isRecord } from "./validate";
 
 type Guard = (body: Item) => boolean;
@@ -22,12 +24,15 @@ type Guard = (body: Item) => boolean;
 const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_visits: isVisitsResponse,
   doctor_patients: isPatientsResponse,
+  doctor_patient_visits: isPatientVisitsResponse,
+  doctor_patient_entries: isPatientEntriesSummaryResponse,
   doctor_courses: isCoursesResponse,
   doctor_unprocessed: isUnprocessedResponse,
   doctor_pipeline_events: isPipelineEventsResponse,
   doctor_skill_changes: isSkillChangesResponse,
   doctor_skill_change_create: isCreateSkillChangeResponse,
   patient_entries: isPatientEntriesResponse,
+  patient_questions: isQuestionsResponse,
 };
 
 function passes(name: string, body: unknown): boolean {
@@ -98,7 +103,37 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ...dateCases("patient_entries", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),
+  // 受診日の区切り（受診日と受付の時刻）
+  ...dateCases("patient_entries", "visit_date", (b, v) => {
+    b.visits[0].visit_date = v;
+  }),
+  ...dateTimeCases("patient_entries", "received_at", (b, v) => {
+    b.visits[0].received_at = v;
+  }),
+  // 今日の記録の見出しの日付（サーバーの今日）
+  ...dateCases("patient_questions", "today", (b, v) => {
+    b.today = v;
+  }),
+  ["patient_questions", "today が null", (b) => (b.today = null)],
   ...dateCases("doctor_unprocessed", "record_date", (b, v) => {
+    b.entries[0].record_date = v;
+  }),
+  ...dateCases("doctor_patients", "last_record_date", (b, v) => {
+    b.patients[0].last_record_date = v;
+  }),
+  ...dateCases("doctor_patients", "next_visit", (b, v) => {
+    b.patients[1].next_visit = v;
+  }),
+  ...dateCases("doctor_patient_visits", "visit_date", (b, v) => {
+    b.visits[0].visit_date = v;
+  }),
+  ...dateTimeCases("doctor_patient_visits", "created_at", (b, v) => {
+    b.visits[0].created_at = v;
+  }),
+  ...dateTimeCases("doctor_patient_entries", "recorded_at", (b, v) => {
+    b.entries[0].recorded_at = v;
+  }),
+  ...dateCases("doctor_patient_entries", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),
   ...dateCases("doctor_courses", "infusion_date", (b, v) => {
@@ -130,6 +165,39 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "diff が無い（null と省略は違う）",
     (b) => delete b.diff,
   ],
+  // 医師画面の UX の見直しで足した項目: nullable も省略は不正
+  ...["days_since_last_record", "record_stale", "current_day"].map(
+    (key): [string, string, Mutate] => [
+      "doctor_patients",
+      `${key} が無い（null と省略は違う）`,
+      (b) => delete b.patients[0][key],
+    ],
+  ),
+  ...["course_no", "day"].flatMap(
+    (key): Array<[string, string, Mutate]> => [
+      [
+        "doctor_patient_entries",
+        `${key} が無い（null と省略は違う）`,
+        (b) => delete b.entries[0][key],
+      ],
+      [
+        "doctor_unprocessed",
+        `${key} が無い（null と省略は違う）`,
+        (b) => delete b.entries[0][key],
+      ],
+    ],
+  ),
+  [
+    "doctor_pipeline_events",
+    "visit の受付番号が無い（null と省略は違う）",
+    (b) => delete b.visit.reception_no,
+  ],
+  ...dateTimeCases("doctor_unprocessed", "visit.created_at", (b, v) => {
+    b.visit.created_at = v;
+  }),
+  ...dateCases("doctor_pipeline_events", "visit.visit_date", (b, v) => {
+    b.visit.visit_date = v;
+  }),
   // D5: nullable の項目も省略は不正
   ...["hook_name", "agent_type", "tool_name", "decision", "duration_ms"].map(
     (key): [string, string, Mutate] => [

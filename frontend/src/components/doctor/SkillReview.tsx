@@ -1,6 +1,7 @@
 import { isUsableDiff } from "./diff";
 import DiffView from "./DiffView";
 import ErrorNote from "./ErrorNote";
+import { skillDisplayName } from "./skillLabels";
 
 export interface ReviewTarget {
   id: number;
@@ -29,7 +30,9 @@ export default function SkillReview({
     <section className="d-review" aria-label="差分の確認">
       <h2>差分を確認（#{target.id}）</h2>
       <p>
-        <code>{target.skillName}</code> への依頼「{target.requestText}」
+        <strong>{skillDisplayName(target.skillName)}</strong>（
+        <code className="d-skill-code">{target.skillName}</code>
+        ）への依頼「{target.requestText}」
       </p>
       <DiffView diff={target.diff} />
       <p className="d-muted">

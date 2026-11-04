@@ -1,4 +1,7 @@
-"""ReportData → A4 一枚の HTML（Jinja2、autoescape）。docs/architecture.md §7b。
+"""ReportData → A4 の HTML（Jinja2、autoescape）。docs/architecture.md §7b。
+
+- 通常のコースは A4 1 枚。コースが長く伸びて経過表の段が増えたときは 2 枚目に流れる
+  （段組みは grid_view.py）
 
 - 描画は決定的（時刻などを埋め込まない）。CSS は templates/report.css を <style> に
   埋め込む（印刷時に外部ファイルを読みに行かない）
@@ -21,17 +24,10 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from markupsafe import Markup
 
-from tsutae.report.labels import (
-    TEMPERATURE_ROW_KEY,
-    answer_label,
-    has_severity_word,
-    question_label,
-)
+from tsutae.report.grid_view import grid_view
+from tsutae.report.labels import answer_label, has_severity_word, question_label
 from tsutae.schemas import (
     AttentionItem,
-    Grid,
-    GridCell,
-    GridRow,
     Question,
     QuoteItem,
     ReportData,
@@ -45,20 +41,20 @@ CSS_NAME = "report.css"
 SECTIONS: tuple[str, ...] = ("header", "attention", "grid", "per_symptom", "quotes")
 DEFAULT_LOW_CONFIDENCE = 0.6  # ReportFormatSkill.low_confidence_threshold の既定と同じ
 
-# 引用欄を2枚目に回すかの見積もり（mm）。A4 から余白 10mm×2 を引いた高さ
+# 引用欄を2枚目に回すかの見積もり（mm）。A4 から余白 10mm×2 を引いた高さ。
+# 1 行の高さ・1 行の字数は report.css の本文（9.5pt）と経過表の寸法に合わせる
 _PAGE_MM = 277.0
-_LINE_MM = 4.4
+_LINE_MM = 5.0
 _GRID_ROW_MM = 5.0
+_GRID_HEAD_MM = 11.0
+_SEGMENT_TITLE_MM = 4.5
+_LEGEND_MM = 13.0
 _SECTION_MM = 8.0
-_QUOTE_CHARS_PER_LINE = 50
+_QUOTE_CHARS_PER_LINE = 46
+# 引用より前の欄で 1 枚目の残りがこれ未満なら強制で改ページしない（見積もりが外れて
+# 前の欄が 2 枚目にまたがったとき、引用が 3 枚目に飛ぶのを防ぐ）
+_NEAR_FULL_MM = 15.0
 
-_OUT_CELL = {
-    "cls": "cell out",
-    "glyph": "",
-    "temp": "",
-    "mark": False,
-    "recalled": False,
-}
 # 理由（二次検出・受診前の範囲外など）は紙では断定しない（AttentionItem に理由が無い）
 UNPROCESSED_NOTE = "{n}件（AI に送っていない記載。理由と内容は院内画面で確認）"
 QUOTES_LIMIT_NOTE = "上限{n}件まで載せた（受診直前の記載を残した。それより前の記載は省いた可能性がある）"
@@ -160,82 +156,6 @@ def _attention_view(
     return lines
 
 
-def _cell_view(
-    cell: GridCell | None, day: int, row: GridRow, slashed: bool
-) -> dict[str, Any]:
-    if cell is None:  # そのコースの範囲外（受診日より後・そのコースに無い Day）
-        return {**_OUT_CELL, "day": day}
-    is_temp = row.question_key == TEMPERATURE_ROW_KEY
-    state = cell.state
-    if is_temp and state in ("present", "none"):
-        state = "measured" if state == "present" else "not_measured"
-    classes = ["cell", f"st-{state}"]
-    if slashed or cell.state == "too_sick":
-        classes.append("slash")
-    glyph = {"none": "−", "not_measured": "−", "not_asked": "−−"}.get(state, "")
-    temp = f"{cell.temperature:.1f}" if is_temp and cell.temperature is not None else ""
-    return {
-        "day": day,
-        "cls": " ".join(classes),
-        "glyph": glyph,
-        "temp": temp,
-        "mark": cell.free_text_mark,
-        "recalled": cell.recalled_mark,
-    }
-
-
-def _slash_days(grid: Grid, rows: Sequence[GridRow], previous: bool) -> set[int]:
-    """そのコースのブロックで列全体に斜線を引く Day。
-
-    今コースは列頭（GridColumn.too_sick）。前コースは列の情報が Grid に無いので、
-    そのブロックのどれかのセルが too_sick の Day（回答のある行にも斜線を引く）。
-    """
-    if not previous:
-        return {c.day for c in grid.columns if c.too_sick}
-    return {c.day for r in rows for c in r.cells if c.state == "too_sick"}
-
-
-def _row_view(row: GridRow, grid: Grid, slash_days: set[int]) -> dict[str, Any]:
-    by_day = {c.day: c for c in row.cells}
-    cells = [
-        _cell_view(by_day.get(day), day, row, slashed=day in slash_days)
-        for day in grid.days
-    ]
-    return {
-        "id": f"c{row.course_no}-{row.question_key}",
-        "label": row.label,
-        "previous": row.is_previous_course,
-        "cells": cells,
-    }
-
-
-def _block_title(row: GridRow) -> str:
-    if row.is_previous_course:
-        return f"第{row.course_no}コース（前コース。クローズ回答のみ）"
-    return f"第{row.course_no}コース（今回）"
-
-
-def _grid_view(grid: Grid) -> dict[str, Any]:
-    grouped: dict[tuple[int, bool], list[GridRow]] = {}
-    for row in grid.rows:
-        grouped.setdefault((row.course_no, row.is_previous_course), []).append(row)
-    blocks = []
-    for key, rows in grouped.items():
-        slash = _slash_days(grid, rows, previous=key[1])
-        blocks.append(
-            {
-                "key": key,
-                "title": _block_title(rows[0]),
-                "rows": [_row_view(row, grid, slash) for row in rows],
-            }
-        )
-    columns = [
-        {"day": c.day, "date": _md(c.date), "proxy": c.by_proxy, "slash": c.too_sick}
-        for c in grid.columns
-    ]
-    return {"columns": columns, "blocks": blocks, "span": len(grid.days) + 1}
-
-
 def _symptom_view(
     items: Sequence[SymptomSummary], threshold: float
 ) -> list[dict[str, Any]]:
@@ -275,18 +195,40 @@ def _quote_lines(quotes: Sequence[QuoteItem]) -> int:
     return sum(max(1, math.ceil(len(q.text) / _QUOTE_CHARS_PER_LINE)) for q in quotes)
 
 
-def _quotes_need_new_page(data: ReportData, sections: Sequence[str]) -> bool:
-    """引用欄まで1枚に収まらない見積もりなら True（引用欄を2枚目に回す）。"""
+def _grid_mm(grid: dict[str, Any]) -> float:
+    """経過表の欄の高さ。段ごとに列頭＋（コースの区切り行＋行）、最後に凡例。"""
+    total = _SECTION_MM + _LEGEND_MM
+    for seg in grid["segments"]:
+        rows = sum(1 + len(block["rows"]) for block in seg["blocks"])
+        title = _SEGMENT_TITLE_MM if seg["title"] else 0.0
+        total += title + _GRID_HEAD_MM + _GRID_ROW_MM * rows
+    return total
+
+
+def _quotes_need_new_page(
+    data: ReportData,
+    sections: Sequence[str],
+    *,
+    attention_lines: int,
+    grid: dict[str, Any],
+) -> bool:
+    """引用欄まで1枚に収まらない見積もりなら True（引用欄を2枚目に回す）。
+
+    引用より前の欄だけで1枚目がほぼ埋まる（経過表が長く伸びた）なら False。強制で
+    改ページすると、見積もりが外れたときに引用が3枚目に飛ぶ。印刷の流れ（欄の途中で
+    切らない）に任せても、引用は2枚目の頭から始まる。
+    """
     if "quotes" not in sections:
         return False
-    blocks = len({(r.course_no, r.is_previous_course) for r in data.grid.rows})
     sizes = {
         "header": 14.0,
-        "attention": _SECTION_MM + _LINE_MM * max(1, len(data.attention)),
-        "grid": _SECTION_MM + 12.0 + _GRID_ROW_MM * (2 + len(data.grid.rows) + blocks),
+        "attention": _SECTION_MM + _LINE_MM * max(1, attention_lines),
+        "grid": _grid_mm(grid),
         "per_symptom": _SECTION_MM + _LINE_MM * (1 + len(data.per_symptom)),
     }
     before = 22.0 + sum(sizes[s] for s in sections if s in sizes)  # 冒頭・欄外を含む
+    if before > _PAGE_MM - _NEAR_FULL_MM:
+        return False
     quotes = _SECTION_MM + _LINE_MM * _quote_lines(data.quotes)
     return before + quotes > _PAGE_MM
 
@@ -299,7 +241,7 @@ def render_report_html(
     sections: Sequence[str] | None = None,
     quotes_max_items: int | None = None,
 ) -> str:
-    """A4 一枚の HTML を返す。
+    """A4 の HTML を返す（通常は 1 枚）。
 
     - questions: 要確認・経過表の表示名に使う質問集（今の regimen Skill）
     - low_confidence_threshold: これ未満の症状別の行に「？」（report Skill の値を渡す）
@@ -308,17 +250,21 @@ def render_report_html(
       省いた可能性を書く。None なら書かない（ReportData に省いた件数が無いための暫定）
     """
     chosen = _sections(sections)
+    attention = _attention_view(data.attention, questions)
+    grid = grid_view(data.grid)
     template = _ENV.get_template(TEMPLATE_NAME)
     return template.render(
         css=_css(),
         sections=chosen,
         fallback=data.fallback,
         header=_header_view(data.header),
-        attention=_attention_view(data.attention, questions),
-        grid=_grid_view(data.grid),
+        attention=attention,
+        grid=grid,
         per_symptom=_symptom_view(data.per_symptom, low_confidence_threshold),
         quotes=_quote_view(data.quotes),
         quotes_limit_note=_quotes_limit_note(data.quotes, quotes_max_items),
-        quotes_page_break=_quotes_need_new_page(data, chosen),
+        quotes_page_break=_quotes_need_new_page(
+            data, chosen, attention_lines=len(attention), grid=grid
+        ),
         report_skill_version=data.report_skill_version,
     )

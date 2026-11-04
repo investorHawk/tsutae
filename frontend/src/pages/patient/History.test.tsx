@@ -6,8 +6,16 @@ import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import History from "./History";
 import { callsTo, mockPatientApi } from "./testing/api";
-import { ENTRIES, PID, questionText, s } from "./testing/fixtures";
+import {
+  ENTRIES,
+  PID,
+  VISITS,
+  entriesBody,
+  questionText,
+  s,
+} from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
+import { spokenText, visibleText } from "./testing/text";
 
 const ROUTES = [{ path: "/history", element: <History /> }];
 
@@ -15,13 +23,67 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** 「11月2日（月）8:10」の形（定型文 history.date・weekday.* から作る）。 */
+function dateText(month: number, day: number, weekday: number, time: string) {
+  const date = s("history.date")
+    .replace("{month}", String(month))
+    .replace("{day}", String(day))
+    .replace("{weekday}", s(`weekday.${weekday}`));
+  return `${date}${time}`;
+}
+
+/** 記録1件の開いた時の中身（表と書いたこと）。 */
+function detailOf(item: HTMLElement): HTMLElement {
+  const detail = item.querySelector<HTMLElement>(".p-entry-detail");
+  if (!detail) {
+    throw new Error("p-entry-detail is missing");
+  }
+  return detail;
+}
+
+function summaryOf(item: HTMLElement): HTMLElement {
+  const summary = item.querySelector("summary");
+  if (!summary) {
+    throw new Error("summary is missing");
+  }
+  return summary;
+}
+
+/** 記録1件の詳しい表示の、行見出しが label の行。 */
+function rowOf(item: HTMLElement, label: string): HTMLElement {
+  const header = within(item).getByRole("rowheader", { name: label });
+  const row = header.closest("tr");
+  if (!row) {
+    throw new Error("row is missing");
+  }
+  return row;
+}
+
+function temperatureText(value: string): string {
+  return `${s("answer.measured")} ${s("history.temperature_value").replace("{value}", value)}`;
+}
+
 function renderHistory() {
   return renderPatient(ROUTES, "/history");
 }
 
+async function list(): Promise<HTMLElement> {
+  return screen.findByRole("list", { name: s("history.title") });
+}
+
+/** 記録の行（受診日の区切りの行は除く）。 */
 async function items(): Promise<HTMLElement[]> {
-  const list = await screen.findByRole("list", { name: s("history.title") });
-  return within(list).getAllByRole("listitem");
+  return within(await list())
+    .getAllByRole("listitem")
+    .filter((li) => li.classList.contains("p-entry"));
+}
+
+/** 「受診日 10月30日（金）」の形（定型文 history.visit_day・history.date から作る）。 */
+function visitDayText(month: number, day: number, weekday: number): string {
+  return s("history.visit_day").replace(
+    "{date}",
+    dateText(month, day, weekday, ""),
+  );
 }
 
 beforeEach(() => {
@@ -51,35 +113,165 @@ describe("History (P2)", () => {
     renderHistory();
     const rows = await items();
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toHaveTextContent("2026-11-02 08:10");
-    expect(rows[1]).toHaveTextContent("2026-10-31 19:30");
-    expect(rows[2]).toHaveTextContent("2026-10-29 21:05");
+    expect(rows[0]).toHaveTextContent(dateText(11, 2, 1, "8:10"));
+    expect(rows[1]).toHaveTextContent(dateText(10, 31, 6, "19:30"));
+    expect(rows[2]).toHaveTextContent(dateText(10, 29, 4, "21:05"));
     expect(
       callsTo(fetchMock, "GET", `/api/patient/${PID}/entries`),
     ).toHaveLength(1);
   });
 
-  it("shows too_sick, proxy, answers with question text, and free text", async () => {
+  it("shows too_sick, proxy, a table of answers, and free text", async () => {
     mockPatientApi();
     renderHistory();
     const [newest, middle, oldest] = await items();
 
     expect(oldest).toHaveTextContent(s("history.too_sick"));
     expect(oldest).not.toHaveTextContent(s("history.proxy"));
+    expect(within(oldest!).queryByRole("table")).toBeNull();
 
-    expect(middle).toHaveTextContent(s("history.proxy"));
-    expect(middle).toHaveTextContent(questionText("diarrhea"));
-    expect(middle).toHaveTextContent(s("answer.present"));
-    expect(middle).toHaveTextContent(questionText("fever"));
-    expect(middle).toHaveTextContent(s("answer.measured"));
-    expect(middle).toHaveTextContent(s("temperature.label"));
-    expect(middle).toHaveTextContent("37.9");
-    expect(middle).toHaveTextContent(s("history.free_text"));
-    expect(middle).toHaveTextContent(ENTRIES[1]!.free_text!);
+    expect(within(detailOf(middle!)).getByText(s("history.proxy"))).toHaveClass(
+      "p-entry-flag",
+    );
+    // 行は短い症状名、列は なし／ある／つらい。読み上げは「下痢 ある」
+    expect(
+      within(middle!)
+        .getAllByRole("columnheader")
+        .map((th) => th.textContent),
+    ).toEqual([s("answer.none"), s("answer.present"), s("answer.hard")]);
+    expect(
+      within(middle!).getByRole("row", {
+        name: `${s("symptom.diarrhea")} ${s("answer.present")}`,
+      }),
+    ).toBeInTheDocument();
+    // 体温は3列をまたいで「測った 37.9℃」
+    expect(
+      within(middle!).getByRole("row", {
+        name: `${s("symptom.fever")} ${temperatureText("37.9")}`,
+      }),
+    ).toBeInTheDocument();
+    expect(within(middle!).getByText(ENTRIES[1]!.free_text!)).toHaveClass(
+      "p-entry-free-text",
+    );
     expect(middle).not.toHaveTextContent(s("history.too_sick"));
 
     expect(newest).toHaveTextContent(ENTRIES[2]!.free_text!);
     expect(newest).not.toHaveTextContent(s("history.proxy"));
+  });
+
+  it("the free text has a small heading and a box, apart from the table", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [, middle] = await items();
+    const body = within(middle!).getByText(ENTRIES[1]!.free_text!);
+    const box = body.closest(".p-entry-free");
+    expect(box).not.toBeNull();
+    expect(
+      within(box as HTMLElement).getByText(s("history.free_text")),
+    ).toHaveClass("p-entry-label");
+    expect(box!.closest("table")).toBeNull();
+  });
+
+  it("each record is one line: the date and a short summary, closed until opened", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [newest, middle, oldest] = await items();
+    for (const item of [newest!, middle!, oldest!]) {
+      expect(item.querySelector("details")).not.toHaveAttribute("open");
+    }
+    const line = summaryOf(middle!);
+    expect(line).toHaveTextContent(dateText(10, 31, 6, "19:30"));
+    expect(line).toHaveTextContent(
+      `${s("symptom.diarrhea")} ${s("answer.present")}`,
+    );
+    expect(line).toHaveTextContent(
+      `${s("symptom.fever")} ${s("history.temperature_value").replace("{value}", "37.9")}`,
+    );
+    expect(line).toHaveTextContent(
+      `${s("history.free_text")} ${s("history.free_text_present")}`,
+    );
+    // 日時の下にタグが並ぶ。代理の記録には代理のタグ
+    const tags = line.querySelector(".p-tags");
+    expect(line.querySelector(".p-entry-time")?.nextElementSibling).toBe(tags);
+    expect(
+      Array.from(line.querySelectorAll(".p-tag")).map(visibleText),
+    ).toEqual([
+      s("symptom.diarrhea"),
+      s("history.temperature_value").replace("{value}", "37.9"),
+      s("history.free_text"),
+      s("history.proxy_short"),
+    ]);
+    expect(summaryOf(newest!).querySelector(".p-tag")).toHaveTextContent(
+      s("history.free_text"),
+    );
+    expect(summaryOf(newest!)).not.toHaveTextContent(s("history.proxy"));
+    // 一行には質問文と自由記載の中身を出さない（開くと出る）
+    expect(line).not.toHaveTextContent(questionText("diarrhea"));
+    expect(line).not.toHaveTextContent(ENTRIES[1]!.free_text!);
+    expect(summaryOf(oldest!)).toHaveTextContent(s("history.too_sick"));
+    expect(summaryOf(newest!)).toHaveTextContent(
+      `${s("history.free_text")} ${s("history.free_text_present")}`,
+    );
+  });
+
+  it("the line shows a tag read with the answer; the details mark the chosen answer", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [, middle] = await items();
+    const tag = summaryOf(middle!).querySelector(".p-tag--present");
+    expect(tag).not.toBeNull();
+    expect(spokenText(tag!)).toBe(
+      `${s("symptom.diarrhea")} ${s("answer.present")}`,
+    );
+    const chosen = rowOf(middle!, s("symptom.diarrhea")).querySelector(
+      ".p-answer-cell--chosen strong",
+    );
+    expect(chosen).toHaveTextContent(s("answer.present"));
+  });
+
+  it("the line is a native summary (focusable) and opens the details", async () => {
+    // Tab で届く・Enter や Space で開くのはブラウザの summary の働き（jsdom は Tab の順に
+    // summary を入れず、押下を click にしない）。ここでは focus できることと、押すと開くことを見る
+    mockPatientApi();
+    renderHistory();
+    const [newest] = await items();
+    const details = newest!.querySelector("details")!;
+    summaryOf(newest!).focus();
+    expect(summaryOf(newest!)).toHaveFocus();
+    await userEvent.click(summaryOf(newest!));
+    expect(details).toHaveAttribute("open");
+  });
+
+  it("an unknown question key: the recorded question text is used in the line", async () => {
+    mockPatientApi({
+      entries: () =>
+        jsonResponse({
+          visits: [],
+          entries: [
+            {
+              ...ENTRIES[1]!,
+              kind: "answers",
+              answers: [
+                {
+                  question_key: "new_question",
+                  value: "hard",
+                  temperature: null,
+                  question_text: "new question text",
+                },
+              ],
+              free_text: null,
+            },
+          ],
+        }),
+    });
+    renderHistory();
+    const [only] = await items();
+    expect(spokenText(summaryOf(only!))).toContain(
+      `new question text ${s("answer.hard")}`,
+    );
+    expect(summaryOf(only!).querySelector(".p-tag--hard")).toHaveTextContent(
+      "new question text",
+    );
   });
 
   it("the free text has the wrapping class (long letters and digits wrap)", async () => {
@@ -99,17 +291,18 @@ describe("History (P2)", () => {
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
-  it("shows the question text recorded with the entry, not the current question set", async () => {
+  it("an unknown key in the details: the question text recorded with the entry", async () => {
     const recordedText = `${questionText("diarrhea")} (v0)`;
     const fetchMock = mockPatientApi({
       entries: () =>
         jsonResponse({
+          visits: [],
           entries: [
             {
               ...ENTRIES[1]!,
               answers: [
                 {
-                  question_key: "diarrhea",
+                  question_key: "diarrhea_v0",
                   value: "hard",
                   temperature: null,
                   question_text: recordedText,
@@ -122,10 +315,14 @@ describe("History (P2)", () => {
     });
     renderHistory();
     const [only] = await items();
-    expect(within(only!).getByRole("term")).toHaveTextContent(
+    expect(within(only!).getByRole("rowheader")).toHaveTextContent(
       new RegExp(`^${escapeRegExp(recordedText)}$`),
     );
-    expect(only).toHaveTextContent(s("answer.hard"));
+    expect(
+      within(only!).getByRole("row", {
+        name: `${recordedText} ${s("answer.hard")}`,
+      }),
+    ).toBeInTheDocument();
     expect(
       callsTo(fetchMock, "GET", `/api/patient/${PID}/questions`),
     ).toHaveLength(0);
@@ -135,6 +332,7 @@ describe("History (P2)", () => {
     mockPatientApi({
       entries: () =>
         jsonResponse({
+          visits: [],
           entries: [
             {
               ...ENTRIES[1]!,
@@ -154,12 +352,11 @@ describe("History (P2)", () => {
     });
     renderHistory();
     const [only] = await items();
-    expect(within(only!).getByRole("term")).toHaveTextContent(
-      s("history.previous_question"),
-    );
-    expect(within(only!).getByRole("definition")).toHaveTextContent(
-      s("answer.hard"),
-    );
+    expect(
+      within(only!).getByRole("row", {
+        name: `${s("history.previous_question")} ${s("answer.hard")}`,
+      }),
+    ).toBeInTheDocument();
     expect(only).not.toHaveTextContent("old_question");
   });
 
@@ -170,18 +367,32 @@ describe("History (P2)", () => {
     renderHistory();
     const rows = await items();
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent(questionText("diarrhea"));
-    expect(rows[1]).toHaveTextContent(s("answer.present"));
+    expect(
+      within(rows[1]!).getByRole("row", {
+        name: `${s("symptom.diarrhea")} ${s("answer.present")}`,
+      }),
+    ).toBeInTheDocument();
     expect(
       callsTo(fetchMock, "GET", `/api/patient/${PID}/questions`),
     ).toHaveLength(0);
   });
 
   it.each([
-    ["entries missing", {}],
-    ["answers missing", { entries: [{ ...ENTRIES[1]!, answers: undefined }] }],
-    ["answers null", { entries: [{ ...ENTRIES[1]!, answers: null }] }],
-    ["entry is a string", { entries: ["x"] }],
+    ["entries missing", { visits: [] }],
+    [
+      "answers missing",
+      { entries: [{ ...ENTRIES[1]!, answers: undefined }], visits: [] },
+    ],
+    [
+      "answers null",
+      { entries: [{ ...ENTRIES[1]!, answers: null }], visits: [] },
+    ],
+    ["entry is a string", { entries: ["x"], visits: [] }],
+    ["visits missing", { entries: [...ENTRIES] }],
+    [
+      "a visit without received_at",
+      { entries: [], visits: [{ visit_date: "2026-10-30" }] },
+    ],
   ])(
     "malformed 200 body (%s): common.load_failed instead of a blank page",
     async (_label, body) => {
@@ -196,10 +407,86 @@ describe("History (P2)", () => {
     },
   );
 
+  describe("visit-day dividers (the days of a reception at the hospital)", () => {
+    function withVisits() {
+      return mockPatientApi({
+        entries: () => jsonResponse(entriesBody(ENTRIES, VISITS)),
+      });
+    }
+
+    function dividersOf(ul: HTMLElement): HTMLElement[] {
+      return within(ul)
+        .getAllByRole("listitem")
+        .filter((li) => li.classList.contains("p-visit-day"));
+    }
+
+    it("no visits: no divider", async () => {
+      mockPatientApi();
+      renderHistory();
+      expect(dividersOf(await list())).toHaveLength(0);
+    });
+
+    it("a divider sits at the reception time: later records above, earlier below", async () => {
+      withVisits();
+      renderHistory();
+      const ul = await list();
+      const rows = within(ul).getAllByRole("listitem");
+      expect(rows.map((li) => li.className)).toEqual([
+        "p-entry",
+        "p-entry",
+        "p-visit-day",
+        "p-entry",
+      ]);
+      expect(rows[1]).toHaveTextContent(dateText(10, 31, 6, "19:30"));
+      expect(rows[3]).toHaveTextContent(dateText(10, 29, 4, "21:05"));
+    });
+
+    it("the divider reads history.visit_day with the date (10-30, Fri) and carries it", async () => {
+      withVisits();
+      renderHistory();
+      const [divider] = dividersOf(await list());
+      expect(spokenText(divider!)).toBe(visitDayText(10, 30, 5));
+      expect(visibleText(divider!)).toBe(visitDayText(10, 30, 5));
+      expect(divider!.querySelector("time")).toHaveAttribute(
+        "datetime",
+        "2026-10-30",
+      );
+      // 押せるものではない（開く・閉じるは無い）
+      expect(divider!.querySelector("details, summary, button, a")).toBeNull();
+    });
+
+    it("shows only the date of the visit (no reception number or state)", async () => {
+      withVisits();
+      renderHistory();
+      const [divider] = dividersOf(await list());
+      expect(divider!.textContent).not.toMatch(/[A-Za-z]/);
+    });
+
+    it("no records but a visit: history.empty and the divider", async () => {
+      mockPatientApi({
+        entries: () => jsonResponse(entriesBody([], VISITS)),
+      });
+      renderHistory();
+      expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
+      const ul = await list();
+      expect(within(ul).getAllByRole("listitem")).toHaveLength(1);
+      expect(spokenText(dividersOf(ul)[0]!)).toBe(visitDayText(10, 30, 5));
+    });
+
+    it("still read only with dividers (no buttons or fields)", async () => {
+      withVisits();
+      renderHistory();
+      await list();
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+  });
+
   it("no entries: history.empty", async () => {
-    mockPatientApi({ entries: () => jsonResponse({ entries: [] }) });
+    mockPatientApi({ entries: () => jsonResponse(entriesBody([])) });
     renderHistory();
     expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: s("history.title") })).toBeNull();
   });
 
   it("401: error.not_registered", async () => {
@@ -218,7 +505,7 @@ describe("History (P2)", () => {
       entries: () =>
         fail
           ? jsonResponse({ error: "boom" }, 500)
-          : jsonResponse({ entries: [] }),
+          : jsonResponse(entriesBody([])),
     });
     renderHistory();
     expect(

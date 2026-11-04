@@ -19,6 +19,7 @@ from tsutae.db import (
     get_timeline,
     get_visit,
     init_db,
+    list_visit_days,
     list_visits,
     mark_printed,
     purge_expired,
@@ -200,6 +201,83 @@ def test_list_visits_filters_status(conn: sqlite3.Connection, pid: str) -> None:
     assert list_visits(conn, ()) == []
     with pytest.raises(ValueError):
         list_visits(conn, ("ready", "nope"))
+
+
+def _set_received(
+    conn: sqlite3.Connection, vid: int, visit_date: date, at: datetime
+) -> None:
+    """受診日と受付の時刻を書き換える（時計に頼らず並びを決めるため）。"""
+    with conn:
+        conn.execute(
+            "UPDATE visits SET visit_date = ?, created_at = ? WHERE id = ?",
+            (visit_date.isoformat(), at.isoformat(timespec="microseconds"), vid),
+        )
+
+
+def test_list_visit_days_newest_first_with_only_date_and_time(
+    conn: sqlite3.Connection, pid: str
+) -> None:
+    old = _visit(conn, pid, no="A-001")
+    new = _visit(conn, pid, no="A-002")
+    _set_received(
+        conn, old, date(2026, 10, 27), datetime(2026, 10, 27, 9, 5, tzinfo=JST)
+    )
+    _set_received(
+        conn, new, date(2026, 11, 9), datetime(2026, 11, 9, 9, 40, tzinfo=JST)
+    )
+    assert list_visit_days(conn, pid) == [
+        {
+            "visit_date": date(2026, 11, 9),
+            "received_at": datetime(2026, 11, 9, 9, 40, tzinfo=JST),
+        },
+        {
+            "visit_date": date(2026, 10, 27),
+            "received_at": datetime(2026, 10, 27, 9, 5, tzinfo=JST),
+        },
+    ]
+
+
+def test_list_visit_days_any_status_and_closed_visits(
+    conn: sqlite3.Connection, pid: str
+) -> None:
+    """状態（generating・ready・printed・failed）や期限切れを問わず、受付があれば受診日。"""
+    days = [date(2026, 10, d) for d in (1, 2, 3, 4, 5)]
+    vids = [_visit(conn, pid, no=f"A-{i}") for i in range(5)]
+    for vid, day in zip(vids, days, strict=True):
+        _set_received(conn, vid, day, datetime.combine(day, datetime.min.time(), JST))
+    set_visit_status(conn, vids[1], "ready")
+    set_visit_status(conn, vids[2], "failed")
+    _with_results(conn, vids[3])
+    mark_printed(conn, vids[3])
+    _with_results(conn, vids[4])
+    assert purge_expired(conn, EXPIRES) >= 1
+    assert [d["visit_date"] for d in list_visit_days(conn, pid)] == days[::-1]
+
+
+def test_list_visit_days_one_per_day_at_the_first_reception(
+    conn: sqlite3.Connection, pid: str
+) -> None:
+    """同じ日に受付が2回あっても受診日は1つ（その日の最初の受付の時刻）。"""
+    first = _visit(conn, pid, no="A-001")
+    again = _visit(conn, pid, no="A-002")
+    _set_received(conn, first, VISIT_DAY, datetime(2026, 11, 9, 9, 0, tzinfo=JST))
+    _set_received(conn, again, VISIT_DAY, datetime(2026, 11, 9, 9, 30, tzinfo=JST))
+    assert list_visit_days(conn, pid) == [
+        {
+            "visit_date": VISIT_DAY,
+            "received_at": datetime(2026, 11, 9, 9, 0, tzinfo=JST),
+        }
+    ]
+
+
+def test_list_visit_days_only_the_patient(conn: sqlite3.Connection, pid: str) -> None:
+    other = create_patient(conn, "FOLFOX", patient_id="P-TEST0002")
+    _visit(conn, other, no="B-001")
+    assert list_visit_days(conn, pid) == []
+    mine = _visit(conn, pid, no="A-001")
+    assert [d["visit_date"] for d in list_visit_days(conn, pid)] == [
+        get_visit(conn, mine)["visit_date"]
+    ]
 
 
 def test_timeline_round_trip_and_overwrite(conn: sqlite3.Connection, pid: str) -> None:

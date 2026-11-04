@@ -131,8 +131,19 @@ export interface PatientEntry {
   free_text: string | null;
 }
 
+/**
+ * 自分の受診日（受付のあった日。状態を問わない）。返るのは日付と、その日の最初の受付の
+ * 時刻だけ（受付番号・状態・レポートは無い）。これまでの記録の区切りに使う。
+ */
+export interface PatientVisitDay {
+  visit_date: IsoDate;
+  received_at: IsoDateTime;
+}
+
 export interface PatientEntriesResponse {
   entries: PatientEntry[];
+  /** 新しい順 */
+  visits: PatientVisitDay[];
 }
 
 export interface VisitRequest {

@@ -338,6 +338,69 @@ def test_get_entries_only_own(client: TestClient, pid: str) -> None:
     assert [e["free_text"] for e in entries] == ["自分の記録"]
 
 
+def _visit_row(client: TestClient, pid: str, no: str, visit_date: date, at: str) -> int:
+    """受診を作り、受診日と受付の時刻を書き換える（時計に頼らず並びを決める）。"""
+    expires = jst_datetime(date(2026, 11, 10), 9, 0)
+    with db_conn(client.app) as conn:
+        vid = db.create_visit(conn, pid, no, visit_date, expires, 1)
+        with conn:
+            conn.execute(
+                "UPDATE visits SET visit_date = ?, created_at = ? WHERE id = ?",
+                (visit_date.isoformat(), at, vid),
+            )
+    return vid
+
+
+def test_get_entries_without_visits_gives_empty_list(
+    client: TestClient, pid: str
+) -> None:
+    r = client.get(f"/api/patient/{pid}/entries")
+    assert r.status_code == 200
+    assert r.json() == {"entries": [], "visits": []}
+
+
+def test_get_entries_has_visit_days_with_only_date_and_time(
+    client: TestClient, pid: str
+) -> None:
+    """受診日は日付と受付の時刻だけ（受付番号・状態・id・レポートは返さない）。新しい順。"""
+    old = _visit_row(
+        client, pid, "A-001", date(2026, 10, 27), "2026-10-27T09:05:00.000000+09:00"
+    )
+    new = _visit_row(
+        client, pid, "A-002", date(2026, 11, 9), "2026-11-09T09:40:00.000000+09:00"
+    )
+    with db_conn(client.app) as conn:
+        db.set_visit_status(conn, old, "failed")
+        db.set_visit_status(conn, new, "ready")
+    r = client.get(f"/api/patient/{pid}/entries")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {"entries", "visits"}
+    assert body["visits"] == [
+        {"visit_date": "2026-11-09", "received_at": "2026-11-09T09:40:00+09:00"},
+        {"visit_date": "2026-10-27", "received_at": "2026-10-27T09:05:00+09:00"},
+    ]
+    for leaked in ("A-001", "A-002", "failed", "ready", "reception_no", "status"):
+        assert leaked not in r.text
+
+
+def test_get_entries_visit_after_post_visit(client: TestClient, pid: str) -> None:
+    """QR の受付（POST /api/visit）をした日が受診日になる（生成の状態を問わない）。"""
+    assert client.post("/api/visit", json={"reception_no": "A-023"}).is_success
+    (visit,) = client.get(f"/api/patient/{pid}/entries").json()["visits"]
+    assert visit["visit_date"] == "2026-11-09"
+    assert visit["received_at"].startswith("2026-11-09T")
+    assert visit["received_at"].endswith("+09:00")
+
+
+def test_get_entries_visits_only_own(client: TestClient, pid: str) -> None:
+    other = add_patient(client.app, courses=C1)
+    _visit_row(
+        client, other, "B-001", date(2026, 11, 9), "2026-11-09T09:00:00.000000+09:00"
+    )
+    assert client.get(f"/api/patient/{pid}/entries").json()["visits"] == []
+
+
 # ---------------------------------------------------------------------------
 # 共通のエラーの形
 # ---------------------------------------------------------------------------

@@ -103,6 +103,13 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ...dateCases("patient_entries", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),
+  // 受診日の区切り（受診日と受付の時刻）
+  ...dateCases("patient_entries", "visit_date", (b, v) => {
+    b.visits[0].visit_date = v;
+  }),
+  ...dateTimeCases("patient_entries", "received_at", (b, v) => {
+    b.visits[0].received_at = v;
+  }),
   // 今日の記録の見出しの日付（サーバーの今日）
   ...dateCases("patient_questions", "today", (b, v) => {
     b.today = v;

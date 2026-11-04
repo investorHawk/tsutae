@@ -305,7 +305,11 @@ describe("patient.css", () => {
       expect(
         contrast(varOf("--p-primary-text"), varOf("--p-primary")),
       ).toBeGreaterThanOrEqual(4.5);
-      expect(ruleOf(".patient-app .p-tag-mark")).toMatch(/font-weight:/);
+      // 印（「!」）は付けない。「ある」（淡い青の地）とは塗りと枠の明るさの差で分ける
+      expect(css).not.toMatch(/p-tag-mark/);
+      expect(
+        contrast(varOf("--p-primary"), varOf("--p-tag-present-bg")),
+      ).toBeGreaterThanOrEqual(4.5);
     });
 
     it("体温・書いたこと・代理などは中立の見た目（白い地＋黒の文字＋灰の枠）", () => {
@@ -320,6 +324,54 @@ describe("patient.css", () => {
       expect(g).toBe(b);
       for (const around of ["--p-surface", "--p-bg"]) {
         expect(contrast(border, varOf(around))).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+
+  describe("これまでの記録の受診日の区切り", () => {
+    it("受診日の区切りは左右に伸びる緑の水平線（2〜3px）と、その中央の緑の文字", () => {
+      const body = ruleOf(".patient-app .p-visit-day");
+      expect(body).toMatch(/display:\s*flex/);
+      expect(body).toMatch(/align-items:\s*center/);
+      expect(body).toMatch(/color:\s*var\(--p-visit\)/);
+      // 線は飾り（::before・::after）。帯（地の塗り・角丸）にしない
+      expect(body).not.toMatch(/background/);
+      expect(body).not.toMatch(/border-radius/);
+      const line = groupRuleOf(".patient-app .p-visit-day::before");
+      expect(groupRuleOf(".patient-app .p-visit-day::after")).toBe(line);
+      expect(line).toMatch(/content:\s*""/);
+      expect(line).toMatch(/flex:\s*1/);
+      const width = /border-top:\s*(\d+)px solid var\(--p-visit\)/.exec(line);
+      expect(Number(width?.[1])).toBeGreaterThanOrEqual(2);
+      expect(Number(width?.[1])).toBeLessThanOrEqual(3);
+      // 390px でもはみ出さない（文字は中で折れる）
+      const label = ruleOf(".patient-app .p-visit-day-label");
+      expect(label).toMatch(/min-width:\s*0/);
+      expect(label).toMatch(/overflow-wrap:\s*anywhere/);
+      expect(label).not.toMatch(/white-space:\s*nowrap/);
+    });
+
+    it("受診日の緑は文字 4.5:1・線 3:1 以上で、他の色（青・橙・紫・黄・赤）と重ならない", () => {
+      const green = varOf("--p-visit");
+      expect(contrast(green, varOf("--p-bg"))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(green, varOf("--p-surface"))).toBeGreaterThanOrEqual(3);
+      const [r, g, b] = rgbOf(green);
+      expect(g).toBeGreaterThan(r);
+      expect(g).toBeGreaterThan(b);
+      // 答え・タグの青、未入力の橙、代理の紫、お知らせの黄、誤りの赤はどれも緑が最大でない
+      for (const other of [
+        "--p-primary",
+        "--p-tag-present-bg",
+        "--p-choice-prompt",
+        "--p-choice-prompt-border",
+        "--p-proxy-bg",
+        "--p-proxy-border",
+        "--p-notice-bg",
+        "--p-notice-border",
+        "--p-error",
+      ]) {
+        const [or, og, ob] = rgbOf(varOf(other));
+        expect(og < Math.max(or, ob), other).toBe(true);
       }
     });
   });

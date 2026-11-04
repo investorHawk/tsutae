@@ -56,3 +56,6 @@ video/src/voice.generated.json
 video/out/
 video/build/
 video/node_modules/.remotion/
+
+# 手元のメモ（公開しない）
+notes/

@@ -17,9 +17,6 @@ function Tag({ item }: { item: Exclude<SummaryItem, { kind: "all_none" }> }) {
       return item.value === "hard" ? (
         <span className="p-tag p-tag--hard">
           {label(item.questionKey, item.questionText)}
-          <span className="p-tag-mark" aria-hidden="true">
-            {t("history.hard_mark")}
-          </span>
           <Hidden>{` ${t("answer.hard")}`}</Hidden>
         </span>
       ) : (
@@ -68,8 +65,9 @@ function Item({ item }: { item: SummaryItem }) {
 
 /**
  * 記録1件の短い要約。タグ（小さな角丸のラベル）を折り返して並べる。
- * - ある: 淡い青の症状名（「下痢」）／つらい: 濃い紺の症状名と印（「しびれ !」）。
- *   答えは読み上げにだけ残す（「しびれ つらい」）。なしはタグにしない
+ * - ある: 淡い青の地に紺の症状名と紺の枠（「下痢」）／つらい: 紺の地に白の症状名
+ *   （「しびれ」）。印は付けず、塗りと枠の明るさの差で分ける。答えは読み上げにだけ残す
+ *   （「しびれ つらい」）。なしはタグにしない
  * - 体温（「37.2℃」）・書いたこと・つらくて書けない・代理は中立の見た目
  * - 全て なしなら「どれも なし」を文で出す
  * タグの間には読み上げ用の区切り（定型文 history.separator。見た目には出さない）を置く。

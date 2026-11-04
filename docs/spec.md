@@ -256,7 +256,7 @@ skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pendin
 | 経路 | 用途 | 読む表 |
 |---|---|---|
 | `POST /api/patient/{pid}/entries` | 記録の保存 | entries 系 |
-| `GET /api/patient/{pid}/entries` | 自分の記録一覧 | entries 系のみ |
+| `GET /api/patient/{pid}/entries` | 自分の記録一覧と受診日（日付・受付の時刻だけ） | entries 系, visits |
 | `POST /api/patient/{pid}/entries/{entry_id}/undo` | 「つらくて書けない」の取り消し（4.1。条件に合わなければ 409） | entries, visits |
 | `GET /api/patient/{pid}/questions` | 今日の質問集（Skill から） | — |
 | `POST /api/visit` | QR 後の受付番号登録 → 変換開始 | visits |

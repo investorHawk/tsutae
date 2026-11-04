@@ -6,7 +6,14 @@ import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import History from "./History";
 import { callsTo, mockPatientApi } from "./testing/api";
-import { ENTRIES, PID, questionText, s } from "./testing/fixtures";
+import {
+  ENTRIES,
+  PID,
+  VISITS,
+  entriesBody,
+  questionText,
+  s,
+} from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import { spokenText, visibleText } from "./testing/text";
 
@@ -60,9 +67,23 @@ function renderHistory() {
   return renderPatient(ROUTES, "/history");
 }
 
+async function list(): Promise<HTMLElement> {
+  return screen.findByRole("list", { name: s("history.title") });
+}
+
+/** 記録の行（受診日の区切りの行は除く）。 */
 async function items(): Promise<HTMLElement[]> {
-  const list = await screen.findByRole("list", { name: s("history.title") });
-  return within(list).getAllByRole("listitem");
+  return within(await list())
+    .getAllByRole("listitem")
+    .filter((li) => li.classList.contains("p-entry"));
+}
+
+/** 「受診日 10月30日（金）」の形（定型文 history.visit_day・history.date から作る）。 */
+function visitDayText(month: number, day: number, weekday: number): string {
+  return s("history.visit_day").replace(
+    "{date}",
+    dateText(month, day, weekday, ""),
+  );
 }
 
 beforeEach(() => {
@@ -225,6 +246,7 @@ describe("History (P2)", () => {
     mockPatientApi({
       entries: () =>
         jsonResponse({
+          visits: [],
           entries: [
             {
               ...ENTRIES[1]!,
@@ -274,6 +296,7 @@ describe("History (P2)", () => {
     const fetchMock = mockPatientApi({
       entries: () =>
         jsonResponse({
+          visits: [],
           entries: [
             {
               ...ENTRIES[1]!,
@@ -309,6 +332,7 @@ describe("History (P2)", () => {
     mockPatientApi({
       entries: () =>
         jsonResponse({
+          visits: [],
           entries: [
             {
               ...ENTRIES[1]!,
@@ -354,10 +378,21 @@ describe("History (P2)", () => {
   });
 
   it.each([
-    ["entries missing", {}],
-    ["answers missing", { entries: [{ ...ENTRIES[1]!, answers: undefined }] }],
-    ["answers null", { entries: [{ ...ENTRIES[1]!, answers: null }] }],
-    ["entry is a string", { entries: ["x"] }],
+    ["entries missing", { visits: [] }],
+    [
+      "answers missing",
+      { entries: [{ ...ENTRIES[1]!, answers: undefined }], visits: [] },
+    ],
+    [
+      "answers null",
+      { entries: [{ ...ENTRIES[1]!, answers: null }], visits: [] },
+    ],
+    ["entry is a string", { entries: ["x"], visits: [] }],
+    ["visits missing", { entries: [...ENTRIES] }],
+    [
+      "a visit without received_at",
+      { entries: [], visits: [{ visit_date: "2026-10-30" }] },
+    ],
   ])(
     "malformed 200 body (%s): common.load_failed instead of a blank page",
     async (_label, body) => {
@@ -372,10 +407,86 @@ describe("History (P2)", () => {
     },
   );
 
+  describe("visit-day dividers (the days of a reception at the hospital)", () => {
+    function withVisits() {
+      return mockPatientApi({
+        entries: () => jsonResponse(entriesBody(ENTRIES, VISITS)),
+      });
+    }
+
+    function dividersOf(ul: HTMLElement): HTMLElement[] {
+      return within(ul)
+        .getAllByRole("listitem")
+        .filter((li) => li.classList.contains("p-visit-day"));
+    }
+
+    it("no visits: no divider", async () => {
+      mockPatientApi();
+      renderHistory();
+      expect(dividersOf(await list())).toHaveLength(0);
+    });
+
+    it("a divider sits at the reception time: later records above, earlier below", async () => {
+      withVisits();
+      renderHistory();
+      const ul = await list();
+      const rows = within(ul).getAllByRole("listitem");
+      expect(rows.map((li) => li.className)).toEqual([
+        "p-entry",
+        "p-entry",
+        "p-visit-day",
+        "p-entry",
+      ]);
+      expect(rows[1]).toHaveTextContent(dateText(10, 31, 6, "19:30"));
+      expect(rows[3]).toHaveTextContent(dateText(10, 29, 4, "21:05"));
+    });
+
+    it("the divider reads history.visit_day with the date (10-30, Fri) and carries it", async () => {
+      withVisits();
+      renderHistory();
+      const [divider] = dividersOf(await list());
+      expect(spokenText(divider!)).toBe(visitDayText(10, 30, 5));
+      expect(visibleText(divider!)).toBe(visitDayText(10, 30, 5));
+      expect(divider!.querySelector("time")).toHaveAttribute(
+        "datetime",
+        "2026-10-30",
+      );
+      // 押せるものではない（開く・閉じるは無い）
+      expect(divider!.querySelector("details, summary, button, a")).toBeNull();
+    });
+
+    it("shows only the date of the visit (no reception number or state)", async () => {
+      withVisits();
+      renderHistory();
+      const [divider] = dividersOf(await list());
+      expect(divider!.textContent).not.toMatch(/[A-Za-z]/);
+    });
+
+    it("no records but a visit: history.empty and the divider", async () => {
+      mockPatientApi({
+        entries: () => jsonResponse(entriesBody([], VISITS)),
+      });
+      renderHistory();
+      expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
+      const ul = await list();
+      expect(within(ul).getAllByRole("listitem")).toHaveLength(1);
+      expect(spokenText(dividersOf(ul)[0]!)).toBe(visitDayText(10, 30, 5));
+    });
+
+    it("still read only with dividers (no buttons or fields)", async () => {
+      withVisits();
+      renderHistory();
+      await list();
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+  });
+
   it("no entries: history.empty", async () => {
-    mockPatientApi({ entries: () => jsonResponse({ entries: [] }) });
+    mockPatientApi({ entries: () => jsonResponse(entriesBody([])) });
     renderHistory();
     expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: s("history.title") })).toBeNull();
   });
 
   it("401: error.not_registered", async () => {
@@ -394,7 +505,7 @@ describe("History (P2)", () => {
       entries: () =>
         fail
           ? jsonResponse({ error: "boom" }, 500)
-          : jsonResponse({ entries: [] }),
+          : jsonResponse(entriesBody([])),
     });
     renderHistory();
     expect(

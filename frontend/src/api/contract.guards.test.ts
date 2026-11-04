@@ -330,6 +330,23 @@ const BROKEN: Array<[string, string, Mutate]> = [
     (b) => (lastEntry(b).answers[0].temperature = null),
   ],
   ["patient_entries", "free_text が無い", (b) => delete b.entries[0].free_text],
+  ["patient_entries", "visits が無い", (b) => delete b.visits],
+  ["patient_entries", "visits の要素が文字列", (b) => (b.visits = ["x"])],
+  [
+    "patient_entries",
+    "visit_date が重複",
+    (b) => (b.visits = [b.visits[0], { ...b.visits[0] }]),
+  ],
+  [
+    "patient_entries",
+    "visit_date が無い",
+    (b) => delete b.visits[0].visit_date,
+  ],
+  [
+    "patient_entries",
+    "received_at が無い",
+    (b) => delete b.visits[0].received_at,
+  ],
   ["visit", "message_key が無い", (b) => delete b.message_key],
   ["patient_strings", "必須の定型文が無い", (b) => delete b["visit.done"]],
 ];
@@ -352,6 +369,16 @@ describe("壊した fixture は guard に拒まれる", () => {
 });
 
 describe("fixture の前提", () => {
+  it("patient_entries には受診日が1件以上あり、日付と受付の時刻だけを持つ", () => {
+    const body = fixtureBody("patient_entries") as {
+      visits: Array<Record<string, unknown>>;
+    };
+    expect(body.visits.length).toBeGreaterThanOrEqual(1);
+    for (const visit of body.visits) {
+      expect(Object.keys(visit).sort()).toEqual(["received_at", "visit_date"]);
+    }
+  });
+
   it("patient_entries の最後の記録は measured の体温を持つ（壊す操作の前提）", () => {
     const body = fixtureBody("patient_entries") as {
       entries: Array<{ answers: Array<{ value: string }> }>;

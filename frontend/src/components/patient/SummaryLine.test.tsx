@@ -1,6 +1,6 @@
 /**
- * これまでの記録の一行の要約（タグの並び）。見た目は症状名だけ（つらいは印つき）、
- * 読み上げは「しびれ つらい」と答えまで読む。
+ * これまでの記録の一行の要約（タグの並び）。見た目は症状名だけ（ある・つらいは塗りと
+ * 枠で分ける。印は付けない）、読み上げは「しびれ つらい」と答えまで読む。
  */
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -52,7 +52,7 @@ describe("SummaryLine (tags)", () => {
   it("one tag per item; none is not a tag", () => {
     const tags = tagsOf(renderLine(SOURCE));
     expect(tags.map(visibleText)).toEqual([
-      `${s("symptom.numbness")}${s("history.hard_mark")}`,
+      s("symptom.numbness"),
       s("symptom.diarrhea"),
       temperature("37.2"),
       s("history.free_text"),
@@ -72,12 +72,11 @@ describe("SummaryLine (tags)", () => {
     );
   });
 
-  it("hard: the symptom name and a mark (dark navy), read with the answer", () => {
+  it("hard: the symptom name only, no mark (dark navy), read with the answer", () => {
     const tag = tagsOf(renderLine(SOURCE))[0]!;
     expect(tag).toHaveClass("p-tag", "p-tag--hard");
-    const mark = tag.querySelector(".p-tag-mark");
-    expect(mark).toHaveTextContent(s("history.hard_mark"));
-    expect(mark).toHaveAttribute("aria-hidden", "true");
+    expect(tag.querySelector(".p-tag-mark")).toBeNull();
+    expect(visibleText(tag)).toBe(s("symptom.numbness"));
     expect(spokenText(tag)).toBe(
       `${s("symptom.numbness")} ${s("answer.hard")}`,
     );

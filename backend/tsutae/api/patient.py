@@ -11,6 +11,8 @@
   の記録で、作ってから UNDO_WINDOW 以内・その後に受診の受付が無いものだけを消す
   （`db.undo_too_sick_entry`）。他人の記録は 404 not_found、条件に合わなければ
   409 not_undoable。押し間違いを戻すためのもので、他の記録は消せない
+- 記録の一覧（`GET /{pid}/entries`）には本人の受診日（`visit_date`・受付の時刻
+  `received_at`）だけを添える（`db.list_visit_days`）。受付番号・状態は返さない
 - 登録（Cookie の発行はここだけ）は、クライアント（request.client.host）ごとに失敗
   （unknown_patient）が 10 分で 10 回に達したら、以降の試行を 429 too_many_attempts
   で断る（正しい pid でも断る。成功・422 は数えない）。全クライアントの合計が 10 分で
@@ -178,11 +180,26 @@ def _entry_out(entry: Entry, texts: dict[str, str] | None) -> dict[str, Any]:
     return data
 
 
+def _visit_days_out(conn: sqlite3.Connection, pid: str) -> list[dict[str, str]]:
+    """受診日（受付のあった日）と受付の時刻だけ。受付番号・状態・レポートは返さない。"""
+    return [
+        {
+            "visit_date": d["visit_date"].isoformat(),
+            "received_at": d["received_at"].isoformat(),
+        }
+        for d in db.list_visit_days(conn, pid)
+    ]
+
+
 @router.get("/{pid}/entries")
 def list_entries(pid: str, request: Request, conn: Conn) -> dict[str, Any]:
+    """自分の記録と、自分の受診日（新しい順。これまでの記録の区切りに使う）。"""
     patient = require_patient(pid, request, conn)
     entries = db.list_entries(conn, patient["id"])
     cache: dict[str, dict[str, str] | None] = {}
     for version in {e.skill_version for e in entries}:
         cache[version] = _question_texts(conn, version)
-    return {"entries": [_entry_out(e, cache[e.skill_version]) for e in entries]}
+    return {
+        "entries": [_entry_out(e, cache[e.skill_version]) for e in entries],
+        "visits": _visit_days_out(conn, patient["id"]),
+    }

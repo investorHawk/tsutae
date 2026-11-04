@@ -193,6 +193,27 @@ def list_visits(
     return [_visit_row(r) for r in rows.fetchall()]
 
 
+def list_visit_days(conn: sqlite3.Connection, pid: str) -> list[dict[str, Any]]:
+    """その患者の受診日（受付のあった日）と、その日の最初の受付の時刻を新しい順で返す。
+
+    患者の「これまでの記録」の区切りに使う。状態・期限（印刷済み・期限切れ）を問わず
+    受付があれば受診日とする。返すのは `visit_date`（date）と `received_at`
+    （datetime）だけ（受付番号・状態・変換結果は読まない）。
+    """
+    rows = conn.execute(
+        "SELECT visit_date, MIN(created_at) AS received_at FROM visits"
+        " WHERE patient_id = ? GROUP BY visit_date ORDER BY visit_date DESC",
+        (pid,),
+    )
+    return [
+        {
+            "visit_date": date_from_db(r["visit_date"]),
+            "received_at": dt_from_db(r["received_at"]),
+        }
+        for r in rows.fetchall()
+    ]
+
+
 def set_visit_status(
     conn: sqlite3.Connection, vid: int, status: str, fallback: bool | None = None
 ) -> None:

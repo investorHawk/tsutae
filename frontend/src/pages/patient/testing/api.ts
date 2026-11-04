@@ -4,7 +4,7 @@ import {
   mockFetch,
   type FetchMock,
 } from "../../../test/fetchMock";
-import { ENTRIES, PID, QUESTIONS_RESPONSE } from "./fixtures";
+import { ENTRIES, PID, QUESTIONS_RESPONSE, entriesBody } from "./fixtures";
 
 export type Reply = Response | Promise<Response>;
 
@@ -20,7 +20,7 @@ export interface PatientApiReplies {
 const DEFAULTS: Required<PatientApiReplies> = {
   questions: () => jsonResponse(QUESTIONS_RESPONSE),
   createEntry: () => jsonResponse({ entry_id: 1, notices: [] }),
-  entries: () => jsonResponse({ entries: ENTRIES }),
+  entries: () => jsonResponse(entriesBody(ENTRIES)),
   undo: () => jsonResponse({ ok: true }),
   visit: () => jsonResponse({ ok: true, message_key: "visit.done" }),
 };

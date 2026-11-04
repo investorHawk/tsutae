@@ -66,7 +66,7 @@ def test_undo_deletes_own_fresh_too_sick(client: TestClient, pid: str) -> None:
     assert r.status_code == 200
     assert r.json() == {"ok": True}
     assert not _exists(client, entry_id)
-    assert client.get(f"/api/patient/{pid}/entries").json() == {"entries": []}
+    assert client.get(f"/api/patient/{pid}/entries").json()["entries"] == []
 
 
 def test_undo_twice_is_404(client: TestClient, pid: str) -> None:

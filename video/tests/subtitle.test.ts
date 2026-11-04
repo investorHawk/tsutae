@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSubtitleChunks,
+  chunkAt,
   LINE_MAX,
   splitSentences,
   wrapLines,
@@ -82,5 +83,34 @@ describe("字幕の分割", () => {
         }
       }
     }
+  });
+});
+
+describe("字幕の塊を出す時刻（activeFrom / activeTo）", () => {
+  const chunks = buildSubtitleChunks(
+    "つたえ。化学療法中の 2 週間の記録を、診察室の A4 一枚にするアプリです。",
+  );
+
+  it("区間の指定が無ければ場面全体に配る（従来どおり）", () => {
+    expect(chunkAt(chunks, 0, 0, 100).index).toBe(0);
+    const lastStart = chunks[chunks.length - 1].start * 100;
+    expect(chunkAt(chunks, Math.ceil(lastStart), 0, 100).index).toBe(
+      chunks.length - 1,
+    );
+    expect(chunkAt(chunks, 100, 0, 100).index).toBe(chunks.length - 1);
+  });
+
+  it("声の区間の前は最初の塊、後は最後の塊を出し続ける", () => {
+    expect(chunkAt(chunks, 0, 15, 75)).toEqual({ index: 0, startFrame: 15 });
+    expect(chunkAt(chunks, 99, 15, 75).index).toBe(chunks.length - 1);
+  });
+
+  it("塊の開始フレームは声の区間の中に配る", () => {
+    const i = chunks.length - 1;
+    const startFrame = 15 + chunks[i].start * 60;
+    expect(chunkAt(chunks, Math.ceil(startFrame), 15, 75)).toEqual({
+      index: i,
+      startFrame,
+    });
   });
 });

@@ -8,6 +8,8 @@ export interface Storyboard {
   compositionId: string;
   title: string;
   scenes: Scene[];
+  /** BGM（public/voice/bgm.wav）を重ねるか。DemoBVoice だけ true */
+  bgm?: boolean;
 }
 
 export const STORYBOARDS: Storyboard[] = [

@@ -139,3 +139,29 @@ export const buildSubtitleChunks = (text: string): SubtitleChunk[] => {
     return { lines: wrapLines(p), start, end: acc / total };
   });
 };
+
+export interface ActiveChunk {
+  index: number;
+  /** その塊を出し始めるフレーム（場面の中で） */
+  startFrame: number;
+}
+
+/**
+ * frame の時点で出す塊。塊の時間は activeFrom〜activeTo（声の区間）に配り、
+ * 区間の前は最初の塊、後は最後の塊を出し続ける。
+ */
+export const chunkAt = (
+  chunks: SubtitleChunk[],
+  frame: number,
+  activeFrom: number,
+  activeTo: number,
+): ActiveChunk => {
+  const span = Math.max(1, activeTo - activeFrom);
+  const progress = Math.min(1, Math.max(0, (frame - activeFrom) / span));
+  const found = chunks.findIndex(
+    (c) => progress >= c.start && progress < c.end,
+  );
+  const index = found >= 0 ? found : Math.max(0, chunks.length - 1);
+  const startFrame = activeFrom + (chunks[index]?.start ?? 0) * span;
+  return { index, startFrame };
+};

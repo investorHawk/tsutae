@@ -50,6 +50,9 @@ video/public/footage/*.mp4
 video/public/footage/*.mov
 video/public/audio/*.mp3
 video/public/audio/*.wav
+# 生成物: scripts/make_voice.py が書く場面ごとの声と、その一覧
+video/public/voice/
+video/src/voice.generated.json
 video/out/
 video/build/
 video/node_modules/.remotion/

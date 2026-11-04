@@ -17,6 +17,7 @@
     "prestill": "node scripts/footage-manifest.mjs",
     "prebundle": "node scripts/footage-manifest.mjs",
     "pretest": "node scripts/footage-manifest.mjs",
+    "prelint": "node scripts/footage-manifest.mjs",
     "stills": "node --import tsx scripts/stills.mjs",
     "prestills": "node scripts/footage-manifest.mjs"
   },

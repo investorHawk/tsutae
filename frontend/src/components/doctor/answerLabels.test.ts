@@ -1,33 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { answerText, questionLabel } from "./answerLabels";
+import { BUNDLED_STRINGS } from "../../strings/bundledStrings";
+import { QUESTION_ORDER, questionLabel, valueLabel } from "./answerLabels";
 
-describe("answerText", () => {
-  it.each([
-    [
-      { question_key: "diarrhea", value: "hard", temperature: null },
-      "下痢 つらい",
-    ],
-    [
-      { question_key: "numbness", value: "none", temperature: null },
-      "しびれ なし",
-    ],
-    [
-      { question_key: "stomatitis", value: "present", temperature: null },
-      "口内炎 ある",
-    ],
-    [
-      { question_key: "fever", value: "measured", temperature: 38 },
-      "体温 38.0℃",
-    ],
-    [
-      { question_key: "fever", value: "not_measured", temperature: null },
-      "体温 測っていない",
-    ],
-  ] as const)("%o → %s", (answer, text) => {
-    expect(answerText(answer)).toBe(text);
+describe("questionLabel", () => {
+  it("短い症状名は患者画面の symptom.<key> と同じ語", () => {
+    for (const key of QUESTION_ORDER) {
+      expect(questionLabel(key)).toBe(BUNDLED_STRINGS[`symptom.${key}`]);
+    }
+  });
+
+  it("患者画面の symptom.<key> を全て持つ", () => {
+    const patientKeys = Object.keys(BUNDLED_STRINGS)
+      .filter((k) => k.startsWith("symptom."))
+      .map((k) => k.slice("symptom.".length));
+    expect([...QUESTION_ORDER].sort()).toEqual(patientKeys.sort());
   });
 
   it("知らない質問は key をそのまま", () => {
     expect(questionLabel("taste")).toBe("taste");
+  });
+});
+
+describe("valueLabel", () => {
+  it.each([
+    ["none", "なし"],
+    ["present", "ある"],
+    ["hard", "つらい"],
+    ["not_measured", "測っていない"],
+    ["measured", "測った"],
+  ] as const)("%s → %s", (value, text) => {
+    expect(valueLabel(value)).toBe(text);
   });
 });

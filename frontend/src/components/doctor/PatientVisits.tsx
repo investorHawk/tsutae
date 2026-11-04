@@ -1,6 +1,7 @@
-import { reportUrl } from "../../api/doctor";
 import type { PatientVisit } from "../../api/types";
+import { formatDay } from "./dayLabel";
 import ErrorNote from "./ErrorNote";
+import ReportLink from "./ReportLink";
 import StatusBadge from "./StatusBadge";
 import UnprocessedLink from "./UnprocessedLink";
 import type { PatientRecords } from "./usePatientRecords";
@@ -30,11 +31,7 @@ function VisitLinks({ visit }: { visit: PatientVisit }) {
   }
   return (
     <span className="d-actions">
-      {visit.report_available ? (
-        <a href={reportUrl(visit.id)} target="_blank" rel="noopener noreferrer">
-          レポートを開く
-        </a>
-      ) : null}
+      {visit.report_available ? <ReportLink visitId={visit.id} /> : null}
       {unprocessed ? (
         <UnprocessedLink visitId={visit.id} count={visit.unprocessed_count} />
       ) : null}
@@ -43,7 +40,8 @@ function VisitLinks({ visit }: { visit: PatientVisit }) {
 }
 
 /**
- * D2 の「受診」の節（D4-1）。新しい順に、受診日・受付番号・状態・レポート。
+ * D2 の「受診」の節（D4-1）。新しい順に、受付の日時・受付番号・状態・レポート（履歴。
+ * 印刷待ちの受診はページの上の「印刷待ちの受診」にも出る）。
  * レポートは印刷済みか 24 時間で消えるので、開けるのは印刷待ちの受診だけ。
  */
 export default function PatientVisits({
@@ -69,7 +67,7 @@ export default function PatientVisits({
         <table className="d-table d-table--middle d-patient-visits">
           <thead>
             <tr>
-              <th scope="col">受診日</th>
+              <th scope="col">受付</th>
               <th scope="col">受付番号</th>
               <th scope="col">状態</th>
               <th scope="col">レポート</th>
@@ -78,7 +76,7 @@ export default function PatientVisits({
           <tbody>
             {list.map((visit) => (
               <tr key={visit.id}>
-                <td className="d-nowrap">{visit.visit_date}</td>
+                <td className="d-nowrap">{formatDay(visit.created_at)}</td>
                 <td className="d-reception">{visit.reception_no ?? NONE}</td>
                 <td>
                   <VisitState visit={visit} />

@@ -359,18 +359,22 @@ def _check_doctor_auth(client: TestClient, visit_id: int, html: str) -> None:
 def _check_unprocessed(client: TestClient, visit_id: int) -> None:
     r = client.get(f"/api/doctor/visits/{visit_id}/unprocessed")
     assert r.status_code == 200
-    assert r.json() == {
-        "entries": [
-            {
-                "entry_id": UNPROCESSED_SEQ,
-                "record_date": "2026-11-05",
-                "reason": "unknown_before_honorific",
-                "text": UNPROCESSED_TEXT,
-                # 疑われた語「磯鷲さん」の原文の中の位置（D7-2）
-                "marks": [{"start": 0, "end": 4}],
-            }
-        ]
-    }
+    body = r.json()
+    assert body["visit"]["reception_no"] == DEMO_RECEPTION
+    assert body["visit"]["patient_id"] == DEMO_PID
+    assert body["entries"] == [
+        {
+            "entry_id": UNPROCESSED_SEQ,
+            "record_date": "2026-11-05",
+            # 第3コース（Day1 = 2026-10-27）の Day10
+            "course_no": 3,
+            "day": 10,
+            "reason": "unknown_before_honorific",
+            "text": UNPROCESSED_TEXT,
+            # 疑われた語「磯鷲さん」の原文の中の位置（D7-2）
+            "marks": [{"start": 0, "end": 4}],
+        }
+    ]
     assert "磯鷲" not in report_html(client, visit_id)  # 紙には載せない
 
 

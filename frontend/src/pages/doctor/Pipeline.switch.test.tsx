@@ -19,6 +19,7 @@ import {
   mockApi,
   type RouteValue,
 } from "../../components/doctor/testing";
+import { visitHeaderStub } from "../../test/doctorStubs";
 import { jsonResponse } from "../../test/fetchMock";
 import Pipeline from "./Pipeline";
 
@@ -58,6 +59,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const FIRST_VISIT = visitHeaderStub({ id: 12, reception_no: "A-023" });
+const NEXT_BODY = {
+  status: "generating",
+  visit: visitHeaderStub({
+    id: 13,
+    reception_no: "B-101",
+    status: "generating",
+    report_available: false,
+  }),
+  events: [],
+};
+
 function GoTo() {
   const navigate = useNavigate();
   return (
@@ -69,7 +82,7 @@ function GoTo() {
 
 async function openFirstThenNext(next: RouteValue) {
   const fetchMock = mockApi({
-    [FIRST]: { status: "ready", events: EVENTS },
+    [FIRST]: { status: "ready", visit: FIRST_VISIT, events: EVENTS },
     [NEXT]: next,
   });
   render(
@@ -88,7 +101,7 @@ async function openFirstThenNext(next: RouteValue) {
 }
 
 function expectNothingFromFirst() {
-  expect(screen.getByText("受診 #13")).toBeInTheDocument();
+  expect(screen.queryByText(/A-023/)).toBeNull();
   expect(screen.queryByText("印刷待ち")).toBeNull();
   expect(screen.queryByRole("list", { name: "時系列" })).toBeNull();
 }
@@ -112,9 +125,10 @@ describe("Pipeline の受診の切り替え", () => {
     expect(screen.getByText("2秒ごとに更新中")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     await act(async () => {
-      pending.resolve(jsonResponse({ status: "generating", events: [] }));
+      pending.resolve(jsonResponse(NEXT_BODY));
     });
     expect(await screen.findByText("生成中")).toBeInTheDocument();
+    expect(screen.getByText(/^B-101 ・ /)).toBeInTheDocument();
   });
 
   it("移った先が通信の失敗でも、前の受診の状態・出来事を残さない", async () => {
@@ -127,7 +141,7 @@ describe("Pipeline の受診の切り替え", () => {
     const slowFirst = deferred<Response>();
     const fetchMock = mockApi({
       [FIRST]: () => slowFirst.promise,
-      [NEXT]: { status: "generating", events: [] },
+      [NEXT]: NEXT_BODY,
     });
     render(
       <MemoryRouter initialEntries={["/doctor/pipeline/12"]}>
@@ -141,7 +155,9 @@ describe("Pipeline の受診の切り替え", () => {
     fireEvent.click(screen.getByRole("button", { name: "go" }));
     expect(await screen.findByText("生成中")).toBeInTheDocument();
     await act(async () => {
-      slowFirst.resolve(jsonResponse({ status: "ready", events: EVENTS }));
+      slowFirst.resolve(
+        jsonResponse({ status: "ready", visit: FIRST_VISIT, events: EVENTS }),
+      );
     });
     expect(screen.getByText("生成中")).toBeInTheDocument();
     expectNothingFromFirst();

@@ -306,6 +306,16 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | 各記録に `marks: [{start, end}]`（原文の中の疑われた語の位置、code point）。原文の中で見つからない区間には付けない（D7-2） |
 | `GET /api/doctor/skills/{name}` | `{name, version, description, questions, text}`（読み取り専用）。書式違いは 400 `invalid_name`、`GET /skills` と同じ一覧に無ければ 404 `unknown_skill`、`skills_dir` の外へのシンボリックリンクは 400、壊れた SKILL.md はその code（D5-2） |
 
+### 医師画面の UX の見直しで足した項目（2026-11-04 夜。経路は増やしていない）
+Day は `course.course_for_date` のコースの実投与日を Day1 として数える（次のコースが未登録なら cycle_days を過ぎても数え続ける。`day_of` と同じ）。今日は `config.today()`。コースに矛盾がある患者は、その値だけ null にして応答は止めない（`doctor_records`）。
+
+| 経路 | 足した項目 |
+|---|---|
+| `GET /api/doctor/patients` | 各患者に `current_day`（今日の今のコースでの Day。今コースが無い・矛盾は null）・`days_since_last_record`（今日 − 最後の記録日の日数。記録が無ければ null）・`record_stale`（最後の記録が今日から3日以上前（今日を含めず3日前以前）、または記録が1件も無い） |
+| `GET /api/doctor/patients/{pid}/entries` | 各記録に `course_no`・`day`（記録日のコースと Day。最初の投与の前・矛盾は null） |
+| `GET /api/doctor/visits/{id}/unprocessed` | `visit: {id, reception_no, patient_id, visit_date, created_at, status, fallback, report_available}`（見出しと、確かめた後の印刷に使う。`report_available` は受付番号が残っていて期限内の ready）と、各記録に `course_no`・`day` |
+| `GET /api/doctor/pipeline/{id}/events` | 同じ `visit`（印刷済み・期限切れは `reception_no` が null） |
+
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=[]`（分離モード。書き換えに Skill の読み込みは要らず、ファイルの設定も混ぜない）、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_work_copy_h3(work_root, skill_name, logger)`。書き込みを作業コピーの SKILL.md ちょうど1つに限る。`workcopy.py`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
 - `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の `skills/<name>/SKILL.md`（`work_copy_path`。`.claude/` の下には置かない。CLI がそこへの書き込みを acceptEdits でも保護し、サーバーには許可を出す人がいないため。2026-11-04）に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない

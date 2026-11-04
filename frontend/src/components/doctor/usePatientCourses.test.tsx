@@ -32,7 +32,10 @@ const patients = {
       created_at: "2026-09-20T10:00:00+09:00",
       register_url: `http://localhost:5173/register?pid=${A}`,
       last_record_date: null,
+      days_since_last_record: null,
+      record_stale: true,
       current_course_no: null,
+      current_day: null,
       next_visit: null,
     },
     {
@@ -41,7 +44,10 @@ const patients = {
       created_at: "2026-09-21T10:00:00+09:00",
       register_url: `http://localhost:5173/register?pid=${B}`,
       last_record_date: null,
+      days_since_last_record: null,
+      record_stale: true,
       current_course_no: null,
+      current_day: null,
       next_visit: null,
     },
   ],
@@ -156,5 +162,30 @@ describe("usePatientCourses の患者の切り替え", () => {
       expect(await older).toBeNull();
     });
     expect(result.current.courses).toHaveLength(2);
+  });
+
+  it("reloadPatient で患者の行を取り直す（失敗したら前の行を残す）", async () => {
+    const answers: Array<() => Response> = [
+      () => jsonResponse(patients),
+      () =>
+        jsonResponse({
+          patients: [{ ...patients.patients[0], current_course_no: 2 }],
+        }),
+      () => jsonResponse({ error: "server_error" }, 500),
+    ];
+    mockApi({
+      [`GET /api/doctor/patients/${A}/courses`]: { courses: [] },
+      "GET /api/doctor/patients": () => answers.shift()!(),
+    });
+    const { result } = renderCourses(A);
+    await waitFor(() => expect(result.current.patient?.id).toBe(A));
+    expect(result.current.patient?.current_course_no).toBeNull();
+    act(() => result.current.reloadPatient());
+    await waitFor(() =>
+      expect(result.current.patient?.current_course_no).toBe(2),
+    );
+    act(() => result.current.reloadPatient());
+    await waitFor(() => expect(answers).toHaveLength(0));
+    expect(result.current.patient?.current_course_no).toBe(2);
   });
 });

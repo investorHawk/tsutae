@@ -12,9 +12,11 @@
 - レポートは `HTMLResponse` に `Cache-Control: no-store` と CSP
 - 未処理（D6）は記録の原文と、疑われた語の原文の中の位置 marks を返す（院内画面だけ。
   紙には載せない。位置は `doctor_marks`）
-- 患者一覧は最後の記録日・今のコース・次回受診も返す。患者の画面（D2）には、その患者の
+- 患者一覧は最後の記録日（と今日からの日数・途切れ）・今のコースと Day・次回受診も
+  返す。患者の画面（D2）には、その患者の
   受診（`GET /patients/{pid}/visits`。印刷済み・期限切れも。前に `purge_expired`）と
-  直近の記録（`GET /patients/{pid}/entries`。自由記載は有無だけ）を返す（`doctor_records`）
+  直近の記録（`GET /patients/{pid}/entries`。自由記載は有無だけ。記録日のコースと Day
+  つき）を返す（`doctor_records`）。未処理・変換ログは見出しの受診（visit）も返す
 - `POST /courses` は保存前に既存＋新規で `validate_courses`（矛盾は 400 `{"error": code}`）
 - 本文つきの `POST /patients`・`POST /courses` は Content-Type が application/json で
   なければ 415 `{"error": "unsupported_media_type"}`（`require_json_body`。Cookie の検査の
@@ -60,8 +62,11 @@ from tsutae.api.doctor_marks import suspect_marks
 from tsutae.api.doctor_records import (
     RECENT_ENTRIES_MAX,
     course_summary,
+    day_fields,
     entry_summary,
     patient_visit,
+    record_gap,
+    visit_header,
 )
 from tsutae.api.visit import run_generation
 from tsutae.config import Settings, now, today
@@ -167,6 +172,7 @@ def list_patients(conn: Conn, settings: AppSettings) -> dict[str, Any]:
                 "created_at": p["created_at"].isoformat(),
                 "register_url": register_url(settings, p["id"]),
                 "last_record_date": None if last is None else last.isoformat(),
+                **record_gap(last, day),
                 **course_summary(db.list_courses(conn, p["id"]), day),
             }
         )
@@ -206,9 +212,10 @@ def list_patient_entries(pid: str, conn: Conn) -> dict[str, Any]:
     """D2 の患者の直近の記録（新しい順）。自由記載は有無だけ（原文は D6 だけ）。"""
     patient = _patient_or_404(conn, pid)
     entries = db.list_entries(conn, patient["id"])
+    courses = db.list_courses(conn, patient["id"])
     recent = sorted(entries, key=lambda e: (e.recorded_at, e.id), reverse=True)
     return {
-        "entries": [entry_summary(e) for e in recent[:RECENT_ENTRIES_MAX]],
+        "entries": [entry_summary(e, courses) for e in recent[:RECENT_ENTRIES_MAX]],
         "total": len(entries),
     }
 
@@ -330,9 +337,13 @@ def regenerate(
 
 @_protected.get("/visits/{vid}/unprocessed")
 def list_unprocessed(vid: VisitId, conn: Conn) -> dict[str, Any]:
-    """D6: 送信から外した記録の原文（伏せ字前）・規則名・疑われた語の位置。"""
+    """D6: 送信から外した記録の原文（伏せ字前）・規則名・疑われた語の位置。
+
+    見出しの受診（visit）と、各記録の記録日のコースと Day も返す。
+    """
     visit = _open_visit(conn, vid)
     literals = [visit["patient_id"], visit["reception_no"]]
+    courses = db.list_courses(conn, visit["patient_id"])
     entries = []
     for item in _unprocessed(conn, vid):
         entry = db.get_entry(conn, item.entry_id)
@@ -343,21 +354,26 @@ def list_unprocessed(vid: VisitId, conn: Conn) -> dict[str, Any]:
             {
                 "entry_id": entry.id,
                 "record_date": entry.record_date.isoformat(),
+                **day_fields(courses, entry.record_date),
                 "reason": item.reason,
                 "text": text,
                 "marks": suspect_marks(text, literals),
             }
         )
-    return {"entries": entries}
+    return {"visit": visit_header(visit, now()), "entries": entries}
 
 
 @_protected.get("/pipeline/{vid}/events")
 def pipeline_events(vid: VisitId, conn: Conn) -> dict[str, Any]:
-    """D5（ポーリング）。ログには文面が無い。トークン・費用は返さない。"""
+    """D5（ポーリング）。ログには文面が無い。トークン・費用は返さない。
+
+    見出しの受診（visit）も返す（印刷済み・期限切れなら受付番号は null）。
+    """
     visit = _visit_or_404(conn, vid)
     logs = db.list_pipeline_logs(conn, "visit", vid)
     return {
         "status": visit["status"],
+        "visit": visit_header(visit, now()),
         "events": [
             {"ts": log["ts"].isoformat(), **{k: log[k] for k in _EVENT_FIELDS}}
             for log in logs

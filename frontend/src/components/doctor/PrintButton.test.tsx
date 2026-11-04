@@ -34,13 +34,10 @@ function stubPrint(impl: () => void = () => {}) {
 }
 
 describe("PrintButton", () => {
-  it("押すまで iframe を作らず、別タブで開くリンクは常にある", () => {
+  it("押すまで iframe を作らない。別タブで開くリンクは持たない（ReportLink を並べる）", () => {
     render(<PrintButton url={URL_} />);
     expect(document.querySelector("iframe")).toBeNull();
-    const link = screen.getByRole("link", { name: "レポートを開く" });
-    expect(link).toHaveAttribute("href", URL_);
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByRole("link")).toBeNull();
   });
 
   it("案内の一行はボタンに付けない（印刷待ちの表の上に1回だけ出す。D2-1）", () => {
@@ -90,9 +87,8 @@ describe("PrintButton", () => {
     });
     fireEvent.load(frame());
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "印刷ダイアログを開けませんでした",
+      "印刷ダイアログを開けませんでした。『レポートを開く』から ⌘P",
     );
-    expect(screen.getByRole("link", { name: "レポートを開く" })).toBeVisible();
   });
 
   it("読み込みが終わらなければ、時間切れで別タブの案内を出す", async () => {

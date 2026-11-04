@@ -165,6 +165,39 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "diff が無い（null と省略は違う）",
     (b) => delete b.diff,
   ],
+  // 医師画面の UX の見直しで足した項目: nullable も省略は不正
+  ...["days_since_last_record", "record_stale", "current_day"].map(
+    (key): [string, string, Mutate] => [
+      "doctor_patients",
+      `${key} が無い（null と省略は違う）`,
+      (b) => delete b.patients[0][key],
+    ],
+  ),
+  ...["course_no", "day"].flatMap(
+    (key): Array<[string, string, Mutate]> => [
+      [
+        "doctor_patient_entries",
+        `${key} が無い（null と省略は違う）`,
+        (b) => delete b.entries[0][key],
+      ],
+      [
+        "doctor_unprocessed",
+        `${key} が無い（null と省略は違う）`,
+        (b) => delete b.entries[0][key],
+      ],
+    ],
+  ),
+  [
+    "doctor_pipeline_events",
+    "visit の受付番号が無い（null と省略は違う）",
+    (b) => delete b.visit.reception_no,
+  ],
+  ...dateTimeCases("doctor_unprocessed", "visit.created_at", (b, v) => {
+    b.visit.created_at = v;
+  }),
+  ...dateCases("doctor_pipeline_events", "visit.visit_date", (b, v) => {
+    b.visit.visit_date = v;
+  }),
   // D5: nullable の項目も省略は不正
   ...["hook_name", "agent_type", "tool_name", "decision", "duration_ms"].map(
     (key): [string, string, Mutate] => [

@@ -2,10 +2,14 @@ import { useCallback, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getPipelineEvents } from "../../api/doctor";
 import { isApiError } from "../../api/http";
-import type { PipelineEvent, VisitStatus } from "../../api/types";
+import type { PipelineEvent, VisitHeader, VisitStatus } from "../../api/types";
 import ErrorNote from "../../components/doctor/ErrorNote";
 import { errorCode, isUnauthorized } from "../../components/doctor/errors";
-import { isPipelineEvent, isVisitStatus } from "../../components/doctor/guards";
+import {
+  isPipelineEvent,
+  isVisitHeader,
+  isVisitStatus,
+} from "../../components/doctor/guards";
 import {
   invalidResponse,
   isRecord,
@@ -17,13 +21,17 @@ import { liveStatus } from "../../components/doctor/pipelineEvents";
 import StatusBadge from "../../components/doctor/StatusBadge";
 import { usePolling } from "../../components/doctor/usePolling";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
+import VisitHeading from "../../components/doctor/VisitHeading";
 import "../../components/doctor/doctor-ui.css";
+import "../../components/doctor/board.css";
 
 const PIPELINE_POLL_MS = 2000;
 const FINISHED: readonly VisitStatus[] = ["ready", "failed", "printed"];
 
 interface Snapshot {
   status: VisitStatus;
+  /** 見出しの受診（受付番号・仮名ID・受付の日時） */
+  visit: VisitHeader;
   events: PipelineEvent[];
 }
 
@@ -51,14 +59,16 @@ function useStopAfterOneMore(): (snap: Snapshot) => boolean {
   }, []);
 }
 
-/** 本文を検査して取り出す。status か events が契約と違えば invalid_response。 */
+/** 本文を検査して取り出す。status・visit・events が契約と違えば invalid_response。 */
 function toSnapshot(body: unknown): Snapshot {
   const status = isRecord(body) ? body.status : undefined;
-  if (!isVisitStatus(status)) {
+  const visit = isRecord(body) ? body.visit : undefined;
+  if (!isVisitStatus(status) || !isRecord(visit) || !isVisitHeader(visit)) {
     throw invalidResponse();
   }
   return {
     status,
+    visit: visit as unknown as VisitHeader,
     events: listOf<PipelineEvent>(body, "events", isPipelineEvent),
   };
 }
@@ -98,7 +108,7 @@ function PipelineView({ visitId }: { visitId: string | undefined }) {
     <section className="page d-pipeline">
       <h1>変換ログ</h1>
       <div className="d-toolbar">
-        <span>受診 #{id ?? "?"}</span>
+        {snap ? <VisitHeading visit={snap.visit} /> : null}
         {snap ? <StatusBadge status={snap.status} /> : null}
         {id !== null ? (
           <span className={`d-live ${live.on ? "d-live--on" : ""}`}>

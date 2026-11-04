@@ -2,23 +2,42 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { reportUrl } from "../../api/doctor";
 import type { VisitSummary } from "../../api/types";
-import { formatDateTime } from "./format";
+import { formatDay } from "./dayLabel";
 import PrintButton from "./PrintButton";
 import RegenerateButton from "./RegenerateButton";
+import ReportLink from "./ReportLink";
 import StatusBadge from "./StatusBadge";
 import TwoStepButton from "./TwoStepButton";
 import UnprocessedLink from "./UnprocessedLink";
+import "./board.css";
 
 interface VisitRowProps {
   visit: VisitSummary;
-  /** 印刷済みの2段目で呼ぶ（受付番号の知らせのために受診ごと渡す） */
+  /** 印刷済みにするの2段目で呼ぶ（受付番号の知らせのために受診ごと渡す） */
   onPrinted: (visit: VisitSummary) => Promise<void>;
   /** 「AI でもう一度変換」で呼ぶ（AI変換なしの ready・failed の行だけに出す） */
   onRegenerate: (visit: VisitSummary) => Promise<void>;
 }
 
+/** 「印刷済みにする」の確かめの文（押した後の流れは D3 のまま）。 */
+export const PRINTED_PROMPT =
+  "レポート・変換結果・受付番号を削除します。印刷は済みましたか？";
+
+function PipelineLink({ visitId }: { visitId: number }) {
+  return (
+    <Link className="d-sublink" to={`/doctor/pipeline/${visitId}`}>
+      変換ログ
+    </Link>
+  );
+}
+
+/**
+ * 操作の列: 左に主の操作（印刷＝青の塗り）と副の操作（印刷済みにする＝白地に枠・
+ * AI でもう一度変換）、右に小さなリンク（レポートを開く・変換ログ）。どの状態の行も
+ * 同じ2つの組に分けて、行ごとに並びをそろえる。
+ */
 function Actions({ visit, onPrinted, onRegenerate }: VisitRowProps) {
-  // 「AI でもう一度変換」を依頼している間は、同じ行の印刷・印刷済みを押せない
+  // 「AI でもう一度変換」を依頼している間は、同じ行の印刷・印刷済みにするを押せない
   // （サーバーも生成中の印刷済みを 409 にするが、押せる見た目にしない）
   const [regenerating, setRegenerating] = useState(false);
   async function regenerateThis() {
@@ -33,45 +52,52 @@ function Actions({ visit, onPrinted, onRegenerate }: VisitRowProps) {
   switch (visit.status) {
     case "ready":
       return (
-        <div className="d-actions">
-          <PrintButton url={reportUrl(visit.id)} disabled={regenerating} />
-          <TwoStepButton
-            label="印刷済み"
-            prompt="レポート・変換結果・受付番号を削除します。印刷は済みましたか？"
-            confirmLabel="削除する（印刷済み）"
-            onConfirm={() => onPrinted(visit)}
-            disabled={regenerating}
-          />
-          {visit.fallback ? regenerate : null}
-          <Link className="d-sublink" to={`/doctor/pipeline/${visit.id}`}>
-            変換ログ
-          </Link>
+        <div className="d-visit-ops">
+          <div className="d-actions">
+            <PrintButton url={reportUrl(visit.id)} disabled={regenerating} />
+            <TwoStepButton
+              label="印刷済みにする"
+              prompt={PRINTED_PROMPT}
+              confirmLabel="削除する（印刷済み）"
+              onConfirm={() => onPrinted(visit)}
+              disabled={regenerating}
+            />
+            {visit.fallback ? regenerate : null}
+          </div>
+          <div className="d-visit-links">
+            <ReportLink visitId={visit.id} />
+            <PipelineLink visitId={visit.id} />
+          </div>
         </div>
       );
     case "generating":
       return (
-        <div className="d-actions">
-          <Link className="d-linkbutton" to={`/doctor/pipeline/${visit.id}`}>
-            変換の様子を見る
-          </Link>
+        <div className="d-visit-ops">
+          <div className="d-actions">
+            <Link className="d-linkbutton" to={`/doctor/pipeline/${visit.id}`}>
+              変換の様子を見る
+            </Link>
+          </div>
         </div>
       );
     case "failed":
       return (
-        <div className="d-actions">
-          <span className="d-muted">レポートを作れませんでした</span>
-          {regenerate}
-          <Link className="d-sublink" to={`/doctor/pipeline/${visit.id}`}>
-            変換ログ
-          </Link>
+        <div className="d-visit-ops">
+          <div className="d-actions">
+            <span className="d-muted">レポートを作れませんでした</span>
+            {regenerate}
+          </div>
+          <div className="d-visit-links">
+            <PipelineLink visitId={visit.id} />
+          </div>
         </div>
       );
   }
 }
 
 /**
- * D3 の1行。受付番号・仮名ID・状態（主の状態のバッジと、副の注記「AI変換なし」）・
- * 未処理・操作。
+ * D3 の1行。受付番号・仮名ID・状態（主の状態のバッジと、副の注記「AI変換なし」）・受付・
+ * 未処理（あれば橙の「要確認 N件」。0件なら何も出さない）・操作。
  * 一覧に出るのは generating・ready・failed だけ（印刷済み・期限切れは API が出さない）。
  * AI変換なしの ready と failed には「AI でもう一度変換」を出す（Claude の一時的な失敗の後）。
  */
@@ -94,13 +120,11 @@ export default function VisitRow({
           ) : null}
         </span>
       </td>
-      <td>{formatDateTime(visit.created_at)}</td>
+      <td>{formatDay(visit.created_at)}</td>
       <td>
         {visit.unprocessed_count > 0 ? (
           <UnprocessedLink visitId={visit.id} count={visit.unprocessed_count} />
-        ) : (
-          <span className="d-muted">—</span>
-        )}
+        ) : null}
       </td>
       <td className="d-visit-actions">
         <Actions

@@ -1,10 +1,17 @@
 import type { Course } from "../../api/types";
 import { delayDays } from "./courseValues";
+import { formatDay } from "./dayLabel";
+
+const NONE = "—";
+
+function dayOrNone(value: string | null | undefined): string {
+  return value ? formatDay(value) : NONE;
+}
 
 function delayText(course: Course): string {
   const days = delayDays(course);
   if (days === null) {
-    return "—";
+    return NONE;
   }
   return days > 0 ? `予定より${days}日延期` : `予定より${-days}日早い`;
 }
@@ -15,7 +22,10 @@ interface CourseTableProps {
   onEdit: (course: Course) => void;
 }
 
-/** D2 のコース一覧（course_no 順で渡す）。延期は日数だけを出し、理由は書かない。 */
+/**
+ * D2 のコース一覧（course_no 順で渡す）。延期は日数だけを出し、理由は書かない。
+ * 日付は「11月9日（月）」（入力欄は type=date のまま）。
+ */
 export default function CourseTable({
   courses,
   editingNo,
@@ -41,10 +51,10 @@ export default function CourseTable({
             className={course.course_no === editingNo ? "d-row-editing" : ""}
           >
             <td>第{course.course_no}コース</td>
-            <td>{course.infusion_date}</td>
-            <td>{course.planned_date ?? "—"}</td>
+            <td className="d-nowrap">{formatDay(course.infusion_date)}</td>
+            <td className="d-nowrap">{dayOrNone(course.planned_date)}</td>
             <td>{delayText(course)}</td>
-            <td>{course.next_visit ?? "—"}</td>
+            <td className="d-nowrap">{dayOrNone(course.next_visit)}</td>
             <td>{course.note ?? ""}</td>
             <td>
               <button type="button" onClick={() => onEdit(course)}>

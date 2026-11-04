@@ -10,6 +10,20 @@
   --d-primary-strong: #0f3563;
   --d-danger: #9b0000;
   --d-ok: #1d5e20;
+  /* 色の意味は患者画面とそろえる（医師画面の UX の見直し。doctorCss.test.ts で比を検査）:
+     ある = 淡い青の地に紺、つらい = 紺の地に白、なし = 薄い灰、受診日 = 緑、
+     要確認・注意 = 橙、代理 = 紫 */
+  --d-yes-bg: #e6eefa;
+  --d-yes-text: #00448f;
+  --d-hard-bg: #00448f;
+  --d-hard-text: #ffffff;
+  --d-none-text: #6b6b6b;
+  --d-visit: #1b7a3a;
+  --d-warn-bg: #fff1e0;
+  --d-warn-border: #b85c00;
+  --d-warn-text: #9a4a00;
+  --d-proxy-bg: #f1ecfa;
+  --d-proxy-text: #6b4fa0;
 
   min-height: 100vh;
   font-size: 15px;

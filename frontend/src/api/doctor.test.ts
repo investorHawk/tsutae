@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { callOf, jsonResponse, mockFetch } from "../test/fetchMock";
+import { visitHeaderStub } from "../test/doctorStubs";
 import { ApiError } from "./http";
 import {
   approveSkillChange,
@@ -119,14 +120,18 @@ const cases: Case[] = [
     run: () => listUnprocessed(12),
     method: "GET",
     url: "/api/doctor/visits/12/unprocessed",
-    response: { entries: [] },
+    response: { visit: visitHeaderStub(), entries: [] },
   },
   {
     name: "getPipelineEvents",
     run: () => getPipelineEvents(12),
     method: "GET",
     url: "/api/doctor/pipeline/12/events",
-    response: { status: "generating", events: [] },
+    response: {
+      status: "generating",
+      visit: visitHeaderStub({ status: "generating", report_available: false }),
+      events: [],
+    },
   },
   {
     name: "listSkills",

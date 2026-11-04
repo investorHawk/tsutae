@@ -10,6 +10,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PipelineEvent, VisitStatus } from "../../api/types";
 import { countOf, mockApi, renderRoute } from "../../components/doctor/testing";
+import { visitHeaderStub } from "../../test/doctorStubs";
 import { jsonResponse } from "../../test/fetchMock";
 import Pipeline from "./Pipeline";
 
@@ -74,7 +75,12 @@ const LATE: PipelineEvent[] = [
 ];
 
 function body(status: VisitStatus, events: PipelineEvent[]) {
-  return { status, events };
+  const visit = visitHeaderStub({
+    status,
+    report_available: status === "ready",
+    reception_no: status === "printed" ? null : "A-023",
+  });
+  return { status, visit, events };
 }
 
 beforeEach(() => {
@@ -372,10 +378,34 @@ describe("Pipeline（D5 変換ログ）", () => {
     expect(countOf(fetchMock, EVENTS_KEY)).toBe(1);
   });
 
+  it("見出しは受付番号・仮名ID・受付の日時（内部の番号「受診 #」は出さない）", async () => {
+    mockApi({ [EVENTS_KEY]: body("ready", LATE) });
+    renderPipeline();
+    expect(
+      await screen.findByText("A-023 ・ P-DEMO0001 ・ 11月9日（月）18:16 受付"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/受診 #/)).toBeNull();
+  });
+
+  it("印刷済みで受付番号が消えていれば、受付番号を出さない", async () => {
+    mockApi({ [EVENTS_KEY]: body("printed", LATE) });
+    renderPipeline();
+    expect(
+      await screen.findByText("P-DEMO0001 ・ 11月9日（月）18:16 受付"),
+    ).toBeInTheDocument();
+  });
+
   it.each([
-    ["events が無い", { status: "generating" }],
-    ["status が知らない値", { status: "weird", events: [] }],
-    ["要素の型が違う", { status: "ready", events: [{ event: 1 }] }],
+    ["events が無い", { status: "generating", visit: visitHeaderStub() }],
+    ["visit が無い", { status: "generating", events: [] }],
+    [
+      "status が知らない値",
+      { status: "weird", visit: visitHeaderStub(), events: [] },
+    ],
+    [
+      "要素の型が違う",
+      { status: "ready", visit: visitHeaderStub(), events: [{ event: 1 }] },
+    ],
   ])(
     "応答が契約と違えば（%s）invalid_response（出来事0件と言わない）",
     async (_l, b) => {

@@ -213,6 +213,8 @@ ENTRY_KEYS = {
     "id",
     "recorded_at",
     "record_date",
+    "course_no",
+    "day",
     "kind",
     "by_proxy",
     "answers",

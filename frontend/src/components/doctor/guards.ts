@@ -15,6 +15,7 @@ export {
   isSkillChange,
   isSkillInfo,
   isUnprocessedItem,
+  isVisitHeader,
   isVisitStatus,
   isVisitSummary,
 } from "../../api/doctorGuards";

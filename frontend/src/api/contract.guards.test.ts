@@ -228,6 +228,36 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "印の start が負",
     (b) => (b.entries[0].marks = [{ start: -1, end: 4 }]),
   ],
+  // 見出しの受診（医師画面の UX の見直し）
+  ["doctor_unprocessed", "visit が無い", (b) => delete b.visit],
+  [
+    "doctor_unprocessed",
+    "visit の仮名IDが無い",
+    (b) => delete b.visit.patient_id,
+  ],
+  [
+    "doctor_unprocessed",
+    "visit の report_available が文字列",
+    (b) => (b.visit.report_available = "yes"),
+  ],
+  ["doctor_unprocessed", "記録の Day が 0", (b) => (b.entries[0].day = 0)],
+  [
+    "doctor_unprocessed",
+    "記録のコースが文字列",
+    (b) => (b.entries[0].course_no = "3"),
+  ],
+  ["doctor_pipeline_events", "visit が無い", (b) => delete b.visit],
+  [
+    "doctor_pipeline_events_printed",
+    "visit の受付番号が数",
+    (b) => (b.visit.reception_no = 23),
+  ],
+  [
+    "doctor_pipeline_events",
+    "visit の状態が未知",
+    (b) => (b.visit.status = "done"),
+  ],
+  ["doctor_patient_entries", "記録の Day が負", (b) => (b.entries[0].day = -1)],
   // 患者の画面の受診・記録（D2）
   [
     "doctor_patient_visits",
@@ -270,6 +300,17 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "doctor_patients",
     "今のコースが 0",
     (b) => (b.patients[0].current_course_no = 0),
+  ],
+  ["doctor_patients", "今の Day が 0", (b) => (b.patients[0].current_day = 0)],
+  [
+    "doctor_patients",
+    "途切れが文字列",
+    (b) => (b.patients[0].record_stale = "true"),
+  ],
+  [
+    "doctor_patients",
+    "記録からの日数が小数",
+    (b) => (b.patients[0].days_since_last_record = 1.5),
   ],
   [
     "doctor_patients",

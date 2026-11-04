@@ -29,6 +29,7 @@ import {
   isOptInt,
   isOptIsoDate,
   isPositiveInt,
+  isRecord,
   isString,
   oneOf,
 } from "./validate";
@@ -91,8 +92,33 @@ export function isDoctorPatient(v: Item): boolean {
     isIsoDateTime(v.created_at) &&
     isString(v.register_url) &&
     hasNullable("last_record_date", isIsoDate)(v) &&
+    hasNullable("days_since_last_record", isInt)(v) &&
+    isBool(v.record_stale) &&
     hasNullable("current_course_no", isPositiveInt)(v) &&
+    hasNullable("current_day", isPositiveInt)(v) &&
     hasNullable("next_visit", isIsoDate)(v)
+  );
+}
+
+/** 記録日のコースと Day（どちらも nullable・省略は不正）。 */
+function hasCourseDay(v: Item): boolean {
+  return (
+    hasNullable("course_no", isPositiveInt)(v) &&
+    hasNullable("day", isPositiveInt)(v)
+  );
+}
+
+/** 未処理・変換ログの見出しの受診。受付番号は印刷済み・期限切れで null。 */
+export function isVisitHeader(v: Item): boolean {
+  return (
+    isInt(v.id) &&
+    hasNullable("reception_no", isString)(v) &&
+    isString(v.patient_id) &&
+    isIsoDate(v.visit_date) &&
+    isIsoDateTime(v.created_at) &&
+    isVisitStatus(v.status) &&
+    isBool(v.fallback) &&
+    isBool(v.report_available)
   );
 }
 
@@ -144,6 +170,7 @@ export function isDoctorEntry(v: Item): boolean {
     isInt(v.id) &&
     isIsoDateTime(v.recorded_at) &&
     isIsoDate(v.record_date) &&
+    hasCourseDay(v) &&
     oneOf(ENTRY_KINDS)(v.kind) &&
     isBool(v.by_proxy) &&
     everyItem(isDoctorEntryAnswer)(v.answers) &&
@@ -243,6 +270,7 @@ export function isUnprocessedItem(v: Item): boolean {
   return (
     isInt(v.entry_id) &&
     isIsoDate(v.record_date) &&
+    hasCourseDay(v) &&
     isString(v.reason) &&
     isString(v.text) &&
     isTextMarks(v.marks, v.text)
@@ -272,7 +300,14 @@ const hasList =
 export const isPatientsResponse = hasList("patients", isDoctorPatient);
 export const isCoursesResponse = hasList("courses", isCourse);
 export const isVisitsResponse = hasList("visits", isVisitSummary);
-export const isUnprocessedResponse = hasList("entries", isUnprocessedItem);
+/** D6 の応答 {visit, entries}。 */
+export function isUnprocessedResponse(v: Item): boolean {
+  return (
+    isRecord(v.visit) &&
+    isVisitHeader(v.visit) &&
+    everyItem(isUnprocessedItem)(v.entries)
+  );
+}
 export const isPatientVisitsResponse = hasList("visits", isPatientVisit);
 /** 患者の画面の記録 {entries, total}。total は 0 以上の整数。 */
 export function isPatientEntriesSummaryResponse(v: Item): boolean {
@@ -304,7 +339,12 @@ export function isSkillContentResponse(v: Item): boolean {
   );
 }
 
-/** D5 の応答 {status, events}。 */
+/** D5 の応答 {status, visit, events}。 */
 export function isPipelineEventsResponse(v: Item): boolean {
-  return isVisitStatus(v.status) && everyItem(isPipelineEvent)(v.events);
+  return (
+    isVisitStatus(v.status) &&
+    isRecord(v.visit) &&
+    isVisitHeader(v.visit) &&
+    everyItem(isPipelineEvent)(v.events)
+  );
 }

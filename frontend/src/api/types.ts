@@ -167,7 +167,9 @@ export interface LoginRequest {
 /**
  * 患者一覧の1件。last_record_date・current_course_no・next_visit は無ければ null
  * （項目は必ずある）。今のコースは今日（サーバーの config.today()）で決め、次回受診は
- * 今のコースの次回受診予定日。
+ * 今のコースの次回受診予定日。current_day は今日の今のコースでの Day、
+ * days_since_last_record は今日 − 最後の記録日（記録が無ければ null）、record_stale は
+ * 最後の記録が3日以上前か記録が無い（判定はサーバー）。
  */
 export interface DoctorPatient {
   id: string;
@@ -175,7 +177,10 @@ export interface DoctorPatient {
   created_at: IsoDateTime;
   register_url: string;
   last_record_date: IsoDate | null;
+  days_since_last_record: number | null;
+  record_stale: boolean;
   current_course_no: number | null;
+  current_day: number | null;
   next_visit: IsoDate | null;
 }
 
@@ -223,11 +228,16 @@ export interface DoctorEntryAnswer {
   temperature: number | null;
 }
 
-/** 患者の画面の記録1件。自由記載は有無だけ（原文は D6 だけに出る）。 */
+/**
+ * 患者の画面の記録1件。自由記載は有無だけ（原文は D6 だけに出る）。
+ * course_no・day は記録日のコースと Day（サーバーで計算。コース外・矛盾は null）。
+ */
 export interface DoctorEntry {
   id: number;
   recorded_at: IsoDateTime;
   record_date: IsoDate;
+  course_no: number | null;
+  day: number | null;
   kind: EntryKind;
   by_proxy: boolean;
   answers: DoctorEntryAnswer[];
@@ -259,10 +269,28 @@ export interface VisitsResponse {
   visits: VisitSummary[];
 }
 
-/** D6。原文。紙には載せない。 */
+/**
+ * 未処理・変換ログの見出しの受診。受付番号は印刷済み・期限切れで null。
+ * report_available はレポートを開ける（受付番号が残っていて期限内の ready）とき true。
+ */
+export interface VisitHeader {
+  id: number;
+  reception_no: string | null;
+  patient_id: string;
+  visit_date: IsoDate;
+  /** 受付の時刻 */
+  created_at: IsoDateTime;
+  status: VisitStatus;
+  fallback: boolean;
+  report_available: boolean;
+}
+
+/** D6。原文。紙には載せない。course_no・day は記録日のコースと Day（無ければ null）。 */
 export interface UnprocessedItem {
   entry_id: number;
   record_date: IsoDate;
+  course_no: number | null;
+  day: number | null;
   /** 検出規則名（例 "unknown_before_honorific"） */
   reason: string;
   text: string;
@@ -276,6 +304,7 @@ export interface TextMark {
 }
 
 export interface UnprocessedResponse {
+  visit: VisitHeader;
   entries: UnprocessedItem[];
 }
 
@@ -292,6 +321,7 @@ export interface PipelineEvent {
 
 export interface PipelineEventsResponse {
   status: VisitStatus;
+  visit: VisitHeader;
   events: PipelineEvent[];
 }
 

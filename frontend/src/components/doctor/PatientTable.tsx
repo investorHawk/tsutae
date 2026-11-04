@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import type { DoctorPatient } from "../../api/types";
-import { formatDateTime } from "./format";
+import { courseDayLabel } from "./courseDayLabel";
+import { formatDay } from "./dayLabel";
+import RecordGapFlag from "./RecordGapFlag";
 
 interface PatientTableProps {
   patients: readonly DoctorPatient[];
@@ -12,8 +14,8 @@ interface PatientTableProps {
 const NONE = "—";
 
 /**
- * D1 の一覧。仮名ID・レジメン・最後の記録日・今のコース・次回受診・作成日時・登録用QR
- * （氏名の欄は無い）。値が無ければ「—」。
+ * D1 の一覧。仮名ID・レジメン・最後の記録日（途切れの印）・今のコース（と Day）・次回受診・
+ * 作成日時・登録用QR（氏名の欄は無い）。値が無ければ「—」。日付は「11月9日（月）」。
  */
 export default function PatientTable({
   patients,
@@ -42,14 +44,26 @@ export default function PatientTable({
               </Link>
             </td>
             <td>{patient.regimen}</td>
-            <td>{patient.last_record_date ?? NONE}</td>
             <td>
-              {patient.current_course_no !== null
-                ? `第${patient.current_course_no}コース`
+              <span className="d-cell-flags">
+                <span className="d-nowrap">
+                  {patient.last_record_date !== null
+                    ? formatDay(patient.last_record_date)
+                    : NONE}
+                </span>
+                <RecordGapFlag gap={patient} />
+              </span>
+            </td>
+            <td className="d-nowrap">
+              {courseDayLabel(patient.current_course_no, patient.current_day) ??
+                NONE}
+            </td>
+            <td className="d-nowrap">
+              {patient.next_visit !== null
+                ? formatDay(patient.next_visit)
                 : NONE}
             </td>
-            <td>{patient.next_visit ?? NONE}</td>
-            <td>{formatDateTime(patient.created_at)}</td>
+            <td className="d-nowrap">{formatDay(patient.created_at)}</td>
             <td>
               <button
                 type="button"

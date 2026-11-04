@@ -5,6 +5,16 @@
   "status": 200,
   "body": {
     "status": "ready",
+    "visit": {
+      "id": 1,
+      "reception_no": "A-023",
+      "patient_id": "P-DEMO0001",
+      "visit_date": "2026-11-09",
+      "created_at": "2026-11-09T10:00:00+09:00",
+      "status": "ready",
+      "fallback": false,
+      "report_available": true
+    },
     "events": [
       {
         "ts": "2026-11-09T10:00:00+09:00",

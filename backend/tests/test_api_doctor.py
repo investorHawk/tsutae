@@ -240,7 +240,10 @@ def test_list_patients(tmp_path: Path, fixed_today: str) -> None:
         "created_at",
         "register_url",
         "last_record_date",
+        "days_since_last_record",
+        "record_stale",
         "current_course_no",
+        "current_day",
         "next_visit",
     }
     assert patients[0]["register_url"] == (

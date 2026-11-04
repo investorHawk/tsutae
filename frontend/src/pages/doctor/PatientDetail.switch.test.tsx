@@ -76,6 +76,12 @@ function renderAt(routes: Record<string, RouteValue>) {
   return fetchMock;
 }
 
+async function openAdd() {
+  await userEvent.click(
+    screen.getByRole("button", { name: "＋ コースを追加" }),
+  );
+}
+
 function goToB() {
   fireEvent.click(screen.getByRole("button", { name: `go ${B}` }));
 }
@@ -94,7 +100,8 @@ describe("PatientDetail の患者の切り替え", () => {
       slowA.resolve(jsonResponse({ courses: A_COURSES }));
     });
     expect(screen.queryByText("第3コース")).toBeNull();
-    expect(screen.queryByText("2026-09-01")).toBeNull();
+    expect(screen.queryByText("9月1日（火）")).toBeNull();
+    await openAdd();
     expect(screen.getByLabelText("コース番号")).toHaveValue(2);
   });
 
@@ -113,6 +120,9 @@ describe("PatientDetail の患者の切り替え", () => {
     goToB();
     expect(screen.getByText(B)).toBeInTheDocument();
     expect(screen.queryByText("第2コース")).toBeNull();
+    // 修正中の欄は閉じる（前の患者の入力を引き継がない）
+    expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+    await openAdd();
     expect(
       screen.getByRole("heading", { level: 3, name: "コースを追加" }),
     ).toBeInTheDocument();
@@ -150,6 +160,7 @@ describe("PatientDetail の患者の切り替え", () => {
     goToB();
     await screen.findByText("第1コース");
     expect(screen.queryByText("第3コース")).toBeNull();
+    await openAdd();
     fireEvent.change(screen.getByLabelText("実投与日（Day1）"), {
       target: { value: "2026-11-10" },
     });

@@ -95,7 +95,7 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     expect(within(rowOf("A-023")).getByText("印刷待ち")).toBeInTheDocument();
     expect(
-      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件を見る →" }),
+      within(rowOf("A-023")).getByRole("link", { name: "要確認 1件" }),
     ).toHaveAttribute("href", "/doctor/unprocessed/1");
     expect(within(rowOf("B-101")).getByText("生成中")).toBeInTheDocument();
     expect(within(rowOf("C-202")).getByText("失敗")).toBeInTheDocument();
@@ -175,16 +175,65 @@ describe("Visits（D3 印刷待ち）", () => {
     expect(screen.queryByText(/印刷ダイアログが開きます/)).toBeNull();
   });
 
-  it("未処理の件数があれば D6 への導線", async () => {
+  it("未処理の件数があれば橙の「要確認 N件」から D6 へ（0件なら何も出さない）", async () => {
     mockApi({ [LIST]: { visits: VISITS } });
     renderVisits();
     await screen.findByText("A-023");
+    const link = within(rowOf("A-023")).getByRole("link", {
+      name: "要確認 1件",
+    });
+    expect(link).toHaveAttribute("href", "/doctor/unprocessed/12");
+    expect(link).toHaveClass("d-warnlink");
+    expect(link.getAttribute("title")).toContain("紙には載らない");
     expect(
-      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件を見る →" }),
-    ).toHaveAttribute("href", "/doctor/unprocessed/12");
-    expect(
-      within(rowOf("A-025")).queryByRole("link", { name: /未処理/ }),
+      within(rowOf("A-025")).queryByRole("link", { name: /要確認/ }),
     ).toBeNull();
+    // 0件の行の未処理の欄は空（「—」も出さない）
+    const cells = within(rowOf("A-025")).getAllByRole("cell");
+    expect(cells[4]).toBeEmptyDOMElement();
+    // 印刷の前に見る、と表の上に1回だけ補足する
+    const hints = screen.getAllByText(/印刷の前に開いて確かめてください/);
+    expect(hints).toHaveLength(1);
+    expect(hints[0].closest("table")).toBeNull();
+  });
+
+  it("要確認が1件も無ければ補足を出さない", async () => {
+    mockApi({ [LIST]: { visits: [VISITS[1]] } });
+    renderVisits();
+    await screen.findByText("A-024");
+    expect(screen.queryByText(/印刷の前に開いて確かめてください/)).toBeNull();
+  });
+
+  it("操作は左に主（印刷）と副（印刷済みにする）、右に小さなリンク", async () => {
+    mockApi({ [LIST]: { visits: VISITS } });
+    renderVisits();
+    await screen.findByText("A-023");
+    const row = rowOf("A-023");
+    const print = within(row).getByRole("button", { name: "印刷" });
+    expect(print).toHaveClass("d-linkbutton--primary");
+    const printed = within(row).getByRole("button", { name: "印刷済みにする" });
+    expect(printed).not.toHaveClass("d-primary");
+    const links = row.querySelector(".d-visit-links");
+    expect(links).not.toBeNull();
+    expect(
+      within(links as HTMLElement)
+        .getAllByRole("link")
+        .map((a) => a.textContent),
+    ).toEqual(["レポートを開く", "変換ログ"]);
+    expect(links?.contains(print)).toBe(false);
+    // 失敗の行も同じ組に分ける（変換ログは右）
+    const failed = rowOf("A-026").querySelector(".d-visit-links");
+    expect(
+      within(failed as HTMLElement).getByRole("link", { name: "変換ログ" }),
+    ).toBeInTheDocument();
+  });
+
+  it("受付は「11月9日（月）18:16」の形", async () => {
+    mockApi({ [LIST]: { visits: VISITS } });
+    renderVisits();
+    await screen.findByText("A-023");
+    const cells = within(rowOf("A-023")).getAllByRole("cell");
+    expect(cells[3]).toHaveTextContent("11月9日（月）09:40");
   });
 
   it("生成中なら D5 への導線", async () => {
@@ -230,7 +279,7 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     const u = user();
     await u.click(
-      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
     );
     expect(countOf(fetchMock, "POST /api/doctor/visits/12/printed")).toBe(0);
     expect(within(rowOf("A-023")).getByText(/削除します/)).toBeInTheDocument();
@@ -254,7 +303,7 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     const u = user();
     await u.click(
-      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
     );
     await u.click(
       within(rowOf("A-023")).getByRole("button", {
@@ -276,7 +325,7 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     const u = user();
     await u.click(
-      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
     );
     await u.click(
       within(rowOf("A-023")).getByRole("button", {
@@ -293,13 +342,13 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     const u = user();
     await u.click(
-      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
     );
     await u.click(
       within(rowOf("A-023")).getByRole("button", { name: "やめる" }),
     );
     expect(
-      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
     ).toBeInTheDocument();
     expect(countOf(fetchMock, "POST /api/doctor/visits/12/printed")).toBe(0);
   });
@@ -314,7 +363,7 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     const u = user();
     await u.click(
-      within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+      within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
     );
     await u.click(
       within(rowOf("A-023")).getByRole("button", {
@@ -338,7 +387,7 @@ describe("Visits（D3 印刷待ち）", () => {
       await screen.findByText("A-023");
       const u = user();
       await u.click(
-        within(rowOf("A-023")).getByRole("button", { name: "印刷済み" }),
+        within(rowOf("A-023")).getByRole("button", { name: "印刷済みにする" }),
       );
       await u.click(
         within(rowOf("A-023")).getByRole("button", {

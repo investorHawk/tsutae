@@ -87,10 +87,11 @@
   font-weight: 600;
 }
 
+/* 注意の帯（未処理の画面など）。色は「要確認」の橙にそろえる（styles/doctor.css の --d-warn-*） */
 .doctor-app .d-notice {
   padding: 10px 14px;
-  background: #fff8e5;
-  border-left: 4px solid #c9a227;
+  background: var(--d-warn-bg);
+  border-left: 4px solid var(--d-warn-border);
   border-radius: 4px;
 }
 
@@ -137,25 +138,9 @@
 }
 
 .doctor-app .d-badge--warn {
-  color: #6b4e00;
-  background: #ffe9a8;
-  border: 1px solid #c9a227;
-}
-
-/* 未処理の記載へのリンク（D2-3）。押せると分かるよう下線と矢印、注意の印の点 */
-.doctor-app .d-warnlink {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.doctor-app .d-warnlink::before {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 6px;
-  content: "";
-  background: #c9a227;
-  border-radius: 50%;
+  color: var(--d-warn-text);
+  background: var(--d-warn-bg);
+  border: 1px solid var(--d-warn-border);
 }
 
 .doctor-app .d-reception {
@@ -264,13 +249,6 @@
 }
 
 /* コース登録（D2） */
-.doctor-app .d-patient-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-}
-
 .doctor-app .d-course-form {
   max-width: 760px;
   padding: 16px;
@@ -293,19 +271,6 @@
   padding-bottom: 4px;
   margin-top: 0;
   border-bottom: 2px solid var(--d-border);
-}
-
-.doctor-app .d-answers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.doctor-app .d-answer--hard {
-  font-weight: 700;
 }
 
 .doctor-app .d-nowrap {

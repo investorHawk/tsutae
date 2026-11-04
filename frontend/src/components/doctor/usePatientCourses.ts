@@ -16,8 +16,15 @@ export interface PatientCourses {
   loadError: string | null;
   /** 一覧から引いたレジメン。見つからなければ null */
   regimen: string | null;
-  /** 取り直して並べた一覧を返す（失敗・古くなった応答は null） */
+  /**
+   * 患者一覧から引いたこの患者の行（要約の行: 今のコースと Day・最後の記録日・次回受診。
+   * API が今日で計算する）。読み込み前・見つからなければ null
+   */
+  patient: DoctorPatient | null;
+  /** コースを取り直して並べた一覧を返す（失敗・古くなった応答は null） */
   reload: () => Promise<Course[] | null>;
+  /** 患者の行を取り直す（コースを保存した後。今のコース・Day・次回受診が変わる） */
+  reloadPatient: () => void;
 }
 
 /** どの患者の値か（別の患者の値は表示に使わない）。 */
@@ -42,7 +49,7 @@ function valueFor<T>(scoped: Scoped<T>, pid: string, empty: T): T {
 }
 
 /**
- * D2 の患者のコース一覧とレジメン（患者一覧から引く。取れなくても画面は使える）。
+ * D2 の患者のコース一覧と、患者一覧のこの患者の行（レジメン・要約。取れなくても画面は使える）。
  * 値は患者ごと: pid が変われば前の患者の値はすぐに消え、前の患者の遅い応答
  * （と、同じ患者で後から始めた取り直しより前の応答）は捨てる（世代で見分ける）。
  */
@@ -51,10 +58,11 @@ export function usePatientCourses(
   handleError: (err: unknown) => string,
 ): PatientCourses {
   const [loaded, setLoaded] = useState<Scoped<Loaded>>({ pid, value: EMPTY });
-  const [regimen, setRegimen] = useState<Scoped<string | null>>({
+  const [patient, setPatient] = useState<Scoped<DoctorPatient | null>>({
     pid,
     value: null,
   });
+  const [patientRound, setPatientRound] = useState(0);
   const generation = useRef(0);
 
   // 患者を切り替えたら、走っている取り直しを古いものにする（描画の確定と同時に）
@@ -92,6 +100,8 @@ export function usePatientCourses(
     return next.courses;
   }, [pid, handleError]);
 
+  // 取り直し（patientRound）では、前の行を消さずに置き換える（要約の行がちらつかない）。
+  // 失敗したら前の行を残す（取り直しの失敗で要約を消さない）
   useEffect(() => {
     let active = true;
     listPatients()
@@ -102,24 +112,28 @@ export function usePatientCourses(
           isDoctorPatient,
         ).find((p) => p.id === pid);
         if (active) {
-          setRegimen({ pid, value: found?.regimen ?? null });
+          setPatient({ pid, value: found ?? null });
         }
       })
       .catch(() => {
         if (active) {
-          setRegimen({ pid, value: null });
+          setPatient((prev) => ({ pid, value: valueFor(prev, pid, null) }));
         }
       });
     return () => {
       active = false;
     };
-  }, [pid]);
+  }, [pid, patientRound]);
 
+  const reloadPatient = useCallback(() => setPatientRound((n) => n + 1), []);
   const current = valueFor(loaded, pid, EMPTY);
+  const found = valueFor(patient, pid, null);
   return {
     courses: current.courses,
     loadError: current.loadError,
-    regimen: valueFor(regimen, pid, null),
+    regimen: found?.regimen ?? null,
+    patient: found,
     reload,
+    reloadPatient,
   };
 }

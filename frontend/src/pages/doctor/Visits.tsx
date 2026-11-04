@@ -7,6 +7,7 @@ import { formatTime } from "../../components/doctor/format";
 import { isVisitSummary } from "../../components/doctor/guards";
 import { listOf } from "../../components/doctor/input";
 import { PRINT_HINT } from "../../components/doctor/PrintButton";
+import { UNPROCESSED_HINT } from "../../components/doctor/UnprocessedLink";
 import { usePolling } from "../../components/doctor/usePolling";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
 import VisitRow from "../../components/doctor/VisitRow";
@@ -107,6 +108,9 @@ export default function Visits() {
       ) : null}
       {visits?.some((v) => v.status === "ready") ? (
         <p className="d-muted d-print-hint">{PRINT_HINT}</p>
+      ) : null}
+      {visits?.some((v) => v.unprocessed_count > 0) ? (
+        <p className="d-muted d-print-hint">{UNPROCESSED_HINT}</p>
       ) : null}
       {visits && visits.length > 0 ? (
         <table className="d-table d-table--middle d-visits">

@@ -15,6 +15,8 @@ type Status = "idle" | "loading" | "opened" | "failed";
  * JSON 等）・print が投げた・時間切れなら、別タブで開くリンクから印刷するよう案内する。
  * iframe は display:none にしない（ブラウザによっては空白を印刷する）。印刷の後も残す
  * （print の直後に消すと印刷が取り消されるブラウザがある）。
+ * 別タブで開くリンクは持たない（呼び出し側が ReportLink を同じ行に並べる。D3 では操作の右の
+ * 小さなリンクにまとめるため）。
  */
 export default function PrintButton({
   url,
@@ -70,14 +72,6 @@ export default function PrintButton({
       >
         印刷
       </button>
-      <a
-        className="d-sublink"
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        レポートを開く
-      </a>
       {status === "failed" ? (
         <span role="alert" className="d-error">
           印刷ダイアログを開けませんでした。『レポートを開く』から ⌘P

@@ -60,6 +60,7 @@ from tsutae.config import (  # noqa: E402
 from tsutae.pipeline.hooks import build_hooks  # noqa: E402
 from tsutae.pipeline.logs import MemoryLogger  # noqa: E402
 from tsutae.pipeline.orchestrator import (  # noqa: E402
+    NO_CLAUDE_MD_ENV,
     NO_SESSION_PERSISTENCE,
     build_options,
 )
@@ -127,6 +128,7 @@ def base_options(cwd: Path, **kw: Any) -> ClaudeAgentOptions:
         permission_mode="dontAsk",
         max_turns=kw.pop("max_turns", 8),
         max_budget_usd=0.5,
+        env=dict(NO_CLAUDE_MD_ENV),
         **kw,
     )
 

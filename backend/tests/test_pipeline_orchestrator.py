@@ -158,6 +158,8 @@ def test_build_options_values(tmp_path: Path) -> None:
     assert not set(ALLOWED_TOOLS) & set(DISALLOWED_TOOLS)
     # 会話の記録（伏せ字後の自由記載・変換結果）を ~/.claude/projects に残さない
     assert options.extra_args == {"no-session-persistence": None}
+    # 開発用の CLAUDE.md（リポジトリ直下など cwd の祖先）を変換の文脈に入れない
+    assert options.env == {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}
     assert options.permission_mode == "dontAsk"
     assert options.max_turns == 12
     assert options.max_budget_usd == 1.5

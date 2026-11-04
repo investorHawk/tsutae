@@ -116,6 +116,9 @@ DISALLOWED_TOOLS: tuple[str, ...] = (
 # 変換結果）を ~/.claude/projects/<cwd>/<session>.jsonl に書かせない（spec §13.3）。
 # SDK の transport は既定でこのフラグを付けない
 NO_SESSION_PERSISTENCE: dict[str, str | None] = {"no-session-persistence": None}
+# setting_sources=["project"] は cwd と全ての祖先の CLAUDE.md も読む（system_prompt を
+# 文字列にしても止まらない）。リポジトリ直下の開発用 CLAUDE.md を変換の文脈に入れない
+NO_CLAUDE_MD_ENV: dict[str, str] = {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}
 _log = logging.getLogger(__name__)
 _MAX_TURNS_RE = re.compile(
     r"max(?:imum)?[\s_-]*(?:number[\s_-]+of[\s_-]+)?turns", re.IGNORECASE
@@ -168,6 +171,7 @@ def build_options(
         max_budget_usd=settings.pipeline_max_budget_usd,
         system_prompt=SYSTEM_PROMPT,
         extra_args=dict(NO_SESSION_PERSISTENCE),
+        env=dict(NO_CLAUDE_MD_ENV),
     )
 
 

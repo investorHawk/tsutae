@@ -138,6 +138,7 @@ def test_check6_options_are_small_and_close_to_build_options(
     assert options.disallowed_tools == list(DISALLOWED_TOOLS)
     assert options.permission_mode == "dontAsk"
     assert options.extra_args == {"no-session-persistence": None}
+    assert options.env == {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}
     assert list(options.mcp_servers) == [SERVER_NAME]  # type: ignore[arg-type]
     assert options.agents is None and options.skills is None
     assert options.max_turns == smoke.CHECK6_MAX_TURNS <= 8

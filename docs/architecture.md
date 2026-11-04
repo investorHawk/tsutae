@@ -378,6 +378,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - React 18 + Vite 5 + TypeScript + react-router 6。vitest + Testing Library（jsdom）。Prettier（2 スペース、セミコロンあり）
 - 開発時は Vite の proxy で `/api` → `http://127.0.0.1:8000`（uvicorn の既定の待ち受け。macOS では localhost が ::1 に解決され届かないため）
 - ルート: 患者 `/register` `/today` `/history` `/visit`、医師 `/doctor/login` `/doctor`（印刷待ち） `/doctor/patients` `/doctor/patients/:pid` `/doctor/settings` `/doctor/pipeline/:visitId` `/doctor/unprocessed/:visitId`
+  - `/doctor/settings`（D4。v1.1・T96）は画面の中のタブで2つに分ける（経路は1つのまま）: 「レジメン」＝左のフォーム＋右のチャット（`components/doctor/regimen/`。タブを開くと `POST /regimen-drafts {skill}` で版 N+1 の下書き、「＋ 新しいレジメン」は `{from: "new"}`。確認 → 採用 → 登録済み）／「レポートの形式（一文で頼む）」＝旧 D4 の一文 → 差分 → 承認（`pages/doctor/ReportFormatSettings.tsx`。選べるのは `report-format-*` だけ、初めは `report-format-default`）。一度開いた種類は描いたまま `hidden` で隠す（往復の最中に種類を替えても下書きの画面を失わない）
 - 患者画面の文字列は `usePatientStrings().t(key)` からのみ出す（直書きしない。テストで検査）。質問文は API の `questions[].text`
 - 型は `src/api/types.ts`（schemas.py の API に出る部分を写す）、呼び出しは `src/api/patient.ts` `src/api/doctor.ts`
 - **W2b の決定**: 患者 API・医師 API の 2xx 応答は実行時に形を検査し、違えば `error.network` 相当の表示にする（真っ白にしない）。患者側・医師側とも ErrorBoundary を置く。患者画面の直書き検査は「患者のファイルの文字列リテラルに日本語を含めない」「JSX のテキストに英字を書かない」の2つ（変数経由の英字は検査の外。既知の限界として README に書く）。Skill 変更の差分が空なら失敗として扱い承認させない。`Course.note` は200字まで（schemas.py で強制）

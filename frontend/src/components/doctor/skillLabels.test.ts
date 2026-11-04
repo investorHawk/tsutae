@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isReportFormatSkill,
   skillDisplayName,
   skillOptionLabel,
   versionLabel,
@@ -47,5 +48,15 @@ describe("skillOptionLabel", () => {
     expect(
       skillOptionLabel({ name: "report-format-default", version: 3 }),
     ).toBe("レポートの形式（第3版）");
+  });
+});
+
+describe("isReportFormatSkill", () => {
+  it("report-format-* だけ（レジメンは D4 レジメンの画面で直す）", () => {
+    expect(isReportFormatSkill("report-format-default")).toBe(true);
+    expect(isReportFormatSkill("report-format-short")).toBe(true);
+    expect(isReportFormatSkill("regimen-folfox")).toBe(false);
+    expect(isReportFormatSkill("regimen-capox")).toBe(false);
+    expect(isReportFormatSkill("report-format-")).toBe(false);
   });
 });

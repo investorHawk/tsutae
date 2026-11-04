@@ -3,7 +3,7 @@ import { isUsableDiff } from "./diff";
 import DiffView from "./DiffView";
 import { formatDateTime } from "./format";
 import { isWorking } from "./skillChangeWork";
-import { skillDisplayName } from "./skillLabels";
+import { isReportFormatSkill, skillDisplayName } from "./skillLabels";
 
 const STATUS_LABELS: Readonly<Record<SkillChangeStatus, string>> = {
   pending: "承認待ち",
@@ -31,7 +31,11 @@ interface SkillChangeHistoryProps {
   onReview: (change: SkillChange) => void;
 }
 
-/** D4 の変更の履歴（新しい順で渡す）。承認待ちは「確認する」で差分を開ける（差分が空なら出さない）。 */
+/**
+ * D4 の変更の履歴（新しい順で渡す）。承認待ちは「確認する」で差分を開ける（差分が空なら出さない）。
+ * レジメン（T95 より前に一文で頼んだ regimen-*）の承認待ちは、承認しても反映できないので
+ * 「確認する」を出さず、レジメンの画面へ案内する。
+ */
 export default function SkillChangeHistory({
   changes,
   onReview,
@@ -75,10 +79,18 @@ export default function SkillChangeHistory({
             </td>
             <td>{versionText(change)}</td>
             <td>
-              {change.status === "pending" && isUsableDiff(change.diff) ? (
+              {change.status === "pending" &&
+              isUsableDiff(change.diff) &&
+              isReportFormatSkill(change.skill_name) ? (
                 <button type="button" onClick={() => onReview(change)}>
                   確認する
                 </button>
+              ) : null}
+              {change.status === "pending" &&
+              !isReportFormatSkill(change.skill_name) ? (
+                <p className="d-muted">
+                  レジメンは「レジメン」のタブで直します（この依頼は反映できません）
+                </p>
               ) : null}
               {change.diff ? (
                 <details>

@@ -4,9 +4,8 @@
  */
 import type { SkillInfo } from "../../api/types";
 
+/** 名前の決まった Skill（レジメンは識別名から作るので表に持たない。T95 で2つ固定を外した）。 */
 const KNOWN: Readonly<Record<string, string>> = {
-  "regimen-folfox": "FOLFOX の質問集",
-  "regimen-capox": "CAPOX の質問集",
   "report-format-default": "レポートの形式",
 };
 
@@ -25,6 +24,11 @@ export function skillDisplayName(name: string): string {
   }
   const report = REPORT_FORMAT.exec(name);
   return report ? `レポートの形式（${report[1]}）` : name;
+}
+
+/** 旧 D4（一文の書き換え）で選べる Skill か（report-format-* だけ。spec 9.2）。 */
+export function isReportFormatSkill(name: string): boolean {
+  return REPORT_FORMAT.test(name);
 }
 
 /** version → 「第N版」。 */

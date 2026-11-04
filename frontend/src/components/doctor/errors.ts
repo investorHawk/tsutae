@@ -56,6 +56,48 @@ const MESSAGES: Readonly<Record<string, string>> = {
   h1_blocked: "依頼の一文に個人を特定しうる語があるため送りませんでした",
   invalid_input: "入力の形が正しくありません",
   internal_error: "サーバーで想定外の失敗がありました",
+  // D4 レジメン（下書き・Claude の1往復・確認・採用。v1.1）
+  working:
+    "Claude の応答中です。返答が来てから、もう一度操作してください（左の欄は編集できません）",
+  not_open:
+    "この下書きはもう閉じています（採用か破棄の後です）。読み直してください",
+  conflict:
+    "読んでから保存するまでに、ほかの変更（Claude の返答など）が先に入りました。読み直したので、もう一度入れてください",
+  invalid_fields: "入れた値を保存できませんでした。欄の下の理由を見てください",
+  invalid_form:
+    "採用の前の検査に掛かりました。下の理由を見て、フォームを直してください",
+  token_mismatch:
+    "確認の画面を出した後に値が変わりました。確認の画面を出し直したので、もう一度確かめてください",
+  ai_values_unconfirmed:
+    "AI が入れた値を確かめていません。「上の値を全て確かめました」に印を付けてください",
+  schedule_locked:
+    "このレジメンには患者がいるため、1コースの日数・薬の Day・ポンプ抜去日は変えられません。変えるときは新しいレジメンとして作ってください",
+  code_taken:
+    "その識別名はもう使われています（ほかのレジメンか、開いている別の下書き）。別の識別名にしてください",
+  draft_exists:
+    "このレジメンには開いている下書きがあります。読み直してください",
+  form_unavailable:
+    "このレジメンの版にはフォームがありません（旧 D4 で作った版）。新しいレジメンとして作ってください",
+  render_failed: "フォームから SKILL.md を描けませんでした",
+  key_taken: "その key はもう使われています（部品集の外した問も含む）",
+  unknown_row: "その行はもうありません。読み直してください",
+  code_locked: "既存のレジメンの識別名は変えられません",
+};
+
+/**
+ * D4 レジメンの画面だけで意味の変わる code（旧 D4 の Skill の書き換えと同じ code）。
+ * 画面は `describeRegimenError` で引く（無ければ共通の表）。
+ */
+const REGIMEN_MESSAGES: Readonly<Record<string, string>> = {
+  stale:
+    "下書きを作った後にこのレジメンの版が変わりました。この下書きを捨てて、開き直してください",
+  version_conflict:
+    "このレジメンの版が合わないため採用できません。この下書きを捨てて、開き直してください",
+  timeout:
+    "Claude の返答が時間内に来ませんでした。フォームは変わっていません。もう一度送ってください",
+  h1_blocked:
+    "個人を特定しうる表現の疑いがあるため、送りませんでした（保存もしていません）",
+  busy: "ほかの採用・保存を処理中です。少し待ってからもう一度押してください",
 };
 
 export function errorCode(err: unknown): string {
@@ -68,4 +110,9 @@ export function isUnauthorized(err: unknown): boolean {
 
 export function describeError(code: string): string {
   return MESSAGES[code] ?? MESSAGES[UNKNOWN_ERROR];
+}
+
+/** D4 レジメンの画面の説明（同じ code でも旧 D4 と意味の違うものを先に引く）。 */
+export function describeRegimenError(code: string): string {
+  return REGIMEN_MESSAGES[code] ?? describeError(code);
 }

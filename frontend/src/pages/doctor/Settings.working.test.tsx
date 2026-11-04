@@ -16,15 +16,15 @@ import {
 import { SKILL_HISTORY_POLL_MS } from "../../components/doctor/useSkillChangeWatch";
 import { jsonResponse } from "../../test/fetchMock";
 import { skillContentRoutes } from "../../components/doctor/skillTesting";
-import Settings from "./Settings";
+import ReportFormatSettings from "./ReportFormatSettings";
 
 const SKILLS = "GET /api/doctor/skills";
 const CHANGES = "GET /api/doctor/skill-changes";
 const CREATE = "POST /api/doctor/skill-changes";
 const REQUEST = "口内炎は、食事がとれたかも次から聞いて";
 const DIFF = [
-  "--- a/regimen-folfox/SKILL.md",
-  "+++ b/regimen-folfox/SKILL.md",
+  "--- a/report-format-default/SKILL.md",
+  "+++ b/report-format-default/SKILL.md",
   "@@ -1,2 +1,2 @@",
   "-version: 1",
   "+version: 2",
@@ -34,7 +34,7 @@ const NOW = new Date("2026-11-09T10:00:30+09:00");
 function change(patch: Partial<SkillChange>): SkillChange {
   return {
     id: 5,
-    skill_name: "regimen-folfox",
+    skill_name: "report-format-default",
     requested_text: REQUEST,
     diff: null,
     status: "pending",
@@ -48,7 +48,7 @@ function change(patch: Partial<SkillChange>): SkillChange {
 }
 
 const SKILL_LIST = {
-  skills: [{ name: "regimen-folfox", version: 1 }],
+  skills: [{ name: "report-format-default", version: 1 }],
   invalid: [],
 };
 
@@ -57,7 +57,7 @@ function api(
   extra: Record<string, RouteValue> = {},
 ) {
   return mockApi({
-    ...skillContentRoutes(["regimen-folfox"]),
+    ...skillContentRoutes(["report-format-default"]),
     [SKILLS]: SKILL_LIST,
     [CHANGES]: () => jsonResponse({ skill_changes: changes() }),
     ...extra,
@@ -94,7 +94,11 @@ async function advance(ms: number) {
 }
 
 function renderSettings() {
-  return renderRoute("/doctor/settings", "/doctor/settings", <Settings />);
+  return renderRoute(
+    "/doctor/settings",
+    "/doctor/settings",
+    <ReportFormatSettings />,
+  );
 }
 
 function historyRow(id: number): HTMLElement {
@@ -164,7 +168,7 @@ describe("Settings: 作業中の変更", () => {
     api(() => [], { [CREATE]: () => pending.promise });
     renderSettings();
     const u = user();
-    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+    await screen.findByRole("option", { name: /レポートの形式（第/ });
     await u.type(screen.getByLabelText("変えたいこと（一文）"), REQUEST);
     await u.click(screen.getByRole("button", { name: "書き換えを依頼する" }));
     const note = screen.getByRole("status");
@@ -192,7 +196,7 @@ describe("Settings: 作業中の変更", () => {
     });
     renderSettings();
     const u = user();
-    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+    await screen.findByRole("option", { name: /レポートの形式（第/ });
     await u.type(screen.getByLabelText("変えたいこと（一文）"), REQUEST);
     await u.click(screen.getByRole("button", { name: "書き換えを依頼する" }));
     expect(await screen.findByText(/経過 30 秒/)).toBeInTheDocument();

@@ -1,0 +1,485 @@
+/* D4 レジメン（フォーム＋チャット）。色・文言・状態は docs/reference/d4-regimen-mock.dc.html が正。
+   欄の4つの状態は色と文字の札の両方で出す（色だけに頼らない）。 */
+
+.doctor-app .rf-kind-tabs,
+.doctor-app .rf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 12px;
+}
+
+.doctor-app .rf-kind-tabs {
+  gap: 4px;
+  border-bottom: 1px solid var(--d-border);
+}
+
+.doctor-app button.rf-kind-tab {
+  min-height: 44px;
+  padding: 6px 14px;
+  font-weight: 700;
+  color: var(--d-muted);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+}
+
+.doctor-app button.rf-kind-tab--on {
+  color: var(--d-primary-strong);
+  border-bottom-color: var(--d-primary);
+}
+
+.doctor-app button.rf-tab {
+  min-height: 44px;
+  padding: 4px 14px;
+  font-weight: 700;
+  color: var(--d-primary);
+  background: #ffffff;
+  border: 2px solid var(--d-border);
+  border-radius: 8px;
+}
+
+.doctor-app button.rf-tab--on {
+  color: #ffffff;
+  background: var(--d-primary);
+  border-color: var(--d-primary);
+}
+
+.doctor-app .rf-tab-sub {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.doctor-app .rf-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.doctor-app .rf-main {
+  display: flex;
+  flex: 999 1 640px;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.doctor-app .rf-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+}
+
+.doctor-app .rf-heading h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.doctor-app .rf-status {
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--d-warn-text);
+  background: var(--d-warn-bg);
+  border: 1px solid var(--d-warn-border);
+  border-radius: 999px;
+}
+
+.doctor-app .rf-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--d-muted);
+}
+
+.doctor-app .rf-legend-tag,
+.doctor-app .rf-tag,
+.doctor-app .rf-count {
+  display: inline-block;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.doctor-app .rf-legend-tag--missing {
+  color: #8c0f3f;
+  background: #fde6ee;
+  border: 1px solid #c2185b;
+}
+
+.doctor-app .rf-legend-tag--asked {
+  color: #a30000;
+  background: #ffffff;
+  border: 2px solid #c40000;
+}
+
+.doctor-app .rf-legend-tag--ai,
+.doctor-app .rf-count {
+  color: #8a4300;
+  background: #fff6ea;
+  border: 1px dashed #b85c00;
+}
+
+.doctor-app .rf-legend-tag--doc {
+  color: var(--d-primary-strong);
+  background: #ffffff;
+  border: 2px solid var(--d-primary);
+}
+
+/* --- 節と欄 ------------------------------------------------------------- */
+
+.doctor-app .rf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.doctor-app .rf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: #ffffff;
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  scroll-margin-top: 16px;
+}
+
+.doctor-app .rf-section--asked {
+  border: 2px solid #c40000;
+  box-shadow: 0 0 0 3px #f6c4c4;
+}
+
+.doctor-app .rf-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doctor-app .rf-section-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.doctor-app .rf-section-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.doctor-app .rf-section--asked .rf-section-tools .rf-tag {
+  color: #a30000;
+  border: 2px solid #c40000;
+}
+
+.doctor-app .rf-empty {
+  margin: 0;
+  padding: 10px 14px;
+  color: #5c0a29;
+  background: #fde6ee;
+  border: 2px dashed #c2185b;
+  border-radius: 8px;
+}
+
+.doctor-app .rf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.doctor-app .rf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.doctor-app .rf-field-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.doctor-app .rf-field input,
+.doctor-app .rf-field select,
+.doctor-app .rf-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 10px;
+  background: #ffffff;
+  border: 2px solid var(--d-border);
+  border-radius: 6px;
+}
+
+.doctor-app .rf-field--missing input,
+.doctor-app .rf-field--missing select,
+.doctor-app .rf-field--missing textarea {
+  background: #fde6ee;
+  border-color: #c2185b;
+}
+
+.doctor-app .rf-field--asked input,
+.doctor-app .rf-field--asked select,
+.doctor-app .rf-field--asked textarea {
+  border-color: #c40000;
+  box-shadow: 0 0 0 3px #f6c4c4;
+}
+
+.doctor-app .rf-field--ai input,
+.doctor-app .rf-field--ai select,
+.doctor-app .rf-field--ai textarea {
+  background: #fff6ea;
+  border: 2px dashed #b85c00;
+}
+
+.doctor-app .rf-field--doc input,
+.doctor-app .rf-field--doc select,
+.doctor-app .rf-field--doc textarea {
+  border-color: var(--d-primary);
+}
+
+.doctor-app .rf-field .rf-tag {
+  align-self: flex-start;
+  padding: 0;
+}
+
+.doctor-app .rf-field--missing .rf-tag {
+  color: #8c0f3f;
+}
+
+.doctor-app .rf-field--asked .rf-tag {
+  color: #a30000;
+}
+
+.doctor-app .rf-field--ai .rf-tag {
+  color: #8a4300;
+}
+
+.doctor-app .rf-field--doc .rf-tag {
+  color: var(--d-primary-strong);
+}
+
+.doctor-app .rf-field-error {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--d-danger);
+}
+
+.doctor-app .rf-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.doctor-app .rf-locked-note {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--d-warn-text);
+  background: var(--d-warn-bg);
+  border: 1px solid var(--d-warn-border);
+  border-radius: 6px;
+}
+
+.doctor-app .rf-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.doctor-app .rf-table-wrap {
+  overflow-x: auto;
+}
+
+.doctor-app .rf-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.doctor-app .rf-table th {
+  padding: 0 6px 4px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--d-muted);
+}
+
+.doctor-app .rf-table td {
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+.doctor-app button.rf-row-delete {
+  min-height: 36px;
+  color: var(--d-danger);
+  border-color: var(--d-danger);
+}
+
+/* --- Day の帯 ------------------------------------------------------------ */
+
+.doctor-app .rf-daybar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.doctor-app .rf-daybar-row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.doctor-app .rf-daybar-name {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doctor-app .rf-daybar-note {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--d-muted);
+}
+
+.doctor-app .rf-daybar-cells {
+  display: grid;
+  gap: 2px;
+}
+
+.doctor-app .rf-daybar-day {
+  font-size: 11px;
+  text-align: center;
+  color: var(--d-muted);
+}
+
+.doctor-app .rf-daybar-cell,
+.doctor-app .rf-swatch {
+  height: 16px;
+  background: #e6e8ec;
+  border-radius: 3px;
+}
+
+.doctor-app .rf-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+}
+
+.doctor-app .rf-daybar-cell--infusion {
+  background: #1a4f8b;
+}
+
+.doctor-app .rf-daybar-cell--oral {
+  background: #1b7a3a;
+}
+
+.doctor-app .rf-daybar-cell--pump {
+  background: #6b4fa0;
+}
+
+.doctor-app .rf-daybar-cell--none {
+  background: #8a8f98;
+}
+
+.doctor-app .rf-daybar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--d-muted);
+}
+
+/* --- 質問 --------------------------------------------------------------- */
+
+.doctor-app .rf-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doctor-app .rf-question {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 150px 70px 80px;
+  gap: 8px;
+  align-items: start;
+}
+
+.doctor-app .rf-question-type,
+.doctor-app .rf-question-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 22px;
+  font-size: 13px;
+}
+
+.doctor-app .rf-fixed-rule {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--d-surface);
+  border-radius: 6px;
+}
+
+/* --- 下のバー ------------------------------------------------------------ */
+
+.doctor-app .rf-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+}
+
+.doctor-app .rf-bar--sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+
+.doctor-app .rf-bar button {
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.doctor-app .rf-bar-note {
+  font-size: 14px;
+}
+
+.doctor-app .rf-notice {
+  margin: 0;
+  padding: 8px 12px;
+  background: #e8f0fa;
+  border: 1px solid var(--d-primary);
+  border-radius: 6px;
+}

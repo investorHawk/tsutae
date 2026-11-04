@@ -1,114 +1,76 @@
 import { useState } from "react";
-
-/** デモ患者の regimen。最初はこれを選んでおく（無ければ一覧の先頭） */
-const DEFAULT_SKILL = "regimen-folfox";
-import ErrorNote from "../../components/doctor/ErrorNote";
-import SkillChangeHistory from "../../components/doctor/SkillChangeHistory";
-import SkillContentPanel from "../../components/doctor/SkillContentPanel";
-import SkillInvalidList from "../../components/doctor/SkillInvalidList";
-import SkillPhaseNote from "../../components/doctor/SkillPhaseNote";
-import SkillRequestForm from "../../components/doctor/SkillRequestForm";
-import SkillReview from "../../components/doctor/SkillReview";
-import SkillSteps from "../../components/doctor/SkillSteps";
-import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
-import { useSkillCatalog } from "../../components/doctor/useSkillCatalog";
-import { useSkillChangeFlow } from "../../components/doctor/useSkillChangeFlow";
-import { useSkillChangeWatch } from "../../components/doctor/useSkillChangeWatch";
-import { useSkillContent } from "../../components/doctor/useSkillContent";
+import RegimenSettings from "../../components/doctor/regimen/RegimenSettings";
+import { moveTabFocus } from "../../components/doctor/tabKeys";
+import ReportFormatSettings from "./ReportFormatSettings";
 import "../../components/doctor/doctor-ui.css";
 import "../../components/doctor/settings.css";
 
+type SettingsTab = "regimen" | "report-format";
+
+const TABS: readonly { key: SettingsTab; label: string }[] = [
+  { key: "regimen", label: "レジメン" },
+  { key: "report-format", label: "レポートの形式（一文で頼む）" },
+];
+
+function Panel({ tab }: { tab: SettingsTab }) {
+  return tab === "regimen" ? <RegimenSettings /> : <ReportFormatSettings />;
+}
+
 /**
- * D4 設定を変える。一文 → Agent SDK が SKILL.md の一時コピーを書き換え → 差分 → 承認／却下。
- * 履歴に作業中（pending・diff なし）の変更があれば、終わるまで生成中と出してフォームを止める。
- * 上に「依頼を書く → 差分を見る → 承認して反映」の段階を出し、依頼の前に選んだ Skill の
- * 今の中身（読み取り専用）を見せる。
+ * D4 設定を変える（v1.1）。「レジメン」はフォーム＋チャット（spec 9.1）、
+ * 「レポートの形式」は旧 D4 の一文 → 差分 → 承認（spec 9.2。report-format-* だけ）。
+ * 一度開いた種類は描いたまま隠す（Claude の往復の最中・欄に入れている途中で種類を
+ * 替えても、下書きの画面の状態・返ってきた往復の結果を失わない）。
  */
 export default function Settings() {
-  const handleError = useDoctorApiError();
-  const catalog = useSkillCatalog(handleError);
-  const [chosen, setChosen] = useState("");
-  const [requestText, setRequestText] = useState("");
-  const flow = useSkillChangeFlow({
-    handleError,
-    onCreated: () => void catalog.reloadHistory(),
-    onDecided: (approved) => {
-      if (approved) {
-        setRequestText("");
-      }
-      void catalog.reloadSkills();
-      void catalog.reloadHistory();
-    },
-  });
-  const { phase } = flow;
-  useSkillChangeWatch({
-    phase,
-    history: catalog.history,
-    reloadHistory: catalog.reloadHistory,
-    watch: flow.watch,
-    settle: flow.settle,
-  });
-  const skillName = catalog.skills.some((s) => s.name === chosen)
-    ? chosen
-    : (catalog.skills.find((s) => s.name === DEFAULT_SKILL)?.name ??
-      catalog.skills[0]?.name ??
-      "");
-  const locked = phase.kind === "generating" || phase.kind === "review";
-  const version =
-    catalog.skills.find((s) => s.name === skillName)?.version ?? null;
-  const content = useSkillContent(skillName, version, handleError);
+  const [tab, setTab] = useState<SettingsTab>("regimen");
+  const [opened, setOpened] = useState<readonly SettingsTab[]>(["regimen"]);
+
+  function choose(next: SettingsTab) {
+    setTab(next);
+    setOpened((prev) => (prev.includes(next) ? prev : [...prev, next]));
+  }
 
   return (
     <section className="page">
       <h1>設定を変える</h1>
-      <p className="d-muted">
-        質問集（regimen）やレポートの形式（report-format）を、一文で頼んで書き換えます。
-        差分を見て承認したものだけが反映されます。
-      </p>
-      <SkillSteps phase={phase} />
-      {catalog.skillsError ? (
-        <ErrorNote
-          code={catalog.skillsError}
-          prefix="Skill の一覧を読み込めません"
-        />
-      ) : null}
-      <SkillInvalidList items={catalog.invalid} />
-      {catalog.historyError ? (
-        <ErrorNote
-          code={catalog.historyError}
-          prefix="変更の履歴を読み込めません"
-        />
-      ) : null}
-      <SkillRequestForm
-        skills={catalog.skills}
-        skillName={skillName}
-        requestText={requestText}
-        locked={locked}
-        onSkillChange={setChosen}
-        onTextChange={setRequestText}
-        onSubmit={() => void flow.request(skillName, requestText.trim())}
-        preview={
-          <SkillContentPanel
-            skillName={skillName}
-            version={version}
-            state={content}
-          />
-        }
-      />
-      <SkillPhaseNote phase={phase} history={catalog.history ?? []} />
-      {phase.kind === "review" ? (
-        <SkillReview
-          target={phase.target}
-          busy={phase.busy}
-          error={phase.error}
-          onApprove={() => void flow.decide(true)}
-          onReject={() => void flow.decide(false)}
-        />
-      ) : null}
-      <h2>履歴</h2>
-      {catalog.history ? (
-        <SkillChangeHistory changes={catalog.history} onReview={flow.review} />
-      ) : null}
+      <div
+        className="rf-kind-tabs"
+        role="tablist"
+        aria-label="設定の種類"
+        onKeyDown={moveTabFocus}
+      >
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            id={`settings-tab-${t.key}`}
+            aria-selected={tab === t.key}
+            aria-controls={
+              opened.includes(t.key) ? `settings-panel-${t.key}` : undefined
+            }
+            tabIndex={tab === t.key ? 0 : -1}
+            className={
+              tab === t.key ? "rf-kind-tab rf-kind-tab--on" : "rf-kind-tab"
+            }
+            onClick={() => choose(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {TABS.filter((t) => opened.includes(t.key)).map((t) => (
+        <div
+          key={t.key}
+          id={`settings-panel-${t.key}`}
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${t.key}`}
+          hidden={tab !== t.key}
+        >
+          <Panel tab={t.key} />
+        </div>
+      ))}
     </section>
   );
 }

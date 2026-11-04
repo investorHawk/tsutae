@@ -180,5 +180,12 @@
 | 変換エージェントの `ClaudeAgentOptions` に `env={"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}`（`NO_CLAUDE_MD_ENV`）を足す。スモークの `base_options` も同じにする | 公式ドキュメント（agent-sdk/claude-code-features）では、`setting_sources=["project"]` は cwd と全ての祖先の CLAUDE.md を読み、`system_prompt` を文字列にしても止まらない。cwd=`backend/skills_home` なので、何もしないと直下の CLAUDE.md が患者記録の変換の文脈に入る。同梱 CLI がこの変数を読むことは確認済み。Skill の書き換え（editor）は `setting_sources=[]` なので対象外 |
 | 確認: この変数を付けたスモーク（2026-11-04 13:04、先生が実行。`docs/eval/smoke-2026-11-04-1304.json`）で 1〜7 が全て OK。3（cwd の Skill の読み込み）も `HAMAGURI-42` を返し、CLAUDE.md を切っても Skill は読まれる | スモークの cwd は一時フォルダなので、直下の CLAUDE.md が入らないことそのものは確かめていない（変数が CLAUDE.md の読み込みを止めることは公式記載と同梱 CLI で確認） |
 
+### UI の見直し（2026-11-04、Artifact の修正ボードで一件ずつ）
+全画面を実際に起動して撮り（一時 DB・合成データ・API を呼ばない偽物の変換）、直す点を ID 付きでボードに並べ、先生が選んだ順に直す。
+
+| 決めたこと | 理由 |
+|---|---|
+| DC-1: 医師画面の全ページ（ログイン画面を含む）の上端に「デモ用の画面です。症例は全て架空（合成データ）です。」の帯を出す。`DoctorLayout` に置き、`position: sticky` でスクロールしても残す | 審査員レビュー B3。動画の半分は医師画面で、台本 0 の「常に出ている」を満たすため。`DoctorShell`（ログイン後だけ）ではなく外枠に置いてログイン画面も覆う。患者画面のように下端に置くと、長い変換ログでは映らない |
+
 ## 未決（先生の判断待ち）
 なし

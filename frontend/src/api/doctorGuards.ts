@@ -371,6 +371,29 @@ export const isSkillChangesResponse = hasList("skill_changes", isSkillChange);
 
 const isAnswerType = oneOf(["three_level", "temperature"] as const);
 
+const isQuestionOrigin = oneOf(["seed", "doctor", "adopted"] as const);
+
+/** 部品集の1問 {key, label, text, answer_type, origin}。 */
+function isLibraryQuestion(v: Item): boolean {
+  return (
+    isString(v.key) &&
+    isString(v.label) &&
+    isString(v.text) &&
+    isAnswerType(v.answer_type) &&
+    isQuestionOrigin(v.origin)
+  );
+}
+
+export const isQuestionLibraryResponse = hasList(
+  "questions",
+  isLibraryQuestion,
+);
+
+/** POST question-library の応答 {question}。 */
+export function isAddLibraryQuestionResponse(v: Item): boolean {
+  return isRecord(v.question) && isLibraryQuestion(v.question);
+}
+
 /** Skill の中身の質問 {key, text, answer_type}。 */
 function isSkillQuestion(v: Item): boolean {
   return isString(v.key) && isString(v.text) && isAnswerType(v.answer_type);

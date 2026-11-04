@@ -136,6 +136,9 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/doctor/skill-changes"),
         ("POST", "/api/doctor/skill-changes/{}/approve"),
         ("POST", "/api/doctor/skill-changes/{}/reject"),
+        ("GET", "/api/doctor/question-library"),
+        ("POST", "/api/doctor/question-library"),
+        ("DELETE", "/api/doctor/question-library/{}"),
     }
 )
 
@@ -145,6 +148,8 @@ _INT_SEGMENT = re.compile(r"/[0-9]+(?=/|$)")
 _SKILL_SEGMENT = re.compile(
     r"(?<=/api/doctor/skills)/(?:regimen|report-format)-[a-z0-9-]+$"
 )
+# DELETE /api/doctor/question-library/{key} の質問 key（QUESTION_KEY_PATTERN の形）
+_LIBRARY_SEGMENT = re.compile(r"(?<=/api/doctor/question-library)/[a-z][a-z0-9_]+$")
 _PARAM_SEGMENT = re.compile(r"/\{[^/}]+\}(?=/|$)")
 
 
@@ -154,7 +159,7 @@ class DumpError(RuntimeError):
 
 def route_template(path: str) -> str:
     """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id・Skill 名も `{}`）。"""
-    named = _SKILL_SEGMENT.sub("/{}", path)
+    named = _LIBRARY_SEGMENT.sub("/{}", _SKILL_SEGMENT.sub("/{}", path))
     return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", named))
 
 
@@ -714,6 +719,27 @@ def _skill_flow(rec: Recorder, home: Path) -> None:
     _skills_with_invalid(rec, home)
 
 
+def _question_library_flow(rec: Recorder) -> None:
+    """質問の部品集（初期の6問・追加・重複・外す・初期の問は外せない）。"""
+    base = "/api/doctor/question-library"
+    rec.call("doctor_question_library", "GET", base)
+    body = {
+        "key": "fatigue",
+        "label": "だるさ",
+        "text": "だるさや疲れやすさはありましたか",
+        "answer_type": "three_level",
+    }
+    rec.call("doctor_question_library_add", "POST", base, body)
+    rec.call("doctor_question_library_add_taken", "POST", base, body, expect=409)
+    rec.call("doctor_question_library_hide", "DELETE", f"{base}/fatigue")
+    rec.call(
+        "doctor_question_library_hide_seed",
+        "DELETE",
+        f"{base}/diarrhea",
+        expect=409,
+    )
+
+
 def _skills_with_invalid(rec: Recorder, home: Path) -> None:
     """壊れた任意の Skill を1つ置いて一覧を取る（必須の Skill は壊さない）。"""
     extra = _skill_dir(home, "regimen-extra")
@@ -745,6 +771,7 @@ def _run(app: FastAPI, home: Path) -> Dump:
         _visit_flow(rec)
         _patient_admin_flow(rec)
         _skill_flow(rec, home)
+        _question_library_flow(rec)
         rec.call("doctor_logout", "POST", "/api/doctor/logout")
         return Dump(
             fixtures=dict(sorted(rec.fixtures.items())),

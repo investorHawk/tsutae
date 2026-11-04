@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { apiFixture, fixtureBody, fixtureNames } from "../test/apiFixtures";
 import { validatePatientStrings } from "../strings/PatientStrings";
 import {
+  isAddLibraryQuestionResponse,
   isApproveResponse,
   isCoursesResponse,
   isCreatePatientResponse,
@@ -19,6 +20,7 @@ import {
   isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
+  isQuestionLibraryResponse,
   isSavedCourse,
   isSkillChangesResponse,
   isSkillContentResponse,
@@ -79,6 +81,9 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_skill_changes: isSkillChangesResponse,
   doctor_skill_change_approve: isApproveResponse,
   doctor_skill_change_reject: isDoctorOk,
+  doctor_question_library: isQuestionLibraryResponse,
+  doctor_question_library_add: isAddLibraryQuestionResponse,
+  doctor_question_library_hide: isDoctorOk,
 };
 
 function guardOf(name: string): Guard {
@@ -112,6 +117,30 @@ type Mutate = (body: any) => void;
 
 /** [fixture, 壊し方の説明, 壊す操作]。壊した本文は guard に拒まれる。 */
 const BROKEN: Array<[string, string, Mutate]> = [
+  // 質問の部品集（v1.1）
+  [
+    "doctor_question_library",
+    "label が無い",
+    (b) => delete b.questions[0].label,
+  ],
+  [
+    "doctor_question_library",
+    "未知の出どころ",
+    (b) => (b.questions[0].origin = "ai"),
+  ],
+  [
+    "doctor_question_library",
+    "未知の回答の型",
+    (b) => (b.questions[0].answer_type = "yes_no"),
+  ],
+  ["doctor_question_library", "questions が無い", (b) => delete b.questions],
+  [
+    "doctor_question_library_add",
+    "question が null",
+    (b) => (b.question = null),
+  ],
+  ["doctor_question_library_add", "text が数", (b) => (b.question.text = 1)],
+  ["doctor_question_library_hide", "ok が false", (b) => (b.ok = false)],
   // 印刷待ち一覧（W3 後の決定）
   ["doctor_visits", "状態が printed", (b) => (b.visits[0].status = "printed")],
   ["doctor_visits", "未知の状態", (b) => (b.visits[0].status = "done")],

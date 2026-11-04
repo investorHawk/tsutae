@@ -4,6 +4,7 @@
  * （§9 W2b の決定。{ok:false} を成功として扱わない）。
  */
 import {
+  isAddLibraryQuestionResponse,
   isApproveResponse,
   isCoursesResponse,
   isCreatePatientResponse,
@@ -13,6 +14,7 @@ import {
   isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
+  isQuestionLibraryResponse,
   isSavedCourse,
   isSkillChangesResponse,
   isSkillContentResponse,
@@ -22,8 +24,10 @@ import {
   isUnprocessedResponse,
   isVisitsResponse,
 } from "./doctorGuards";
-import { getJson, isApiError, postJson, seg } from "./http";
+import { deleteJson, getJson, isApiError, postJson, seg } from "./http";
 import type {
+  AddLibraryQuestionRequest,
+  AddLibraryQuestionResponse,
   ApproveSkillChangeResponse,
   CoursesResponse,
   Course,
@@ -42,6 +46,7 @@ import type {
   PatientVisitsResponse,
   PatientsResponse,
   PipelineEventsResponse,
+  QuestionLibraryResponse,
   Regimen,
   RejectSkillChangeResponse,
   SkillChangesResponse,
@@ -297,6 +302,42 @@ export function rejectSkillChange(
 ): Promise<RejectSkillChangeResponse> {
   return postChecked<RejectSkillChangeResponse>(
     `/api/doctor/skill-changes/${seg(id)}/reject`,
+    isOkTrue,
+  );
+}
+
+// --- 質問の部品集（D4 レジメンの小窓。v1.1） ---------------------------------
+
+export function listQuestionLibrary(): Promise<QuestionLibraryResponse> {
+  return getChecked<QuestionLibraryResponse>(
+    "/api/doctor/question-library",
+    isQuestionLibraryResponse,
+  );
+}
+
+/**
+ * 1問を足す。形・H1 に掛かれば 422（code は invalid_key・h1_blocked など）、key の
+ * 重複（外した key も）は 409 key_taken。
+ */
+export function addLibraryQuestion(
+  body: AddLibraryQuestionRequest,
+): Promise<AddLibraryQuestionResponse> {
+  return postChecked<AddLibraryQuestionResponse>(
+    "/api/doctor/question-library",
+    isAddLibraryQuestionResponse,
+    body,
+  );
+}
+
+/**
+ * 選択肢から外す（行は残る。何度呼んでもよい）。初期の6問は 409 seed_question、
+ * どれかの版が使っている key は 409 in_use。
+ */
+export async function hideLibraryQuestion(key: string): Promise<OkResponse> {
+  return checked<OkResponse>(
+    await deleteJson<unknown>(`/api/doctor/question-library/${seg(key)}`, {
+      timeoutMs: DOCTOR_TIMEOUT_MS,
+    }),
     isOkTrue,
   );
 }

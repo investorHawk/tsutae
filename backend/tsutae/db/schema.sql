@@ -133,3 +133,15 @@ CREATE TABLE IF NOT EXISTS skill_versions (
     approved_at TEXT NOT NULL,
     PRIMARY KEY (skill_name, version)
 );
+
+-- 質問の部品集（v1.1。spec 9.1）。D4 レジメンの画面の小窓で選ぶ候補。SKILL.md には影響しない。
+-- 削除は hidden=1（行は残す。消した key は作り直せない）。初期の6問は origin='seed'
+CREATE TABLE IF NOT EXISTS question_library (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    text TEXT NOT NULL,
+    answer_type TEXT NOT NULL CHECK (answer_type IN ('three_level', 'temperature')),
+    origin TEXT NOT NULL CHECK (origin IN ('seed', 'doctor', 'adopted')),
+    hidden INTEGER NOT NULL DEFAULT 0 CHECK (hidden IN (0, 1)),
+    created_at TEXT NOT NULL
+);

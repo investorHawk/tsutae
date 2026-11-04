@@ -30,7 +30,7 @@ export function isApiError(value: unknown): value is ApiError {
   return value instanceof ApiError;
 }
 
-type Method = "GET" | "POST";
+type Method = "GET" | "POST" | "DELETE";
 
 export interface RequestOptions {
   /**
@@ -134,6 +134,14 @@ export function postJson<T>(
   options?: RequestOptions,
 ): Promise<T> {
   return request<T>("POST", path, body, options);
+}
+
+/** 本文の無い DELETE（質問の部品集から外すなど）。 */
+export function deleteJson<T>(
+  path: string,
+  options?: RequestOptions,
+): Promise<T> {
+  return request<T>("DELETE", path, undefined, options);
 }
 
 /** 経路の一部に入れる値を URL エンコードする。 */

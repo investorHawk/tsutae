@@ -5,7 +5,8 @@
   `tsutae.skillchange` が無ければ None）・skills_home を置く
 - create_app は設定を検査する（`settings_check`。公開の構成で既定の鍵・パスワードなら
   `InsecureSettingsError` で起動しない。手元では警告だけ）
-- 起動時（lifespan）に `init_db`・`ensure_skill_versions`・`purge_expired`。起動中は
+- 起動時（lifespan）に `init_db`・`ensure_skill_versions`・`seed_question_library`
+  （質問の部品集の初期6問）・`purge_expired`。起動中は
   `PURGE_INTERVAL_S` ごとに `purge_once` を回す周期タスク（`app.state.purge_task`）を
   置き、終了時に止める（医師 API が呼ばれなくても期限切れの中身を消す）
 - 起動時（purge の後・リクエストを受ける前）に1回だけ `orphans.recover_orphans`:
@@ -15,7 +16,8 @@
   （最後のログから pipeline_timeout_s + 120 秒以上）だけを同じやり方で救う
   （稼働中に生成が DB を開けずに抜けた受診を、再起動を待たずに回収する）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
-- 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`）は、モジュールがあれば
+- 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`・
+  `tsutae.api.doctor_question_library`）は、モジュールがあれば
   `router` を載せる（無ければ飛ばす。中の import の失敗は隠さない）
 - モジュールの `app` は初めて参照されたときに作る（`.env` もそのとき読む）
 """
@@ -52,7 +54,11 @@ __all__ = [
     "startup",
 ]
 
-OPTIONAL_ROUTERS = ("tsutae.api.doctor", "tsutae.api.doctor_skills")
+OPTIONAL_ROUTERS = (
+    "tsutae.api.doctor",
+    "tsutae.api.doctor_skills",
+    "tsutae.api.doctor_question_library",
+)
 SKILLCHANGE_MODULE = "tsutae.skillchange"
 PURGE_INTERVAL_S = 600.0
 _log = logging.getLogger(__name__)
@@ -65,6 +71,7 @@ def startup(settings: Settings) -> int:
     try:
         db.init_db(conn)
         ensure_skill_versions(conn, settings.skills_dir)
+        db.seed_question_library(conn)
         return db.purge_expired(conn, now())
     finally:
         conn.close()

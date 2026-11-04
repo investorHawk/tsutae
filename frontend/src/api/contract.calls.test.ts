@@ -10,16 +10,19 @@ import { apiFixture, fixtureNames, type ApiFixture } from "../test/apiFixtures";
 import { callOf, jsonResponse, mockFetch } from "../test/fetchMock";
 import { validatePatientStrings } from "../strings/PatientStrings";
 import {
+  addLibraryQuestion,
   approveSkillChange,
   checkMasks,
   createPatient,
   createSkillChange,
   getPipelineEvents,
   getSkill,
+  hideLibraryQuestion,
   listCourses,
   listPatientEntries,
   listPatientVisits,
   listPatients,
+  listQuestionLibrary,
   listSkillChanges,
   listSkills,
   listUnprocessed,
@@ -43,6 +46,7 @@ import {
   undoEntry,
 } from "./patient";
 import type {
+  AddLibraryQuestionRequest,
   Course,
   EntryCreate,
   MaskCheckRequest,
@@ -107,6 +111,11 @@ const change: Call = (f) =>
   createSkillChange(String(req(f).skill_name), String(req(f).request_text));
 const approve: Call = (f) => approveSkillChange(idIn(f));
 const reject: Call = (f) => rejectSkillChange(idIn(f));
+const addQuestion: Call = (f) =>
+  addLibraryQuestion(f.request as AddLibraryQuestionRequest);
+/** 経路の最後の質問 key（DELETE question-library/{key}）。 */
+const hideQuestion: Call = (f) =>
+  hideLibraryQuestion(f.path.replace(/^.*\//, ""));
 
 /** fixture の名前 → それを受け取る API の関数。全ての fixture に要る。 */
 const CALLS: Readonly<Record<string, Call>> = {
@@ -173,6 +182,11 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_skill_change_approve_not_pending: approve,
   doctor_skill_change_reject: reject,
   doctor_skill_change_reject_busy: reject,
+  doctor_question_library: () => listQuestionLibrary(),
+  doctor_question_library_add: addQuestion,
+  doctor_question_library_add_taken: addQuestion,
+  doctor_question_library_hide: hideQuestion,
+  doctor_question_library_hide_seed: hideQuestion,
 };
 
 const NAMES = fixtureNames();

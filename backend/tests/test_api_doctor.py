@@ -79,6 +79,7 @@ def test_routers_are_mounted(client: TestClient) -> None:
     assert client.app.state.optional_routers == (
         "tsutae.api.doctor",
         "tsutae.api.doctor_skills",
+        "tsutae.api.doctor_question_library",
     )
 
 

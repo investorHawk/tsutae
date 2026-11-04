@@ -448,3 +448,36 @@ export interface ApproveSkillChangeResponse {
 export interface RejectSkillChangeResponse {
   ok: true;
 }
+
+/** 質問の部品集の出どころ（初期の6問・医師が足した・採用したレジメンから）。 */
+export type QuestionOrigin = "seed" | "doctor" | "adopted";
+
+/** 質問の部品集の1問（D4 レジメンの小窓の候補。v1.1）。 */
+export interface LibraryQuestion {
+  key: string;
+  /** 医師画面の短い名前（例: しびれ） */
+  label: string;
+  text: string;
+  answer_type: AnswerType;
+  origin: QuestionOrigin;
+}
+
+/** GET /api/doctor/question-library（外した問は含まない。初期の6問が先）。 */
+export interface QuestionLibraryResponse {
+  questions: LibraryQuestion[];
+}
+
+/**
+ * POST /api/doctor/question-library。回答の型は3択だけ（体温は初期の fever だけ）。
+ * 形・H1 に掛かれば 422 {error, field}、key の重複（外した key も）は 409 key_taken。
+ */
+export interface AddLibraryQuestionRequest {
+  key: string;
+  label: string;
+  text: string;
+  answer_type?: "three_level";
+}
+
+export interface AddLibraryQuestionResponse {
+  question: LibraryQuestion;
+}

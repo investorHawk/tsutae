@@ -121,6 +121,8 @@ CAPOX の切り替え。どの場合も **T91 のバイト一致テスト・H1�
 - **`regimen_max_turns`=12・`regimen_max_budget_usd`=1.0 の見直し**: smoke の実測（往復ごとの SDK の回数と費用。`docs/eval/demo-regimen-*.json` の `turns[].sdk_turns`・`cost_usd` と `limits`）を見て決める。値は先生の smoke の後に記入
 - **spec §16 の行の直し**: spec の `GET /api/doctor/regimens/{name}/form` は作らず、`POST /api/doctor/regimen-drafts {skill}`（開いた下書きがあればそれを返す）で代えた（T96）。spec §16 の表をこれに合わせて直してよいか（spec の変更なので先生の確認が要る）
 
+- **最初にサーバーを起こす前に `data/tsutae.db` を写しておく**: 起動の `migrate_db` が、古い CHECK の残る `pipeline_logs`（T93）と `patients`（T95）を 12-step の作り直しで移行する。移行で全行が残ることは古い形を写した DB のテストで確かめたが、実際の `data/tsutae.db` ではまだ走らせていない（`.env` を読めないため）。例: `! cp data/tsutae.db data/tsutae.db.bak-20261105`
+
 smoke（先生が実行。サンドボックスの外）:
 
 ```

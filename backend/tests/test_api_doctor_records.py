@@ -85,6 +85,34 @@ def test_list_patients_has_record_course_and_next_visit(client: TestClient) -> N
     assert patient["next_visit"] == "2026-11-10"
 
 
+def _patient_with_next_visit(client: TestClient, next_visit: date) -> dict[str, Any]:
+    pid = add_patient(client.app, courses=C3)
+    with db_conn(client.app) as conn:
+        db.upsert_course(
+            conn,
+            Course(
+                patient_id=pid,
+                course_no=3,
+                infusion_date=date(2026, 10, 27),
+                next_visit=next_visit,
+            ),
+        )
+    return client.get("/api/doctor/patients").json()["patients"][0]
+
+
+def test_list_patients_past_next_visit_is_null(client: TestClient) -> None:
+    """今日（2026-11-09）より前の次回受診予定日は出さない（画面は「—」）。"""
+    patient = _patient_with_next_visit(client, date(2026, 11, 8))
+    assert patient["current_course_no"] == 3
+    assert patient["next_visit"] is None
+
+
+def test_list_patients_next_visit_today_is_shown(client: TestClient) -> None:
+    """今日の次回受診予定日は過去ではないので出す。"""
+    patient = _patient_with_next_visit(client, date(2026, 11, 9))
+    assert patient["next_visit"] == "2026-11-09"
+
+
 def test_list_patients_without_records_or_courses_is_null(client: TestClient) -> None:
     add_patient(client.app)
     patient = client.get("/api/doctor/patients").json()["patients"][0]

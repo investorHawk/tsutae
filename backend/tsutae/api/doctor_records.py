@@ -1,7 +1,7 @@
 """医師 API の患者まわりの応答の形（D1 の一覧の追加項目・D2 の患者の受診と記録）。
 
 - 患者一覧: last_record_date（最後の記録日）・current_course_no（今日のコース。
-  `course.current_course` に `config.today()`）・next_visit（今のコースの次回受診予定日）。
+  `course.current_course` に `config.today()`）・next_visit（今のコースの次回受診予定日。今日より前なら null）。
   無ければ null。コースに矛盾があっても一覧は止めない（その患者は null）
 - 患者の受診: 印刷済み・期限切れも含めて新しい順。受付番号は消えていれば null。
   report_available はレポートを開ける（受付番号が残っている ready）か
@@ -35,16 +35,22 @@ def _iso(value: date | None) -> str | None:
 
 
 def course_summary(courses: Sequence[Course], today: date) -> dict[str, Any]:
-    """{current_course_no, next_visit}。今日より前に始まったコースが無ければ null。"""
+    """{current_course_no, next_visit}。今日より前に始まったコースが無ければ null。
+
+    next_visit は今日以降の予定日だけを出す（過去の予定日は null。画面は「—」）。
+    """
     try:
         current = current_course(courses, today)
     except CourseValidationError:
         current = None
     if current is None:
         return {"current_course_no": None, "next_visit": None}
+    upcoming = current.next_visit
+    if upcoming is not None and upcoming < today:
+        upcoming = None
     return {
         "current_course_no": current.course_no,
-        "next_visit": _iso(current.next_visit),
+        "next_visit": _iso(upcoming),
     }
 
 

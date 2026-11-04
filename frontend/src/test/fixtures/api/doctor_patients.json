@@ -21,7 +21,7 @@
         "register_url": "http://localhost:5173/register?pid=P-EVAL0001",
         "last_record_date": "2026-09-28",
         "current_course_no": 2,
-        "next_visit": "2026-09-28"
+        "next_visit": null
       },
       {
         "id": "P-EVAL0002",
@@ -30,7 +30,7 @@
         "register_url": "http://localhost:5173/register?pid=P-EVAL0002",
         "last_record_date": "2026-09-21",
         "current_course_no": 2,
-        "next_visit": "2026-09-21"
+        "next_visit": null
       },
       {
         "id": "P-NOCOURSE",

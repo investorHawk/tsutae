@@ -299,7 +299,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | 経路 | 応答 |
 |---|---|
 | `POST /api/patient/{pid}/entries/{entry_id}/undo` | `{ok: true}`。本人の「つらくて書けない」の記録で、作ってから10分以内（`UNDO_WINDOW`）・その後に受付が無いものだけ消す（`db.undo_too_sick_entry`）。他人の記録・無い記録は 404 `not_found`、条件に合わなければ 409 `not_undoable`（P2-5） |
-| `GET /api/doctor/patients`（追加項目） | 各患者に `last_record_date`・`current_course_no`（`config.today()` の今コース）・`next_visit`（今コースの次回受診予定日）。無ければ null（D3-2） |
+| `GET /api/doctor/patients`（追加項目） | 各患者に `last_record_date`・`current_course_no`（`config.today()` の今コース）・`next_visit`（今コースの次回受診予定日。今日より前なら null）。無ければ null（D3-2） |
 | `GET /api/doctor/patients/{pid}/visits` | その患者の受診を新しい順（印刷済み・期限切れも）。受付番号は消えていれば null、`report_available` は開ける ready か（D4-1） |
 | `GET /api/doctor/patients/{pid}/entries` | 直近30件と総数。クローズ回答はコードのまま、自由記載は有無（`has_free_text`）だけで原文は返さない（D4-1） |
 | `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | 各記録に `marks: [{start, end}]`（原文の中の疑われた語の位置、code point）。原文の中で見つからない区間には付けない（D7-2） |

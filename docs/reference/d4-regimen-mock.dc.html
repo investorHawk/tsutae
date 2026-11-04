@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>レジメンの設定</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#ffffff}
+a{color:#1a4f8b}a:hover{color:#0f3563}
+.dapp{font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,system-ui,sans-serif;font-size:15px;line-height:1.6;color:#111111;background:#ffffff}
+.dapp h1,.dapp h2,.dapp h3,.dapp p{margin-top:0}
+.dapp button,.dapp input,.dapp textarea{font:inherit;color:inherit}
+.dapp button{cursor:pointer}
+.dapp button:disabled{cursor:not-allowed;opacity:.5}
+.dapp :focus-visible{outline:3px solid #1a5fb4;outline-offset:2px}
+.btn{min-height:44px;padding:8px 18px;font-weight:700;border-radius:8px;border:2px solid #1a4f8b}
+.btn-primary{color:#ffffff;background:#1a4f8b}
+.btn-primary:hover{background:#0f3563;border-color:#0f3563}
+.btn-ghost{color:#1a4f8b;background:#ffffff}
+.btn-danger{color:#9b0000;background:#ffffff;border-color:#9b0000}
+.btn-sm{min-height:36px;padding:2px 12px;font-size:14px}
+.sec{padding:16px 18px;border:1px solid #c4c8cf;border-radius:10px;background:#ffffff;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+.sec-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.sec-h h2{margin:0;font-size:17px}
+.fld{display:flex;flex-direction:column;gap:2px;min-width:0;position:relative}
+.fld input{width:100%;box-sizing:border-box;min-height:40px;padding:4px 10px;background:#ffffff;border:2px solid #c4c8cf;border-radius:6px}
+.fld-tag{font-size:12px;font-weight:700}
+.f-miss input{background:#fde6ee;border-color:#c2185b}
+.f-miss .fld-tag{color:#8c0f3f}
+.f-asked input{border-color:#c40000;box-shadow:0 0 0 3px #f6c4c4}
+.f-asked .fld-tag{color:#a30000}
+.f-ai input{background:#fff6ea;border:2px dashed #b85c00}
+.f-ai .fld-tag{color:#8a4300}
+.f-doc input{border-color:#1a4f8b}
+.tbl .fld-tag,.qrow .fld-tag,.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.tag{display:inline-block;padding:0 8px;font-size:12px;font-weight:700;border-radius:999px;white-space:nowrap}
+.cnt{display:inline-flex;align-items:center;padding:0 10px;font-size:12.5px;font-weight:700;color:#8a4300;background:#fff6ea;border:1px dashed #b85c00;border-radius:999px;min-height:28px}
+.tbl{width:100%;border-collapse:collapse;min-width:640px}
+.tbl th{font-size:13px;font-weight:700;text-align:left;color:#4a4a4a;padding:0 6px 4px}
+.tbl td{padding:4px 6px;vertical-align:top}
+.tabbar{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid #c4c8cf}
+.tab{min-height:44px;padding:6px 14px;font-weight:700;color:#4a4a4a;background:none;border:none;border-bottom:3px solid transparent}
+.tab--on{color:#0f3563;border-bottom-color:#1a4f8b}
+.chip{min-height:40px;padding:4px 12px;font-size:14px;font-weight:700;color:#00448f;background:#ffffff;border:2px solid #00448f;border-radius:999px}
+.chip:hover{background:#e6eefa}
+.chip--on{color:#ffffff;background:#1a4f8b;border-color:#1a4f8b;opacity:1}
+.flink{min-height:32px;padding:2px 10px;font-size:13px;font-weight:700;color:#8a4300;background:#fff6ea;border:1px dashed #b85c00;border-radius:999px;text-decoration:none;display:inline-flex;align-items:center}
+.flink--doc{color:#0f3563;background:#e6eefa;border:1px solid #1a4f8b}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55}
+.pill{flex:1;padding:4px 0;text-align:center;font-size:13px;font-weight:700;border:2px solid #c4c8cf;border-radius:8px;color:#4a4a4a}
+.empty{padding:14px;border:2px dashed #c2185b;background:#fde6ee;border-radius:8px;color:#5c0a29}
+.chat{position:sticky;top:12px;display:flex;flex-direction:column;border:1px solid #c4c8cf;border-radius:12px;background:#f7f8fa;height:calc(100vh - 24px);max-height:960px;min-height:560px}
+</style>
+</helmet>
+<div class="dapp">
+  <p style="margin: 0; padding: 4px 24px; font-size: 12.8px; font-weight: 700; color: #4a3500; text-align: center; background: #fff4d0; border-bottom: 1px solid #e3c766">症例・患者は全て合成（架空）です</p>
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 10px 24px; color: #ffffff; background: #0f3563">
+    <span style="font-weight: 800">つたえ（院内）</span>
+    <nav aria-label="医師メニュー" style="display: flex; flex-wrap: wrap; gap: 4px 16px; flex: 1 1 auto">
+      <a href="#" style="color: #ffffff; text-decoration: none; padding: 4px 2px">印刷待ち</a>
+      <a href="#" style="color: #ffffff; text-decoration: none; padding: 4px 2px">患者</a>
+      <a href="#" aria-current="page" style="color: #ffffff; text-decoration: none; padding: 4px 2px; border-bottom: 3px solid #ffffff; font-weight: 700">設定を変える</a>
+    </nav>
+    <button type="button" style="min-height: 36px; padding: 2px 14px; color: #ffffff; background: transparent; border: 1px solid #ffffff; border-radius: 6px">ログアウト</button>
+  </header>
+
+  <div style="max-width: 1400px; margin: 0 auto; padding: 20px 24px 48px">
+    <h1 style="margin-bottom: 6px; font-size: 26px">設定を変える</h1>
+    <div class="tabbar" role="tablist" aria-label="設定の種類" style="margin-bottom: 12px">
+      <button type="button" role="tab" aria-selected="true" class="tab tab--on">レジメン</button>
+      <button type="button" role="tab" aria-selected="false" class="tab">レポートの形式（一文で頼む）</button>
+    </div>
+
+    <div role="tablist" aria-label="レジメン" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px">
+      <sc-for list="{{regimenTabs}}" as="t" hint-placeholder-count="4">
+        <button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="min-height: 44px; padding: 4px 14px; font-weight: 700; border-radius: 8px; {{t.style}}">{{t.label}} <span style="font-size: 12px; font-weight: 400">{{t.sub}}</span></button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+      <!-- 左: Skill の UI -->
+      <div style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+          <h2 style="margin: 0; font-size: 21px">{{heading}}</h2>
+          <span class="tag" style="{{statusTagStyle}}">{{statusTag}}</span>
+        </div>
+        <sc-if value="{{showLegend}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12.5px; color: #4a4a4a">
+            <span><span class="tag" style="color: #8c0f3f; background: #fde6ee; border: 1px solid #c2185b">未入力</span> 必須</span>
+            <span><span class="tag" style="color: #a30000; background: #ffffff; border: 2px solid #c40000">Claude が聞いています</span></span>
+            <span><span class="tag" style="color: #8a4300; background: #fff6ea; border: 1px dashed #b85c00">AI が入れた</span> 採用の前に確かめる</span>
+            <span><span class="tag" style="color: #0f3563; background: #ffffff; border: 2px solid #1a4f8b">先生が入れた</span> 頼まない限り Claude は書き換えない</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{showForm}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; flex-direction: column; gap: 14px">
+            <!-- 基本 -->
+            <section class="sec" id="sec-basic" aria-labelledby="h-basic">
+              <div class="sec-h">
+                <h2 id="h-basic">基本</h2>
+                <sc-if value="{{conf.basic.show}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 8px; align-items: center"><span class="cnt">AI が入れた {{conf.basic.n}} 欄</span><button type="button" class="btn btn-ghost btn-sm" onClick="{{conf.basic.pick}}">確かめた</button></span></sc-if>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+                <sc-for list="{{basic}}" as="f" hint-placeholder-count="3">
+                  <label class="fld {{f.cls}}">
+                    <span style="font-size: 13px; font-weight: 700">{{f.label}}</span>
+                    <input type="text" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.ph}}">
+                    <span class="fld-tag">{{f.tag}}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </section>
+
+            <!-- 投与スケジュール -->
+            <section class="sec" id="sec-drugs" aria-labelledby="h-drugs">
+              <div class="sec-h">
+                <h2 id="h-drugs">投与スケジュール（内服・注射）</h2>
+                <span style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+                  <sc-if value="{{conf.drugs.show}}" hint-placeholder-val="{{false}}"><span class="cnt">AI が入れた {{conf.drugs.n}} 欄</span><button type="button" class="btn btn-ghost btn-sm" onClick="{{conf.drugs.pick}}">確かめた</button></sc-if>
+                  <button type="button" class="btn btn-ghost btn-sm">＋ 薬を足す</button>
+                </span>
+              </div>
+              <sc-if value="{{noDrugs}}" hint-placeholder-val="{{false}}">
+                <p class="empty" style="margin: 0">必須: 薬を1つ以上。右のチャットに書くか、「＋ 薬を足す」で入れてください。</p>
+              </sc-if>
+              <sc-if value="{{hasDrugs}}" hint-placeholder-val="{{true}}">
+                <div style="overflow-x: auto">
+                  <table class="tbl">
+                    <thead><tr><th scope="col" style="width: 28%">薬</th><th scope="col" style="width: 16%">経路</th><th scope="col" style="width: 15%">Day</th><th scope="col" style="width: 15%">内服の回数</th><th scope="col">飲み始め・抜去など</th></tr></thead>
+                    <tbody>
+                      <sc-for list="{{drugs}}" as="r" hint-placeholder-count="2">
+                        <tr>
+                          <sc-for list="{{r.cells}}" as="f" hint-placeholder-count="5">
+                            <td><label class="fld {{f.cls}}"><span class="sr">{{f.label}}</span><input type="text" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.ph}}"><span class="fld-tag">{{f.tag}}</span></label></td>
+                          </sc-for>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+                <figure style="margin: 0; display: flex; flex-direction: column; gap: 4px" aria-label="1コースの投与の帯">
+                  <div style="display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px; align-items: end">
+                    <span style="font-size: 12px; color: #4a4a4a">1コース {{cycleLabel}}</span>
+                    <div style="display: grid; grid-template-columns: {{barCols}}; gap: 2px">
+                      <sc-for list="{{barDays}}" as="d" hint-placeholder-count="21"><span style="font-size: 11px; color: #4a4a4a; text-align: center">{{d}}</span></sc-for>
+                    </div>
+                  </div>
+                  <sc-for list="{{bars}}" as="b" hint-placeholder-count="2">
+                    <div style="display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px; align-items: center">
+                      <span style="font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{b.name}}</span>
+                      <div style="display: grid; grid-template-columns: {{barCols}}; gap: 2px">
+                        <sc-for list="{{b.cells}}" as="c" hint-placeholder-count="21"><span style="height: 16px; border-radius: 3px; background: {{c}}"></span></sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <figcaption style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #4a4a4a">
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: #1a4f8b; border-radius: 2px; vertical-align: -1px"></span> 点滴</span>
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: #1b7a3a; border-radius: 2px; vertical-align: -1px"></span> 内服</span>
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: #6b4fa0; border-radius: 2px; vertical-align: -1px"></span> 持続ポンプ</span>
+                    <span>日付の言い方（「飲み薬が終わった日」→ Day14 など）はこの表から自動で作ります</span>
+                  </figcaption>
+                </figure>
+              </sc-if>
+            </section>
+
+            <!-- 副作用 -->
+            <section class="sec" id="sec-se" aria-labelledby="h-se">
+              <div class="sec-h">
+                <h2 id="h-se">副作用（注意する症状）</h2>
+                <span style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+                  <sc-if value="{{conf.se.show}}" hint-placeholder-val="{{false}}"><span class="cnt">AI が入れた {{conf.se.n}} 欄</span><button type="button" class="btn btn-ghost btn-sm" onClick="{{conf.se.pick}}">確かめた</button></sc-if>
+                  <button type="button" class="btn btn-ghost btn-sm">＋ 症状を足す</button>
+                </span>
+              </div>
+              <sc-if value="{{noSe}}" hint-placeholder-val="{{false}}">
+                <p class="empty" style="margin: 0">必須: 症状を1つ以上。用語は CTCAE v5.0 JCOG版の一覧から選びます。</p>
+              </sc-if>
+              <sc-if value="{{hasSe}}" hint-placeholder-val="{{true}}">
+                <div style="overflow-x: auto">
+                  <table class="tbl">
+                    <thead><tr><th scope="col" style="width: 30%">患者の言い方の例</th><th scope="col" style="width: 30%">CTCAE の用語（一覧から選ぶ）</th><th scope="col">対応する質問（下の質問から選ぶ）</th></tr></thead>
+                    <tbody>
+                      <sc-for list="{{se}}" as="r" hint-placeholder-count="5">
+                        <tr>
+                          <sc-for list="{{r.cells}}" as="f" hint-placeholder-count="3">
+                            <td><label class="fld {{f.cls}}"><span class="sr">{{f.label}}</span><input type="text" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.ph}}"><span class="fld-tag">{{f.tag}}</span></label></td>
+                          </sc-for>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </sc-if>
+            </section>
+
+            <!-- 患者への質問 -->
+            <section class="sec" id="sec-qs" aria-labelledby="h-qs">
+              <div class="sec-h">
+                <h2 id="h-qs">患者への質問（スマホに毎日出る）</h2>
+                <span style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+                  <sc-if value="{{conf.qs.show}}" hint-placeholder-val="{{false}}"><span class="cnt">AI が入れた {{conf.qs.n}} 欄</span><button type="button" class="btn btn-ghost btn-sm" onClick="{{conf.qs.pick}}">確かめた</button></sc-if>
+                  <button type="button" class="btn btn-ghost btn-sm">部品集から選ぶ</button>
+                  <button type="button" class="btn btn-ghost btn-sm">＋ 手で足す</button>
+                </span>
+              </div>
+              <sc-if value="{{noQs}}" hint-placeholder-val="{{false}}">
+                <p class="empty" style="margin: 0">必須: 質問を1つ以上。上の3つがそろうと、Claude が副作用をもとに提案します（部品集から選ぶ・手で足すこともできます）。</p>
+              </sc-if>
+              <sc-if value="{{hasQs}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <sc-for list="{{qs}}" as="q" hint-placeholder-count="6">
+                    <div class="qrow" style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 90px; gap: 8px; align-items: start">
+                      <label class="fld {{q.label.cls}}"><span style="font-size: 12px; color: #4a4a4a">短い名前 · {{q.origin}}</span><input type="text" value="{{q.label.value}}" onChange="{{q.label.onChange}}"><span class="fld-tag">{{q.label.tag}}</span></label>
+                      <label class="fld {{q.text.cls}}"><span style="font-size: 12px; color: #4a4a4a">患者に出る文</span><input type="text" value="{{q.text.value}}" onChange="{{q.text.onChange}}"><span class="fld-tag">{{q.text.tag}}</span></label>
+                      <span style="padding-top: 26px; font-size: 13px">{{q.type}}</span>
+                    </div>
+                  </sc-for>
+                  <p style="margin: 0; padding: 8px 12px; font-size: 13px; background: #f4f5f7; border-radius: 6px">固定規則（外せない）: 体温が 38.0℃ 以上なら、患者の画面に決まった文で連絡先を出す</p>
+                </div>
+              </sc-if>
+            </section>
+
+            <sc-if value="{{showBar}}" hint-placeholder-val="{{true}}">
+              <div style="position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; background: #f4f5f7; border: 1px solid #c4c8cf; border-radius: 10px">
+                <button type="button" class="btn btn-primary" disabled="{{notReady}}" onClick="{{goConfirm}}">確認へ進む</button>
+                <button type="button" class="btn btn-danger" onClick="{{discard}}">下書きを捨てる</button>
+                <span style="font-size: 14px">{{readyNote}}</span>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- 確認 -->
+        <sc-if value="{{showConfirm}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; flex-direction: column; gap: 14px">
+            <sc-if value="{{hasAiList}}" hint-placeholder-val="{{true}}">
+              <section class="sec" aria-labelledby="ai-h" style="border: 1px dashed #b85c00; background: #fffaf3">
+                <div class="sec-h"><h2 id="ai-h">AI が入れた値（{{aiCount}} 件）。先生の文に無かったので、標準の値から入れました</h2></div>
+                <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 14px">
+                  <sc-for list="{{aiList}}" as="a" hint-placeholder-count="8"><li style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; padding: 3px 0; border-bottom: 1px solid #f0e2cf"><span style="color: #4a4a4a">{{a.where}}</span><span>{{a.value}}</span></li></sc-for>
+                </ul>
+                <label style="display: flex; gap: 10px; align-items: center; font-weight: 700; min-height: 44px"><input type="checkbox" checked="{{aiChecked}}" onChange="{{toggleAi}}" style="width: 20px; height: 20px"> 上の値を全て確かめました</label>
+              </section>
+            </sc-if>
+            <div style="display: flex; flex-wrap: wrap; gap: 14px">
+              <section class="sec" aria-labelledby="sk-h" style="flex: 999 1 420px; min-width: 0">
+                <div class="sec-h"><h2 id="sk-h">{{skillHeading}}</h2></div>
+                <p style="margin: 0; font-size: 13px; color: #4a4a4a">フォームの値からコードが決まった形で描いたもの。AI は SKILL.md を書いていません。</p>
+                <div class="mono" style="max-height: 420px; overflow: auto; padding: 8px 12px; background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 6px">
+                  <sc-for list="{{skillLines}}" as="l" hint-placeholder-count="20"><div style="white-space: pre-wrap; {{l.style}}">{{l.t}}</div></sc-for>
+                </div>
+                <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px">
+                  <sc-for list="{{checks}}" as="c" hint-placeholder-count="4">
+                    <li style="display: flex; gap: 8px; align-items: center; font-size: 14px"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#1d5e20"></circle><path d="M6 10.5l2.6 2.6L14 7.6" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>{{c}}</li>
+                  </sc-for>
+                </ul>
+              </section>
+              <section aria-labelledby="pv-h" style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 8px">
+                <h2 id="pv-h" style="margin: 0; font-size: 16px">採用すると、患者のスマホはこうなります</h2>
+                <p style="margin: 0; font-size: 13px; color: #4a4a4a">変わるのは次の記録から。それまでの記録は今の版のまま表示・集計します。</p>
+                <div style="max-width: 330px; padding: 14px; border: 2px solid #111111; border-radius: 24px; display: flex; flex-direction: column; gap: 8px">
+                  <p style="margin: 0; font-weight: 800">今日の記録（{{regName}} 第1コース Day5）</p>
+                  <sc-for list="{{phoneQs}}" as="p" hint-placeholder-count="6">
+                    <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid #e1e4e8">
+                      <span style="font-size: 14px">{{p.text}}</span>
+                      <sc-if value="{{p.three}}" hint-placeholder-val="{{true}}"><div style="display: flex; gap: 6px"><span class="pill">なし</span><span class="pill">ある</span><span class="pill">つらい</span></div></sc-if>
+                      <sc-if value="{{p.temp}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 6px"><span class="pill">測った（℃）</span><span class="pill">測っていない</span></div></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+              <button type="button" class="btn btn-primary" disabled="{{cantAdopt}}" onClick="{{adopt}}">{{adoptLabel}}</button>
+              <button type="button" class="btn btn-ghost" onClick="{{backToForm}}">フォームに戻る</button>
+              <button type="button" class="btn btn-danger" onClick="{{discard}}">下書きを捨てる</button>
+              <span style="font-size: 13px; color: #4a4a4a">{{adoptNote}}</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{showDone}}" hint-placeholder-val="{{false}}">
+          <section class="sec" style="border: 2px solid #1d5e20">
+            <h2 style="margin: 0; font-size: 19px; color: #1d5e20">{{doneHeading}}</h2>
+            <ul style="margin: 0; padding-left: 1.2em">
+              <sc-for list="{{doneItems}}" as="d" hint-placeholder-count="4"><li>{{d}}</li></sc-for>
+            </ul>
+            <div><button type="button" class="btn btn-ghost" onClick="{{goView}}">一覧に戻る</button></div>
+          </section>
+        </sc-if>
+      </div>
+
+      <!-- 右: チャット -->
+      <aside class="chat" aria-label="Claude とのチャット" style="flex: 1 1 360px; min-width: 0">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #c4c8cf; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-weight: 800">Claude と決める</span>
+          <span style="font-size: 12px; color: #4a4a4a">Claude の文はこの院内の画面だけに出ます。患者の名前・ID は書かないでください（送る前に検査します）</span>
+        </div>
+        <div data-chat-log="1" aria-live="polite" style="flex: 1 1 auto; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <sc-for list="{{msgs}}" as="m" hint-placeholder-count="4">
+            <div style="display: flex; flex-direction: column; gap: 6px; {{m.align}}">
+              <span style="font-size: 11.5px; font-weight: 700; color: #4a4a4a">{{m.who}}</span>
+              <div style="max-width: 92%; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; {{m.bubble}}">{{m.text}}</div>
+              <sc-if value="{{m.hasLinks}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                  <sc-for list="{{m.links}}" as="l" hint-placeholder-count="3"><a class="flink {{l.cls}}" href="{{l.href}}">{{l.label}}</a></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{m.hasChips}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                  <sc-for list="{{m.chips}}" as="c" hint-placeholder-count="3">
+                    <button type="button" class="chip {{c.cls}}" disabled="{{c.off}}" onClick="{{c.pick}}">{{c.label}}</button>
+                  </sc-for>
+                </div>
+                <span style="font-size: 12px; color: #4a4a4a">左の赤枠の欄に直接入れても答えになります</span>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{busy}}" hint-placeholder-val="{{false}}">
+            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+              <span style="font-size: 11.5px; font-weight: 700; color: #4a4a4a">Claude</span>
+              <div style="padding: 8px 12px; border-radius: 10px; background: #ffffff; border: 1px dashed #c4c8cf; color: #4a4a4a">考えています…（この間、左の欄は編集できません）</div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="padding: 12px; border-top: 1px solid #c4c8cf; display: flex; flex-direction: column; gap: 6px; background: #ffffff; border-radius: 0 0 12px 12px">
+          <label for="chat-in" style="font-size: 13px; font-weight: 700">{{chatLabel}}</label>
+          <textarea id="chat-in" rows="3" value="{{chatText}}" onChange="{{onChat}}" onKeyDown="{{onChatKey}}" placeholder="{{chatPh}}" style="width: 100%; box-sizing: border-box; padding: 8px 10px; border: 2px solid #c4c8cf; border-radius: 8px; resize: vertical"></textarea>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between">
+            <span style="font-size: 12px; color: #4a4a4a">Enter で送る · Shift+Enter で改行（変換中の Enter は送らない）</span>
+            <button type="button" class="btn btn-primary btn-sm" disabled="{{cantSend}}" onClick="{{send}}">送る</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startStage":{"editor":"enum","options":["0","1","2","3","4","5","6"],"default":"0"},"$preview":{"width":1440,"height":1600}}'>
+const MSG1 = 'SOX を足したい。胃がんの外来で使う。S-1 を朝夕2週間飲んで1週休み、オキサリプラチンは Day1 に点滴。';
+const MSG2 = '手のひら・足の裏の質問も足して。涙の質問はもっとやさしい言い方にして。';
+const ASKED = 'd1.note';
+const FOLFOX = {
+  basic: { name: ['FOLFOX', 'doc'], target: ['大腸がん', 'doc'], cycle: ['14', 'doc'] },
+  drugs: [
+    ['オキサリプラチン', '点滴', 'Day1', '', '', 'doc'],
+    ['レボホリナート', '点滴', 'Day1', '', '', 'doc'],
+    ['フルオロウラシル（急速静注）', '点滴', 'Day1', '', '', 'doc'],
+    ['フルオロウラシル（46時間）', '持続ポンプ', 'Day1〜3', '', 'Day3 に抜去', 'doc']
+  ],
+  se: [
+    ['しびれ、冷たいものでピリピリ', '末梢性感覚ニューロパチー', 'しびれ', 'doc'],
+    ['下痢、お腹がゆるい', '下痢', '下痢', 'doc'],
+    ['口内炎、口の中が痛い', '口腔粘膜炎', '口内炎', 'doc'],
+    ['吐き気、食欲がない', '悪心／食欲不振', '吐き気・食欲', 'doc'],
+    ['熱が出た', '発熱', '体温', 'doc']
+  ],
+  qs: [
+    ['しびれ', '手足のしびれや冷たいものがさわりにくい感じはありましたか', '3択', '部品集', 'doc'],
+    ['下痢', '下痢はありましたか', '3択', '部品集', 'doc'],
+    ['口内炎', '口の中の痛みや口内炎はありましたか', '3択', '部品集', 'doc'],
+    ['吐き気・食欲', '吐き気や食欲の落ち込みはありましたか', '3択', '部品集', 'doc'],
+    ['体温', '熱を測りましたか', '体温', '部品集', 'doc']
+  ]
+};
+const SOX_DRUGS = [
+  ['オキサリプラチン', '点滴', 'Day1', '', '', 'doc'],
+  ['S-1', '内服', 'Day1〜14', '1日2回', '', 'doc']
+];
+const SOX_SE = [
+  ['しびれ、冷たいものでピリピリ', '末梢性感覚ニューロパチー', 'しびれ', 'ai'],
+  ['下痢、お腹がゆるい', '下痢', '下痢', 'ai'],
+  ['口内炎、口の中が痛い', '口腔粘膜炎', '口内炎', 'ai'],
+  ['吐き気、食欲がない', '悪心／食欲不振', '吐き気・食欲', 'ai'],
+  ['涙が止まらない、目がしょぼしょぼ', '流涙', '涙・目', 'ai'],
+  ['皮膚や爪が黒っぽくなった', '皮膚色素過剰', '', 'ai']
+];
+const SOX_QS3 = [
+  ['しびれ', '手足のしびれや冷たいものがさわりにくい感じはありましたか', '3択', '部品集', 'ai'],
+  ['下痢', '下痢はありましたか', '3択', '部品集', 'ai'],
+  ['口内炎', '口の中の痛みや口内炎はありましたか', '3択', '部品集', 'ai'],
+  ['吐き気・食欲', '吐き気や食欲の落ち込みはありましたか', '3択', '部品集', 'ai'],
+  ['涙・目', '涙が出やすい、目がしょぼしょぼする感じはありましたか', '3択', '新規（AI）', 'ai'],
+  ['体温', '熱を測りましたか', '体温', '部品集', 'ai']
+];
+const SOX_QS4 = [
+  SOX_QS3[0], SOX_QS3[1], SOX_QS3[2], SOX_QS3[3],
+  ['手のひら・足の裏', '手のひらや足の裏の赤み・痛み・ひび割れはありましたか', '3択', '部品集', 'ai'],
+  ['涙・目', '涙が止まらなかったり、目がしょぼしょぼすることはありましたか', '3択', '新規（AI）', 'ai'],
+  SOX_QS3[5]
+];
+const ROUTE_COLOR = { '点滴': '#1a4f8b', '内服': '#1b7a3a', '持続ポンプ': '#6b4fa0' };
+const SEC_NAME = { basic: '基本', drugs: '投与スケジュール', se: '副作用', qs: '患者への質問' };
+
+function stageData(stage, answer) {
+  if (stage === 0 || stage === 7) return FOLFOX;
+  if (stage === 1) return { basic: { name: ['', null], target: ['', null], cycle: ['', null] }, drugs: [], se: [], qs: [] };
+  const drugs = SOX_DRUGS.map((d, i) => i === 1 && stage >= 3 ? [d[0], d[1], d[2], d[3], answer || 'Day1 の夕方から', 'doc'] : d);
+  return {
+    basic: { name: ['SOX', 'doc'], target: ['胃がん', 'doc'], cycle: ['21', 'ai'] },
+    drugs: drugs,
+    se: SOX_SE,
+    qs: stage >= 4 ? SOX_QS4 : stage === 3 ? SOX_QS3 : []
+  };
+}
+
+class Component extends DCLogic {
+  // stage: 0 表示(FOLFOX) 1 空 2 分解して聞く 3 質問の提案 4 直した後 5 確認 6 登録済み 7 FOLFOX を直接編集中(版2の下書き)
+  st() {
+    const s = this.state || {};
+    if (s.stage !== undefined) return s;
+    const start = Number(this.props.startStage) || 0;
+    return { stage: start, edits: {}, conf: {}, chat: null, answer: null, more: [], aiOk: false, busy: false, from: start };
+  }
+  put(patch) {
+    this.setState(Object.assign({}, this.st(), patch));
+  }
+  componentDidUpdate() {
+    const log = document.querySelector('[data-chat-log]');
+    if (log) log.scrollTop = log.scrollHeight;
+  }
+  go(stage) {
+    const s = this.st();
+    const fresh = stage === 1;
+    this.put({ stage: stage, chat: null, edits: fresh ? {} : s.edits, conf: fresh ? {} : s.conf, answer: fresh ? null : s.answer, more: fresh ? [] : s.more, aiOk: false });
+  }
+  discard() {
+    this.put({ stage: 0, edits: {}, conf: {}, chat: null, answer: null, more: [], aiOk: false, busy: false });
+  }
+  reply(nextStage, extra) {
+    // 本物はサーバーの1往復。モックでは少し待ってから返す
+    this.put({ busy: true, chat: null });
+    setTimeout(() => {
+      const s = this.st();
+      this.put({ busy: false, stage: nextStage, more: extra ? s.more.concat(extra) : s.more });
+    }, 700);
+  }
+  edit(id, value) {
+    const s = this.st();
+    const stage = s.stage === 0 ? 7 : s.stage;
+    this.put({ stage: stage, edits: Object.assign({}, s.edits, { [id]: value }) });
+  }
+  confirm(sec) {
+    const s = this.st();
+    this.put({ conf: Object.assign({}, s.conf, { [sec]: true }) });
+  }
+  answerWith(text) {
+    this.put({ answer: text, chat: null });
+    this.reply(3);
+  }
+  send() {
+    const s = this.st();
+    if (s.busy) return;
+    const text = this.chatText(s).trim();
+    if (s.stage === 1 && text) return this.reply(2);
+    if (s.stage === 2) {
+      const direct = (s.edits[ASKED] || '').trim();
+      if (text || direct) return this.answerWith(text || direct);
+      return;
+    }
+    if (s.stage === 3 && text) return this.reply(4);
+    if ((s.stage === 4 || s.stage === 0 || s.stage === 7) && text) {
+      const next = s.stage === 0 ? 7 : s.stage;
+      return this.reply(next, [{ who: 'doc', text: text }, { who: 'ai', text: '（モック）承知しました。本物では、ここで左の欄を書き換え、変えた欄をこの下に並べます。' }]);
+    }
+  }
+  chatText(s) {
+    if (s.chat !== null && s.chat !== undefined) return s.chat;
+    if (s.stage === 1) return MSG1;
+    if (s.stage === 3) return MSG2;
+    return '';
+  }
+  field(id, label, raw, sec, s, opts) {
+    const o = opts || {};
+    const edited = Object.prototype.hasOwnProperty.call(s.edits, id);
+    const value = edited ? s.edits[id] : raw[0];
+    const empty = !String(value || '').trim();
+    const required = o.required !== false;
+    const asked = s.stage === 2 && id === ASKED && empty;
+    const missing = required && empty;
+    const ai = !edited && raw[1] === 'ai' && !s.conf[sec] && !empty;
+    let cls = '';
+    let tag = '';
+    if (asked) { cls = 'f-asked f-miss'; tag = 'Claude が聞いています'; }
+    else if (missing) { cls = 'f-miss'; tag = '未入力'; }
+    else if (ai) { cls = 'f-ai'; tag = 'AI が入れた'; }
+    else if (edited) { cls = 'f-doc'; tag = '先生が入れた'; }
+    return { id: id, sec: sec, label: label, value: value, orig: raw[0], edited: edited, ph: o.ph || '', cls: cls, tag: tag, missing: missing, ai: ai, onChange: (e) => this.edit(id, e.target.value) };
+  }
+  renderVals() {
+    const s = this.st();
+    const stage = s.stage;
+    // FOLFOX の直接編集（7）から確認（5）・登録（6）に来たときは FOLFOX の値のまま
+    const fromEdit = s.from === 7 && stage >= 5;
+    const data = stageData(fromEdit ? 7 : stage, s.answer);
+    const isView = stage === 0;
+    const editing = stage === 7;
+    const newOne = stage >= 1 && stage <= 6 && !fromEdit;
+    const basic = [
+      this.field('name', 'レジメン名', data.basic.name, 'basic', s, { ph: '例: SOX' }),
+      this.field('target', '対象（任意）', data.basic.target, 'basic', s, { required: false, ph: '例: 胃がん' }),
+      this.field('cycle', '1コースの日数', data.basic.cycle, 'basic', s, { ph: '例: 21' })
+    ];
+    const all = basic.slice();
+    const drugs = data.drugs.map((d, i) => {
+      const oral = d[1] === '内服';
+      const cells = [
+        this.field('d' + i + '.name', '薬', [d[0], d[5]], 'drugs', s),
+        this.field('d' + i + '.route', '経路', [d[1], d[5]], 'drugs', s, { ph: '点滴／内服／持続ポンプ' }),
+        this.field('d' + i + '.days', 'Day', [d[2], d[5]], 'drugs', s, { ph: 'Day1〜14' }),
+        this.field('d' + i + '.times', '内服の回数', [d[3], d[5]], 'drugs', s, { required: oral, ph: oral ? '1日2回' : '—' }),
+        this.field('d' + i + '.note', '飲み始め・抜去など', [d[4], d[4] ? d[5] : null], 'drugs', s, { required: oral, ph: oral ? '例: Day1 の夕方から' : '' })
+      ];
+      all.push.apply(all, cells);
+      return { cells: cells, name: cells[0].value, route: cells[1].value, days: cells[2].value };
+    });
+    const se = data.se.map((r, i) => {
+      const cells = [
+        this.field('s' + i + '.say', '患者の言い方の例', [r[0], r[3]], 'se', s),
+        this.field('s' + i + '.term', 'CTCAE の用語', [r[1], r[3]], 'se', s),
+        this.field('s' + i + '.q', '対応する質問', [r[2], r[2] ? r[3] : null], 'se', s, { required: false, ph: 'なし' })
+      ];
+      all.push.apply(all, cells);
+      return { cells: cells };
+    });
+    const qs = data.qs.map((q, i) => {
+      const label = this.field('q' + i + '.label', '短い名前', [q[0], q[4]], 'qs', s);
+      const text = this.field('q' + i + '.text', '患者に出る文', [q[1], q[4]], 'qs', s);
+      all.push(label, text);
+      return { label: label, text: text, type: q[2], origin: q[3], three: q[2] === '3択' };
+    });
+    const regName = basic[0].value || '新しいレジメン';
+    const cycle = Math.max(1, Math.min(42, parseInt(basic[2].value, 10) || 21));
+    const days = [];
+    for (let d = 1; d <= cycle; d++) days.push(d === 1 || d % 7 === 0 ? String(d) : '');
+    const bars = drugs.map((d) => {
+      const m = /Day\s*(\d+)(?:\s*[〜~\-–]\s*(\d+))?/.exec(d.days || '');
+      const from = m ? Number(m[1]) : 0;
+      const to = m ? Number(m[2] || m[1]) : -1;
+      const color = ROUTE_COLOR[d.route] || '#8a8f98';
+      const cells = [];
+      for (let k = 1; k <= cycle; k++) cells.push(k >= from && k <= to ? color : '#e6e8ec');
+      return { name: d.name || '（名前なし）', cells: cells };
+    });
+    const missing = all.filter((f) => f.missing).length + (drugs.length ? 0 : 1) + (se.length ? 0 : 1) + (qs.length ? 0 : 1);
+    const aiFields = all.filter((f) => f.ai);
+    const conf = {};
+    Object.keys(SEC_NAME).forEach((k) => {
+      const n = aiFields.filter((f) => f.sec === k).length;
+      conf[k] = { show: n > 0 && stage !== 0, n: n, pick: () => this.confirm(k) };
+    });
+    const asking = stage === 2;
+    const ready = !asking && stage !== 1 && missing === 0;
+    const draftNote = asking ? 'Claude の質問に答えてください（赤枠の欄）' : missing > 0 ? '未入力 ' + missing + (stage < 3 && newOne ? ' · 質問はまだ' : '') : aiFields.length > 0 ? 'そろいました。AI が入れた ' + aiFields.length + ' 欄は確認の画面でも一覧にします' : 'そろいました';
+    const qList = qs.map((q) => ({ text: q.text.value, three: q.three, temp: !q.three }));
+    const tabStyle = (on) => on ? 'color: #ffffff; background: #1a4f8b; border: 2px solid #1a4f8b' : 'color: #1a4f8b; background: #ffffff; border: 2px solid #c4c8cf';
+    const folfoxOn = isView || editing || fromEdit;
+    const regimenTabs = [
+      { label: 'FOLFOX', sub: fromEdit && stage === 6 ? '版 2' : (editing || fromEdit) ? '版 2 の下書き' : '版 1', selected: folfoxOn ? 'true' : 'false', style: tabStyle(folfoxOn), pick: () => { if (isView) this.go(0); } },
+      { label: 'CAPOX', sub: '版 1', selected: 'false', style: tabStyle(false), pick: () => {} },
+      { label: stage === 6 && !fromEdit ? 'SOX' : '＋ 新しいレジメン', sub: stage === 6 && !fromEdit ? '版 1' : (newOne ? '下書き' : ''), selected: newOne ? 'true' : 'false', style: tabStyle(newOne), pick: () => { if (stage === 0) this.go(1); } }
+    ];
+    // 確認の画面は欄ごとでなく行ごとにまとめる（副作用 1 行 = 言い方 → 用語 → 質問）
+    const aiList = [];
+    basic.filter((f) => f.ai).forEach((f) => aiList.push({ where: '基本 · ' + f.label, value: f.value }));
+    drugs.forEach((d) => { if (d.cells.some((f) => f.ai)) aiList.push({ where: '薬', value: d.cells.map((f) => f.value).filter(Boolean).join(' · ') }); });
+    se.forEach((r) => { if (r.cells.some((f) => f.ai)) aiList.push({ where: '副作用', value: r.cells[0].value + ' → ' + r.cells[1].value + (r.cells[2].value ? ' → 質問「' + r.cells[2].value + '」' : '') }); });
+    qs.forEach((q) => { if (q.label.ai || q.text.ai) aiList.push({ where: '質問 · ' + q.label.value, value: q.text.value }); });
+    const needAi = aiList.length > 0 && !s.aiOk;
+    const isNew = !fromEdit;
+    return {
+      regimenTabs: regimenTabs,
+      heading: isView ? 'FOLFOX' : editing ? 'FOLFOX（版 2 の下書き）' : stage === 6 ? regName : stage === 5 ? '確認: ' + regName + (isNew ? '（新規・版 1）' : '（版 1 → 版 2）') : '新しいレジメン（下書き）',
+      statusTag: isView ? '版 1・採用済み · 患者 2 人' : stage === 6 ? (fromEdit ? '版 2・採用済み' : '版 1・採用済み') : stage === 5 ? '採用の前の確認' : editing ? '下書き（患者には版 1 のまま）' : '下書き（まだ患者に出ない）',
+      statusTagStyle: isView || stage === 6 ? 'color: #ffffff; background: #1d5e20' : 'color: #9a4a00; background: #fff1e0; border: 1px solid #b85c00',
+      showLegend: (newOne && stage <= 4) || editing,
+      showForm: stage <= 4 || editing,
+      showConfirm: stage === 5,
+      showDone: stage === 6,
+      showBar: (newOne && stage <= 4) || editing,
+      basic: basic,
+      drugs: drugs,
+      hasDrugs: drugs.length > 0,
+      noDrugs: drugs.length === 0,
+      se: se,
+      hasSe: se.length > 0,
+      noSe: se.length === 0,
+      qs: qs,
+      hasQs: qs.length > 0,
+      noQs: qs.length === 0,
+      conf: conf,
+      cycleLabel: cycle + ' 日',
+      barCols: 'repeat(' + cycle + ', minmax(0, 1fr))',
+      barDays: days,
+      bars: bars,
+      notReady: !ready || s.busy,
+      readyNote: draftNote,
+      goConfirm: () => this.put({ from: stage, stage: 5, aiOk: false }),
+      backToForm: () => this.put({ stage: s.from === 7 ? 7 : 4 }),
+      discard: () => this.discard(),
+      adopt: () => this.put({ stage: 6, adoptedFrom: s.from }),
+      goView: () => this.discard(),
+      hasAiList: aiList.length > 0,
+      aiCount: aiList.length,
+      aiList: aiList,
+      aiChecked: !!s.aiOk,
+      toggleAi: () => this.put({ aiOk: !s.aiOk }),
+      cantAdopt: needAi,
+      adoptLabel: s.from === 7 ? '採用して版 2 にする' : '採用して登録',
+      adoptNote: needAi ? '「上の値を全て確かめました」に印を付けると採用できます' : '採用するまで患者の画面は変わりません',
+      regName: regName,
+      skillHeading: s.from === 7 ? 'SKILL.md の差分（版 1 → 版 2）' : 'SKILL.md（regimen-' + regName.toLowerCase() + '・新規）',
+      skillLines: this.skillLines(basic, drugs, se, qs, cycle, s.from === 7, all),
+      checks: ['必須の項目が全てある', 'CTCAE の用語は全て一覧にある', '質問の key が重ならない・依頼文の検査（H1）に掛からない', '今の FOLFOX / CAPOX を同じ描き方で描くと今の SKILL.md と一致する'],
+      phoneQs: qList,
+      doneHeading: s.adoptedFrom === 7 ? 'FOLFOX を版 2 にしました' : 'regimen-' + regName.toLowerCase() + ' 版 1 を登録しました',
+      doneItems: s.adoptedFrom === 7
+        ? ['FOLFOX の患者には、次の記録から新しい質問集で聞きます', 'それまでの記録は版 1 の質問集のまま表示・集計します', '版の履歴に全文を残しました（版 1 に戻すこともできます）']
+        : ['患者を登録するとき、レジメンに「' + regName + '」を選べます', regName + ' の患者には、次の記録から上の ' + qs.length + ' 問を聞きます', '受診時のレポートは regimen-' + regName.toLowerCase() + ' 版 1 を読み、1コース ' + cycle + ' 日で Day を数えます', '新しく作った質問は部品集にも入りました'],
+      msgs: this.messages(s),
+      busy: !!s.busy,
+      chatText: this.chatText(s),
+      chatLabel: isView || editing ? 'このレジメンを直す（版 2 の下書きになります）' : 'Claude に伝える',
+      chatPh: isView ? '例: 口内炎は、食事がとれたかも聞いて' : stage === 2 ? '答えを書くか、上の選択肢を押す' : '',
+      cantSend: s.busy || !(stage === 1 || stage === 2 || stage === 3 || stage === 4 || stage === 0 || stage === 7),
+      onChat: (e) => this.put({ chat: e.target.value }),
+      onChatKey: (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent && e.nativeEvent.isComposing)) {
+          e.preventDefault();
+          this.send();
+        }
+      },
+      send: () => this.send()
+    };
+  }
+  skillLines(basic, drugs, se, qs, cycle, asDiff, all) {
+    const name = (basic[0].value || 'new').toLowerCase();
+    if (asDiff) {
+      const out = [{ t: '--- regimen-folfox/SKILL.md（版 1）', style: 'color: #4a4a4a' }, { t: '+++ regimen-folfox/SKILL.md（版 2）', style: 'color: #4a4a4a' }];
+      const changed = all.filter((f) => f.edited && f.value !== f.orig);
+      changed.forEach((f) => {
+        out.push({ t: '@@ ' + SEC_NAME[f.sec] + ' · ' + f.label, style: 'color: #4a4a4a' });
+        out.push({ t: '- ' + (f.orig || '（空）'), style: 'background: #fde6ee; color: #5c0a29' });
+        out.push({ t: '+ ' + (f.value || '（空）'), style: 'background: #e7f4e8; color: #1d4a1f' });
+      });
+      if (changed.length === 0) out.push({ t: '（変更なし。チャットで頼んだ変更もここに差分で出ます）', style: 'color: #4a4a4a' });
+      return out;
+    }
+    const lines = ['---', 'name: regimen-' + name, 'version: 1', 'regimen: ' + (basic[0].value || ''), 'cycle_days: ' + cycle, 'pump_removal_day: null', 'questions:'];
+    qs.forEach((q) => lines.push('  - {label: ' + q.label.value + ', text: ' + q.text.value + '}'));
+    lines.push('fixed_rules:', '  - {key: fever_38, threshold_celsius: 38.0}', '---', '', '# ' + (basic[0].value || '') + ' の記録を時系列に直すための指示', '', '## 1. 投与スケジュール', '- 1コースは' + cycle + '日。Day1 = 実投与日');
+    drugs.forEach((d) => lines.push('- ' + d.name + ': ' + d.route + ' ' + d.days + (d.cells[3].value ? '・' + d.cells[3].value : '') + (d.cells[4].value ? '（' + d.cells[4].value + '）' : '')));
+    lines.push('- 持続ポンプは無い', '', '## 2. 相対時間表現の直し方', '| 表現 | 直し方 |', '|---|---|', '| 点滴の日・飲み薬を始めた日 | Day1 |', '| 飲み薬が終わった日 | Day14 |', '| 休薬に入った日 | Day15 |', '…（共通の行は FOLFOX・CAPOX と同じ）', '', '## 3. 用語（term-mapper）', '| 書き方の例 | term の候補 | question |', '|---|---|---|');
+    se.forEach((r) => lines.push('| ' + r.cells[0].value + ' | ' + r.cells[1].value + ' | ' + (r.cells[2].value || 'null') + ' |'));
+    lines.push('', '## 4〜9 …（status・食い違い・引用・固定規則・しないことは共通）');
+    return lines.map((t) => ({ t: t, style: '' }));
+  }
+  messages(s) {
+    const stage = s.stage;
+    const ai = (text) => ({ who: 'Claude', text: text, align: 'align-items: flex-start', bubble: 'background: #ffffff; border: 1px solid #c4c8cf', hasChips: false, chips: [], hasLinks: false, links: [] });
+    const doc = (text) => ({ who: '先生', text: text, align: 'align-items: flex-end', bubble: 'color: #ffffff; background: #1a4f8b', hasChips: false, chips: [], hasLinks: false, links: [] });
+    const more = (s.more || []).map((m) => m.who === 'doc' ? doc(m.text) : ai(m.text));
+    if (stage === 0 || stage === 7 || s.from === 7) {
+      const m = [ai('FOLFOX（版 1）を表示しています。直したいところを書くと、左の欄を書き換えて版 2 の下書きを作ります。左の欄を直接直しても同じです。採用するまで患者の画面は版 1 のままです。')].concat(more);
+      if (stage === 5 || stage === 6) m.push(ai('版 1 との差分を描きました。患者の画面と一緒に確かめてから採用してください。'));
+      if (stage === 6) m.push(ai('FOLFOX を版 2 にしました。'));
+      return m;
+    }
+    const m = [ai('作りたいレジメンを自由に書いてください。薬・飲み方・注意する副作用など、分かるところからで構いません。足りないところは私から聞きます。')];
+    if (stage >= 2) {
+      m.push(doc(MSG1));
+      const filled = ai('左の欄に入れました。青い枠は先生の文から、橙の点線は標準の値から入れたものです（採用の前に確かめてください）。');
+      filled.hasLinks = true;
+      filled.links = [
+        { label: '基本: SOX・胃がん', href: '#sec-basic', cls: 'flink--doc' },
+        { label: '薬: オキサリプラチン・S-1', href: '#sec-drugs', cls: 'flink--doc' },
+        { label: '1コース 21 日（標準）', href: '#sec-basic', cls: '' },
+        { label: '副作用 6 つ（標準）', href: '#sec-se', cls: '' }
+      ];
+      m.push(filled);
+      const ask = ai('S-1 はいつから飲み始めますか？「飲み薬を始めた日」を Day に直すときに使います。');
+      ask.hasChips = true;
+      ask.chips = ['Day1 の夕方から（標準）', 'Day1 の朝から', 'Day2 の朝から'].map((label) => {
+        const value = label.replace('（標準）', '');
+        return { label: label, off: stage !== 2, cls: s.answer === value ? 'chip--on' : '', pick: () => this.answerWith(value) };
+      });
+      m.push(ask);
+    }
+    if (stage >= 3) {
+      m.push(doc(s.answer || 'Day1 の夕方から'));
+      const prop = ai('必須の項目がそろいました。副作用をもとに、患者への質問を 6 問提案します。5 問は部品集から、「涙・目」は新しく作りました。文言はそのまま患者に出るので、確かめてください。');
+      prop.hasLinks = true;
+      prop.links = [{ label: '患者への質問 6 問', href: '#sec-qs', cls: '' }];
+      m.push(prop);
+    }
+    if (stage >= 4) {
+      m.push(doc(MSG2));
+      const fixed = ai('部品集から「手のひら・足の裏」を足し、「涙・目」の文を言い換えました。');
+      fixed.hasLinks = true;
+      fixed.links = [{ label: '質問: 手のひら・足の裏（追加）', href: '#sec-qs', cls: '' }, { label: '質問: 涙・目（言い換え）', href: '#sec-qs', cls: '' }];
+      m.push(fixed);
+    }
+    if (stage >= 5) m.push(ai('フォームから SKILL.md を描きました。AI が入れた値の一覧・SKILL.md・患者の画面を確かめてから採用してください。'));
+    if (stage >= 6) m.push(ai('regimen-sox 版 1 を登録しました。'));
+    return m.concat(more);
+  }
+}
+</script>
+</body>
+</html>

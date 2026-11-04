@@ -69,7 +69,9 @@ export default function Register() {
   return (
     <section className="page">
       <h1>{t("register.title")}</h1>
-      <p>{t("register.about")}</p>
+      {/* 1文ずつ別の行にする（スマホ幅で読みやすいように） */}
+      <p className="p-about">{t("register.about_record")}</p>
+      <p className="p-about">{t("register.about_doctor")}</p>
       <p className="p-synthetic">{t("app.notice_synthetic")}</p>
       {problem ? (
         <ErrorMessage messageKey={problem} />

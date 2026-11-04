@@ -1,8 +1,9 @@
 /**
  * P1 今日の記録: 記録した後（修正ボード P2-2〜P2-5）。
  * - 押せない「記録する」の理由（today.submit_hint）
- * - 記録した後は登録の案内を消す・記録した内容の要約・「追加で記録する」
- * - 「つらくて書けない」の後だけ「取り消す」（押す前の確認は無い）
+ * - 記録した後は登録の案内を消す・記録した内容（これまでの記録と同じ回答の表）・
+ *   「追加で記録する」
+ * - 「つらくて書けない」の後だけ「取り消す」（取り消す前の確認は無い）
  * 期待する文は patient_strings.json のキーから引く（このファイルに日本語を直書きしない）。
  */
 import { screen, waitFor, within } from "@testing-library/react";
@@ -83,7 +84,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
     expect(screen.queryByText(s("register.done"))).toBeNull();
   });
 
-  it("shows a short summary of what was recorded", async () => {
+  it("shows what was recorded in the same answer table as the history", async () => {
     mockPatientApi({ createEntry: savedReply });
     renderToday();
     await choose("numbness", "answer.hard");
@@ -102,31 +103,70 @@ describe("Today: after saving (P2-3, P2-4)", () => {
     await screen.findByText(s("today.saved"));
 
     const box = summary();
-    expect(box).toHaveTextContent(
-      `${s("symptom.numbness")} ${s("answer.hard")}`,
-    );
-    expect(box).toHaveTextContent(
-      `${s("symptom.diarrhea")} ${s("answer.present")}`,
-    );
-    expect(box).toHaveTextContent(
-      `${s("symptom.fever")} ${s("history.temperature_value").replace("{value}", "37.8")}`,
-    );
+    const row = (name: string) => within(box).getByRole("row", { name });
+    expect(row(`${s("symptom.numbness")} ${s("answer.hard")}`)).toBeVisible();
+    expect(
+      row(`${s("symptom.diarrhea")} ${s("answer.present")}`),
+    ).toBeVisible();
+    // 表なので「なし」も行に出る
+    expect(row(`${s("symptom.stomatitis")} ${s("answer.none")}`)).toBeVisible();
+    expect(
+      row(
+        `${s("symptom.fever")} ${s("answer.measured")} ${s("history.temperature_value").replace("{value}", "37.8")}`,
+      ),
+    ).toBeVisible();
+    // 書いたことは「あり」だけ（本文はこの画面に出さない）
     expect(box).toHaveTextContent(
       `${s("history.free_text")} ${s("history.free_text_present")}`,
     );
-    expect(box).not.toHaveTextContent(s("symptom.stomatitis"));
     expect(box).not.toHaveTextContent("free text sample");
-    // 答えは太字
-    expect(within(box).getByText(s("answer.hard")).tagName).toBe("STRONG");
+    // 選んだ答えは太字
+    const chosen = within(box)
+      .getByRole("rowheader", { name: s("symptom.numbness") })
+      .closest("tr")!
+      .querySelector(".p-answer-cell--chosen strong");
+    expect(chosen).toHaveTextContent(s("answer.hard"));
   });
 
-  it("all none: history.all_none", async () => {
+  it("the title is a small heading apart from the table", async () => {
+    mockPatientApi({ createEntry: savedReply });
+    renderToday();
+    await choose("diarrhea", "answer.present");
+    await userEvent.click(button("today.submit"));
+    await screen.findByText(s("today.saved"));
+    const title = screen.getByRole("heading", {
+      level: 2,
+      name: s("today.saved_summary"),
+    });
+    expect(title).toHaveClass("p-saved-title");
+    expect(within(summary()).getByRole("table")).toBeInTheDocument();
+  });
+
+  it("with the proxy toggle: history.proxy is shown above the table", async () => {
+    mockPatientApi({ createEntry: savedReply });
+    renderToday();
+    await choose("diarrhea", "answer.present");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: s("today.proxy_toggle") }),
+    );
+    await userEvent.click(button("today.submit"));
+    await screen.findByText(s("today.saved"));
+    expect(within(summary()).getByText(s("history.proxy"))).toHaveClass(
+      "p-entry-flag",
+    );
+  });
+
+  it("all none: the table shows the none row", async () => {
     mockPatientApi({ createEntry: savedReply });
     renderToday();
     await choose("diarrhea", "answer.none");
     await userEvent.click(button("today.submit"));
     await screen.findByText(s("today.saved"));
-    expect(summary()).toHaveTextContent(s("history.all_none"));
+    expect(
+      within(summary()).getByRole("row", {
+        name: `${s("symptom.diarrhea")} ${s("answer.none")}`,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("normal records have no undo button", async () => {
@@ -176,10 +216,11 @@ describe("Today: after saving (P2-3, P2-4)", () => {
 describe("Today: undo too_sick (P2-5)", () => {
   async function recordTooSick() {
     await userEvent.click(button("today.too_sick_button"));
+    await userEvent.click(button("today.too_sick_confirm_yes"));
     await screen.findByText(s("today.too_sick_done"));
   }
 
-  it("too_sick is recorded with one tap and can be undone", async () => {
+  it("too_sick is recorded and can be undone", async () => {
     const fetchMock = mockPatientApi({ createEntry: savedReply });
     renderToday();
     await recordTooSick();
@@ -207,6 +248,26 @@ describe("Today: undo too_sick (P2-5)", () => {
     expect(
       within(group).getByRole("button", { name: s("answer.present") }),
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("a kept 'measured' answer does not take the focus after undoing", async () => {
+    mockPatientApi({ createEntry: savedReply });
+    renderToday();
+    await choose("fever", "answer.measured");
+    const before = screen.getByRole("textbox", {
+      name: s("temperature.label"),
+    });
+    await userEvent.type(before, "36.8");
+    await userEvent.click(button("today.too_sick_button"));
+    await userEvent.click(button("today.too_sick_confirm_yes"));
+    await screen.findByText(s("today.too_sick_done"));
+    await userEvent.click(button("today.undo"));
+    await screen.findByText(s("today.undone"));
+    const input = screen.getByRole("textbox", {
+      name: s("temperature.label"),
+    });
+    expect(input).toHaveValue("36.8");
+    expect(input).not.toHaveFocus();
   });
 
   it("409 not_undoable: today.undo_failed and no undo button", async () => {

@@ -38,6 +38,33 @@ function groupRuleOf(selector: string): string {
   return "";
 }
 
+/** :root 相当（.patient-app）の CSS 変数の値（#rrggbb）。 */
+function varOf(name: string): string {
+  const match = new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, "i").exec(css);
+  if (!match?.[1]) {
+    throw new Error(`${name} is missing`);
+  }
+  return match[1];
+}
+
+function rgbOf(hex: string): [number, number, number] {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return [r!, g!, b!];
+}
+
+/** WCAG のコントラスト比。 */
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, b] = rgbOf(hex).map((v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
 function remOf(body: string, property: string): number {
   const match = new RegExp(`${property}:\\s*([\\d.]+)rem`).exec(body);
   return match ? Number(match[1]) : NaN;
@@ -80,24 +107,28 @@ describe("patient.css", () => {
     expect(body).toMatch(/env\(safe-area-inset-bottom/);
   });
 
-  it("P2-1: 「つらい」を選んだ時は「ある」より濃い色で、色以外（内側の白い輪）でも分かる", () => {
-    const present = groupRuleOf(
-      '.patient-app .p-choice--present[aria-pressed="true"]',
-    );
-    const hard = groupRuleOf(
-      '.patient-app .p-choice--hard[aria-pressed="true"]',
-    );
-    expect(present).toMatch(/background:\s*var\(--p-primary\)/);
-    expect(hard).toMatch(/background:\s*var\(--p-hard\)/);
-    expect(hard).toMatch(/box-shadow:\s*inset/);
-    expect(css).toMatch(/--p-hard:\s*#[0-9a-f]{6}/);
+  it("選んだボタンはどの答えでも同じ青（答えごとの見た目はやめた）", () => {
+    expect(css).not.toMatch(/\.p-choice--/);
+    expect(css).not.toMatch(/--p-hard:/);
+    const pressed = ruleOf('.patient-app button[aria-pressed="true"]');
+    expect(pressed).toMatch(/background:\s*var\(--p-primary\)/);
+    expect(pressed).toMatch(/color:\s*var\(--p-primary-text\)/);
+    expect(pressed).toMatch(/border-width:\s*4px/);
+    expect(
+      ruleOf('.patient-app .p-choice[aria-pressed="true"]::before'),
+    ).toMatch(/content:/);
   });
 
-  it("P2-1: 「なし」も選んだことが分かる（薄い塗りと太枠）", () => {
-    const none = groupRuleOf(
-      '.patient-app .p-choice--none[aria-pressed="true"]',
+  it("何も選んでいない質問のボタンは薄い緑（押せない時は灰のまま）", () => {
+    const body = ruleOf(
+      ".patient-app .p-choices--unanswered > .p-choice:not(:disabled)",
     );
-    expect(none).toMatch(/background:\s*var\(--p-choice-light\)/);
+    expect(body).toMatch(/background:\s*var\(--p-choice-prompt\)/);
+    const green = varOf("--p-choice-prompt");
+    const [r, g, b] = rgbOf(green);
+    expect(g).toBeGreaterThan(r);
+    expect(g).toBeGreaterThan(b);
+    expect(contrast(varOf("--p-text"), green)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("P2-2: 押せないボタンは点線にしない（focus の輪と紛らわしい）", () => {
@@ -115,8 +146,84 @@ describe("patient.css", () => {
     expect(r!).toBeLessThan(0x20);
   });
 
-  it("P3-2: 記録の答えは太字", () => {
-    expect(ruleOf(".patient-app .p-entry dd")).toMatch(/font-weight:\s*700/);
+  it("「つらくて書けない」は淡い紺の地＋紺の文字（4.5:1 以上）、確認中は濃い紺", () => {
+    const body = ruleOf(".patient-app .p-button--too-sick");
+    expect(body).toMatch(/color:\s*var\(--p-too-sick\)/);
+    expect(body).toMatch(/background:\s*var\(--p-too-sick-bg\)/);
+    expect(body).toMatch(/border:\s*3px solid var\(--p-too-sick\)/);
+    expect(
+      contrast(varOf("--p-too-sick"), varOf("--p-too-sick-bg")),
+    ).toBeGreaterThanOrEqual(4.5);
+    const open = ruleOf(
+      '.patient-app .p-button--too-sick[aria-expanded="true"]',
+    );
+    expect(open).toMatch(/background:\s*var\(--p-too-sick\)/);
+    expect(open).toMatch(/color:\s*#ffffff/);
+  });
+
+  it("自動で記録する「はい」は地が左から満ちる。動きを減らす設定では出さない", () => {
+    const fill = ruleOf(".patient-app .p-countdown-fill");
+    expect(fill).toMatch(/clip-path:\s*inset\(0 100% 0 0\)/);
+    expect(fill).toMatch(/animation-name:\s*p-countdown-fill/);
+    expect(css).toMatch(/@keyframes p-countdown-fill/);
+    const reduced =
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.patient-app \.p-countdown-fill\s*\{([^}]*)\}/.exec(
+        css,
+      )?.[1] ?? "";
+    expect(reduced).toMatch(/display:\s*none/);
+    expect(reduced).toMatch(/animation:\s*none/);
+    expect(
+      contrast(varOf("--p-primary"), varOf("--p-too-sick-bg")),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("代理入力中は画面全体と下のタブの地が薄い橙（お知らせの黄とは別の色）", () => {
+    const page = groupRuleOf(".patient-app:has(.p-toggle--on)");
+    expect(page).toMatch(/background:\s*var\(--p-proxy-bg\)/);
+    expect(groupRuleOf(".patient-app:has(.p-toggle--on) .p-nav")).toMatch(
+      /background:\s*var\(--p-proxy-bg\)/,
+    );
+    expect(ruleOf(".patient-app .p-toggle--on")).toMatch(
+      /border:\s*4px solid var\(--p-proxy-border\)/,
+    );
+    const orange = varOf("--p-proxy-bg");
+    expect(orange).not.toBe(varOf("--p-notice-bg"));
+    const [r, g, b] = rgbOf(orange);
+    expect(r).toBeGreaterThan(g);
+    expect(g).toBeGreaterThan(b);
+    for (const text of ["--p-text", "--p-muted", "--p-error", "--p-primary"]) {
+      expect(contrast(varOf(text), orange)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(varOf("--p-proxy-border"), orange)).toBeGreaterThanOrEqual(
+      3,
+    );
+  });
+
+  it("体温の欄はラベル・入力欄・単位を1行に並べ、入力欄は短く文字は大きい", () => {
+    const row = ruleOf(".patient-app .p-temperature");
+    expect(row).toMatch(/display:\s*flex/);
+    expect(row).toMatch(/flex-wrap:\s*nowrap/);
+    const input = ruleOf(".patient-app .p-temperature input");
+    expect(input).toMatch(/width:\s*calc\(5ch/);
+    expect(remOf(input, "font-size")).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it("回答の表: 3列の幅をそろえ、選んだ欄は青地の太字、行の間に細い線", () => {
+    expect(ruleOf(".patient-app .p-answers")).toMatch(/table-layout:\s*fixed/);
+    expect(ruleOf(".patient-app .p-answers-col")).toMatch(/width:\s*\d+px/);
+    const chosen = ruleOf(".patient-app .p-answer-cell--chosen strong");
+    expect(chosen).toMatch(/font-weight:\s*700/);
+    expect(chosen).toMatch(/background:\s*var\(--p-primary\)/);
+    expect(chosen).toMatch(/border:/);
+    expect(groupRuleOf(".patient-app .p-answers td")).toMatch(
+      /border-bottom:\s*1px solid/,
+    );
+  });
+
+  it("記録した内容の見出しは小さめの灰色", () => {
+    const title = ruleOf(".patient-app .p-saved-title");
+    expect(title).toMatch(/font-size:\s*18px/);
+    expect(title).toMatch(/color:\s*var\(--p-muted\)/);
   });
 
   it("「つらくて書けない」と代理のトグルの間をあける", () => {

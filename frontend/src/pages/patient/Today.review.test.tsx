@@ -3,7 +3,7 @@
  * 読み直し・体温の範囲外・不正な欄への focus・送信中の表示）。
  * 期待する文は patient_strings.json のキーから引く（このファイルに日本語を直書きしない）。
  */
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
@@ -31,6 +31,21 @@ function tooSickButton() {
   return screen.getByRole("button", { name: s("today.too_sick_button") });
 }
 
+function yesButton() {
+  return screen.getByRole("button", { name: s("today.too_sick_confirm_yes") });
+}
+
+function countdownText(seconds: number): string {
+  return s("today.too_sick_countdown").replace("{seconds}", String(seconds));
+}
+
+/** 秒読み（setInterval）を進めて、その後の送信の Promise も流す。 */
+async function advance(ms: number) {
+  await act(async () => {
+    vi.advanceTimersByTime(ms);
+  });
+}
+
 function submitButton() {
   return screen.getByRole("button", { name: s("today.submit") });
 }
@@ -56,6 +71,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -100,8 +116,15 @@ describe("Today: too_sick after something was entered asks first", () => {
       { too_sick: true, by_proxy: true },
     ]);
   });
+});
 
-  it("nothing entered (only the proxy toggle): one tap, no confirm", async () => {
+describe("Today: too_sick with nothing entered records after 3 seconds", () => {
+  // 偽にするのは秒読みの setInterval だけ（setTimeout は Testing Library が使う）
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  });
+
+  it("short confirm and countdown, then {too_sick, by_proxy} is sent once", async () => {
     const fetchMock = mockPatientApi();
     renderToday();
     await screen.findByRole("group", { name: questionText("fever") });
@@ -109,9 +132,70 @@ describe("Today: too_sick after something was entered asks first", () => {
       screen.getByRole("checkbox", { name: s("today.proxy_toggle") }),
     );
     await userEvent.click(tooSickButton());
-    await screen.findByText(s("today.too_sick_done"));
+    expect(
+      screen.getByText(s("today.too_sick_confirm_empty")),
+    ).toBeInTheDocument();
     expect(screen.queryByText(s("today.too_sick_confirm"))).toBeNull();
+    expect(screen.getByText(countdownText(3))).toBeInTheDocument();
+    await advance(2000);
+    expect(screen.getByText(countdownText(1))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    await advance(1000);
+    expect(
+      await screen.findByText(s("today.too_sick_done")),
+    ).toBeInTheDocument();
+    await advance(5000);
+    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+      { too_sick: true, by_proxy: true },
+    ]);
+  });
+
+  it("yes before the time: sent once", async () => {
+    const fetchMock = mockPatientApi();
+    renderToday();
+    await userEvent.click(tooSickButton());
+    await advance(1000);
+    await userEvent.click(yesButton());
+    await screen.findByText(s("today.too_sick_done"));
+    await advance(5000);
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
+  });
+
+  it("no: nothing is sent, the button can be pressed again", async () => {
+    const fetchMock = mockPatientApi();
+    renderToday();
+    await userEvent.click(tooSickButton());
+    await advance(1000);
+    await userEvent.click(
+      screen.getByRole("button", { name: s("today.too_sick_confirm_no") }),
+    );
+    await advance(5000);
+    expect(screen.queryByText(s("today.too_sick_confirm_empty"))).toBeNull();
+    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(tooSickButton()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("choosing an answer during the countdown: the input confirm, no auto send", async () => {
+    const fetchMock = mockPatientApi();
+    renderToday();
+    await screen.findByRole("group", { name: questionText("fever") });
+    await userEvent.click(tooSickButton());
+    await advance(2000);
+    await choose("diarrhea", "answer.present");
+    expect(screen.getByText(s("today.too_sick_confirm"))).toBeInTheDocument();
+    expect(screen.queryByText(countdownText(1))).toBeNull();
+    await advance(5000);
+    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+  });
+
+  it("leaving the page stops the countdown", async () => {
+    const fetchMock = mockPatientApi();
+    const view = renderToday();
+    await userEvent.click(tooSickButton());
+    await advance(1000);
+    view.unmount();
+    await advance(5000);
+    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
   });
 });
 
@@ -125,6 +209,7 @@ describe("Today: where the error of too_sick is shown", () => {
       name: questionText("numbness"),
     });
     await userEvent.click(tooSickButton());
+    await userEvent.click(yesButton());
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(s("error.generic"));
     expect(isBefore(tooSickButton(), alert)).toBe(true);

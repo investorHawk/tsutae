@@ -36,6 +36,16 @@ function submitButton() {
   return screen.getByRole("button", { name: s("today.submit") });
 }
 
+/** 「つらくて書けない」を押して、確認の「はい」を押す。 */
+async function recordTooSick() {
+  await userEvent.click(
+    await screen.findByRole("button", { name: s("today.too_sick_button") }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: s("today.too_sick_confirm_yes") }),
+  );
+}
+
 beforeEach(() => {
   clearPid();
   savePid(PID);
@@ -98,20 +108,35 @@ describe("Today (P1): registration", () => {
   });
 });
 
+describe("Today (P1): the proxy toggle", () => {
+  it("checked: the toggle is marked on (the page turns light orange in CSS)", async () => {
+    mockPatientApi();
+    renderToday();
+    const checkbox = await screen.findByRole("checkbox", {
+      name: s("today.proxy_toggle"),
+    });
+    const label = checkbox.closest("label");
+    expect(label).toHaveClass("p-toggle");
+    expect(label).not.toHaveClass("p-toggle--on");
+    await userEvent.click(checkbox);
+    expect(label).toHaveClass("p-toggle--on");
+    await userEvent.click(checkbox);
+    expect(label).not.toHaveClass("p-toggle--on");
+  });
+});
+
 describe("Today (P1): stage 0 too_sick", () => {
-  it("one tap sends {too_sick, by_proxy:false} and finishes", async () => {
+  it("press, then yes: sends {too_sick, by_proxy:false} and finishes", async () => {
     const fetchMock = mockPatientApi();
     renderToday();
-    await userEvent.click(
-      screen.getByRole("button", { name: s("today.too_sick_button") }),
-    );
+    await recordTooSick();
     expect(
       await screen.findByText(s("today.too_sick_done")),
     ).toBeInTheDocument();
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
       { too_sick: true, by_proxy: false },
     ]);
-    // 記録した後は「取り消す」と「追加で記録する」だけ（P2-4・P2-5。押す前の確認は無い）
+    // 記録した後は「取り消す」と「追加で記録する」だけ（P2-4・P2-5。取り消す前の確認は無い）
     expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
       s("today.undo"),
       s("today.add_more"),
@@ -127,9 +152,7 @@ describe("Today (P1): stage 0 too_sick", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: s("today.proxy_toggle") }),
     );
-    await userEvent.click(
-      screen.getByRole("button", { name: s("today.too_sick_button") }),
-    );
+    await recordTooSick();
     await screen.findByText(s("today.too_sick_done"));
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
       { too_sick: true, by_proxy: true },
@@ -254,6 +277,43 @@ describe("Today (P1): stage 1-2 questions and free text", () => {
 });
 
 describe("Today (P1): temperature", () => {
+  it("label, a short field and the unit on one row (text field, decimal keypad)", async () => {
+    mockPatientApi();
+    renderToday();
+    await choose("fever", "answer.measured");
+    const input = screen.getByRole("textbox", { name: s("temperature.label") });
+    expect(input).toHaveAttribute("type", "text");
+    expect(input).toHaveAttribute("inputmode", "decimal");
+    const row = input.closest(".p-temperature");
+    expect(row).not.toBeNull();
+    const unit = within(row as HTMLElement).getByText(s("temperature.unit"));
+    // 単位は読み上げでも分かるよう、入力欄の説明に入れる
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toEqual([
+      unit.id,
+    ]);
+    // 送ろうとして不正なら、説明に失敗の文も足す
+    await userEvent.click(submitButton());
+    const error = screen.getByText(s("temperature.invalid"));
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toEqual([
+      unit.id,
+      error.id,
+    ]);
+  });
+
+  it("pressing measured focuses the field (the keypad comes up)", async () => {
+    mockPatientApi();
+    renderToday();
+    await choose("fever", "answer.measured");
+    expect(
+      screen.getByRole("textbox", { name: s("temperature.label") }),
+    ).toHaveFocus();
+    await choose("fever", "answer.not_measured");
+    await choose("fever", "answer.measured");
+    expect(
+      screen.getByRole("textbox", { name: s("temperature.label") }),
+    ).toHaveFocus();
+  });
+
   it("measured shows a number field; invalid values block sending", async () => {
     const fetchMock = mockPatientApi();
     renderToday();
@@ -428,9 +488,7 @@ describe("Today (P1): errors and starting over", () => {
       createEntry: () => jsonResponse({ error: "not_registered" }, 401),
     });
     renderToday();
-    await userEvent.click(
-      await screen.findByRole("button", { name: s("today.too_sick_button") }),
-    );
+    await recordTooSick();
     expect(
       await screen.findByText(s("error.not_registered")),
     ).toBeInTheDocument();
@@ -445,9 +503,7 @@ describe("Today (P1): errors and starting over", () => {
     expect(
       await screen.findByText(s("common.load_failed")),
     ).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("button", { name: s("today.too_sick_button") }),
-    );
+    await recordTooSick();
     await screen.findByText(s("today.too_sick_done"));
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
   });

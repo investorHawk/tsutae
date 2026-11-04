@@ -10,7 +10,8 @@ interface ChoiceButtonsProps<V extends AnswerValue> {
 
 /**
  * 大きな選択ボタン（なし／ある／つらい、測っていない／測った）。押したものは aria-pressed。
- * 値ごとの class（p-choice--hard 等）で、選んだ時の見た目を値ごとに変える（P2-1）。
+ * まだ何も選んでいない質問は p-choices--unanswered（全てのボタンを薄い緑にして入力を促す）。
+ * 選んだボタンはどの答えでも同じ青（✓ と太枠つき）、選ばなかったボタンは白。
  */
 export default function ChoiceButtons<V extends AnswerValue>({
   values,
@@ -19,13 +20,14 @@ export default function ChoiceButtons<V extends AnswerValue>({
   disabled = false,
 }: ChoiceButtonsProps<V>) {
   const { t } = usePatientStrings();
+  const unanswered = selected === undefined || !values.includes(selected as V);
   return (
-    <div className="p-choices">
+    <div className={`p-choices${unanswered ? " p-choices--unanswered" : ""}`}>
       {values.map((value) => (
         <button
           key={value}
           type="button"
-          className={`p-choice p-choice--${value}`}
+          className="p-choice"
           aria-pressed={selected === value}
           disabled={disabled}
           onClick={() => onSelect(value)}

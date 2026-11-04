@@ -86,6 +86,9 @@ describe("Today (P1): malformed 200 bodies", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: s("today.too_sick_button") }),
     );
+    await userEvent.click(
+      screen.getByRole("button", { name: s("today.too_sick_confirm_yes") }),
+    );
     expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
     expect(screen.queryByText(s("today.too_sick_done"))).toBeNull();
   });

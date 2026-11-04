@@ -12,7 +12,7 @@ import {
   type EntryFormState,
   type TemperatureProblem,
 } from "./entryForm";
-import { summarizeEntry, summarySourceOf } from "./entrySummary";
+import { summarySourceOf } from "./entrySummary";
 import FreeTextField from "./FreeTextField";
 import { LoadFailed, Loading } from "./LoadStatus";
 import { DoneMessage, ErrorMessage } from "./Messages";
@@ -26,6 +26,7 @@ import QuestionList from "./QuestionList";
 import TodayDone, { type SavedRecord } from "./TodayDone";
 import TooSickButton, { SendingMessage } from "./TooSickButton";
 import { useAsync } from "./useAsync";
+import { useTooSickConfirm } from "./useTooSickConfirm";
 
 /** どちらのボタンから送ったか（送信中・失敗の知らせをそのボタンの近くに出す）。 */
 type Origin = "too_sick" | "submit";
@@ -48,7 +49,8 @@ const NO_ERRORS: ReadonlyMap<string, TemperatureProblem> = new Map();
 /**
  * 今日の記録（P1）の本体。段階0「つらくて書けない」→ 段階1 クローズ質問 → 段階2 自由記載。
  * 送るのは答えたものだけ。空なら送らない。送信後は notices の定型文をそのまま出す。
- * 入力済みで「つらくて書けない」を押したら、入力を捨てることを確かめてから送る。
+ * 「つらくて書けない」は必ず確認してから送る。何も入れていなければ3秒で自動で送り、
+ * 入れた内容があれば、それを捨てることを確かめてから（「はい」を押した時だけ）送る。
  * 記録した後は TodayDone（要約・取り消し・追加で記録する）。記録できたら onSaved を呼ぶ。
  */
 export default function TodayForm({
@@ -66,7 +68,7 @@ export default function TodayForm({
   const [phase, setPhase] = useState<Phase>({ name: "editing" });
   const [error, setError] = useState<{ key: string; at: Origin } | null>(null);
   const [temperatureTried, setTemperatureTried] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const confirm = useTooSickConfirm(hasInput(form));
   const [focusRound, setFocusRound] = useState(0);
   const [infoKey, setInfoKey] = useState<string | null>(null);
 
@@ -93,7 +95,7 @@ export default function TodayForm({
     setForm(EMPTY_FORM);
     setError(null);
     setTemperatureTried(false);
-    setConfirming(false);
+    confirm.close();
     setInfoKey(null);
     setPhase({ name: "editing" });
   }
@@ -124,7 +126,8 @@ export default function TodayForm({
         entryId: res.entry_id,
         messageKey: doneKey,
         notices: res.notices,
-        items: summarizeEntry(summarySourceOf(entry, questions)),
+        source: summarySourceOf(entry, questions),
+        byProxy: entry.by_proxy === true,
         undoable: entry.too_sick === true,
       };
       setPhase({ name: "done", saved });
@@ -163,7 +166,10 @@ export default function TodayForm({
   }
 
   function sendTooSick() {
-    setConfirming(false);
+    if (sending) {
+      return;
+    }
+    confirm.close();
     void send(
       { too_sick: true, by_proxy: form.byProxy },
       "today.too_sick_done",
@@ -190,13 +196,13 @@ export default function TodayForm({
         onChange={(byProxy) => setForm((prev) => ({ ...prev, byProxy }))}
       />
       <TooSickButton
-        confirming={confirming}
+        confirming={confirm.mode}
         disabled={sending}
         sending={sendingFrom === "too_sick"}
         errorKey={error?.at === "too_sick" ? error.key : null}
-        onPress={() => (hasInput(form) ? setConfirming(true) : sendTooSick())}
+        onPress={confirm.open}
         onConfirm={sendTooSick}
-        onCancel={() => setConfirming(false)}
+        onCancel={confirm.close}
       />
 
       {loaded.status === "loading" && <Loading />}

@@ -2,8 +2,8 @@ import { useId, useState } from "react";
 import { isApiError } from "../../api/http";
 import { undoEntry } from "../../api/patient";
 import { usePatientStrings } from "../../strings/PatientStrings";
-import SummaryLine from "./SummaryLine";
-import type { SummaryItem } from "./entrySummary";
+import EntryDetail from "./EntryDetail";
+import type { SummarySource } from "./entrySummary";
 import { DoneMessage, ErrorMessage, Notices } from "./Messages";
 import {
   GENERIC_ERROR_KEY,
@@ -17,7 +17,9 @@ export interface SavedRecord {
   /** today.saved か today.too_sick_done */
   messageKey: string;
   notices: readonly string[];
-  items: readonly SummaryItem[];
+  /** 記録した内容（回答の表の元。なし・測っていないも含む） */
+  source: SummarySource;
+  byProxy: boolean;
   /** 「つらくて書けない」なら取り消せる（P2-5） */
   undoable: boolean;
 }
@@ -50,7 +52,8 @@ interface TodayDoneProps {
 }
 
 /**
- * 記録した後（P2-4・P2-5）。「記録しました」・固定規則の案内・記録した内容の要約・
+ * 記録した後（P2-4・P2-5）。「記録しました」・固定規則の案内・記録した内容（これまでの
+ * 記録と同じ回答の表。書いたことは「あり」だけで本文は出さない）・
  * 「取り消す」（つらくて書けないの後だけ。押す前の確認は無い）・「追加で記録する」。
  */
 export default function TodayDone({
@@ -82,9 +85,11 @@ export default function TodayDone({
         <h2 id={titleId} className="p-saved-title">
           {t("today.saved_summary")}
         </h2>
-        <p>
-          <SummaryLine items={saved.items} />
-        </p>
+        <EntryDetail
+          byProxy={saved.byProxy}
+          source={saved.source}
+          showFreeTextBody={false}
+        />
       </section>
       {canUndo && (
         <button

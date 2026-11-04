@@ -32,6 +32,20 @@ function summaryOf(item: HTMLElement): HTMLElement {
   return summary;
 }
 
+/** 記録1件の詳しい表示の、行見出しが label の行。 */
+function rowOf(item: HTMLElement, label: string): HTMLElement {
+  const header = within(item).getByRole("rowheader", { name: label });
+  const row = header.closest("tr");
+  if (!row) {
+    throw new Error("row is missing");
+  }
+  return row;
+}
+
+function temperatureText(value: string): string {
+  return `${s("answer.measured")} ${s("history.temperature_value").replace("{value}", value)}`;
+}
+
 function renderHistory() {
   return renderPatient(ROUTES, "/history");
 }
@@ -76,27 +90,55 @@ describe("History (P2)", () => {
     ).toHaveLength(1);
   });
 
-  it("shows too_sick, proxy, answers with question text, and free text", async () => {
+  it("shows too_sick, proxy, a table of answers, and free text", async () => {
     mockPatientApi();
     renderHistory();
     const [newest, middle, oldest] = await items();
 
     expect(oldest).toHaveTextContent(s("history.too_sick"));
     expect(oldest).not.toHaveTextContent(s("history.proxy"));
+    expect(within(oldest!).queryByRole("table")).toBeNull();
 
-    expect(middle).toHaveTextContent(s("history.proxy"));
-    expect(middle).toHaveTextContent(questionText("diarrhea"));
-    expect(middle).toHaveTextContent(s("answer.present"));
-    expect(middle).toHaveTextContent(questionText("fever"));
-    expect(middle).toHaveTextContent(s("answer.measured"));
-    expect(middle).toHaveTextContent(s("temperature.label"));
-    expect(middle).toHaveTextContent("37.9");
-    expect(middle).toHaveTextContent(s("history.free_text"));
-    expect(middle).toHaveTextContent(ENTRIES[1]!.free_text!);
+    expect(within(middle!).getByText(s("history.proxy"))).toHaveClass(
+      "p-entry-flag",
+    );
+    // 行は短い症状名、列は なし／ある／つらい。読み上げは「下痢 ある」
+    expect(
+      within(middle!)
+        .getAllByRole("columnheader")
+        .map((th) => th.textContent),
+    ).toEqual([s("answer.none"), s("answer.present"), s("answer.hard")]);
+    expect(
+      within(middle!).getByRole("row", {
+        name: `${s("symptom.diarrhea")} ${s("answer.present")}`,
+      }),
+    ).toBeInTheDocument();
+    // 体温は3列をまたいで「測った 37.9℃」
+    expect(
+      within(middle!).getByRole("row", {
+        name: `${s("symptom.fever")} ${temperatureText("37.9")}`,
+      }),
+    ).toBeInTheDocument();
+    expect(within(middle!).getByText(ENTRIES[1]!.free_text!)).toHaveClass(
+      "p-entry-free-text",
+    );
     expect(middle).not.toHaveTextContent(s("history.too_sick"));
 
     expect(newest).toHaveTextContent(ENTRIES[2]!.free_text!);
     expect(newest).not.toHaveTextContent(s("history.proxy"));
+  });
+
+  it("the free text has a small heading and a box, apart from the table", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [, middle] = await items();
+    const body = within(middle!).getByText(ENTRIES[1]!.free_text!);
+    const box = body.closest(".p-entry-free");
+    expect(box).not.toBeNull();
+    expect(
+      within(box as HTMLElement).getByText(s("history.free_text")),
+    ).toHaveClass("p-entry-label");
+    expect(box!.closest("table")).toBeNull();
   });
 
   it("each record is one line: the date and a short summary, closed until opened", async () => {
@@ -133,7 +175,10 @@ describe("History (P2)", () => {
     expect(
       within(summaryOf(middle!)).getByText(s("answer.present")).tagName,
     ).toBe("STRONG");
-    expect(middle!.querySelector("dd")).toHaveTextContent(s("answer.present"));
+    const chosen = rowOf(middle!, s("symptom.diarrhea")).querySelector(
+      ".p-answer-cell--chosen strong",
+    );
+    expect(chosen).toHaveTextContent(s("answer.present"));
   });
 
   it("the line is a native summary (focusable) and opens the details", async () => {
@@ -194,7 +239,7 @@ describe("History (P2)", () => {
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
-  it("shows the question text recorded with the entry, not the current question set", async () => {
+  it("an unknown key in the details: the question text recorded with the entry", async () => {
     const recordedText = `${questionText("diarrhea")} (v0)`;
     const fetchMock = mockPatientApi({
       entries: () =>
@@ -204,7 +249,7 @@ describe("History (P2)", () => {
               ...ENTRIES[1]!,
               answers: [
                 {
-                  question_key: "diarrhea",
+                  question_key: "diarrhea_v0",
                   value: "hard",
                   temperature: null,
                   question_text: recordedText,
@@ -217,10 +262,14 @@ describe("History (P2)", () => {
     });
     renderHistory();
     const [only] = await items();
-    expect(within(only!).getByRole("term")).toHaveTextContent(
+    expect(within(only!).getByRole("rowheader")).toHaveTextContent(
       new RegExp(`^${escapeRegExp(recordedText)}$`),
     );
-    expect(only).toHaveTextContent(s("answer.hard"));
+    expect(
+      within(only!).getByRole("row", {
+        name: `${recordedText} ${s("answer.hard")}`,
+      }),
+    ).toBeInTheDocument();
     expect(
       callsTo(fetchMock, "GET", `/api/patient/${PID}/questions`),
     ).toHaveLength(0);
@@ -249,12 +298,11 @@ describe("History (P2)", () => {
     });
     renderHistory();
     const [only] = await items();
-    expect(within(only!).getByRole("term")).toHaveTextContent(
-      s("history.previous_question"),
-    );
-    expect(within(only!).getByRole("definition")).toHaveTextContent(
-      s("answer.hard"),
-    );
+    expect(
+      within(only!).getByRole("row", {
+        name: `${s("history.previous_question")} ${s("answer.hard")}`,
+      }),
+    ).toBeInTheDocument();
     expect(only).not.toHaveTextContent("old_question");
   });
 
@@ -265,8 +313,11 @@ describe("History (P2)", () => {
     renderHistory();
     const rows = await items();
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent(questionText("diarrhea"));
-    expect(rows[1]).toHaveTextContent(s("answer.present"));
+    expect(
+      within(rows[1]!).getByRole("row", {
+        name: `${s("symptom.diarrhea")} ${s("answer.present")}`,
+      }),
+    ).toBeInTheDocument();
     expect(
       callsTo(fetchMock, "GET", `/api/patient/${PID}/questions`),
     ).toHaveLength(0);

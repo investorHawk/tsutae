@@ -2,24 +2,11 @@ import { Fragment } from "react";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import { fillTemplate } from "../../strings/template";
 import type { SummaryItem } from "./entrySummary";
-
-const PREVIOUS_QUESTION_KEY = "history.previous_question";
-
-/** 項目の名前。短い症状名（symptom.<key>）、無ければ質問文、それも無ければ「以前の質問」。 */
-function useLabel() {
-  const { t, has } = usePatientStrings();
-  return (questionKey: string, questionText: string | null): string => {
-    const key = `symptom.${questionKey}`;
-    if (has(key)) {
-      return t(key);
-    }
-    return questionText ?? t(PREVIOUS_QUESTION_KEY);
-  };
-}
+import { useSymptomLabel } from "./useSymptomLabel";
 
 function Item({ item }: { item: SummaryItem }) {
   const { t } = usePatientStrings();
-  const label = useLabel();
+  const label = useSymptomLabel();
   switch (item.kind) {
     case "too_sick":
       return <strong>{t("history.too_sick")}</strong>;

@@ -32,16 +32,23 @@ describe("Register (P0)", () => {
     expect(screen.getByText(s("app.notice_synthetic"))).toBeInTheDocument();
   });
 
-  it("says what the app records and who receives it (register.about)", () => {
+  it("says what the app records and who receives it, in two lines", () => {
     mockFetch(() => jsonResponse({ ok: true }));
     renderPatient(ROUTES, `/register?pid=${PID}`);
-    expect(screen.getByText(s("register.about"))).toBeInTheDocument();
+    const first = screen.getByText(s("register.about_record"));
+    const second = screen.getByText(s("register.about_doctor"));
+    // 文ごとに別の段落（1行目「記録します」、2行目「先生に届きます」）
+    expect(first.tagName).toBe("P");
+    expect(second.tagName).toBe("P");
+    expect(first).not.toBe(second);
+    expect(first.nextElementSibling).toBe(second);
   });
 
   it("the explanation is shown even when the QR code is missing", () => {
     mockFetch(() => jsonResponse({ ok: true }));
     renderPatient(ROUTES, "/register");
-    expect(screen.getByText(s("register.about"))).toBeInTheDocument();
+    expect(screen.getByText(s("register.about_record"))).toBeInTheDocument();
+    expect(screen.getByText(s("register.about_doctor"))).toBeInTheDocument();
   });
 
   it("without pid: register.required, no button, no request", () => {

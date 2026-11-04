@@ -5,6 +5,11 @@
 skill_versions に登録するが、regimen_forms・部品集・下書きの adopted は無いまま残る
 （既存は form_unavailable、新規は code_taken で開けなくなる）。
 
+`recover_abandoned_turns(conn)`（起動時に recover_interrupted_adoptions の前に呼ぶ。T94）:
+working の下書きを全て open に戻し、会話に失敗の行を足す。起動の時点で working の行は
+全て前のプロセスの往復の取り残し（単一プロセス）。戻さないと、working のまま落ちた
+下書きが下の回復（open だけを見る）から漏れる
+
 `recover_interrupted_adoptions(conn, skills_dir)`（起動時に ensure_skill_versions の後で呼ぶ）:
 
 - 開いた（open の）下書きのうち、採用で作る版が skill_versions にあり regimen_forms に無い
@@ -37,7 +42,7 @@ from tsutae.regimen.source import canonical_form_json
 from tsutae.regimen.text_checks import RegimenFormError
 from tsutae.skills import SKILL_FILE_NAME, SkillValidationError
 
-__all__ = ["recover_interrupted_adoptions"]
+__all__ = ["recover_abandoned_turns", "recover_interrupted_adoptions"]
 
 _log = logging.getLogger(__name__)
 
@@ -133,6 +138,11 @@ def _recover_one(
         return False
     _log.info("採用の途中で止まった %s@%d を補った", name, version)
     return True
+
+
+def recover_abandoned_turns(conn: sqlite3.Connection) -> int:
+    """working の下書きを全て open に戻し、戻した数を返す（起動時だけ呼ぶ）。"""
+    return repo.recover_stale_working(conn, timeout_s=0.0)
 
 
 def recover_interrupted_adoptions(conn: sqlite3.Connection, skills_dir: Path) -> int:

@@ -23,9 +23,11 @@ from e2e_scripts import (
     DEMO_PID,
     DEMO_RECEPTION,
     NEW_QUESTION_KEY,
+    NEW_QUESTION_LABEL,
     NEW_QUESTION_TEXT,
     UNPROCESSED_SEQ,
     InterruptingRunner,
+    adopt_new_question,
     bad_doctor_tokens,
     close_visit,
     demo_client,
@@ -38,7 +40,6 @@ from e2e_scripts import (
     grid_row,
     post_visit,
     prompt_input,
-    question_adding_editor,
     report_html,
     section,
     set_runner,
@@ -532,13 +533,14 @@ def test_visit_closed_during_generation_is_not_revived(
 
 
 # ---------------------------------------------------------------------------
-# (10) D4: 質問を1つ足す → 差分 → 承認 → 版 2 → 翌日の質問集と経過表の「−−」
+# (10) D4 レジメン: 質問を1つ足す → 確認（差分）→ 採用 → 版 2 → 翌日の質問集と経過表の「−−」
+#      （v1.1。旧 D4 の一文の書き換えは report-format だけ。regimen-* は use_regimen_editor）
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
 def d4_client(tmp_path: Path, fixed_today: str):
-    with demo_client(tmp_path, editor=question_adding_editor()) as c:
+    with demo_client(tmp_path) as c:
         yield c
 
 
@@ -552,13 +554,11 @@ def _approve_new_question(client: TestClient) -> None:
             "request_text": "口内炎は、食事がとれたかも次から聞いて",
         },
     )
-    assert r.status_code == 200, r.text
-    change = r.json()
-    assert change["status"] == "pending"
-    assert f"+  - {{key: {NEW_QUESTION_KEY}" in change["diff"]
-    assert skill_file(client).read_text("utf-8") == before  # 承認まで本体は同じ
-    r = client.post(f"/api/doctor/skill-changes/{change['id']}/approve")
-    assert r.status_code == 200 and r.json() == {"ok": True, "new_version": 2}
+    assert r.status_code == 400 and r.json() == {"error": "use_regimen_editor"}
+    assert skill_file(client).read_text("utf-8") == before
+    preview = adopt_new_question(client)
+    assert f"+  - {{key: {NEW_QUESTION_KEY}" in preview["skill_md"]["text"]
+    assert preview["adopted"]["version"] == 2
     skills = {
         s["name"]: s["version"]
         for s in client.get("/api/doctor/skills").json()["skills"]
@@ -599,7 +599,8 @@ def test_skill_change_updates_next_day_questions_and_grid(
     )  # 医師の Cookie も取り直す
     assert visit["status"] == "ready" and visit["fallback"] is False
     html = report_html(client, visit["id"])
-    assert NEW_QUESTION_TEXT in section(html, "grid")  # 未知の key は質問文が行名
+    grid = section(html, "grid")  # 未知の key は版の form の短い名前が行名（v1.1）
+    assert f">{NEW_QUESTION_LABEL}<" in grid and NEW_QUESTION_TEXT not in grid
     row = grid_row(html, f"c3-{NEW_QUESTION_KEY}")
     for day in (12, 13):  # 前の日（v1 の記録がある日）は未設問
         cls, body = row[day]

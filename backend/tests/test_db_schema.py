@@ -132,10 +132,7 @@ def test_measured_with_temperature_is_accepted(conn: sqlite3.Connection) -> None
 @pytest.mark.parametrize(
     ("sql", "params"),
     [
-        (
-            "INSERT INTO patients (id, regimen, created_at) VALUES ('P-X', 'XELOX', 'x')",
-            (),
-        ),
+        # patients.regimen の CHECK は v1.1 で外した（test_db_migrate_patients.py）
         (
             "INSERT INTO entries (patient_id, recorded_at, record_date, kind, by_proxy,"
             " skill_version) VALUES (?, 'x', 'x', 'chat', 0, 'v')",

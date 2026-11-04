@@ -800,7 +800,8 @@ async def test_questions_by_version_fetch_is_bounded(
     versions += [folfox.name + suffix for suffix in bad]
     got = questions_by_version(conn, versions=versions)
     assert got == {folfox.skill_version: list(folfox.questions), huge: shorter}
-    assert len(calls) == 3  # folfox@1・folfox@1000000・capox@7 だけ
+    # folfox@1・folfox@1000000・capox@7・unknown@1 だけ（v1.1: regimen-* は全て引く）
+    assert len(calls) == 4
 
     calls.clear()
     with caplog.at_level(logging.WARNING, logger=service.__name__):

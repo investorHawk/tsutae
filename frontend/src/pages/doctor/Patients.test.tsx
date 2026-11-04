@@ -21,6 +21,10 @@ afterEach(() => {
 
 const LIST = "GET /api/doctor/patients";
 const CREATE = "POST /api/doctor/patients";
+// 追加の欄はレジメンの選択肢を API から読む（T95）
+const REGIMENS = {
+  "GET /api/doctor/regimens": fixtureBody("doctor_regimens") as object,
+};
 const BASE = "http://localhost:5173/register?pid=";
 
 const PATIENTS: DoctorPatient[] = [
@@ -58,9 +62,10 @@ const PATIENTS: DoctorPatient[] = [
   }),
 ];
 
-/** 見出しの右の「＋ 患者を追加」で追加の欄を開く。 */
+/** 見出しの右の「＋ 患者を追加」で追加の欄を開き、レジメンの選択肢を読むまで待つ。 */
 async function openAdd() {
   await userEvent.click(screen.getByRole("button", { name: "＋ 患者を追加" }));
+  await screen.findByRole("option", { name: "CAPOX" });
 }
 
 function renderPatients() {
@@ -77,7 +82,10 @@ function rowOf(pid: string): HTMLElement {
 
 describe("Patients（D1 患者一覧）", () => {
   it("仮名ID・レジメンを並べ、仮名IDから D2 へ", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     expect(
       screen.getByRole("heading", { level: 1, name: "患者一覧" }),
@@ -88,7 +96,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("最後の記録日・今のコース・次回受診の列（無ければ —）", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     const headers = screen
@@ -110,7 +121,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("記録が途切れた患者（API の record_stale）に橙の印と何日前か", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     const demo = within(rowOf("P-DEMO0001"));
@@ -127,7 +141,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("実際の API の応答（fixture）をそのまま並べる", async () => {
-    mockApi({ [LIST]: fixtureBody("doctor_patients") as object });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: fixtureBody("doctor_patients") as object,
+    });
     renderPatients();
     const demo = within(
       (await screen.findByRole("link", { name: "P-DEMO0001" })).closest(
@@ -138,7 +155,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("一覧がいちばん上。追加の欄は普段は閉じ、「＋ 患者を追加」で開いて「やめる」で閉じる", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     expect(screen.queryByRole("region", { name: "患者を追加" })).toBeNull();
@@ -154,7 +174,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("「患者を追加」は小見出し付きの枠で、一覧と分かれている", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     await openAdd();
@@ -170,7 +193,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("氏名の欄は無い", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     expect(screen.queryByText(/氏名/)).toBeNull();
@@ -178,7 +204,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("行の「登録用QR」でその患者の register_url の QR を描く", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     await userEvent.click(
@@ -195,7 +224,10 @@ describe("Patients（D1 患者一覧）", () => {
   });
 
   it("QR はもう一度押すと閉じる", async () => {
-    mockApi({ [LIST]: { patients: PATIENTS } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: PATIENTS },
+    });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     const button = within(rowOf("P-DEMO0001")).getByRole("button", {
@@ -223,6 +255,7 @@ describe("Patients（D1 患者一覧）", () => {
     });
     const lists = [PATIENTS, [...PATIENTS, created]];
     const fetchMock = mockApi({
+      ...REGIMENS,
       [LIST]: () => jsonResponse({ patients: lists.shift() ?? [] }),
       [CREATE]: { id: created.id, register_url: created.register_url },
     });
@@ -246,6 +279,7 @@ describe("Patients（D1 患者一覧）", () => {
 
   it("作成に失敗したら code を出す", async () => {
     mockApi({
+      ...REGIMENS,
       [LIST]: { patients: PATIENTS },
       [CREATE]: () => jsonResponse({ error: "invalid_regimen" }, 400),
     });
@@ -264,7 +298,11 @@ describe("Patients（D1 患者一覧）", () => {
   ])(
     "作成の応答が契約と違えば（%s）invalid_response、QR は出さない",
     async (_l, body) => {
-      mockApi({ [LIST]: { patients: PATIENTS }, [CREATE]: body });
+      mockApi({
+        ...REGIMENS,
+        [LIST]: { patients: PATIENTS },
+        [CREATE]: body,
+      });
       renderPatients();
       await screen.findByRole("link", { name: "P-DEMO0001" });
       await openAdd();
@@ -277,7 +315,10 @@ describe("Patients（D1 患者一覧）", () => {
   );
 
   it("患者がいなければその旨", async () => {
-    mockApi({ [LIST]: { patients: [] } });
+    mockApi({
+      ...REGIMENS,
+      [LIST]: { patients: [] },
+    });
     renderPatients();
     expect(
       await screen.findByText("登録された患者はいません"),
@@ -299,7 +340,10 @@ describe("Patients（D1 患者一覧）", () => {
   ])(
     "応答が契約と違えば（%s）invalid_response（0件と言わない）",
     async (_l, b) => {
-      mockApi({ [LIST]: b });
+      mockApi({
+        ...REGIMENS,
+        [LIST]: b,
+      });
       renderPatients();
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "invalid_response",

@@ -26,6 +26,7 @@ C3 = [(1, date(2026, 9, 27)), (2, date(2026, 10, 13)), (3, date(2026, 10, 27))]
 PROTECTED: list[tuple[str, str, dict | None]] = [
     ("get", "/api/doctor/patients", None),
     ("post", "/api/doctor/patients", {"regimen": "FOLFOX"}),
+    ("get", "/api/doctor/regimens", None),
     ("get", "/api/doctor/patients/P-AAAAAAAA/courses", None),
     ("get", "/api/doctor/patients/P-AAAAAAAA/visits", None),
     ("get", "/api/doctor/patients/P-AAAAAAAA/entries", None),

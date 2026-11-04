@@ -22,6 +22,7 @@ from pydantic import ValidationError
 
 from tsutae.config import PATIENT_STRINGS_PATH, get_settings
 from tsutae.schemas import (
+    REGIMEN_CODE_MAX,
     REGIMEN_CODE_PATTERN,
     Regimen,
     RegimenSkill,
@@ -34,6 +35,8 @@ DEFAULT_REPORT_SKILL = "report-format-default"
 # SKILL.md 全文の上限（文字数）。D4 でエージェントが書いた結果の暴走を止める
 MAX_SKILL_CHARS = 100_000
 
+# 評価済みの2つ（必須の Skill・FOLFOX/CAPOX の並び）。レジメンの全体ではない（v1.1。
+# 置かれているレジメンは `skills.catalog.list_regimens`）
 REGIMEN_SKILL_NAMES: Mapping[str, str] = MappingProxyType(
     {"FOLFOX": "regimen-folfox", "CAPOX": "regimen-capox"}
 )
@@ -43,7 +46,6 @@ _SKILL_MODELS: tuple[tuple[str, type[RegimenSkill] | type[ReportFormatSkill]], .
 )
 _SKILL_NAME_RE = re.compile(SKILL_NAME_PATTERN)
 _REGIMEN_CODE_RE = re.compile(REGIMEN_CODE_PATTERN)
-_REGIMEN_CODE_MAX = 30  # RegimenSkill.regimen の max_length と同じ
 _FENCE = "---"
 # 固定規則の閾値（℃）として受け付ける範囲。ReportFormatSkill.fever_attention_celsius と同じ
 _THRESHOLD_MIN_CELSIUS = 35.0
@@ -260,10 +262,9 @@ def _check_fixed_rules(skill: RegimenSkill) -> None:
 
 def _check_regimen_skill(name: str, skill: RegimenSkill) -> None:
     """RegimenSkill の型だけでは見ていない、ローダーとパイプラインの前提を確かめる。"""
-    # load_regimen_skill と同じ合否にする（D4 の検査はこちらを通る）
-    if name in REGIMEN_SKILL_NAMES.values() and (
-        REGIMEN_SKILL_NAMES.get(skill.regimen) != name
-    ):
+    # 全ての regimen-* で名前は `regimen-` + 識別名の小文字（v1.1。T91 の検証の指摘）。
+    # load_regimen_skill・list_regimens と同じ合否にする（D4 の検査もこちらを通る）
+    if regimen_skill_name(skill.regimen) != name:
         raise SkillValidationError(
             "regimen_mismatch", f"{name} の regimen が {skill.regimen} になっている"
         )
@@ -321,7 +322,7 @@ def regimen_skill_name(regimen: object) -> str | None:
         return None
     if regimen in REGIMEN_SKILL_NAMES:
         return REGIMEN_SKILL_NAMES[regimen]
-    if len(regimen) > _REGIMEN_CODE_MAX or not _REGIMEN_CODE_RE.fullmatch(regimen):
+    if len(regimen) > REGIMEN_CODE_MAX or not _REGIMEN_CODE_RE.fullmatch(regimen):
         return None
     return "regimen-" + regimen.lower()
 

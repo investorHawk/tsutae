@@ -6,7 +6,8 @@ architecture 9c「下書き」。値の検査・描画は `tsutae.regimen`（こ
 - 書き換え（`update_draft_form`）・破棄は open のときだけ（条件付きの UPDATE。working・
   閉じた下書きは False）。1つのレジメンに開いている下書きは1つまで（部分 UNIQUE 索引。
   ぶつかれば `DraftConflictError`）
-- `begin_working` は generation を上げて working にする（T94 の1往復の始まり）。
+- `begin_working` は generation を上げて working にする（T94 の1往復の始まり。読んだ時の
+  form_json・sources_json と同じときだけ）。
   `recover_stale_working` は working のまま上限を過ぎた行を open に戻し、会話に失敗の行
   `{role: system, kind: turn_failed, reason: timeout, generation, at}` を足す
 - 採用は呼び出し側が1つの write_transaction で `insert_skill_version_row`・
@@ -165,16 +166,32 @@ def update_draft_form(
 
 
 def begin_working(
-    conn: sqlite3.Connection, draft_id: int, *, at: datetime | None = None
+    conn: sqlite3.Connection,
+    draft_id: int,
+    *,
+    at: datetime | None = None,
+    expected_form_json: str | None = None,
+    expected_sources_json: str | None = None,
 ) -> int | None:
-    """open → working にし、上げた generation を返す。open でなければ None。"""
+    """open → working にし、上げた generation を返す。open でなければ None。
+
+    `expected_*` を渡すと、今の値がそれと同じときだけ working にする（往復が読んでから
+    始めるまでの間に PATCH が入っていれば None。`update_draft_form` と同じ楽観的な検査）。
+    """
     stamp = dt_to_db(at if at is not None else clock_now())
+    sql = (
+        "UPDATE regimen_drafts SET status = 'working', generation = generation + 1,"
+        " working_since = ?, updated_at = ? WHERE id = ? AND status = 'open'"
+    )
+    params: list[object] = [stamp, stamp, draft_id]
+    if expected_form_json is not None:
+        sql += " AND form_json = ?"
+        params.append(expected_form_json)
+    if expected_sources_json is not None:
+        sql += " AND sources_json = ?"
+        params.append(expected_sources_json)
     with write_transaction(conn):
-        cur = conn.execute(
-            "UPDATE regimen_drafts SET status = 'working', generation = generation + 1,"
-            " working_since = ?, updated_at = ? WHERE id = ? AND status = 'open'",
-            (stamp, stamp, draft_id),
-        )
+        cur = conn.execute(sql, params)
         if cur.rowcount == 0:
             return None
         row = conn.execute(

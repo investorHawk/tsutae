@@ -6,7 +6,8 @@
 - 患者の受診: 印刷済み・期限切れも含めて新しい順。受付番号は消えていれば null。
   report_available はレポートを開ける（受付番号が残っている ready）か
 - 患者の記録: 直近 `RECENT_ENTRIES_MAX` 件を新しい順。クローズ回答はコード
-  （question_key・value・temperature）のまま返し、表示名は画面で引く。自由記載は有無
+  （question_key・value・temperature）のまま返し、表示名は画面で引く（既知の6問は画面の表、
+  それ以外は記録の版の form の短い名前 question_label。無ければ null。v1.1）。自由記載は有無
   （has_free_text）だけで原文は返さない（原文は D6 の未処理の記載だけに出す）
 - 医師画面の UX の見直し（2026-11-04 夜）: 一覧の current_day（今日の Day）・
   days_since_last_record・record_stale（最後の記録が今日から `STALE_AFTER_DAYS` 日以上前、
@@ -18,7 +19,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from typing import Any
 
@@ -128,8 +129,16 @@ def _day_fields(day: CourseDay | None) -> dict[str, int | None]:
     return {"course_no": day[0], "day": day[1]}
 
 
-def entry_summary(entry: Entry, courses: Sequence[Course]) -> dict[str, Any]:
-    """患者の画面の記録1件（記録日のコースと Day つき）。自由記載の原文は入れない。"""
+def entry_summary(
+    entry: Entry,
+    courses: Sequence[Course],
+    labels: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """患者の画面の記録1件（記録日のコースと Day つき）。自由記載の原文は入れない。
+
+    labels はその記録の版の form の質問の短い名前（`question_label`。無ければ null。v1.1）。
+    """
+    names = labels or {}
     return {
         "id": entry.id,
         "recorded_at": entry.recorded_at.isoformat(),
@@ -142,6 +151,7 @@ def entry_summary(entry: Entry, courses: Sequence[Course]) -> dict[str, Any]:
                 "question_key": a.question_key,
                 "value": a.value,
                 "temperature": a.temperature,
+                "question_label": names.get(a.question_key),
             }
             for a in entry.answers
         ],

@@ -262,3 +262,13 @@ def latest_skill_version(
         (skill_name,),
     ).fetchone()
     return None if row is None else _version_row(row)
+
+
+def list_skill_names(conn: sqlite3.Connection, prefix: str) -> list[str]:
+    """skill_versions に登録済みの Skill 名のうち prefix で始まるもの（重複なし・名前順）。"""
+    rows = conn.execute(
+        "SELECT DISTINCT skill_name FROM skill_versions"
+        " WHERE substr(skill_name, 1, ?) = ? ORDER BY skill_name",
+        (len(prefix), prefix),
+    ).fetchall()
+    return [str(r[0]) for r in rows]

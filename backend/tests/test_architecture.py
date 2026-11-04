@@ -1,10 +1,11 @@
 """アーキテクチャの検査（ast。docs/architecture.md §0-10・§8・§8b）。
 
 - 患者 API（`tsutae/api/patient.py`）は pipeline・report・変換結果（get_timeline・
-  get_report）・skillchange を import しない
+  get_report）・skillchange・D4 レジメンの下書き（tsutae.regimen・repo_regimen_drafts。
+  チャットの文面を持つ。v1.1）を import しない
 - 患者側の API（`patient.py`・`visit.py`・`fixed_rules.py`）は変換結果の読み書き
-  （`db.get_report` 等の属性参照・名前・`getattr` の文字列・reports/timelines を引く
-  SQL）を使わない（`from tsutae import db` 経由の抜け道を塞ぐ）
+  （`db.get_report` 等の属性参照・名前・`getattr` の文字列・reports/timelines・
+  regimen_drafts を引く SQL）を使わない（`from tsutae import db` 経由の抜け道を塞ぐ）
 - 実際の患者 API の応答（spec §18）: AI の出力（用語・引用・レポート）と医師向けの
   語を含まない。文字列は patient_strings.json・Skill の質問文・本人の記録・機械の
   コード（日時・状態・キー）だけ
@@ -27,7 +28,15 @@ from tsutae.config import PACKAGE_ROOT, PATIENT_STRINGS_PATH
 
 PATIENT_API = PACKAGE_ROOT / "api" / "patient.py"
 CLOCK_MODULE = PACKAGE_ROOT / "config.py"
-FORBIDDEN_MODULES = ("tsutae.pipeline", "tsutae.report", "tsutae.skillchange")
+# v1.1: D4 レジメンの下書き（tsutae.regimen・regimen_drafts）は Claude の返答・チャットの
+# 文面を持つ院内のもの。患者 API からは読まない（患者に届くのは採用した質問文だけ）
+FORBIDDEN_MODULES = (
+    "tsutae.pipeline",
+    "tsutae.report",
+    "tsutae.skillchange",
+    "tsutae.regimen",
+    "tsutae.db.repo_regimen_drafts",
+)
 FORBIDDEN_NAMES = frozenset({"get_timeline", "get_report", "skillchange"})
 # 患者側の API。visit.py は生成を起こすため pipeline.service の import は許す
 PATIENT_SIDE = tuple(
@@ -37,7 +46,8 @@ RESULT_ACCESSORS = frozenset(
     {"get_timeline", "get_report", "save_timeline", "save_report"}
 )
 RESULT_SQL = re.compile(
-    r"\b(?:from|join|into|update|table)\s+[\"'`\[]?(?:reports|timelines)\b",
+    r"\b(?:from|join|into|update|table)\s+[\"'`\[]?"
+    r"(?:reports|timelines|regimen_drafts)\b",
     re.IGNORECASE,
 )
 
@@ -141,6 +151,10 @@ def test_patient_api_does_not_import_results_or_pipeline() -> None:
         "from ..pipeline import service\n",
         "from .. import report\n",
         "def f():\n    from tsutae.db import get_report\n",
+        "from tsutae.regimen.drafts import load_draft\n",
+        "from tsutae import regimen\n",
+        "from tsutae.db import repo_regimen_drafts\n",
+        "from tsutae.db.repo_regimen_drafts import get_draft\n",
     ],
 )
 def test_forbidden_import_detector_catches(tmp_path: Path, source: str) -> None:
@@ -211,6 +225,7 @@ def test_fixed_rules_does_not_import_results_or_pipeline() -> None:
         "def f(conn):\n    return conn.execute('SELECT html FROM reports')\n",
         "q = 'select json from timelines where visit_id = ?'\n",
         "q = 'SELECT * FROM visits v JOIN \"reports\" r ON r.visit_id = v.id'\n",
+        "q = 'SELECT chat_json FROM regimen_drafts WHERE id = ?'\n",
     ],
 )
 def test_result_reference_detector_catches(tmp_path: Path, source: str) -> None:

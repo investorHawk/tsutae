@@ -18,10 +18,11 @@ from tsutae.db.connection import (
     require_exists,
     write_transaction,
 )
-from tsutae.schemas import Course
+from tsutae.schemas import REGIMEN_CODE_MAX, REGIMEN_CODE_PATTERN, Course
 
 PATIENT_ID_PATTERN = re.compile(r"P-[A-Z0-9]{8}")
-REGIMENS = ("FOLFOX", "CAPOX")
+# レジメンの識別名の書式だけを見る（v1.1。置かれたレジメンとの照合は API の入口）
+_REGIMEN_CODE_RE = re.compile(REGIMEN_CODE_PATTERN)
 _ID_ALPHABET = string.ascii_uppercase + string.digits
 _ID_ATTEMPTS = 5
 
@@ -35,12 +36,21 @@ def _validate_patient_id(patient_id: str) -> None:
         raise ValueError("patient_id は P- + 英大文字数字8桁")
 
 
+def _validate_regimen(regimen: object) -> None:
+    """識別名の書式（英大文字・数字・`-`、30字まで）。置かれているかは見ない。"""
+    if not (
+        isinstance(regimen, str)
+        and len(regimen) <= REGIMEN_CODE_MAX
+        and _REGIMEN_CODE_RE.fullmatch(regimen)
+    ):
+        raise ValueError(f"bad regimen code: {regimen!r}")
+
+
 def create_patient(
     conn: sqlite3.Connection, regimen: str, patient_id: str | None = None
 ) -> str:
     """患者を登録して仮名IDを返す。patient_id 指定時はそれを使う（合成データ用）。"""
-    if regimen not in REGIMENS:
-        raise ValueError(f"unknown regimen: {regimen!r}")
+    _validate_regimen(regimen)
     if patient_id is not None:
         validate_new_patient(regimen, patient_id)
         _insert_patient(conn, patient_id, regimen)
@@ -57,8 +67,7 @@ def create_patient(
 
 def validate_new_patient(regimen: str, patient_id: str) -> None:
     """regimen と（指定された）仮名IDの形を検査する。違えば ValueError。"""
-    if regimen not in REGIMENS:
-        raise ValueError(f"unknown regimen: {regimen!r}")
+    _validate_regimen(regimen)
     _validate_patient_id(patient_id)
 
 

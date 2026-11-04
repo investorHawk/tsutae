@@ -5,7 +5,13 @@ PreparedInput は変換パイプラインが作る。レポートはそれを信
 
 - 患者: courses・entries・引数の patient_id が同じ患者
 - 日程: 受診日の今コース・レジメン・日程が courses と Skill から作り直したものと同じ
-- Skill: regimen / report の版と質問集が、渡された Skill と完全に一致する
+- Skill: regimen / report の版と質問集・用語の対応（term_keys）が、渡された Skill と
+  完全に一致する
+- 記録の版（v1.1。用語の対応を記録ごとに引くため）: entry_versions は送った記録の
+  skill_version と同じ（entry_mismatch）。入力の版と違う版の記録があり、その版の質問集が
+  questions_by_version にあれば、other_versions にその版の材料があって質問の key がその
+  質問集と同じこと。入力の版・送っていない版の材料は持たない（skill_mismatch）。
+  材料の term_keys は版の frontmatter からしか作れないので、ここでは作り直さない
 - 記録: entry_no ごとに、記録日・Day（記録日から数え直す）・代理・too_sick・回答・
   伏せ字後の文が元の記録と一致する。伏せ字後の文は元の自由記載に伏せ字を掛け直して
   比べる（両方を同じ捏造文に差し替えても通らない）。二次検出に掛かる記録は送れない
@@ -104,6 +110,31 @@ def _check_skills(
         raise ReportBuildError("skill_mismatch", "report Skill の版が違う")
     if list(pi.questions) != list(regimen_skill.questions):
         raise ReportBuildError("skill_mismatch", "質問集が regimen Skill と違う")
+    if dict(prepared.term_keys) != dict(regimen_skill.term_keys or {}):
+        raise ReportBuildError("skill_mismatch", "用語の対応が regimen Skill と違う")
+
+
+def _check_entry_versions(prepared: PreparedInput, by_id: Mapping[int, Entry]) -> None:
+    for no, version in prepared.entry_versions.items():
+        entry = by_id.get(prepared.entry_ids.get(no, -1))
+        if entry is None or entry.skill_version != version:
+            raise ReportBuildError("entry_mismatch", f"entry_no {no} の版が記録と違う")
+
+
+def _check_other_versions(
+    prepared: PreparedInput,
+    questions_by_version: Mapping[str, Sequence[Question]],
+) -> None:
+    current = prepared.input.regimen_skill_version
+    sent = set(prepared.entry_versions.values()) - {current}
+    expected = {
+        v: [q.key for q in questions_by_version[v]]
+        for v in sent
+        if v in questions_by_version
+    }
+    got = {v: list(o.question_keys) for v, o in prepared.other_versions.items()}
+    if not set(got) <= sent or any(got.get(v) != keys for v, keys in expected.items()):
+        raise ReportBuildError("skill_mismatch", "記録の版の用語の対応の材料が版と違う")
 
 
 def mask_free_text(
@@ -239,5 +270,7 @@ def check_inputs(
     _check_schedule(prepared, ordered, regimen_skill, visit_date)
     _check_skills(prepared, regimen_skill, report_skill)
     _check_prepared_entries(prepared, by_id, ordered, doctor_masks)
+    _check_entry_versions(prepared, by_id)
+    _check_other_versions(prepared, questions_by_version)
     _check_answer_types(entries, regimen_skill, questions_by_version)
     return CheckedInputs(courses=ordered, by_id=by_id)

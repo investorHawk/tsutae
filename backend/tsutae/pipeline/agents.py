@@ -4,7 +4,10 @@
   JSON のテキストを返し、主エージェントがまとめて emit_timeline / emit_report を呼ぶ
   （Hook の掛け所を1か所にする。docs/decisions.md）
 - model は settings.subagent_model、skills はレジメンの Skill（本文の決まりに従わせる）
-- term-mapper には ctcae_terms.json の用語名と question_key を埋める（一覧から選ばせる）
+- term-mapper には ctcae_terms.json の用語名と question_key を埋める（一覧から選ばせる）。
+  question_key は入力の版の term_keys で上書きした値（v1.1。FOLFOX/CAPOX@1 は一覧のまま）。
+  記録ごとの版の対応は入れない（記録に版を持たせると依頼文が変わる）。版の混ざる受診で
+  違う key を付けた出来事は checks が記録の版の key で差し戻す
 - 指示の文に敬称・施設名の語を書かない（主エージェントへの依頼文と同じ理由）
 - date-normalizer には主エージェントが依頼文の「日付と Day の対応表」（DAY_TABLE_TITLE。
   prompt.py が作る）を day_table として渡す。Day は表から引かせ、数えさせない
@@ -12,6 +15,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from claude_agent_sdk import AgentDefinition
@@ -19,6 +23,7 @@ from claude_agent_sdk import AgentDefinition
 from tsutae.config import Settings
 from tsutae.pipeline.tools import EMIT_REPORT_TOOL, EMIT_TIMELINE_TOOL
 from tsutae.skills import is_valid_skill_name
+from tsutae.skills.term_keys import term_keys_for
 from tsutae.synthetic import load_terms
 
 __all__ = [
@@ -131,23 +136,33 @@ closed_answer はその回答の value をそのまま写す
 """
 
 
-def _term_lines(terms: list[dict[str, Any]]) -> str:
+def _term_lines(
+    terms: list[dict[str, Any]], term_keys: Mapping[str, str | None] | None = None
+) -> str:
+    keys = term_keys_for(term_keys, terms)
     return "\n".join(
-        f"- {t['term']}（question_key: {t.get('question_key') or 'null'}）"
-        for t in terms
+        f"- {t['term']}（question_key: {keys[t['term']] or 'null'}）" for t in terms
     )
 
 
 def build_agents(
-    settings: Settings, regimen_skill_name: str
+    settings: Settings,
+    regimen_skill_name: str,
+    term_keys: Mapping[str, str | None] | None = None,
 ) -> dict[str, AgentDefinition]:
-    """3役の AgentDefinition（名前 → 定義）。"""
+    """3役の AgentDefinition（名前 → 定義）。
+
+    term_keys は入力の版の用語 → 質問 key の上書き（PreparedInput.term_keys）。無ければ
+    全体の対応（FOLFOX/CAPOX@1 の依頼文は変わらない）。
+    """
     if not (
         is_valid_skill_name(regimen_skill_name)
         and regimen_skill_name.startswith("regimen-")
     ):
         raise ValueError("regimen_skill_name はレジメンの Skill 名")
-    term_prompt = _TERM_MAPPER_TEMPLATE.replace("{terms}", _term_lines(load_terms()))
+    term_prompt = _TERM_MAPPER_TEMPLATE.replace(
+        "{terms}", _term_lines(load_terms(), term_keys)
+    )
     specs = {
         DATE_NORMALIZER: (
             "自由記載から症状の記述を切り出し、出来事ごとの暦日（date）・Day・回想かどうかを"

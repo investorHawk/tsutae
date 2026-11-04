@@ -15,6 +15,7 @@ import {
   isPatientsResponse,
   isPipelineEventsResponse,
   isQuestionLibraryResponse,
+  isRegimensResponse,
   isSavedCourse,
   isSkillChangesResponse,
   isSkillContentResponse,
@@ -48,6 +49,7 @@ import type {
   PipelineEventsResponse,
   QuestionLibraryResponse,
   Regimen,
+  RegimensResponse,
   RejectSkillChangeResponse,
   SkillChangesResponse,
   SkillContentResponse,
@@ -116,6 +118,14 @@ export function listPatients(): Promise<PatientsResponse> {
   return getChecked<PatientsResponse>(
     "/api/doctor/patients",
     isPatientsResponse,
+  );
+}
+
+/** 患者の登録で選べるレジメン（置かれていて検査に通るもの。T95）。 */
+export function listRegimens(): Promise<RegimensResponse> {
+  return getChecked<RegimensResponse>(
+    "/api/doctor/regimens",
+    isRegimensResponse,
   );
 }
 

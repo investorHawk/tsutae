@@ -3,8 +3,11 @@
 `regimen_drafts_flow(rec)` を dump_api_fixtures の `_run` の最後に呼ぶ（rec は `Recorder`）。
 新規の下書きを FOLFIRI＋BV（`backend/tests/regimen_fixtures.py`）にして採用し、既存の
 CAPOX の版2の下書きの差分を見て捨てる（FOLFOX は先の台本が旧 D4 で版2にしていて
-form が無い）。Claude の1往復（T94）はまだ無いので、AI の値（出どころ standard）は
-DB に直接置く。
+form が無い）。採用の台本の AI の値（出どころ standard）は DB に直接置く。
+
+Claude の1往復（T94。`POST .../turns`）は、別の新しい下書きで、偽の chat
+（`backend/tests/regimen_chat_fakes.py` の ScriptChat・FailingChat）を
+`app.state.regimen_chat` に置いて流す（成功・失敗の行・H1 の 422）。
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from dataclasses import asdict
 from typing import Any
 
 from api_helpers import db_conn
+from regimen_chat_fakes import FailingChat, ScriptChat, change
 from regimen_fixtures import extra_form, fill_patch
 
 from tsutae.db import repo_regimen_drafts as repo
@@ -93,8 +97,71 @@ def _adopt(rec: Any, draft_id: int) -> None:
     rec.call("doctor_regimen_draft_adopt", "POST", f"{path}/adopt", body)
 
 
+def _turn_chat() -> ScriptChat:
+    ask = {
+        "field": "drugs.1.days",
+        "question": "ベバシズマブは何日目に点滴しますか",
+        "options": ["Day1", "Day1・15"],
+    }
+    return ScriptChat(
+        [
+            change("basic.display_name", "FOLFIRI＋BV"),
+            change("basic.cycle_days", 14),
+            change("basic.target", "大腸がん", "standard"),
+            (
+                "set_fields",
+                {
+                    "add_rows": ["drugs.1"],
+                    "changes": [
+                        {
+                            "field": "drugs.1.name",
+                            "value": "ベバシズマブ",
+                            "source": "doctor_text",
+                        },
+                        {
+                            "field": "drugs.1.route",
+                            "value": "infusion",
+                            "source": "standard",
+                        },
+                    ],
+                },
+            ),
+            # 先生が文で指定した質問（症状がそろう前の standard の提案は not_ready）
+            (
+                "propose_questions",
+                {"from_library": ["diarrhea"], "source": "doctor_text"},
+            ),
+            ("ask", ask),
+        ],
+        reply="名前・1コースの日数・ベバシズマブを入れ、下痢の質問を足しました。"
+        "点滴の日を選んでください",
+    )
+
+
+def _turns(rec: Any) -> None:
+    """Claude の1往復: 成功（欄・ask・質問）→ 失敗（会話に失敗の行）→ H1 の 422。"""
+    created = rec.client.post(BASE, json={"from": "new"})
+    path = f"{BASE}/{created.json()['draft']['id']}/turns"
+    state = rec.client.app.state
+    saved = state.regimen_chat
+    try:
+        state.regimen_chat = _turn_chat()
+        text = {
+            "text": "FOLFIRI＋BV を作りたい。14日ごと、ベバシズマブも使う。"
+            "下痢の質問も入れて"
+        }
+        rec.call("doctor_regimen_draft_turn", "POST", path, text)
+        state.regimen_chat = FailingChat(RuntimeError("偽の失敗"))
+        again = {"text": "点滴の日は Day1"}
+        rec.call("doctor_regimen_draft_turn_failed", "POST", path, again)
+        h1 = {"text": "受付 A-023 の方と同じにして"}
+        rec.call("doctor_regimen_draft_turn_h1", "POST", path, h1, expect=422)
+    finally:
+        state.regimen_chat = saved
+
+
 def regimen_drafts_flow(rec: Any) -> None:
-    """新規 → 直接編集 → 一覧 → 確認 → 採用、既存の版2の下書き → 差分 → 破棄。"""
+    """新規 → 直接編集 → 一覧 → 確認 → 採用、既存の版2の下書き → 差分 → 破棄、往復。"""
     draft_id = _new_draft(rec)
     rec.call("doctor_regimen_drafts", "GET", BASE)
     rec.call("doctor_regimen_draft", "GET", f"{BASE}/{draft_id}")
@@ -116,4 +183,5 @@ def regimen_drafts_flow(rec: Any) -> None:
         f"{path}/discard",
         expect=409,
     )
+    _turns(rec)
     rec.call("doctor_regimen_draft_missing", "GET", f"{BASE}/999", expect=404)

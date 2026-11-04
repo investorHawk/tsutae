@@ -2,9 +2,11 @@
 -- 日時は JST の ISO 8601（+09:00、マイクロ秒まで固定幅）、日付は YYYY-MM-DD。
 -- init_db が何度流しても安全なように IF NOT EXISTS のみを使う。
 
+-- regimen はレジメンの識別名（v1.1。FOLFOX/CAPOX に固定しない。一覧との照合は API の入口、
+-- 書式は repo_patients。既存の DB の CHECK は migrate_db が外す）
 CREATE TABLE IF NOT EXISTS patients (
     id TEXT PRIMARY KEY,
-    regimen TEXT NOT NULL CHECK (regimen IN ('FOLFOX', 'CAPOX')),
+    regimen TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 

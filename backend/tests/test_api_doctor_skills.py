@@ -23,10 +23,11 @@ from tsutae.skillchange import service as service_module
 from tsutae.skillchange.lock import skill_lock
 from tsutae.skills import load_skill
 
-NAME = "regimen-folfox"
-OLD_Q = "text: 下痢はありましたか"
-NEW_Q = "text: 下痢やお腹のゆるさはありましたか"
-REQUEST = "下痢の質問をお腹のゆるさも含む文にして"
+# v1.1: 旧 D4（一文の書き換え）は report-format だけ（regimen-* は 400 use_regimen_editor）
+NAME = "report-format-default"
+OLD_Q = "quotes_max_items: 30"
+NEW_Q = "quotes_max_items: 20"
+REQUEST = "引用は20件までにして"
 CHANGE_KEYS = {
     "id",
     "skill_name",
@@ -219,7 +220,7 @@ def test_no_change_is_failed_and_cannot_be_approved(
 
 
 def test_request_with_identifier_is_failed_without_editor(client: TestClient) -> None:
-    r = _request(client, request_text="田中さんの記録に合わせて下痢の質問を直して")
+    r = _request(client, request_text="田中さんの記録に合わせて引用を減らして")
     assert r.status_code == 200
     assert r.json()["status"] == "failed"
     assert client.app.state.skill_editor.calls == []
@@ -234,7 +235,9 @@ def test_request_with_identifier_is_failed_without_editor(client: TestClient) ->
         ({"skill_name": "Regimen-Folfox"}, 400, "invalid_name"),
         ({"request_text": "   "}, 400, "invalid_request"),
         ({"request_text": "あ" * 2001}, 400, "invalid_request"),
-        ({"skill_name": "regimen-nothing"}, 404, "unknown_skill"),
+        ({"skill_name": "report-format-nothing"}, 404, "unknown_skill"),
+        ({"skill_name": "regimen-folfox"}, 400, "use_regimen_editor"),
+        ({"skill_name": "regimen-nothing"}, 400, "use_regimen_editor"),
     ],
 )
 def test_request_rejected_before_row(
@@ -291,7 +294,7 @@ def _break(home: Path, name: str) -> None:
 def test_list_skills_reports_broken_required_skill(
     client: TestClient, home: Path
 ) -> None:
-    _break(home, NAME)
+    _break(home, "regimen-folfox")
     r = client.get("/api/doctor/skills")
     assert r.status_code == 200  # 印刷待ち等の画面を止めない（ログイン確認もこの経路）
     body = r.json()
@@ -299,7 +302,9 @@ def test_list_skills_reports_broken_required_skill(
         {"name": "regimen-capox", "version": 1},
         {"name": "report-format-default", "version": 1},
     ]
-    assert body["invalid"] == [{"name": NAME, "error_code": "format", "required": True}]
+    assert body["invalid"] == [
+        {"name": "regimen-folfox", "error_code": "format", "required": True}
+    ]
 
 
 def test_list_skills_reports_missing_required_skill(

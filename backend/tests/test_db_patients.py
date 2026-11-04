@@ -92,9 +92,13 @@ def test_create_patient_rejects_malformed_id(
         create_patient(conn, "FOLFOX", patient_id=bad)
 
 
-def test_create_patient_rejects_unknown_regimen(conn: sqlite3.Connection) -> None:
+@pytest.mark.parametrize("bad", ["folfox", "XELOX ", ""])
+def test_create_patient_rejects_bad_regimen_code(
+    conn: sqlite3.Connection, bad: str
+) -> None:
+    # v1.1: 置かれていない識別名（XELOX）の拒否は API の入口。repo は書式だけを見る
     with pytest.raises(ValueError):
-        create_patient(conn, "XELOX")
+        create_patient(conn, bad)
 
 
 def test_get_patient_unknown_is_none(conn: sqlite3.Connection) -> None:

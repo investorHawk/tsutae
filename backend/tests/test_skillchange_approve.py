@@ -37,10 +37,11 @@ from tsutae.skillchange import approve as approve_module
 from tsutae.skillchange import lock as lock_module
 from tsutae.skillchange.workcopy import work_copy_path
 
-NAME = "regimen-folfox"
-OLD_Q = "text: 下痢はありましたか"
-NEW_Q = "text: 下痢やお腹のゆるさはありましたか"
-REQUEST = "下痢の質問をお腹のゆるさも含む文にして"
+# v1.1: 旧 D4（一文の書き換え）は report-format だけ（regimen-* は use_regimen_editor）
+NAME = "report-format-default"
+OLD_Q = "quotes_max_items: 30"
+NEW_Q = "quotes_max_items: 20"
+REQUEST = "引用は20件までにして"
 
 _HOLDER = """
 import fcntl, os, sys
@@ -52,7 +53,7 @@ sys.stdin.readline()
 
 
 class Editor:
-    """写しの SKILL.md の下痢の質問を書き換える。after があれば最後に呼ぶ。"""
+    """写しの SKILL.md の引用の最大件数を書き換える。after があれば最後に呼ぶ。"""
 
     def __init__(self, transform=None, after=None) -> None:
         self.transform = transform or (lambda t: t.replace(OLD_Q, NEW_Q))
@@ -186,7 +187,14 @@ async def test_second_change_on_same_base_is_stale_and_keeps_winner(
 ):
     first = await _request(conn, home, settings)
     second = await _request(
-        conn, home, settings, Editor(lambda t: t.replace("手足のしびれ", "手足の痺れ"))
+        conn,
+        home,
+        settings,
+        Editor(
+            lambda t: t.replace(
+                "show_temperature_row: true", "show_temperature_row: false"
+            )
+        ),
     )
     other = db.connect(db_path)  # 別の接続（別の担当者の承認）
     try:

@@ -4,6 +4,8 @@
 内側で行い、ロックを取ってから変更の行と本体の SKILL.md を読み直す。取れなければ busy。
 
 承認の手順（ロックの内側）:
+0. regimen-* は use_regimen_editor で failed にする（v1.1。T95 より前に作られた pending の
+   行。旧 D4 で上げた版には form JSON が無く D4 レジメンの画面で開けない。却下はできる）
 1. 変更が pending で diff・new_text があること。final = new_text の version を base+1 に
 2. 本体を読む。「既に final になっている」なら途中で落ちた承認の続き（resume）とみなす
    （他の承認済みの変更が同じ版を作っていれば stale）。そうでなければ、今の版が
@@ -30,10 +32,11 @@ from tsutae.pipeline.logs import EventLogger, PipelineLogger
 from tsutae.schemas import RegimenSkill, ReportFormatSkill
 from tsutae.skillchange.atomic import write_atomic as _write_atomic
 from tsutae.skillchange.diff import set_version, unified
-from tsutae.skillchange.errors import SkillChangeError
+from tsutae.skillchange.errors import USE_REGIMEN_EDITOR, SkillChangeError
 from tsutae.skillchange.lock import skill_lock
 from tsutae.skillchange.state import RUN_KIND, fail_pending, transition
 from tsutae.skills import (
+    REGIMEN_PREFIX,
     SKILL_FILE_NAME,
     SkillValidationError,
     is_valid_skill_name,
@@ -187,6 +190,8 @@ def _approve_locked(
 ) -> int:
     change = _ready(conn, change_id)  # ロックを取ってから読み直す
     try:
+        if str(change["skill_name"]).startswith(REGIMEN_PREFIX):
+            raise SkillChangeError(USE_REGIMEN_EDITOR)
         version = _write_and_record(conn, change, path, logger)
     except SkillChangeError as exc:
         fail_pending(conn, logger, change_id, exc.code)

@@ -23,6 +23,7 @@ import {
   listPatientVisits,
   listPatients,
   listQuestionLibrary,
+  listRegimens,
   listSkillChanges,
   listSkills,
   listUnprocessed,
@@ -60,6 +61,7 @@ import {
   getRegimenDraft,
   listRegimenDrafts,
   patchRegimenFields,
+  postRegimenTurn,
   previewRegimenDraft,
 } from "./regimenDrafts";
 import type {
@@ -136,6 +138,7 @@ const draftPreview: Call = (f) => previewRegimenDraft(idIn(f));
 const draftAdopt: Call = (f) =>
   adoptRegimenDraft(idIn(f), f.request as AdoptRegimenRequest);
 const draftDiscard: Call = (f) => discardRegimenDraft(idIn(f));
+const draftTurn: Call = (f) => postRegimenTurn(idIn(f), String(req(f).text));
 /** 経路の最後の質問 key（DELETE question-library/{key}）。 */
 const hideQuestion: Call = (f) =>
   hideLibraryQuestion(f.path.replace(/^.*\//, ""));
@@ -162,6 +165,9 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_logout: () => logout(),
   doctor_patients: () => listPatients(),
   doctor_patient_create: (f) => createPatient(req(f).regimen as Regimen),
+  doctor_patient_create_unknown_regimen: (f) =>
+    createPatient(req(f).regimen as Regimen),
+  doctor_regimens: () => listRegimens(),
   doctor_courses: courses,
   doctor_courses_unknown_patient: courses,
   doctor_patient_visits: patientVisits,
@@ -199,6 +205,7 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_skill_change_create: change,
   doctor_skill_change_create_failed: change,
   doctor_skill_change_create_invalid_name: change,
+  doctor_skill_change_create_regimen: change,
   doctor_skill_changes: () => listSkillChanges(),
   doctor_skill_change_approve: approve,
   doctor_skill_change_approve_busy: approve,
@@ -225,6 +232,9 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_regimen_draft_adopt_token_mismatch: draftAdopt,
   doctor_regimen_draft_discard: draftDiscard,
   doctor_regimen_draft_discard_closed: draftDiscard,
+  doctor_regimen_draft_turn: draftTurn,
+  doctor_regimen_draft_turn_failed: draftTurn,
+  doctor_regimen_draft_turn_h1: draftTurn,
 };
 
 const NAMES = fixtureNames();

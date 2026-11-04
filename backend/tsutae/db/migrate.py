@@ -13,7 +13,8 @@ CREATE 文を見て古い形の表だけを SQLite の「12-step generalized ALT
 7. `PRAGMA foreign_key_check` が空でなければ ROLLBACK（`MigrationError`）
 8. COMMIT。finally で `PRAGMA foreign_keys = ON`
 
-対象は `MIGRATIONS`（表名・古いかの判定・新しい CREATE 文）。新しい CREATE 文は schema.sql
+対象は `MIGRATIONS`（表名・古いかの判定・新しい CREATE 文）。今は pipeline_logs（T93）と
+patients（regimen の CHECK を外す。T95）。新しい CREATE 文は schema.sql
 から引く（同じ文を2か所に書かない）。何度呼んでもよい（新しい形なら何もしない）。
 """
 
@@ -81,12 +82,29 @@ def _pipeline_logs_outdated(sql: str) -> bool:
     return "'regimen_chat'" not in sql
 
 
+def _patients_outdated(sql: str) -> bool:
+    return "'FOLFOX'" in sql
+
+
+def _copy_with_rowid(new: str, columns: Sequence[str]) -> str:
+    """rowid も写す（主キーが TEXT の表。list_patients は同じ時刻を rowid 順に並べる）。"""
+    names = ", ".join(columns)
+    return f"INSERT INTO {new} (rowid, {names}) SELECT rowid, {names} FROM patients"
+
+
 MIGRATIONS: tuple[TableMigration, ...] = (
     # T93: run_kind に regimen_chat（T94 の会話のログ）を足す
     TableMigration(
         table="pipeline_logs",
         is_outdated=_pipeline_logs_outdated,
         create_sql=lambda: schema_create_statement("pipeline_logs"),
+    ),
+    # T95: regimen の CHECK（FOLFOX・CAPOX だけ）を外す。courses・entries・visits が参照する
+    TableMigration(
+        table="patients",
+        is_outdated=_patients_outdated,
+        create_sql=lambda: schema_create_statement("patients"),
+        copy_sql=_copy_with_rowid,
     ),
 )
 

@@ -109,8 +109,48 @@ export function isFieldIssue(v: Item): boolean {
   return isString(v.field_id) && isString(v.code) && isString(v.message);
 }
 
+const isNonNegativeInt = (v: unknown): boolean => isInt(v) && v >= 0;
+
+function isChatAsk(v: unknown): boolean {
+  return (
+    isRecord(v) &&
+    isString(v.field_id) &&
+    isString(v.question) &&
+    isStringList(v.options) &&
+    (v.options as unknown[]).length >= 2
+  );
+}
+
+/** 会話の行に共通の generation・at。 */
+function isChatMeta(v: Item): boolean {
+  return isNonNegativeInt(v.generation) && isIsoDateTime(v.at);
+}
+
+function isAssistantRow(v: Item): boolean {
+  return (
+    isString(v.text) &&
+    isStringList(v.changed) &&
+    hasNullable("ask", isChatAsk)(v) &&
+    isStringList(v.proposed) &&
+    isBool(v.reply_hidden)
+  );
+}
+
+/** 会話の1行（role ごとに形を見る。未知の role は拒む）。 */
 function isChatRow(v: Item): boolean {
-  return isString(v.role);
+  if (!isChatMeta(v)) {
+    return false;
+  }
+  switch (v.role) {
+    case "doctor":
+      return isString(v.text);
+    case "assistant":
+      return isAssistantRow(v);
+    case "system":
+      return isString(v.kind) && isString(v.reason);
+    default:
+      return false;
+  }
 }
 
 /** 一覧の1件。 */
@@ -150,6 +190,11 @@ export function isRegimenDraftsResponse(v: Item): boolean {
 /** GET regimen-drafts/{id}・PATCH .../fields {draft}。 */
 export function isRegimenDraftResponse(v: Item): boolean {
   return isRegimenDraft(v.draft);
+}
+
+/** POST .../turns {draft, turn_error}。 */
+export function isRegimenTurnResponse(v: Item): boolean {
+  return isRegimenDraft(v.draft) && hasNullable("turn_error", isString)(v);
 }
 
 /** POST regimen-drafts {draft, created}。 */

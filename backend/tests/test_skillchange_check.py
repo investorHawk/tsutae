@@ -21,7 +21,6 @@ from claude_agent_sdk import ResultMessage
 from tsutae import db
 from tsutae.config import SKILLS_HOME, get_settings
 from tsutae.pipeline.logs import MemoryLogger
-from tsutae.pipeline.service import questions_by_version
 from tsutae.schemas import RunStats
 from tsutae.skillchange import SdkSkillEditor, approve_change, request_change
 from tsutae.skillchange.check import (
@@ -34,10 +33,10 @@ from tsutae.skillchange.check import (
 )
 from tsutae.skillchange.editor import build_options
 from tsutae.skillchange.workcopy import work_copy_path
+from tsutae.skills import load_skill
 
 NAME = "regimen-folfox"
 REPORT = "report-format-default"
-DEMO_REQUEST = "口内炎は、食事がとれたかも次から聞いて"
 STOMATITIS_LINE = (
     "  - {key: stomatitis, text: 口の中の痛みや口内炎はありましたか,"
     " answer_type: three_level}\n"
@@ -317,8 +316,19 @@ def settings(home: Path):
     )
 
 
+REPORT_REQUEST = "引用は20件までにして"
+REPORT_OLD = "quotes_max_items: 30\n"
+REPORT_NEW = "quotes_max_items: 20\n"
+
+
+def _shorten_quotes(text: str) -> str:
+    assert REPORT_OLD in text
+    return text.replace(REPORT_OLD, REPORT_NEW)
+
+
 class DemoEditor:
-    """デモの依頼どおり、stomatitis の後に three_level の質問を1つ足す。"""
+    """依頼どおり report-format の引用の最大件数を 30 → 20 にする（v1.1。旧 D4 は
+    report-format だけ。regimen-* は use_regimen_editor で editor まで来ない）。"""
 
     def __init__(self) -> None:
         self.requests: list[str] = []
@@ -328,32 +338,29 @@ class DemoEditor:
     ) -> RunStats:
         self.requests.append(request_text)
         path = work_copy_path(work_root, skill_name)
-        path.write_text(_add_eating_question(path.read_text("utf-8")), "utf-8")
+        path.write_text(_shorten_quotes(path.read_text("utf-8")), "utf-8")
         return RunStats(duration_ms=10, num_turns=3)
 
 
 async def test_demo_request_flow_reaches_version_2(conn, home, settings) -> None:
     editor = DemoEditor()
     cid = await request_change(
-        conn, NAME, DEMO_REQUEST, editor=editor, settings=settings, skills_home=home
+        conn,
+        REPORT,
+        REPORT_REQUEST,
+        editor=editor,
+        settings=settings,
+        skills_home=home,
     )
     change = db.get_skill_change(conn, cid)
     assert (change["status"], change["error_code"]) == ("pending", None)
-    assert editor.requests == [DEMO_REQUEST]
-    assert "+" + EATING_LINE in change["diff"]
+    assert editor.requests == [REPORT_REQUEST]
+    assert "\n+" + REPORT_NEW in change["diff"]
+    assert "\n-" + REPORT_OLD in change["diff"]
     assert approve_change(conn, cid, skills_home=home) == 2
-    got = questions_by_version(conn, versions=[f"{NAME}@2"])
-    keys = [q.key for q in got[f"{NAME}@2"]]
-    assert keys == [
-        "numbness",
-        "diarrhea",
-        "stomatitis",
-        "stomatitis_eating",
-        "nausea_appetite",
-        "fever",
-    ]
-    eating = got[f"{NAME}@2"][3]
-    assert eating.answer_type == "three_level"
+    skill = load_skill(REPORT, home / ".claude" / "skills")
+    assert skill.version == 2 and skill.quotes_max_items == 20
+    assert db.get_skill_version(conn, REPORT, 2)["questions"] is None
 
 
 async def test_sdk_editor_hook_lets_model_fix_then_pending(
@@ -363,11 +370,12 @@ async def test_sdk_editor_hook_lets_model_fix_then_pending(
     seen: list[dict] = []
 
     async def fake_query(*, prompt: str, options):
-        assert "stomatitis" in prompt and "nausea_appetite" in prompt
+        assert REPORT_REQUEST in prompt
         [post] = options.hooks["PostToolUse"]
-        path = work_copy_path(Path(options.cwd), NAME)
-        good = _add_eating_question(path.read_text("utf-8"))
-        path.write_text(good.replace("key: stomatitis_eating", "key: Eating"), "utf-8")
+        path = work_copy_path(Path(options.cwd), REPORT)
+        good = _shorten_quotes(path.read_text("utf-8"))
+        broken = good.replace(REPORT_NEW, "quotes_max_items: 内緒の値\n")
+        path.write_text(broken, "utf-8")
         seen.append(await post.hooks[0](_post("Edit", path), "t1", None))
         path.write_text(good, "utf-8")
         seen.append(await post.hooks[0](_post("Edit", path), "t2", None))
@@ -384,9 +392,14 @@ async def test_sdk_editor_hook_lets_model_fix_then_pending(
 
     editor = SdkSkillEditor(settings, query_fn=fake_query)
     cid = await request_change(
-        conn, NAME, DEMO_REQUEST, editor=editor, settings=settings, skills_home=home
+        conn,
+        REPORT,
+        REPORT_REQUEST,
+        editor=editor,
+        settings=settings,
+        skills_home=home,
     )
-    assert "questions.3.key" in _context(seen[0])
+    assert "quotes_max_items" in _context(seen[0])
     assert seen[1] == {}
     assert db.get_skill_change(conn, cid)["status"] == "pending"
     logs = db.list_pipeline_logs(conn, "skill_change", cid)
@@ -394,7 +407,7 @@ async def test_sdk_editor_hook_lets_model_fix_then_pending(
     assert events.index("hook_skill_check_retry") < events.index(
         "hook_skill_check_allow"
     )
-    assert "Eating" not in repr(logs)
+    assert "内緒の値" not in repr(logs)
 
 
 @pytest.mark.parametrize(

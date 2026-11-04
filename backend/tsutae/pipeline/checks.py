@@ -6,7 +6,11 @@ architecture §7 / §7b の「Grade・重症などの語を出さない」をプ
 
 - events
   - term は CTCAE 用語の一覧（ctcae_terms.json。term-mapper に渡すものと同じ）の名前そのもの
-  - question_key はその用語に対応する質問の key（今回の質問に無ければ null）
+  - question_key はその用語に対応する質問の key（その記録の版の質問に無ければ null）。
+    対応は記録ごとに、全体の対応 ＋ その記録の版（Entry.skill_version）の term_keys
+    （`skills.term_keys.entry_term_keys`。v1.1。spec 9.1）。term-mapper の一覧は入力の版の
+    対応なので、版の混ざる受診で古い版の記録を新しい質問につなげると、ここで期待の key
+    つきで差し戻す
   - course_no は schedule.course_no、by_proxy はその記録のもの
   - date はその記録の record_date 以前（report は記録日より後の出来事を使わない。§7 W2b）
   - day は `course.day_of(date, schedule, courses=…)` と同じ値。受け付ける date は
@@ -37,7 +41,7 @@ architecture §7 / §7b の「Grade・重症などの語を出さない」をプ
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from types import MappingProxyType
 from typing import Any
@@ -50,7 +54,7 @@ from tsutae.schemas import (
     Timeline,
     TimelineEvent,
 )
-from tsutae.synthetic import load_terms, term_question_keys
+from tsutae.skills.term_keys import entry_term_keys, input_term_keys
 
 __all__ = [
     "OutputContext",
@@ -91,7 +95,13 @@ class OutputContext:
     day1_date: date
     last_day_date: date
     entries: Mapping[int, MaskedEntry]  # entry_no -> 送った記録
-    term_keys: Mapping[str, str | None]  # 用語名 -> 今回の質問の key（無ければ None）
+    term_keys: Mapping[
+        str, str | None
+    ]  # 用語名 -> 入力の版の質問の key（無ければ None）
+    # entry_no -> その記録の版の対応（入力の版と違う記録だけ。無ければ term_keys）
+    entry_term_keys: Mapping[int, Mapping[str, str | None]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     @classmethod
     def from_prepared(
@@ -99,18 +109,25 @@ class OutputContext:
         prepared: PreparedInput,
         terms: Iterable[Mapping[str, Any]] | None = None,
     ) -> OutputContext:
-        asked = {q.key for q in prepared.input.questions}
-        mapping = term_question_keys(load_terms() if terms is None else terms)
+        mapping = input_term_keys(prepared, terms)
+        per_entry = {
+            e.entry_no: MappingProxyType(keys)
+            for e in prepared.input.entries
+            if (keys := entry_term_keys(prepared, e.entry_no, terms)) != mapping
+        }
         schedule = prepared.input.schedule
         return cls(
             course_no=schedule.course_no,
             day1_date=schedule.day1_date,
             last_day_date=schedule.last_day_date,
             entries=MappingProxyType({e.entry_no: e for e in prepared.input.entries}),
-            term_keys=MappingProxyType(
-                {t: (k if k in asked else None) for t, k in mapping.items()}
-            ),
+            term_keys=MappingProxyType(mapping),
+            entry_term_keys=MappingProxyType(per_entry),
         )
+
+    def term_keys_for(self, entry_no: int) -> Mapping[str, str | None]:
+        """その記録の版の対応（用語名 -> 質問の key）。"""
+        return self.entry_term_keys.get(entry_no, self.term_keys)
 
     @property
     def entry_nos(self) -> frozenset[int]:
@@ -142,15 +159,16 @@ def _day_reason(expected: int | None) -> str:
 
 
 def _term_problems(where: str, ev: TimelineEvent, ctx: OutputContext) -> list[Problem]:
-    if ev.term not in ctx.term_keys:
+    keys = ctx.term_keys_for(ev.entry_no)
+    if ev.term not in keys:
         return [(f"{where}.term", "用語の一覧に無い（一覧の用語名をそのまま使う）")]
-    expected = ctx.term_keys[ev.term]
+    expected = keys[ev.term]
     if ev.question_key != expected:
         return [
             (
                 f"{where}.question_key",
                 f"term に対応する質問の key と違う（{_expect(expected)}。"
-                "今回の質問に無い key なら null）",
+                "その記録の版の質問に無い key なら null）",
             )
         ]
     return []

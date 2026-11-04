@@ -1,5 +1,11 @@
 """Skill（`backend/skills_home/.claude/skills/<name>/SKILL.md`）の読み込みと検査。"""
 
+from tsutae.skills.catalog import (
+    REGIMEN_PREFIX,
+    RegimenInfo,
+    list_regimens,
+    regimen_codes,
+)
 from tsutae.skills.loader import (
     DEFAULT_REPORT_SKILL,
     MAX_SKILL_CHARS,
@@ -22,6 +28,8 @@ from tsutae.skills.loader import (
 
 __all__ = [
     "DEFAULT_REPORT_SKILL",
+    "REGIMEN_PREFIX",
+    "RegimenInfo",
     "MAX_SKILL_CHARS",
     "REGIMEN_SKILL_NAMES",
     "SKILL_FILE_NAME",
@@ -30,11 +38,13 @@ __all__ = [
     "SkillNotFoundError",
     "SkillValidationError",
     "is_valid_skill_name",
+    "list_regimens",
     "load_regimen_skill",
     "load_report_skill",
     "load_skill",
     "parse_skill_md",
     "read_skill_text",
+    "regimen_codes",
     "regimen_skill_name",
     "skill_path",
     "validate_skill_text",

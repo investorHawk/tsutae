@@ -26,6 +26,9 @@ PATIENT_STRINGS_PATH = PACKAGE_ROOT / "patient_strings.json"
 
 DEFAULT_MODEL = "claude-opus-5-5"
 SUBAGENT_MODEL = "claude-sonnet-5-5"
+# 往復の上限を過ぎた working を open に戻すまでの余裕（秒）。往復の処理が上限ちょうどで
+# 自分の結果・失敗の行を書く前に、別の読み出しが回復してしまわないように
+REGIMEN_RECOVER_GRACE_S = 15.0
 
 
 def load_env_file(path: Path | None = None) -> bool:
@@ -58,6 +61,14 @@ class Settings:
     public_base_url: str
     # D4 レジメンの Claude の1往復の上限（秒。T94）。working のまま過ぎた下書きは open に戻す
     regimen_turn_timeout_s: float = 90.0
+    # 1往復の max_turns・max_budget_usd（T94）
+    regimen_max_turns: int = 12
+    regimen_max_budget_usd: float = 1.0
+
+    @property
+    def regimen_recover_after_s(self) -> float:
+        """working のまま何秒で取り残しとみなすか（往復の上限＋余裕）。"""
+        return self.regimen_turn_timeout_s + REGIMEN_RECOVER_GRACE_S
 
 
 def get_settings() -> Settings:
@@ -79,6 +90,10 @@ def get_settings() -> Settings:
         ),
         regimen_turn_timeout_s=float(
             os.environ.get("TSUTAE_REGIMEN_TURN_TIMEOUT_S", "90")
+        ),
+        regimen_max_turns=int(os.environ.get("TSUTAE_REGIMEN_MAX_TURNS", "12")),
+        regimen_max_budget_usd=float(
+            os.environ.get("TSUTAE_REGIMEN_MAX_BUDGET_USD", "1.0")
         ),
     )
 

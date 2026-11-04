@@ -63,8 +63,48 @@ export interface FieldIssue {
   message: string;
 }
 
-/** 会話の1行（T94 で形が増える。失敗の行は role=system・kind=turn_failed）。 */
-export type ChatRow = Record<string, unknown> & { role: string };
+/** Claude が先生に聞いた1問。画面は field_id の欄（か節）を赤枠にし、選択肢を出す。 */
+export interface ChatAsk {
+  field_id: string;
+  question: string;
+  options: string[];
+}
+
+/** 先生の文。 */
+export interface DoctorChatRow {
+  role: "doctor";
+  text: string;
+  generation: number;
+  at: string;
+}
+
+/**
+ * Claude の返答。changed は変えた欄の id（札にして押すとその欄へ）、proposed は足した
+ * 質問の key。返答の文に個人を特定しうる表現の疑いがあれば text は固定の文で
+ * reply_hidden=true。
+ */
+export interface AssistantChatRow {
+  role: "assistant";
+  text: string;
+  changed: string[];
+  ask: ChatAsk | null;
+  proposed: string[];
+  reply_hidden: boolean;
+  generation: number;
+  at: string;
+}
+
+/** 往復の失敗（kind=turn_failed。reason は timeout・max_turns・internal_error など）。 */
+export interface SystemChatRow {
+  role: "system";
+  kind: string;
+  reason: string;
+  generation: number;
+  at: string;
+}
+
+/** 会話の1行（院内の画面だけに出る。採用・破棄で消える）。 */
+export type ChatRow = DoctorChatRow | AssistantChatRow | SystemChatRow;
 
 /** GET regimen-drafts の1件。version は採用で作る版（新規は1、既存は N+1）。 */
 export interface RegimenDraftSummary {
@@ -121,6 +161,20 @@ export interface PatchRegimenFieldsRequest {
   changes?: FieldChange[];
   adds?: RowAdd[];
   deletes?: string[];
+}
+
+/** POST .../turns（Claude の1往復。応答まで待つ。上限はサーバーの 90 秒）。 */
+export interface RegimenTurnRequest {
+  text: string;
+}
+
+/**
+ * turn_error は成功なら null。時間切れ・失敗なら timeout・max_turns・max_budget・
+ * sdk_error・internal_error など（下書きは open に戻り、会話に失敗の行がある）、
+ * 遅れた結果を捨てたら discarded。
+ */
+export interface RegimenTurnResponse extends RegimenDraftResponse {
+  turn_error: string | null;
 }
 
 export interface AiValue {

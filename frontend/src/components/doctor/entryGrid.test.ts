@@ -6,6 +6,7 @@ const level = (question_key: string, value: "none" | "present" | "hard") => ({
   question_key,
   value,
   temperature: null,
+  question_label: null,
 });
 
 describe("gridColumns", () => {
@@ -13,7 +14,12 @@ describe("gridColumns", () => {
     const columns = gridColumns([
       doctorEntryStub({
         answers: [
-          { question_key: "fever", value: "measured", temperature: 37.2 },
+          {
+            question_key: "fever",
+            value: "measured",
+            temperature: 37.2,
+            question_label: null,
+          },
           level("diarrhea", "present"),
           level("numbness", "none"),
         ],
@@ -57,12 +63,39 @@ describe("gridColumns", () => {
     const columns = gridColumns([
       doctorEntryStub({
         answers: [
-          { question_key: "temp2", value: "not_measured", temperature: null },
+          {
+            question_key: "temp2",
+            value: "not_measured",
+            temperature: null,
+            question_label: null,
+          },
         ],
       }),
     ]);
     expect(columns).toEqual([
       { key: "temp2", label: "temp2", kind: "temperature" },
+    ]);
+  });
+
+  it("知らない質問は記録の版の短い名前（question_label）、既知の質問は画面の名前（T95）", () => {
+    const columns = gridColumns([
+      doctorEntryStub({
+        id: 2,
+        answers: [
+          { ...level("fatigue", "present"), question_label: "だるさ" },
+          { ...level("hand_foot", "none"), question_label: "手足の皮膚" },
+          level("bleeding", "none"),
+        ],
+      }),
+      doctorEntryStub({
+        id: 1,
+        answers: [{ ...level("bleeding", "none"), question_label: "出血" }],
+      }),
+    ]);
+    expect(columns).toEqual([
+      { key: "hand_foot", label: "手のひら・足の裏", kind: "level" },
+      { key: "fatigue", label: "だるさ", kind: "level" },
+      { key: "bleeding", label: "出血", kind: "level" },
     ]);
   });
 

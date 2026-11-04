@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/patients",
+  "request": {
+    "regimen": "XELOX"
+  },
+  "status": 422,
+  "body": {
+    "error": "invalid_input"
+  }
+}

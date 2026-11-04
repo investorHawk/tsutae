@@ -64,11 +64,14 @@ function renderSettings() {
 
 async function openReview() {
   await screen.findByRole("option", { name: /FOLFOX の質問集/ });
-  // fixture の一覧は名前順（regimen-capox が先）。依頼の fixture と同じ Skill を選ぶ
-  await userEvent.selectOptions(screen.getByRole("combobox"), "regimen-folfox");
+  // 依頼の fixture と同じ Skill を選ぶ（v1.1: 旧 D4 の一文の書き換えは report-format だけ）
+  await userEvent.selectOptions(
+    screen.getByRole("combobox"),
+    "report-format-default",
+  );
   await userEvent.type(
     screen.getByLabelText("変えたいこと（一文）"),
-    "口内炎の質問で食事がとれたかも聞いて",
+    "見出しの順を変えて",
   );
   await userEvent.click(
     screen.getByRole("button", { name: "書き換えを依頼する" }),
@@ -163,7 +166,7 @@ describe("Settings: 承認・却下の 409 busy", () => {
     expect(again).toBeEnabled();
     await userEvent.click(again);
     const done = await screen.findByText(/第2版（version 2）になりました/);
-    expect(done).toHaveTextContent("regimen-folfox");
+    expect(done).toHaveTextContent("report-format-default");
     expect(screen.queryByRole("region", { name: "差分の確認" })).toBeNull();
   });
 

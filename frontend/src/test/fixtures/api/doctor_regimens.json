@@ -1,0 +1,22 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/regimens",
+  "request": null,
+  "status": 200,
+  "body": {
+    "regimens": [
+      {
+        "code": "FOLFOX",
+        "skill_name": "regimen-folfox",
+        "version": 1,
+        "display_name": "FOLFOX"
+      },
+      {
+        "code": "CAPOX",
+        "skill_name": "regimen-capox",
+        "version": 1,
+        "display_name": "CAPOX"
+      }
+    ]
+  }
+}

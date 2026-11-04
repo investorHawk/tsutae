@@ -338,3 +338,44 @@
 | 回復は下書きごとに例外を捕まえ、読めない下書きがあっても起動を止めない（警告は下書きの id と例外の型名だけ）。回復でも「患者のいるレジメンの日程の変更」はやり直して確定しない。警告（`regimen.recover_mismatch`・`recover_skipped`・`recover_failed`）が出たときは手で戻す: 下書きを破棄し、SKILL.md を `skill_versions` の前の版の文に戻す（または その版の form を regimen_forms に入れる）。旧 D4 で regimen-* に版が足された場合の誤った警告は T95 の制限（`use_regimen_editor`）で起きなくなる | `ensure_skill_versions` と同じ「起動を止めない」方針。adopt が断る版を回復が通すと決まりが崩れる | 確かめ直しの指摘 |
 | 新規の採用の後始末は SKILL.md と書き込みの一時ファイルだけを消す。他のファイル（.DS_Store など）があればフォルダを残し、警告に名前を残す（先生が手で片付ける）。新規の SKILL.md の書き込みの OSError は既存と同じ `write_error` | 自分の書いていないファイルは消さない。失敗の code を新規と既存でそろえる | 検証の指摘 |
 | 「同じ generation のときだけ往復の結果を反映する」書き込みと、回復の上限に余裕（往復の上限＋数秒）を足すことは T94 で行う（今は回復の上限＝`regimen_turn_timeout_s`） | 往復の結果を書く関数が T94 にしか無い。既定の 90 秒は設定のテストで固定している | 検証の指摘（T94 へ送る） |
+
+### T94 Claude の1往復（2026-11-05）
+| 決定 | 理由 | 出どころ |
+|---|---|---|
+| 許可ツール `REGIMEN_ALLOWED_TOOLS` は `mcp__tsutae_regimen__set_fields`・`mcp__tsutae_regimen__ask`・`mcp__tsutae_regimen__propose_questions` の3つだけ。H4 の許可一覧も同じ3つ（サブエージェントは空）。Hook は H1（UserPromptSubmit。依頼文に二次検出）と H4（PreToolUse・全ツール）だけ | Claude が触るのは欄の値だけ（plan §1）。ファイルを読まない・書かないので H3・read_guard は要らない | 仕様（9c） |
+| 拒否ツール `REGIMEN_DISALLOWED_TOOLS` は 9b の一覧（Bash・WebFetch・WebSearch・Task・Agent・Skill・MultiEdit・NotebookEdit・Workflow・Glob・Grep）＋Read・Edit・Write に、ToolSearch と pipeline と同じ使わない組み込みツール（CronCreate・CronDelete・CronList・DesignSync・EnterWorktree・ExitWorktree・ListAgents・Monitor・PushNotification・ReportFindings・ScheduleWakeup・SendMessage・TaskStop）を足した。値はテスト（`test_regimen_chat_sdk.py`）で固定 | ToolSearch が使えると MCP ツールが遅延読み込みの向こうに隠れ、H4 が ToolSearch を拒むので set_fields に届かない（pipeline で 2026-11-04 に確かめた挙動）。ツールが MCP の3つだけなので致命的。使わない組み込みは説明文がコンテキストに載り max_turns を使う。9c の文面より広げた | 技術判断（pipeline の知見） |
+| **依頼文とツールでは行を row_id でなく ref（`drugs.1`・`drugs.1.days`）で指す**。ref と row_id の対応は1往復の間だけ（`chat_handles.RowHandles`）。Claude が足す行の row_id はサーバーが `drug1`・`effect1`・`question1` と振る。結果（会話の changed・ask の field_id）は本当の欄の id に直して返す | FOLFOX の row_id（`q-fever`・`se-numbness`・`d-fu-pump` の `fu-pump`）が H1 の id_like に掛かり、form JSON をそのまま入れると全ての往復が h1_blocked になる。H1 は変えない決まり。番号の ref は掛からないことをテストで確かめた | 技術判断 |
+| 依頼文の会話の行の話し手は「医師:」「あなた:」と書く（「先生:」にしない） | 見出しの直後の行頭の「先生」が H1 の unknown_before_honorific（前の行の語＋敬称）に掛かった | 技術判断（テストで発覚） |
+| set_fields は doctor_text で当ててから standard の欄の出どころを付け替える（`apply_patch` の出どころは1つのため）。doctor_edit の欄への変更と、doctor_edit の欄を持つ行の削除は `overwrite_requested=true` のときだけ（無ければ欄の ref とコード doctor_edit を返す）。上書きした欄の出どころは渡された source | 1回の呼び出しで doctor_text と standard が混ざる。apply_patch を2回に分けると途中の形で検査に掛かる（日数と Day を別々に当てる等） | 技術判断 |
+| ask は欄の ref か節の名前（drugs・side_effects・questions。行がまだ無いとき）を受け、1往復に1問だけ（2問目は one_ask で拒否）。問い・選択肢には文の欄と同じ検査（H1・薬の量・改行・長さ）を掛ける | 「1問ずつ聞く」。行の無い新規の下書きでも「どの薬を使いますか」を聞けるように | 技術判断 |
+| propose_questions は部品集の key（from_library）か新しい3択の質問（key・label・text）。部品集にある key を新しい質問として足す・予約語 temperature・フォームにある key は拒否。出どころは既定 standard | 部品集と同じ key に別の文を付けると、採用で部品集に入らず（ON CONFLICT）key の意味がずれる | 技術判断 |
+| `POST .../turns` は成功でも失敗でも 200 `{draft, turn_error}` を返す（失敗は open に戻して会話に先生の文と失敗の行）。始められない（H1・working・not_open・not_found）は 4xx。遅れた結果を捨てた（generation が違う）ときは turn_error=discarded | 画面（T96）は応答の下書きを描くだけで失敗の行も出せる。4xx は何も保存していない場合だけ | 技術判断 |
+| H1 は入力の文と依頼文の全体（部品集・用語・会話・フォームを含む）に掛け、掛かれば begin_working の前に 422 h1_blocked（issues は下の行。generation も会話も変えない）。Claude の返答の文に掛かれば本文を固定の文にして reply_hidden=true（フォームの変更は反映する）。ask の文に掛かれば ask を落とす | 次の往復の依頼文に入る文は全て H1 を通す。返答の文で往復ごと失敗にすると、検査を通ったフォームの変更まで失う | 技術判断 |
+| 結果を書く前に、chat の結果を検査し直す（validate_form・既存の版の識別名・体温の質問・prose が変わっていない）。通らなければ失敗（invalid_result） | RegimenChat は差し替えられる（偽物・将来の実装）。ツールを通らない値を下書きに入れない | 技術判断 |
+| 読み出しの回復の上限は `regimen_recover_after_s` = `regimen_turn_timeout_s` ＋ 15 秒（`config.REGIMEN_RECOVER_GRACE_S`）。下書きの API の読み出しは全てこれを使う（`doctor_regimen_drafts.py` の呼び出しを替えた） | 往復が上限ちょうどで自分の失敗の行を書く前に、別の読み出しが回復して失敗の行が2つになるのを防ぐ（T93 から送られた指摘） | 検証の指摘（T93 から） |
+| 起動時に `recover_abandoned_turns`（working を全て open に戻し失敗の行を足す。上限 0 秒）を `recover_interrupted_adoptions` の前に呼ぶ | 起動の時点の working は全て前のプロセスの取り残し（単一プロセス）。回復は open だけを見るので、working のまま落ちた下書きが漏れていた（T93 の確かめ直しの指摘） | 確かめ直しの指摘（T93 から） |
+| `regimen_max_turns` 既定 12（`TSUTAE_REGIMEN_MAX_TURNS`）、`regimen_max_budget_usd` 既定 1.0（`TSUTAE_REGIMEN_MAX_BUDGET_USD`）。実測は T97 で decisions に書く | set_fields 数回（拒否の直しを含む）・propose_questions・ask・締めで 10 前後。費用は未計測（キーが無い） | 技術判断（T97 で見直す） |
+| ログ（`regimen_chat`）は h1_check・turn_start・regimen_tool（ツール名と accept / reject:<コード>）・Hook（H1・H4）・turn_end（decision・秒・トークン・費用）・turn_counts（`calls:N:rejected:N:turns:N:changed:N`）・reply_hidden・turn_discarded・turn_failed・internal_error（型名だけ）。文面は入れない（テストで確かめる）。**入力が schema に合わず SDK の jsonschema が handler の前に止めた呼び出しは calls・rejected・regimen_tool に数えない**（Claude には SDK のエラーが返る） | ログの列は固定（num_turns の列は無い）ので、回数は decision のコードに入れる。schema 違いを数えるには SDK の内部か PostToolUse の Hook に頼ることになり、本番の組み立てを増やす割に得るものが小さい | 技術判断（確かめ直しの指摘で明記） |
+| 往復は `begin_working` に読んだ時の form_json・sources_json を渡し（`expected_*`。`update_draft_form` と同じ形）、違えば 409 `conflict`（generation は上げない。H1 の検査はその前のまま） | 往復が下書きを読んでから begin_working するまでの間に PATCH（スレッドプール）が入ると、古い値から作った結果で上書きし、PATCH の値と doctor_edit が黙って消えた。335 行（PATCH 側の expected_*）と対になる穴 | 確かめ直しの指摘 |
+| begin_working より後で外に抜ける例外（取り消し・`finish_turn` の DB の失敗・失敗の行の書き込みの失敗・最後の読み出し）は、`run_turn` の外側の `except BaseException` でできる範囲で `fail_turn`（reason は cancelled か internal_error）してから投げ直す（`chat_fail.rescue`）。後始末の失敗は握りつぶして型名だけをログに出し、元の例外を投げる | working のまま残すと回復の上限（約 105 秒）まで PATCH・確認・採用・次の往復が全て 409 になり、回復は誤った理由（timeout）の行を足す。fail_turn は「working かつ同じ generation」の条件付きなので、書き終えた後・既に戻した後に呼んでも何もしない | 確かめ直しの指摘 |
+| ask の選択肢は依頼文の会話に「」で囲んでつなぐ（`chat_prompt.ask_line`。前は「 / 」）。ask は問い・選択肢を1つずつ見るのに加え、`ask_line` の形にも H1 を掛けて掛かれば拒否する（`identifier`。「14日」のように単位を付けさせる）。依頼文の会話の行は、描いて H1 に掛かれば固定の文（`HISTORY_HIDDEN`）に置き換える | 空白と「/」は long_digits の区切りなので、ask の選択肢 7・14・21・28 や「1・8・15」「1・15」がつながって7桁以上の数字の並びになり、次の往復から全て h1_blocked で会話が進まなくなった（抜け道は破棄だけ）。行の置き換えで、既に詰まった下書きも戻れる。H1 は変えない | 確かめ直しの指摘 |
+| H1 の 422 は `{error:"h1_blocked", issues:[{field_id, code:"identifier", message}]}`。field_id は `text`（先生の文）か `prompt`（依頼文の他の部分）、message は規則の名前だけ（`text_checks.identifier_issue`。文面は返さない） | spec 9.1 の 2「掛かった欄の id と規則の種類を返す」。先生の文の「Day 1, 8, 15, 22」も long_digits に掛かるので、規則が返らないと先生には直し方が分からない。画面は `fieldIssuesOf` で読める | 仕様（9.1）・確かめ直しの指摘 |
+| propose_questions の source=standard（Claude が自分で提案する質問）は、基本・薬・注意する症状の必須の欄（`missing_fields` の basic・drugs・side_effects。新規の下書きでは識別名も含む）がそろうまで `not_ready` で拒否する。source=doctor_text（先生が文で質問を指定した）はそろう前でも足せる。依頼文の規則にも同じ一文 | spec 9.1「基本・投与スケジュール・副作用がそろってから、副作用をもとに提案する」。依頼文だけだと守られる保証が無い。先生が早く質問を頼む場合は止めない | 仕様（9.1）・確かめ直しの指摘 |
+| ツールの ref の並び（add_rows・delete_rows・from_library）の要素は `MAX_REF`（60）字まで（pydantic と input_schema の items.maxLength） | 拒否の理由に Claude が書いた ref が戻るので、長い ref がそのままツールの結果に返っていた（欄の field は既に 60 字まで） | 確かめ直しの指摘 |
+
+### T95 2 レジメン固定の解除と周辺（2026-11-05）
+| 決定 | 理由 | 出どころ |
+|---|---|---|
+| 用語→質問 key の対応は記録ごと（`PreparedInput.entry_versions`＋`other_versions`。service が skill_versions の全文から引く）。gate は記録の版と他の版の質問の key を照合する | spec 9.1「その記録の Skill の版の対応」。今の版で揃えると、新しい版で足した質問の行に、聞いていない古い版の記録から ○ が付く | 検証の指摘 |
+| term-mapper の用語の一覧は今の版（入力の版）の対応のまま。版の混ざる受診で違う key を付けた出来事は、checks が期待の key つきで差し戻す | 記録に版を持たせると Claude に送る JSON と評価済みの依頼文が変わる。差し戻しの回数・費用は T97 で実測する | 技術判断 |
+| 紙の照合（usable_events）を checks と同じ対応（その版の質問に無い key は null）にそろえた。FOLFOX の手掌・足底発赤知覚不全症候群の出来事は question_key=null で紙に残る | T95 より前は checks が null を求め紙が hand_foot を求めたため、checks を通った出来事を紙が黙って落としていた。合成3人に手足症候群の記載は無く、評価の数字は変わらない | 検証の指摘 |
+| `approve_change` も regimen-* を failed（use_regimen_editor）にする（本体・skill_versions は変えない。却下はできる） | T95 より前に作られた pending の行を承認すると、form JSON の無い版ができて D4 レジメンの画面で開けない | 検証の指摘 |
+| 患者の登録とレジメンの一覧は、SKILL.md が検査に通り、かつ skill_versions に版のあるものだけ | 新規の採用はファイルが先・DB が後。その途中で登録し DB が落ちると、置かれていないレジメンの患者が残る | 検証の指摘 |
+| `Regimen` は識別名の書式の str。合成データ（`SyntheticPatient`）と seed は `BuiltinRegimen`（FOLFOX/CAPOX）のまま。`POST /patients` の一覧に無い識別名は 422 invalid_input | 合成データ・eval の固定を変えない。書式の誤りと同じ扱いで画面の処理を1つにする | 技術判断 |
+| 名前と regimen の食い違い（regimen_mismatch）の検査は loader に置き、全ての regimen-* に掛ける | T91 からの申し送り。一覧・読み込みの両方で同じ検査を通す | 技術判断 |
+| 紙・医師画面の短い名前は SHORT_LABELS（既知の6問）＞版の form の label＞質問文。form の無い版の D2 の question_label は null | 既知の6問は評価済みの紙と同じ名前を保つ。旧 D4 の版には form が無い | 技術判断 |
+| patients の CHECK を外す移行では rowid も写す | 並び・参照を移行の前後で変えない | 技術判断 |
+| `ReportHeader.regimen_label` は FOLFOX/CAPOX で None（識別名のまま） | 評価済みの紙を1文字も変えない | 技術判断 |
+| 一覧の並びは FOLFOX・CAPOX を先、ほかは識別名の順。壊れた SKILL.md は載せず警告だけ | 既存の画面の並びを保ち、1つの壊れた Skill で登録を止めない | 技術判断 |
+| 旧 D4 のテスト・`run_demo_skill_change.py` の既定は report-format-default に移した（偽の editor は引用の最大件数 30→20）。test_e2e_flow の「質問を足して版2」は D4 レジメンの API で作り直した | regimen-* は use_regimen_editor になるため。テストの意味（一文→差分→承認）は保つ | 技術判断 |
+| FOLFOX/CAPOX の依頼文・3役の指示文は sha256 で固定（`test_regimen_prompt_frozen.py`） | 版ごとの対応を入れても評価済みの依頼文が変わらないことを確かめる | 技術判断 |

@@ -55,6 +55,7 @@ from tsutae.db.repo_skills import (
     insert_skill_version_row,
     latest_skill_version,
     list_skill_changes,
+    list_skill_names,
     save_skill_version,
     update_skill_change,
 )
@@ -104,6 +105,7 @@ __all__ = [
     "init_db",
     "insert_skill_version_row",
     "latest_skill_version",
+    "list_skill_names",
     "list_courses",
     "list_doctor_masks",
     "last_record_dates",

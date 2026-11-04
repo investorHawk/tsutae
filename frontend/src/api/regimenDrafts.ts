@@ -11,6 +11,7 @@ import {
   isRegimenDraftResponse,
   isRegimenDraftsResponse,
   isRegimenPreviewResponse,
+  isRegimenTurnResponse,
 } from "./regimenGuards";
 import type {
   AdoptRegimenRequest,
@@ -22,12 +23,18 @@ import type {
   RegimenDraftResponse,
   RegimenDraftsResponse,
   RegimenPreview,
+  RegimenTurnResponse,
 } from "./regimenTypes";
 import type { OkResponse } from "./types";
 import { checked, isRecord } from "./validate";
 
 /** 医師 API の打ち切り（ms。doctor.ts の DOCTOR_TIMEOUT_MS と同じ）。 */
 const TIMEOUT_MS = 30_000;
+/**
+ * Claude の1往復の打ち切り（ms）。サーバーの上限（regimen_turn_timeout_s、既定 90 秒）を
+ * 待ってから失敗の行つきの下書きが返るので、それより長くする。
+ */
+export const TURN_TIMEOUT_MS = 100_000;
 const BASE = "/api/doctor/regimen-drafts";
 
 const draftPath = (id: number): string => `${BASE}/${seg(id)}`;
@@ -72,6 +79,30 @@ export async function patchRegimenFields(
       timeoutMs: TIMEOUT_MS,
     }),
     isRegimenDraftResponse,
+  );
+}
+
+/**
+ * Claude の1往復（先生の文を送り、応答まで待つ）。応答は往復の後の下書きと turn_error
+ * （成功は null。時間切れ・失敗でも下書きは open に戻り、会話に失敗の行がある）。
+ * 入力の文・依頼文に個人を特定しうる表現の疑いがあれば 422 h1_blocked（何も保存しない。
+ * `fieldIssuesOf(err)` は掛かった場所 field_id "text"＝先生の文 / "prompt"＝依頼文の他の
+ * 部分と、規則の名前の入った message。文面は返らない）、応答中・閉じた下書きは 409
+ * working・not_open、読んでから始めるまでに直接編集が入れば 409 conflict（読み直す）。
+ */
+export async function postRegimenTurn(
+  id: number,
+  text: string,
+): Promise<RegimenTurnResponse> {
+  return checked<RegimenTurnResponse>(
+    await postJson<unknown>(
+      `${draftPath(id)}/turns`,
+      { text },
+      {
+        timeoutMs: TURN_TIMEOUT_MS,
+      },
+    ),
+    isRegimenTurnResponse,
   );
 }
 

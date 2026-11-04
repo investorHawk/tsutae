@@ -52,3 +52,24 @@ def test_regimen_turn_timeout_default_and_env(monkeypatch) -> None:
     assert config.get_settings().regimen_turn_timeout_s == 90.0
     monkeypatch.setenv("TSUTAE_REGIMEN_TURN_TIMEOUT_S", "45")
     assert config.get_settings().regimen_turn_timeout_s == 45.0
+
+
+def test_regimen_chat_limits_default_and_env(monkeypatch) -> None:
+    for name in (
+        "TSUTAE_REGIMEN_MAX_TURNS",
+        "TSUTAE_REGIMEN_MAX_BUDGET_USD",
+        "TSUTAE_REGIMEN_TURN_TIMEOUT_S",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    settings = config.get_settings()
+    assert settings.regimen_max_turns == 12
+    assert settings.regimen_max_budget_usd == 1.0
+    # 回復（working を open に戻す）は往復の上限に余裕を足してから
+    assert config.REGIMEN_RECOVER_GRACE_S == 15.0
+    assert settings.regimen_recover_after_s == 105.0
+    monkeypatch.setenv("TSUTAE_REGIMEN_MAX_TURNS", "5")
+    monkeypatch.setenv("TSUTAE_REGIMEN_MAX_BUDGET_USD", "0.3")
+    monkeypatch.setenv("TSUTAE_REGIMEN_TURN_TIMEOUT_S", "45")
+    settings = config.get_settings()
+    assert (settings.regimen_max_turns, settings.regimen_max_budget_usd) == (5, 0.3)
+    assert settings.regimen_recover_after_s == 60.0

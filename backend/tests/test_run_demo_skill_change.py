@@ -1,7 +1,8 @@
 """scripts/run_demo_skill_change.py（D4 の書き換えを1回だけ試す先生用のスクリプト）。
 
 API は呼ばない（--dry-run と、キーなしの終了だけを試す）。本体の SKILL.md は
-実行の前後で1バイトも変わらないことを確かめる。
+実行の前後で1バイトも変わらないことを確かめる。既定の Skill は report-format-default
+（v1.1。regimen-* は use_regimen_editor で断られる）。
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ def test_dry_run_is_pending_and_writes_files(
     assert code == 0, captured.out + captured.err
     assert "状態: pending" in captured.out
     assert "error_code: -" in captured.out
-    assert "差分: 追加 1 行 / 削除 0 行" in captured.out
+    assert "差分: 追加 1 行 / 削除 1 行" in captured.out
     diffs = sorted(out_dir.glob("demo-skill-change-*.diff"))
     mds = sorted(out_dir.glob("demo-skill-change-*.md"))
     assert len(diffs) == 1 and len(mds) == 1
@@ -61,11 +62,11 @@ def test_dry_run_is_pending_and_writes_files(
     assert str(diffs[0]) in captured.out and str(mds[0]) in captured.out
     diff = diffs[0].read_text(encoding="utf-8")
     assert diff.startswith("---")
-    assert f"+  - {{key: {script.DRY_RUN_KEY}" in diff
+    assert f"+{script.DRY_RUN_NEW}" in diff and f"-{script.DRY_RUN_OLD}" in diff
     md = mds[0].read_text(encoding="utf-8")
-    assert md.startswith("---\nname: regimen-folfox\n")
+    assert md.startswith("---\nname: report-format-default\n")
     assert "version: 1\n" in md  # 版は承認の時に上がる
-    assert script.DRY_RUN_KEY in md and script.DRY_RUN_TEXT in md
+    assert script.DRY_RUN_NEW in md and script.DRY_RUN_OLD not in md
 
 
 def test_dry_run_counts_hooks_and_stats(
@@ -81,18 +82,15 @@ def test_dry_run_counts_hooks_and_stats(
     assert "所要時間:" in out
 
 
-def test_approve_makes_version_2_with_new_question(
+def test_approve_makes_version_2_with_new_setting(
     script: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code = script.main(["--dry-run", "--approve", "--out-dir", str(tmp_path)])
     captured = capsys.readouterr()
     assert code == 0, captured.out + captured.err
-    assert "承認: regimen-folfox の版 2" in captured.out
-    assert f"{script.DRY_RUN_KEY}: {script.DRY_RUN_TEXT}" in captured.out
-    assert "stomatitis: 口の中の痛みや口内炎はありましたか" in captured.out
-    lines = captured.out.splitlines()
-    keys = [line.split(":")[0].strip() for line in lines if line.startswith("  ")]
-    assert keys.index(script.DRY_RUN_KEY) == keys.index("stomatitis") + 1
+    assert "承認: report-format-default の版 2" in captured.out
+    assert f"  {script.DRY_RUN_NEW}" in captured.out.splitlines()
+    assert "  show_previous_course: True" in captured.out.splitlines()
 
 
 def test_original_skills_untouched(
@@ -105,25 +103,34 @@ def test_original_skills_untouched(
     assert _snapshot() == before
 
 
-def test_custom_skill_and_request(
-    script: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_custom_request_without_change_is_failed(
+    script: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """--skill で別の Skill を選べる（偽の editor は stomatitis の無い Skill を変えない）。"""
+    """--request で依頼文を選べる（偽の editor が何も変えなければ no_change）。"""
+    monkeypatch.setattr(script, "DRY_RUN_OLD", "no_such_line: 1")
     code = script.main(
-        [
-            "--dry-run",
-            "--skill",
-            "report-format-default",
-            "--request",
-            "見出しを短くして",
-            "--out-dir",
-            str(tmp_path),
-        ]
+        ["--dry-run", "--request", "見出しを短くして", "--out-dir", str(tmp_path)]
     )
     out = capsys.readouterr().out
     assert code == 1
+    assert "依頼: 見出しを短くして" in out
     assert "状態: failed" in out
     assert "error_code: no_change" in out
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("skill", ["regimen-folfox", "regimen-nothing"])
+def test_regimen_skill_is_refused(
+    script: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str], skill: str
+) -> None:
+    """レジメンは D4 レジメンの画面で直す（旧 D4 は report-format だけ。v1.1）。"""
+    code = script.main(["--dry-run", "--skill", skill, "--out-dir", str(tmp_path)])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "error_code: use_regimen_editor" in out
     assert list(tmp_path.iterdir()) == []
 
 
@@ -131,7 +138,7 @@ def test_unknown_skill_exits_1(
     script: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code = script.main(
-        ["--dry-run", "--skill", "regimen-nothing", "--out-dir", str(tmp_path)]
+        ["--dry-run", "--skill", "report-format-nothing", "--out-dir", str(tmp_path)]
     )
     out = capsys.readouterr().out
     assert code == 1

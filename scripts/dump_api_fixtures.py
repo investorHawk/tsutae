@@ -122,6 +122,7 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/doctor/logout"),
         ("GET", "/api/doctor/patients"),
         ("POST", "/api/doctor/patients"),
+        ("GET", "/api/doctor/regimens"),
         ("GET", "/api/doctor/patients/{}/courses"),
         ("GET", "/api/doctor/patients/{}/visits"),
         ("GET", "/api/doctor/patients/{}/entries"),
@@ -149,6 +150,7 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/doctor/regimen-drafts/{}/discard"),
         ("GET", "/api/doctor/regimen-drafts/{}/preview"),
         ("POST", "/api/doctor/regimen-drafts/{}/adopt"),
+        ("POST", "/api/doctor/regimen-drafts/{}/turns"),
     }
 )
 
@@ -640,8 +642,16 @@ def _patient_records_flow(rec: Recorder) -> None:
 
 def _patient_admin_flow(rec: Recorder) -> None:
     rec.call("doctor_patients", "GET", "/api/doctor/patients")
+    rec.call("doctor_regimens", "GET", "/api/doctor/regimens")
     rec.call(
         "doctor_patient_create", "POST", "/api/doctor/patients", {"regimen": "CAPOX"}
+    )
+    rec.call(
+        "doctor_patient_create_unknown_regimen",
+        "POST",
+        "/api/doctor/patients",
+        {"regimen": "XELOX"},
+        expect=422,
     )
     rec.call("doctor_courses", "GET", f"/api/doctor/patients/{DEMO}/courses")
     _patient_records_flow(rec)
@@ -686,14 +696,12 @@ def _skill_flow(rec: Recorder, home: Path) -> None:
         "/api/doctor/skills/regimen-nope",
         expect=404,
     )
+    # v1.1: 旧 D4（一文の書き換え）は report-format だけ。regimen-* は 400 use_regimen_editor
     first = _request_change(
-        rec,
-        "doctor_skill_change_create",
-        REGIMEN_SKILL,
-        "口内炎の質問で食事がとれたかも聞いて",
+        rec, "doctor_skill_change_create", REPORT_SKILL, "見出しの順を変えて"
     )
     _request_change(
-        rec, "doctor_skill_change_create_failed", REGIMEN_SKILL, NO_CHANGE_REQUEST
+        rec, "doctor_skill_change_create_failed", REPORT_SKILL, NO_CHANGE_REQUEST
     )
     rec.call(
         "doctor_skill_change_create_invalid_name",
@@ -702,8 +710,15 @@ def _skill_flow(rec: Recorder, home: Path) -> None:
         {"skill_name": "../etc", "request_text": "x"},
         expect=400,
     )
+    rec.call(
+        "doctor_skill_change_create_regimen",
+        "POST",
+        base,
+        {"skill_name": REGIMEN_SKILL, "request_text": "口内炎の質問を直して"},
+        expect=400,
+    )
     second = _request_change(rec, None, REPORT_SKILL, "引用は短くして")
-    with skill_lock(_skill_dir(home, REGIMEN_SKILL)):
+    with skill_lock(_skill_dir(home, REPORT_SKILL)):
         rec.call(
             "doctor_skill_change_approve_busy",
             "POST",

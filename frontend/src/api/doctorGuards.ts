@@ -7,7 +7,8 @@
  */
 import {
   FEVER_VALUES,
-  REGIMENS,
+  REGIMEN_CODE_MAX,
+  REGIMEN_CODE_PATTERN,
   TEMPERATURE_MAX,
   TEMPERATURE_MIN,
   THREE_LEVEL_VALUES,
@@ -84,11 +85,38 @@ export function isVisitSummary(v: Item): boolean {
   );
 }
 
+/** レジメンの識別名（書式だけ。置かれているかは GET regimens の一覧）。 */
+export function isRegimenCode(v: unknown): boolean {
+  return (
+    isString(v) && v.length <= REGIMEN_CODE_MAX && REGIMEN_CODE_PATTERN.test(v)
+  );
+}
+
+/** GET regimens の1件。skill_name は `regimen-` + 識別名の小文字。 */
+function isRegimenChoice(v: Item): boolean {
+  return (
+    isRegimenCode(v.code) &&
+    v.skill_name === `regimen-${String(v.code).toLowerCase()}` &&
+    isPositiveInt(v.version) &&
+    isString(v.display_name) &&
+    v.display_name.trim() !== ""
+  );
+}
+
+/** GET regimens {regimens}。識別名は重ならない（空の一覧も契約どおり）。 */
+export function isRegimensResponse(v: Item): boolean {
+  if (!everyItem(isRegimenChoice)(v.regimens)) {
+    return false;
+  }
+  const codes = (v.regimens as Item[]).map((r) => r.code);
+  return new Set(codes).size === codes.length;
+}
+
 /** 患者一覧の1件。最後の記録日・今のコース・次回受診は nullable（省略は不正）。 */
 export function isDoctorPatient(v: Item): boolean {
   return (
     isString(v.id) &&
-    oneOf(REGIMENS)(v.regimen) &&
+    isRegimenCode(v.regimen) &&
     isIsoDateTime(v.created_at) &&
     isString(v.register_url) &&
     hasNullable("last_record_date", isIsoDate)(v) &&
@@ -160,7 +188,10 @@ function fitsTemperature(v: Item): boolean {
 
 function isDoctorEntryAnswer(v: Item): boolean {
   return (
-    isString(v.question_key) && isAnswerValue(v.value) && fitsTemperature(v)
+    isString(v.question_key) &&
+    isAnswerValue(v.value) &&
+    fitsTemperature(v) &&
+    hasNullable("question_label", isString)(v)
   );
 }
 

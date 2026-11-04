@@ -114,18 +114,23 @@ def group_by_date(entries: Sequence[Entry]) -> dict[date, tuple[Entry, ...]]:
 
 
 def row_specs(
-    regimen_skill: RegimenSkill, report_skill: ReportFormatSkill
+    regimen_skill: RegimenSkill,
+    report_skill: ReportFormatSkill,
+    labels: Mapping[str, str] | None = None,
 ) -> list[RowSpec]:
-    """3択の質問（Skill の順）＋体温行（show_temperature_row のとき、最初の体温の質問）。"""
+    """3択の質問（Skill の順）＋体温行（show_temperature_row のとき、最初の体温の質問）。
+
+    labels は版の form の短い名前（labels.question_label の順に使う）。
+    """
     questions = list(regimen_skill.questions)
     rows = [
-        RowSpec(q.key, question_label(q.key, questions), q)
+        RowSpec(q.key, question_label(q.key, questions, labels), q)
         for q in questions
         if q.answer_type == "three_level"
     ]
     temperature = next((q for q in questions if q.answer_type == "temperature"), None)
     if report_skill.show_temperature_row and temperature is not None:
-        label = question_label(TEMPERATURE_ROW_KEY, questions)
+        label = question_label(TEMPERATURE_ROW_KEY, questions, labels)
         rows.append(RowSpec(TEMPERATURE_ROW_KEY, label, temperature))
     return rows
 

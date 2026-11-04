@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -96,7 +96,7 @@ def _header_view(h: ReportHeader) -> dict[str, Any]:
     return {
         "reception_no": h.reception_no,
         "patient_id": h.patient_id,
-        "regimen": h.regimen,
+        "regimen": h.regimen_label or h.regimen,
         "course": f"第{h.course_no}コース",
         "period": f"{h.course_start.isoformat()}〜{h.course_end.isoformat()}",
         "records": f"{h.recorded_days}日/{h.total_days}日",
@@ -110,9 +110,11 @@ def _line(kind: str, mark: str, title: str, day: str, detail: str) -> dict[str, 
 
 
 def _contradiction_line(
-    a: AttentionItem, questions: Sequence[Question]
+    a: AttentionItem,
+    questions: Sequence[Question],
+    labels: Mapping[str, str] | None,
 ) -> dict[str, str]:
-    label = question_label(a.question_key or "", questions)
+    label = question_label(a.question_key or "", questions, labels)
     detail = (
         f"{label}: クローズ回答「{answer_label(a.closed_answer)}」"
         f"／自由記載「{a.quote or ''}」"
@@ -128,11 +130,15 @@ def _too_sick_line(items: Sequence[AttentionItem]) -> dict[str, str]:
 
 
 def _attention_view(
-    items: Sequence[AttentionItem], questions: Sequence[Question]
+    items: Sequence[AttentionItem],
+    questions: Sequence[Question],
+    labels: Mapping[str, str] | None = None,
 ) -> list[dict[str, str]]:
     """食い違い → 発熱 → つらくて書けない（1行にまとめる）→ 未処理 の順。"""
     lines = [
-        _contradiction_line(a, questions) for a in items if a.kind == "contradiction"
+        _contradiction_line(a, questions, labels)
+        for a in items
+        if a.kind == "contradiction"
     ]
     lines += [
         _line("fever", "▲", "発熱", _day(a.day), f"{a.temperature:.1f}℃")
@@ -240,17 +246,20 @@ def render_report_html(
     low_confidence_threshold: float = DEFAULT_LOW_CONFIDENCE,
     sections: Sequence[str] | None = None,
     quotes_max_items: int | None = None,
+    question_labels: Mapping[str, str] | None = None,
 ) -> str:
     """A4 の HTML を返す（通常は 1 枚）。
 
     - questions: 要確認・経過表の表示名に使う質問集（今の regimen Skill）
+    - question_labels: 今の版の form の質問の短い名前（要確認の質問名。既知の6問は
+      SHORT_LABELS が先。無ければ質問文。v1.1）
     - low_confidence_threshold: これ未満の症状別の行に「？」（report Skill の値を渡す）
     - sections: 欄とその順（report Skill の sections）。None なら全て既定の順
     - quotes_max_items: 引用の上限（report Skill の値を渡す）。引用が上限に達していれば
       省いた可能性を書く。None なら書かない（ReportData に省いた件数が無いための暫定）
     """
     chosen = _sections(sections)
-    attention = _attention_view(data.attention, questions)
+    attention = _attention_view(data.attention, questions, question_labels)
     grid = grid_view(data.grid)
     template = _ENV.get_template(TEMPLATE_NAME)
     return template.render(

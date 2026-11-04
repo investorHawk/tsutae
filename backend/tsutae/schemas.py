@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # 基本の列挙
 # ---------------------------------------------------------------------------
 
-Regimen = Literal["FOLFOX", "CAPOX"]
 ThreeLevel = Literal["none", "present", "hard"]
 FeverValue = Literal["not_measured", "measured"]
 AnswerValue = Literal["none", "present", "hard", "not_measured", "measured"]
@@ -28,6 +27,15 @@ SkillChangeStatus = Literal["pending", "approved", "rejected", "failed"]
 QUESTION_KEY_PATTERN = r"^[a-z][a-z0-9_]{1,40}$"
 # レジメンの識別名（v1.1。英大文字・数字・`-`。Skill 名は `regimen-` + 小文字）
 REGIMEN_CODE_PATTERN = r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$"
+REGIMEN_CODE_MAX = 30
+# 患者のレジメン（識別名）。v1.1 で FOLFOX/CAPOX に固定しない。置かれたレジメン
+# （`skills.list_regimens`）との照合は API の入口（POST /api/doctor/patients）で行う
+Regimen = Annotated[
+    str, Field(pattern=REGIMEN_CODE_PATTERN, max_length=REGIMEN_CODE_MAX)
+]
+# 評価済みの2つ。合成データ（data/synthetic・seed・eval）はこの2つだけを使う（v1.0 のまま）
+BuiltinRegimen = Literal["FOLFOX", "CAPOX"]
+BUILTIN_REGIMENS: tuple[str, ...] = ("FOLFOX", "CAPOX")
 
 
 class Frozen(BaseModel):
@@ -61,8 +69,8 @@ class RegimenSkill(Frozen):
     name: str
     description: str
     version: int = Field(ge=1)
-    # v1.1: FOLFOX/CAPOX 以外も持てる（患者の regimen の型 `Regimen` は T95 で広げる）
-    regimen: str = Field(pattern=REGIMEN_CODE_PATTERN, max_length=30)
+    # v1.1: FOLFOX/CAPOX 以外も持てる（Skill 名は `regimen-` + 識別名の小文字）
+    regimen: Regimen
     cycle_days: int = Field(ge=7, le=42)
     pump_removal_day: int | None = Field(default=None, ge=1)
     questions: list[Question] = Field(min_length=1)
@@ -334,6 +342,8 @@ class ReportHeader(Frozen):
     reception_no: str
     patient_id: str
     regimen: Regimen
+    # 紙のヘッダの表示名（Skill の display_name。識別名と同じなら None。v1.1）
+    regimen_label: str | None = None
     course_no: int
     course_start: date
     course_end: date
@@ -391,7 +401,7 @@ class SyntheticEntry(Frozen):
 class SyntheticPatient(Frozen):
     patient_id: str
     role: Literal["demo", "eval"]
-    regimen: Regimen
+    regimen: BuiltinRegimen
     visit_date: date  # この日に受診（QR）する想定
     reception_no: str
     courses: list[SyntheticCourse]
@@ -456,6 +466,17 @@ class DoctorMask(Frozen):
     allowed: list[TextSpan] = Field(default_factory=list)
 
 
+class VersionTermKeys(Frozen):
+    """変換の入力の版と違う版の、用語 → 質問 key の対応の材料（v1.1。記録の版ごと）。
+
+    term_keys はその版の frontmatter の term_keys（全体の対応と違うものだけ）、
+    question_keys はその版の質問の key（その版の質問に無い key は null にする）。
+    """
+
+    term_keys: dict[str, str | None] = Field(default_factory=dict)
+    question_keys: list[str] = Field(default_factory=list)
+
+
 class PreparedInput(Frozen):
     """伏せ字・選別を済ませた変換の入力。レポート組み立てとフォールバックも使う。"""
 
@@ -466,6 +487,15 @@ class PreparedInput(Frozen):
     # 医師が確かめて許した部分文字列（送る記録のもの。重複なし・昇順）。H1 に渡す。
     # Claude には送らない（PipelineInput の外）
     allowed_suspects: list[str] = Field(default_factory=list)
+    # 変換の入力の版（regimen_skill_version）の term_keys（用語 → 質問 key のうち全体の
+    # 対応と違うものだけ。v1.1）。term-mapper の一覧はこの版の対応。FOLFOX/CAPOX@1 は空
+    term_keys: dict[str, str | None] = Field(default_factory=dict)
+    # 記録の版（entry_no -> Entry.skill_version）と、入力の版と違う版の対応の材料（v1.1）。
+    # checks・紙の照合は記録ごとにその版の対応を使う（`skills.term_keys.entry_term_keys`）。
+    # 版の分からない記録・材料の無い版は入力の版の対応（gate が材料の欠けを止める）。
+    # ここまでの3つは Claude に送る JSON（input）には入れない
+    entry_versions: dict[int, str] = Field(default_factory=dict)
+    other_versions: dict[str, VersionTermKeys] = Field(default_factory=dict)
 
 
 class RunStats(Frozen):

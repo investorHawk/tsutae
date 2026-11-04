@@ -3,7 +3,8 @@
 - 全経路で医師 Cookie を検査する（`require_doctor`）。GET 以外は `require_same_origin`
   （別サイトからは 403 cross_origin）。本文つきの POST・PATCH は Content-Type が
   application/json でなければ 415（`require_json_body`。本文の無い discard は対象外）
-- 読み出しの前に、working のまま `regimen_turn_timeout_s` を過ぎた下書きを open に戻す
+- 読み出しの前に、working のまま `regimen_recover_after_s`（往復の上限＋余裕）を過ぎた
+  下書きを open に戻す
 - `POST /regimen-drafts {from: "new"} | {skill: "regimen-folfox"}` → `{draft, created}`。
   既存のレジメンに開いた下書きがあればそれを返す（created=false）
 - `GET /regimen-drafts` → `{drafts: [要約]}`（開いている下書き。id 順）
@@ -19,6 +20,12 @@
   `{ok: true, skill_name, version, regimen}`。止めたら 409（token_mismatch・
   ai_values_unconfirmed・stale・schedule_locked・code_taken・working・not_open・busy など）
   か 422 invalid_form（issues つき）。書き込みの失敗は 500 write_error
+- `POST /regimen-drafts/{id}/turns {text}` → `{draft, turn_error}`（Claude の1往復。
+  応答まで待つ。上限 `regimen_turn_timeout_s`）。turn_error は成功なら null、時間切れ・
+  失敗なら timeout・max_turns・max_budget・sdk_error・internal_error など（下書きは open に
+  戻り、会話に失敗の行）、遅れた結果を捨てたら discarded。入力の文・依頼文の全体に H1 が
+  掛かれば 422 `{error: "h1_blocked"}`（Claude を呼ばず保存しない）。working の間は 409
+  working。本体は `tsutae.regimen.chat_turn.run_turn`、Claude は `app.state.regimen_chat`
 - 下書きの form は `prose`（描画用の文。画面に出さない）を除いて返す
 """
 
@@ -41,6 +48,7 @@ from tsutae.api.deps import (
 )
 from tsutae.db import repo_regimen_drafts as repo
 from tsutae.regimen.adopt import adopt
+from tsutae.regimen.chat_turn import run_turn
 from tsutae.regimen.drafts import (
     DraftError,
     create_new_draft,
@@ -73,11 +81,13 @@ _STATUS = {
     "not_found": 404,
     "unknown_skill": 404,
     "invalid_name": 400,
+    "h1_blocked": 422,
     "base_invalid": 500,
     "render_failed": 500,
     "write_error": 500,
 }
 MAX_CHANGES = 300
+MAX_TURN_TEXT = 1000
 
 
 class DraftCreateIn(BaseModel):
@@ -116,6 +126,12 @@ class AdoptIn(BaseModel):
 
     confirm_token: StrictStr = Field(max_length=200)
     ai_values_confirmed: StrictBool
+
+
+class TurnIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: StrictStr = Field(min_length=1, max_length=MAX_TURN_TEXT)
 
 
 def error_status(code: str) -> int:
@@ -182,7 +198,7 @@ def _patch_of(body: FieldsIn) -> FormPatch:
 def create_draft(body: DraftCreateIn, conn: Conn, settings: AppSettings) -> Any:
     if (body.from_ is None) == (body.skill is None):
         raise ApiError(422, "invalid_input")
-    repo.recover_stale_working(conn, timeout_s=settings.regimen_turn_timeout_s)
+    repo.recover_stale_working(conn, timeout_s=settings.regimen_recover_after_s)
     try:
         if body.skill is None:
             draft, created = create_new_draft(conn), True
@@ -197,14 +213,14 @@ def create_draft(body: DraftCreateIn, conn: Conn, settings: AppSettings) -> Any:
 
 @router.get(_BASE)
 def list_drafts(conn: Conn, settings: AppSettings) -> dict[str, Any]:
-    repo.recover_stale_working(conn, timeout_s=settings.regimen_turn_timeout_s)
+    repo.recover_stale_working(conn, timeout_s=settings.regimen_recover_after_s)
     return {"drafts": [_summary(d) for d in repo.list_active_drafts(conn)]}
 
 
 @router.get(_BASE + "/{draft_id}")
 def get_draft(draft_id: DraftId, conn: Conn, settings: AppSettings) -> Any:
     try:
-        draft = load_draft(conn, draft_id, timeout_s=settings.regimen_turn_timeout_s)
+        draft = load_draft(conn, draft_id, timeout_s=settings.regimen_recover_after_s)
     except DraftError as exc:
         return _error(exc)
     return {"draft": _view(conn, draft)}
@@ -220,7 +236,7 @@ def patch_fields(
             draft_id,
             _patch_of(body),
             skills_dir=settings.skills_dir,
-            timeout_s=settings.regimen_turn_timeout_s,
+            timeout_s=settings.regimen_recover_after_s,
         )
     except DraftError as exc:
         return _error(exc)
@@ -230,7 +246,7 @@ def patch_fields(
 @router.post(_BASE + "/{draft_id}/discard")
 def discard_draft(draft_id: DraftId, conn: Conn, settings: AppSettings) -> Any:
     try:
-        discard(conn, draft_id, timeout_s=settings.regimen_turn_timeout_s)
+        discard(conn, draft_id, timeout_s=settings.regimen_recover_after_s)
     except DraftError as exc:
         return _error(exc)
     return {"ok": True}
@@ -239,7 +255,7 @@ def discard_draft(draft_id: DraftId, conn: Conn, settings: AppSettings) -> Any:
 @router.get(_BASE + "/{draft_id}/preview")
 def preview(draft_id: DraftId, conn: Conn, settings: AppSettings) -> Any:
     try:
-        draft = load_draft(conn, draft_id, timeout_s=settings.regimen_turn_timeout_s)
+        draft = load_draft(conn, draft_id, timeout_s=settings.regimen_recover_after_s)
         require_open(draft)
     except DraftError as exc:
         return _error(exc)
@@ -261,7 +277,7 @@ def adopt_draft(
             body.confirm_token,
             body.ai_values_confirmed,
             skills_home=request.app.state.skills_home,
-            timeout_s=settings.regimen_turn_timeout_s,
+            timeout_s=settings.regimen_recover_after_s,
         )
     except DraftError as exc:
         return _error(exc)
@@ -271,3 +287,27 @@ def adopt_draft(
         "version": result.version,
         "regimen": result.regimen,
     }
+
+
+@router.post(_BASE + "/{draft_id}/turns", dependencies=[Depends(require_json_body)])
+async def post_turn(
+    draft_id: DraftId,
+    body: TurnIn,
+    request: Request,
+    conn: Conn,
+    settings: AppSettings,
+) -> Any:
+    if not body.text.strip():
+        raise ApiError(422, "invalid_input")
+    try:
+        outcome = await run_turn(
+            conn,
+            draft_id,
+            body.text,
+            chat=request.app.state.regimen_chat,
+            settings=settings,
+            skills_dir=settings.skills_dir,
+        )
+    except DraftError as exc:
+        return _error(exc)
+    return {"draft": _view(conn, outcome.draft), "turn_error": outcome.error}

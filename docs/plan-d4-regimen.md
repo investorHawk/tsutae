@@ -121,11 +121,20 @@ CAPOX の切り替え。どの場合も **T91 のバイト一致テスト・H1�
 - **`regimen_max_turns`=12・`regimen_max_budget_usd`=1.0 の見直し**: smoke の実測（往復ごとの SDK の回数と費用。`docs/eval/demo-regimen-*.json` の `turns[].sdk_turns`・`cost_usd` と `limits`）を見て決める。値は先生の smoke の後に記入
 - **spec §16 の行の直し**: spec の `GET /api/doctor/regimens/{name}/form` は作らず、`POST /api/doctor/regimen-drafts {skill}`（開いた下書きがあればそれを返す）で代えた（T96）。spec §16 の表をこれに合わせて直してよいか（spec の変更なので先生の確認が要る）
 
-- **最初にサーバーを起こす前に `data/tsutae.db` を写しておく**: 起動の `migrate_db` が、古い CHECK の残る `pipeline_logs`（T93）と `patients`（T95）を 12-step の作り直しで移行する。移行で全行が残ることは古い形を写した DB のテストで確かめたが、実際の `data/tsutae.db` ではまだ走らせていない（`.env` を読めないため）。例: `! cp data/tsutae.db data/tsutae.db.bak-20261105`
+- **DB の移行は写しで確かめた（先生の作業は無し）**: 既定の `data/tsutae.db` は無かった（前の案内の `cp` が誤り）。手元の `data/ui-fix.db`（古い CHECK の残る合成データ）の写しに `init_db` を2回掛け、全12表の行数と中身が同じ・外部キーの検査が空・整合性の検査が ok を確かめた（2026-11-05）。画面の確認は下のとおり新しい DB で行う。`.env` の `TSUTAE_DB` が別の DB を指していて、それをそのまま起動するときは、先に写す
 
 smoke（先生が実行。サンドボックスの外）:
 
 ```
 ! .venv/bin/python scripts/run_demo_regimen.py --json            # 採用はしない
 ! .venv/bin/python scripts/run_demo_regimen.py --json --adopt    # 一時の写しの上で採用まで
+```
+
+画面の確認（別のターミナルで。採用すると Skill のフォルダに書くので、本体の写しと新しい DB を使う）:
+
+```
+TSUTAE_DB=data/d4-check.db make seed
+cp -R backend/skills_home/.claude/skills /tmp/d4-skills
+TSUTAE_DB=data/d4-check.db TSUTAE_SKILLS_DIR=/tmp/d4-skills TSUTAE_TODAY=2026-11-09 make dev-api
+make dev-web
 ```

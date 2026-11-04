@@ -39,6 +39,30 @@ describe("字幕の分割", () => {
     chunks.slice(1).forEach((c, i) => expect(c.start).toBe(chunks[i].end));
   });
 
+  it("ひらがなの直前では切らない（「」の直後の助詞・語の途中）", () => {
+    expect(
+      wrapLines(
+        "「おとといの夜から口内炎」は Day5 の口腔粘膜炎として、原文の引用つきで載ります。",
+      )[1].startsWith("は"),
+    ).toBe(false);
+    const breaks: string[] = [];
+    for (const { scenes } of STORYBOARDS) {
+      for (const s of scenes) {
+        const lines = buildSubtitleChunks(s.caption ?? s.narration).flatMap(
+          (c) => c.lines,
+        );
+        lines.slice(1).forEach((l, i) => {
+          const prev = Array.from(lines[i].trim()).pop() ?? "";
+          const next = Array.from(l.trim())[0] ?? "";
+          if (/[\u3041-\u309F]/.test(next) && !/[、。！？]/.test(prev)) {
+            breaks.push(`${s.id}: ${lines[i]} / ${l}`);
+          }
+        });
+      }
+    }
+    expect(breaks).toEqual([]);
+  });
+
   it("全案の全ナレーションが 2 行以内・1 行 30 字以内に収まり、文字を落とさない", () => {
     for (const { scenes } of STORYBOARDS) {
       for (const s of scenes) {

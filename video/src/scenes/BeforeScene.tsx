@@ -20,7 +20,7 @@ const Conversation: React.FC<{
       width: 1080,
       display: "flex",
       flexDirection: "column",
-      gap: 16,
+      gap: 10,
     }}
   >
     {bubbles.map((b, i) => {
@@ -43,12 +43,13 @@ const Conversation: React.FC<{
 
 const LOSS_STYLE: React.CSSProperties = {
   flex: 1,
-  padding: "26px 28px",
+  padding: "18px 20px",
   borderRadius: 20,
   border: `5px solid ${COLORS.reject}`,
   background: COLORS.white,
   color: COLORS.reject,
-  fontSize: 50,
+  fontSize: 42,
+  whiteSpace: "nowrap",
   fontWeight: 800,
   textAlign: "center",
 };
@@ -61,7 +62,7 @@ const Losses: React.FC<{ losses: string[]; frame: number; start: number }> = ({
   <div
     style={{
       position: "absolute",
-      top: 680,
+      top: 720,
       left: 100,
       right: 100,
       display: "flex",

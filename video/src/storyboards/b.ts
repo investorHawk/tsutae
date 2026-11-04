@@ -91,10 +91,11 @@ export const scenesB: Scene[] = [
     seconds: 18,
     kind: "report",
     title: "受診時レポート",
-    screen: "経過表（前コースと同じ Day、−−、代、回）→ 引用（Day5 口腔粘膜炎）",
+    screen:
+      "経過表（前コースと同じ Day、−−、代、回）→ 症状別の時系列（Day5 口腔粘膜炎と原文の引用）",
     narration:
       "経過表はコースの日数で並び、前のコースと同じ Day で比べられます。入力なし、つらくて書けない、症状なし、未設問を区別。「おとといの夜から口内炎」は Day5 の口腔粘膜炎として、原文の引用つきで載ります。",
-    props: { focus: ["timeline", "symptoms", "quotes"] },
+    props: { focus: ["timeline", "symptoms"] },
   },
   {
     id: "b08-settings",

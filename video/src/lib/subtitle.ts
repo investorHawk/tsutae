@@ -40,15 +40,32 @@ const canBreakAt = (cs: string[], i: number): boolean =>
   !NO_LINE_START.includes(cs[i]) &&
   !NO_LINE_END.includes(cs[i - 1]);
 
-/** 切る位置の良さ（大きいほど良い）。読点・括弧の後を好む */
+const HIRAGANA = /[\u3041-\u309F]/;
+const PARTICLES = "はがをにでとものへ";
+
+/** 空白を飛ばした、切れ目の直前・直後の文字 */
+const neighbors = (cs: string[], i: number): [string, string] => {
+  let p = i - 1;
+  while (p >= 0 && cs[p] === " ") p -= 1;
+  let n = i;
+  while (n < cs.length && cs[n] === " ") n += 1;
+  return [cs[p] ?? "", cs[n] ?? ""];
+};
+
+/**
+ * 切る位置の良さ（大きいほど良い）。読点・句点の後を好み、
+ * ひらがなの直前（送り仮名・助詞・「」の直後の助詞）は避ける。
+ */
 const breakScore = (cs: string[], i: number, target: number): number => {
-  const prev = cs[i - 1];
+  const [prev, next] = neighbors(cs, i);
   let bonus = 0;
   if ("、，,".includes(prev)) bonus = 12;
-  else if ("。」』！？".includes(prev)) bonus = 14;
-  else if (cs[i] === " " || prev === " ") bonus = 6;
-  else if ("「『".includes(cs[i])) bonus = 8;
-  else if ("はがをにでとものへ".includes(prev)) bonus = 3;
+  else if ("。！？".includes(prev)) bonus = 14;
+  else if (HIRAGANA.test(next)) bonus = -20;
+  else if ("」』".includes(prev)) bonus = 10;
+  else if ("「『".includes(next)) bonus = 8;
+  else if (PARTICLES.includes(prev)) bonus = 4;
+  else if (cs[i] === " " || cs[i - 1] === " ") bonus = 2;
   return bonus - Math.abs(i - target);
 };
 

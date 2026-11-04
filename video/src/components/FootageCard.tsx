@@ -45,7 +45,14 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({
   children,
 }) => (
   <div style={{ display: "flex", gap: 24, alignItems: "baseline" }}>
-    <div style={{ width: 170, flexShrink: 0, color: COLORS.inkSoft }}>
+    <div
+      style={{
+        width: 200,
+        flexShrink: 0,
+        color: COLORS.inkSoft,
+        whiteSpace: "nowrap",
+      }}
+    >
       {label}
     </div>
     <div style={{ flex: 1 }}>{children}</div>

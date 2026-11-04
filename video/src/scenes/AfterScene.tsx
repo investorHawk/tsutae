@@ -21,7 +21,12 @@ const Desk: React.FC<{
     VIEWPORT,
     0.94,
   );
-  const close = fitCamera(REGIONS.alerts, VIEWPORT, 0.94, 1.4);
+  const near = fitCamera(REGIONS.alerts, VIEWPORT, 0.94, 1.4);
+  // 寄っても紙の上端より上（机）が見えないよう、中心を下げる
+  const close = {
+    ...near,
+    cy: Math.max(near.cy, VIEWPORT.height / 2 / near.scale),
+  };
   const zoom = interpolate(frame, [zoomAt, zoomAt + 24], [0, 1], CLAMP);
   const slide = interpolate(frame, [0, 22], [0, 1], CLAMP);
   return (
@@ -54,8 +59,8 @@ const AlertList: React.FC<{
   <div
     style={{
       position: "absolute",
-      top: 260,
-      left: 1410,
+      top: 250,
+      left: 1160,
       right: 40,
       display: "flex",
       flexDirection: "column",
@@ -105,10 +110,10 @@ export const AfterScene: React.FC<SceneComponentProps> = ({
       {scene.title ? (
         <Caption text={scene.title} top={130} left={1160} />
       ) : null}
-      <div style={{ position: "absolute", top: 270, left: 1150 }}>
+      <div style={{ position: "absolute", top: 590, left: 1160 }}>
         <Clock
           seconds={elapsed}
-          size={210}
+          size={170}
           color={COLORS.navy}
           label="聞き取り"
         />

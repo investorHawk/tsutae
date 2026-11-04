@@ -28,6 +28,17 @@ const TONE: Record<
   paper: { bg: COLORS.white, fg: COLORS.ink, border: COLORS.line },
 };
 
+/** 箱の見出しの文字の大きさ（箱の幅に 1 行で収まる大きさ） */
+const LABEL_SIZE: Record<PipeNode["tone"], number> = {
+  mask: 44,
+  muted: 36,
+  hook: 52,
+  agent: 44,
+  role: 44,
+  tool: 44,
+  paper: 44,
+};
+
 const EDGE_COLOR: Record<NonNullable<PipeEdge["tone"]>, string> = {
   normal: COLORS.ink,
   reject: COLORS.reject,
@@ -75,7 +86,7 @@ export const NodeBox: React.FC<{
       <>
         <div
           style={{
-            fontSize: node.tone === "hook" ? 52 : 44,
+            fontSize: LABEL_SIZE[node.tone],
             fontWeight: 900,
             lineHeight: 1.15,
           }}
@@ -83,7 +94,14 @@ export const NodeBox: React.FC<{
           {node.label}
         </div>
         {node.sub ? (
-          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 4 }}>
+          <div
+            style={{
+              fontSize: node.tone === "hook" ? 24 : 26,
+              fontWeight: 600,
+              marginTop: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
             {node.sub}
           </div>
         ) : null}
@@ -230,7 +248,7 @@ export const HookBanner: React.FC<{
       position: "absolute",
       left: 420,
       right: 420,
-      top: 770,
+      top: 785,
       textAlign: "center",
       padding: "10px 30px",
       borderRadius: 18,

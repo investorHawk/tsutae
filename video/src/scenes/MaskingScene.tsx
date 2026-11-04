@@ -172,7 +172,9 @@ export const MaskingScene: React.FC<SceneComponentProps> = ({
   return (
     <AbsoluteFill style={{ background: COLORS.paper, fontFamily: FONT_FAMILY }}>
       <LeftFootage scene={scene} />
-      {scene.title ? <Caption text={scene.title} top={48} left={900} /> : null}
+      {scene.title ? (
+        <Caption text={scene.title} top={48} left={900} size={64} />
+      ) : null}
       <MaskPanel frame={frame} duration={durationInFrames} />
     </AbsoluteFill>
   );

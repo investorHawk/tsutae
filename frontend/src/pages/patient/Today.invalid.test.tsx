@@ -24,10 +24,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** 見出しが出ている（質問集を読めた後は、右に今日の日付も付く）。 */
 function expectPageShown() {
-  expect(
-    screen.getByRole("heading", { level: 1, name: s("today.title") }),
-  ).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    s("today.title"),
+  );
 }
 
 describe("Today (P1): malformed 200 bodies", () => {

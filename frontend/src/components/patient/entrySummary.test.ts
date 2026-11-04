@@ -76,6 +76,44 @@ describe("summarizeEntry", () => {
     ).toEqual([{ kind: "all_none" }, { kind: "free_text" }]);
   });
 
+  it("家族が代わりに入力した記録は最後に proxy（つらくて書けないの時も）", () => {
+    expect(
+      summarizeEntry({
+        tooSick: false,
+        answers: [
+          { questionKey: "diarrhea", value: "present", questionText: null },
+        ],
+        freeText: "abc",
+        byProxy: true,
+      }),
+    ).toEqual([
+      {
+        kind: "answer",
+        questionKey: "diarrhea",
+        value: "present",
+        questionText: null,
+      },
+      { kind: "free_text" },
+      { kind: "proxy" },
+    ]);
+    expect(
+      summarizeEntry({
+        tooSick: true,
+        answers: [],
+        freeText: null,
+        byProxy: true,
+      }),
+    ).toEqual([{ kind: "too_sick" }, { kind: "proxy" }]);
+    expect(
+      summarizeEntry({
+        tooSick: false,
+        answers: [],
+        freeText: "abc",
+        byProxy: false,
+      }),
+    ).toEqual([{ kind: "free_text" }]);
+  });
+
   it("空白だけの自由記載は無いのと同じ", () => {
     expect(
       summarizeEntry({ tooSick: false, answers: [], freeText: "  " }),
@@ -119,8 +157,10 @@ describe("summarySourceOf", () => {
         },
       ],
       freeText: ENTRIES[1]!.free_text,
+      byProxy: true,
     });
     expect(summarySourceOf(ENTRIES[0]!).tooSick).toBe(true);
+    expect(summarySourceOf(ENTRIES[0]!).byProxy).toBe(false);
   });
 
   it("送った EntryCreate と質問集から作る（質問文は質問集の文）", () => {
@@ -152,13 +192,15 @@ describe("summarySourceOf", () => {
         },
       ],
       freeText: "x",
+      byProxy: false,
     });
     expect(
-      summarySourceOf({ too_sick: true, by_proxy: false }, QUESTIONS),
+      summarySourceOf({ too_sick: true, by_proxy: true }, QUESTIONS),
     ).toEqual({
       tooSick: true,
       answers: [],
       freeText: null,
+      byProxy: true,
     });
   });
 });

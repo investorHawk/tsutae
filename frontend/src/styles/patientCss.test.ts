@@ -119,16 +119,30 @@ describe("patient.css", () => {
     ).toMatch(/content:/);
   });
 
-  it("何も選んでいない質問のボタンは薄い緑（押せない時は灰のまま）", () => {
+  it("何も選んでいない質問のボタンは薄い橙の地と濃い橙の枠（押せない時は灰のまま）", () => {
     const body = ruleOf(
       ".patient-app .p-choices--unanswered > .p-choice:not(:disabled)",
     );
     expect(body).toMatch(/background:\s*var\(--p-choice-prompt\)/);
-    const green = varOf("--p-choice-prompt");
-    const [r, g, b] = rgbOf(green);
-    expect(g).toBeGreaterThan(r);
-    expect(g).toBeGreaterThan(b);
-    expect(contrast(varOf("--p-text"), green)).toBeGreaterThanOrEqual(4.5);
+    expect(body).toMatch(/border-color:\s*var\(--p-choice-prompt-border\)/);
+    expect(body).not.toMatch(/color:\s*var\(--p-primary/);
+    const fill = varOf("--p-choice-prompt");
+    const border = varOf("--p-choice-prompt-border");
+    // 橙: 赤 > 緑 > 青
+    for (const hex of [fill, border]) {
+      const [r, g, b] = rgbOf(hex);
+      expect(r).toBeGreaterThan(g);
+      expect(g).toBeGreaterThan(b);
+    }
+    expect(contrast(varOf("--p-text"), fill)).toBeGreaterThanOrEqual(4.5);
+    // 枠は白い画面・代理入力の紫の画面・自分の地のどれに対しても 3:1 以上（WCAG 1.4.11）
+    for (const around of ["--p-bg", "--p-proxy-bg", "--p-choice-prompt"]) {
+      expect(contrast(border, varOf(around))).toBeGreaterThanOrEqual(3);
+    }
+    // 押せない時は灰のまま（:not(:disabled) の時だけ橙）
+    expect(ruleOf(".patient-app button:disabled")).toMatch(
+      /background:\s*var\(--p-surface\)/,
+    );
   });
 
   it("P2-2: 押せないボタンは点線にしない（focus の輪と紛らわしい）", () => {
@@ -177,7 +191,7 @@ describe("patient.css", () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("代理入力中は画面全体と下のタブの地が薄い橙（お知らせの黄とは別の色）", () => {
+  it("代理入力中は画面全体と下のタブの地が薄い紫、チェック欄は濃い紫の太枠", () => {
     const page = groupRuleOf(".patient-app:has(.p-toggle--on)");
     expect(page).toMatch(/background:\s*var\(--p-proxy-bg\)/);
     expect(groupRuleOf(".patient-app:has(.p-toggle--on) .p-nav")).toMatch(
@@ -186,16 +200,39 @@ describe("patient.css", () => {
     expect(ruleOf(".patient-app .p-toggle--on")).toMatch(
       /border:\s*4px solid var\(--p-proxy-border\)/,
     );
-    const orange = varOf("--p-proxy-bg");
-    expect(orange).not.toBe(varOf("--p-notice-bg"));
-    const [r, g, b] = rgbOf(orange);
-    expect(r).toBeGreaterThan(g);
-    expect(g).toBeGreaterThan(b);
-    for (const text of ["--p-text", "--p-muted", "--p-error", "--p-primary"]) {
-      expect(contrast(varOf(text), orange)).toBeGreaterThanOrEqual(4.5);
+    const purple = varOf("--p-proxy-bg");
+    const border = varOf("--p-proxy-border");
+    expect(purple).not.toBe(varOf("--p-notice-bg"));
+    // 紫: 青 > 赤 > 緑（未入力の橙・お知らせの黄とは別の色）
+    for (const hex of [purple, border]) {
+      const [r, g, b] = rgbOf(hex);
+      expect(b).toBeGreaterThan(r);
+      expect(r).toBeGreaterThan(g);
     }
-    expect(contrast(varOf("--p-proxy-border"), orange)).toBeGreaterThanOrEqual(
-      3,
+    // 紫の画面の上でも、文字（黒・灰・赤・青）は 4.5:1 以上
+    for (const text of ["--p-text", "--p-muted", "--p-error", "--p-primary"]) {
+      expect(contrast(varOf(text), purple)).toBeGreaterThanOrEqual(4.5);
+    }
+    // 枠: チェック欄の紫・未入力の橙・白いボタンの枠は紫の画面に対して 3:1 以上
+    for (const edge of [
+      "--p-proxy-border",
+      "--p-choice-prompt-border",
+      "--p-border",
+    ]) {
+      expect(contrast(varOf(edge), purple)).toBeGreaterThanOrEqual(3);
+    }
+    expect(contrast(border, varOf("--p-bg"))).toBeGreaterThanOrEqual(3);
+  });
+
+  it("今日の記録の見出しの右の日付は、見出しより小さい灰色で、途中で折らない", () => {
+    const date = ruleOf(".patient-app .p-title-date");
+    expect(date).toMatch(/font-size:\s*18px/);
+    expect(date).toMatch(/color:\s*var\(--p-muted\)/);
+    expect(date).toMatch(/white-space:\s*nowrap/);
+    expect(date).toMatch(/display:\s*inline-block/);
+    // 見出しは 1.5rem（24px）。日付は 18px
+    expect(remOf(ruleOf(".patient-app h1"), "font-size")).toBeGreaterThan(
+      18 / 16,
     );
   });
 
@@ -230,5 +267,60 @@ describe("patient.css", () => {
     const body = ruleOf(".patient-app .p-too-sick");
     const margin = /margin-top:\s*(\d+)px/.exec(body);
     expect(Number(margin?.[1] ?? 0)).toBeGreaterThanOrEqual(24);
+  });
+
+  describe("これまでの記録の一行の要約（タグ）", () => {
+    it("タグは折り返して並び、1つのタグも横にはみ出さない", () => {
+      const tags = ruleOf(".patient-app .p-tags");
+      expect(tags).toMatch(/display:\s*flex/);
+      expect(tags).toMatch(/flex-wrap:\s*wrap/);
+      expect(tags).toMatch(/gap:/);
+      const tag = ruleOf(".patient-app .p-tag");
+      expect(tag).toMatch(/max-width:\s*100%/);
+      expect(tag).toMatch(/overflow-wrap:\s*anywhere/);
+      expect(tag).toMatch(/border-radius:\s*\d+px/);
+      expect(tag).not.toMatch(/white-space:\s*nowrap/);
+    });
+
+    it("「ある」は淡い青の地＋紺の文字＋紺の細い枠（表の青と同じ）", () => {
+      const body = ruleOf(".patient-app .p-tag--present");
+      expect(body).toMatch(/color:\s*var\(--p-primary\)/);
+      expect(body).toMatch(/background:\s*var\(--p-tag-present-bg\)/);
+      expect(body).toMatch(/border-color:\s*var\(--p-primary\)/);
+      const fill = varOf("--p-tag-present-bg");
+      const [r, , b] = rgbOf(fill);
+      expect(b).toBeGreaterThan(r);
+      expect(contrast(varOf("--p-primary"), fill)).toBeGreaterThanOrEqual(4.5);
+      // 一覧の1件の地（--p-surface）に対して枠が 3:1 以上
+      expect(
+        contrast(varOf("--p-primary"), varOf("--p-surface")),
+      ).toBeGreaterThanOrEqual(3);
+    });
+
+    it("「つらい」は濃い紺の地＋白の文字（表の選んだ欄と同じ青）", () => {
+      const body = ruleOf(".patient-app .p-tag--hard");
+      expect(body).toMatch(/color:\s*var\(--p-primary-text\)/);
+      expect(body).toMatch(/background:\s*var\(--p-primary\)/);
+      expect(body).toMatch(/border-color:\s*var\(--p-primary\)/);
+      expect(
+        contrast(varOf("--p-primary-text"), varOf("--p-primary")),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(ruleOf(".patient-app .p-tag-mark")).toMatch(/font-weight:/);
+    });
+
+    it("体温・書いたこと・代理などは中立の見た目（白い地＋黒の文字＋灰の枠）", () => {
+      const body = ruleOf(".patient-app .p-tag--neutral");
+      expect(body).toMatch(/color:\s*var\(--p-text\)/);
+      expect(body).toMatch(/background:\s*var\(--p-bg\)/);
+      expect(body).toMatch(/border-color:\s*var\(--p-tag-neutral-border\)/);
+      expect(body).toMatch(/font-weight:\s*400/);
+      const border = varOf("--p-tag-neutral-border");
+      const [r, g, b] = rgbOf(border);
+      expect(r).toBe(g);
+      expect(g).toBe(b);
+      for (const around of ["--p-surface", "--p-bg"]) {
+        expect(contrast(border, varOf(around))).toBeGreaterThanOrEqual(3);
+      }
+    });
   });
 });

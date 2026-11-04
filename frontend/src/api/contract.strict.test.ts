@@ -16,7 +16,7 @@ import {
   isUnprocessedResponse,
   isVisitsResponse,
 } from "./doctorGuards";
-import { isPatientEntriesResponse } from "./patientGuards";
+import { isPatientEntriesResponse, isQuestionsResponse } from "./patientGuards";
 import { type Item, isRecord } from "./validate";
 
 type Guard = (body: Item) => boolean;
@@ -32,6 +32,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_skill_changes: isSkillChangesResponse,
   doctor_skill_change_create: isCreateSkillChangeResponse,
   patient_entries: isPatientEntriesResponse,
+  patient_questions: isQuestionsResponse,
 };
 
 function passes(name: string, body: unknown): boolean {
@@ -102,6 +103,11 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ...dateCases("patient_entries", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),
+  // 今日の記録の見出しの日付（サーバーの今日）
+  ...dateCases("patient_questions", "today", (b, v) => {
+    b.today = v;
+  }),
+  ["patient_questions", "today が null", (b) => (b.today = null)],
   ...dateCases("doctor_unprocessed", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),

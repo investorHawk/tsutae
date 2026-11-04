@@ -315,6 +315,7 @@ const BROKEN: Array<[string, string, Mutate]> = [
     (b) => (b.questions[1].key = b.questions[0].key),
   ],
   ["patient_questions", "skill_version が無い", (b) => delete b.skill_version],
+  ["patient_questions", "today が無い", (b) => delete b.today],
   ["patient_entry_create", "notices に数", (b) => (b.notices = [1])],
   ["patient_entry_create", "entry_id が無い", (b) => delete b.entry_id],
   ["patient_entries", "kind が未知", (b) => (b.entries[0].kind = "other")],

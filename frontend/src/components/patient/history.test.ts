@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ENTRIES, s } from "../../pages/patient/testing/fixtures";
-import { formatRecordedAt, newestFirst, recordedAtParts } from "./history";
+import {
+  formatDate,
+  formatRecordedAt,
+  newestFirst,
+  recordedAtParts,
+} from "./history";
 
 describe("newestFirst", () => {
   it("記録日時の新しい順に並べた新しい配列を返す", () => {
@@ -106,4 +111,25 @@ describe("formatRecordedAt", () => {
       "broken",
     );
   });
+});
+
+describe("formatDate（今日の記録の見出しの日付）", () => {
+  const t = (key: string) => s(key);
+
+  it("YYYY-MM-DD を定型文の history.date と weekday.* で「月日（曜）」にする", () => {
+    // 2026-11-09 は月曜
+    expect(formatDate("2026-11-09", t)).toBe(
+      s("history.date")
+        .replace("{month}", "11")
+        .replace("{day}", "9")
+        .replace("{weekday}", s("weekday.1")),
+    );
+  });
+
+  it.each(["", "2026-02-30", "2026-13-01", "2026-11-09T10:00:00+09:00"])(
+    "読めない日付（%s）は null",
+    (value) => {
+      expect(formatDate(value, t)).toBeNull();
+    },
+  );
 });

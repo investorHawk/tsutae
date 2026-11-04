@@ -16,13 +16,19 @@
   --p-too-sick: #001a40;
   /* 「つらくて書けない」の初めの地: 淡い紺（--p-too-sick の文字とのコントラスト約 14:1） */
   --p-too-sick-bg: #e3ebf7;
-  /* まだ何も選んでいない質問のボタンの地: 薄い緑（黒文字とのコントラスト約 16:1） */
-  --p-choice-prompt: #e3f4e6;
-  /* 家族が代わりに入力している間の画面の地: 薄い橙（黒文字 約 16:1・--p-muted 約 9:1）。
-     お知らせの黄（--p-notice-bg）とは別の色 */
-  --p-proxy-bg: #ffe6d1;
-  /* 代理入力のチェック欄の太枠: 濃い橙（--p-proxy-bg に対して約 5:1） */
-  --p-proxy-border: #a34400;
+  /* まだ何も選んでいない質問のボタンの地: 薄い橙（黒文字とのコントラスト約 17:1） */
+  --p-choice-prompt: #fff1e0;
+  /* その枠: 濃い橙（白い画面 約 4.6:1・代理入力の紫 約 4.0:1・自分の地 約 4.1:1） */
+  --p-choice-prompt-border: #b85c00;
+  /* 家族が代わりに入力している間の画面の地: 薄い紫（黒文字 約 16:1・--p-muted 約 9.4:1・
+     --p-error 約 7.6:1・--p-primary 約 8.2:1）。未入力の橙・お知らせの黄とは別の色 */
+  --p-proxy-bg: #f1ecfa;
+  /* 代理入力のチェック欄の太枠: 濃い紫（--p-proxy-bg に対して約 5.6:1・白に約 6.5:1） */
+  --p-proxy-border: #6b4fa0;
+  /* 記録の一覧の要約のタグ「ある」の地: 淡い青（--p-primary の文字と約 8:1） */
+  --p-tag-present-bg: #e6eefa;
+  /* 中立のタグ（体温・書いたこと・代理など）の枠: 灰（一覧の地 --p-surface に約 4.8:1） */
+  --p-tag-neutral-border: #6b6b6b;
   /* 回答の表で選ばれていない欄の小さな○ */
   --p-dot: #9a9a9a;
   /* 回答の表の行の間の細い線 */
@@ -78,6 +84,16 @@
   font-size: 1.5rem;
   line-height: 1.4;
   margin-bottom: 20px;
+}
+
+/* 今日の記録の見出しの右の日付（h1 の中）。見出しより小さい灰色。幅が足りない時は
+   日付ごと次の行へ回す（「11月9日（／月）」と途中で折らない） */
+.patient-app .p-title-date {
+  display: inline-block;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--p-muted);
+  white-space: nowrap;
 }
 
 .patient-app h2 {
@@ -179,10 +195,12 @@
   font-size: 0.85em;
 }
 
-/* まだ何も選んでいない質問: 全てのボタンを薄い緑にして入力を促す（枠は同じ太さ）。
-   選んだら、選んだボタンは青（上の aria-pressed）、選ばなかったボタンは白 */
+/* まだ何も選んでいない質問: 全てのボタンを薄い橙の地＋濃い橙の枠にして入力を促す
+   （枠は同じ太さ。文字は黒のまま）。選んだら、選んだボタンは青（上の aria-pressed）、
+   選ばなかったボタンは白 */
 .patient-app .p-choices--unanswered > .p-choice:not(:disabled) {
   background: var(--p-choice-prompt);
+  border-color: var(--p-choice-prompt-border);
 }
 
 /* --- 入力欄 ------------------------------------------------------------ */
@@ -229,7 +247,7 @@
   border-radius: 12px;
 }
 
-/* 代理で入力している間: チェック欄は橙の太枠、画面全体（下のタブも）の地は薄い橙 */
+/* 代理で入力している間: チェック欄は紫の太枠、画面全体（下のタブも）の地は薄い紫 */
 .patient-app .p-toggle--on {
   font-weight: 700;
   border: 4px solid var(--p-proxy-border);
@@ -419,19 +437,59 @@
   margin-bottom: 20px;
 }
 
-/* 一行の要約（「しびれ つらい／下痢 ある」）。答えは太字 */
-.patient-app .p-summary strong {
+/* 一行の要約: 日時の下にタグ（小さな角丸のラベル）を折り返して並べる。
+   読み上げの答え（「ある」「つらい」）と区切りの「／」は visually-hidden */
+.patient-app .p-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+
+/* 1つのタグ。長い質問文（短い症状名が無いもの）でも横にはみ出さず中で折る */
+.patient-app .p-tag {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 10px;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  border: 2px solid;
+  border-radius: 8px;
 }
 
-.patient-app .p-summary-sep {
-  padding: 0 4px;
-  color: var(--p-muted);
+/* 「ある」: 淡い青の地＋紺の文字＋紺の細い枠 */
+.patient-app .p-tag--present {
+  color: var(--p-primary);
+  background: var(--p-tag-present-bg);
+  border-color: var(--p-primary);
 }
 
-/* 「下痢 つらい」の一組は途中で折らない（「つら／い」にしない）。折るのは組の間だけ */
-.patient-app .p-summary-item {
-  white-space: nowrap;
+/* 「つらい」: 濃い紺の地＋白の文字。症状名の後ろに印（色だけに頼らない） */
+.patient-app .p-tag--hard {
+  color: var(--p-primary-text);
+  background: var(--p-primary);
+  border-color: var(--p-primary);
+}
+
+.patient-app .p-tag-mark {
+  margin-left: 4px;
+  font-weight: 900;
+}
+
+/* 体温・書いたこと・つらくて書けない・代理: 白い地＋黒の文字＋灰の枠（症状のタグと別） */
+.patient-app .p-tag--neutral {
+  color: var(--p-text);
+  background: var(--p-bg);
+  border-color: var(--p-tag-neutral-border);
+  font-weight: 400;
+}
+
+/* 全て「なし」の時はタグにせず文で出す */
+.patient-app .p-tags-none {
+  font-weight: 700;
 }
 
 /* --- 記録一覧 ----------------------------------------------------------- */

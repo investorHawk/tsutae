@@ -10,7 +10,7 @@ interface ChoiceButtonsProps<V extends AnswerValue> {
 
 /**
  * 大きな選択ボタン（なし／ある／つらい、測っていない／測った）。押したものは aria-pressed。
- * まだ何も選んでいない質問は p-choices--unanswered（全てのボタンを薄い緑にして入力を促す）。
+ * まだ何も選んでいない質問は p-choices--unanswered（全てのボタンを薄い橙にして入力を促す）。
  * 選んだボタンはどの答えでも同じ青（✓ と太枠つき）、選ばなかったボタンは白。
  */
 export default function ChoiceButtons<V extends AnswerValue>({

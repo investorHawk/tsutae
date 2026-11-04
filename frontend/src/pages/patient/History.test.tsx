@@ -8,6 +8,7 @@ import History from "./History";
 import { callsTo, mockPatientApi } from "./testing/api";
 import { ENTRIES, PID, questionText, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
+import { spokenText, visibleText } from "./testing/text";
 
 const ROUTES = [{ path: "/history", element: <History /> }];
 
@@ -22,6 +23,15 @@ function dateText(month: number, day: number, weekday: number, time: string) {
     .replace("{day}", String(day))
     .replace("{weekday}", s(`weekday.${weekday}`));
   return `${date}${time}`;
+}
+
+/** 記録1件の開いた時の中身（表と書いたこと）。 */
+function detailOf(item: HTMLElement): HTMLElement {
+  const detail = item.querySelector<HTMLElement>(".p-entry-detail");
+  if (!detail) {
+    throw new Error("p-entry-detail is missing");
+  }
+  return detail;
 }
 
 function summaryOf(item: HTMLElement): HTMLElement {
@@ -99,7 +109,7 @@ describe("History (P2)", () => {
     expect(oldest).not.toHaveTextContent(s("history.proxy"));
     expect(within(oldest!).queryByRole("table")).toBeNull();
 
-    expect(within(middle!).getByText(s("history.proxy"))).toHaveClass(
+    expect(within(detailOf(middle!)).getByText(s("history.proxy"))).toHaveClass(
       "p-entry-flag",
     );
     // 行は短い症状名、列は なし／ある／つらい。読み上げは「下痢 ある」
@@ -159,6 +169,21 @@ describe("History (P2)", () => {
     expect(line).toHaveTextContent(
       `${s("history.free_text")} ${s("history.free_text_present")}`,
     );
+    // 日時の下にタグが並ぶ。代理の記録には代理のタグ
+    const tags = line.querySelector(".p-tags");
+    expect(line.querySelector(".p-entry-time")?.nextElementSibling).toBe(tags);
+    expect(
+      Array.from(line.querySelectorAll(".p-tag")).map(visibleText),
+    ).toEqual([
+      s("symptom.diarrhea"),
+      s("history.temperature_value").replace("{value}", "37.9"),
+      s("history.free_text"),
+      s("history.proxy_short"),
+    ]);
+    expect(summaryOf(newest!).querySelector(".p-tag")).toHaveTextContent(
+      s("history.free_text"),
+    );
+    expect(summaryOf(newest!)).not.toHaveTextContent(s("history.proxy"));
     // 一行には質問文と自由記載の中身を出さない（開くと出る）
     expect(line).not.toHaveTextContent(questionText("diarrhea"));
     expect(line).not.toHaveTextContent(ENTRIES[1]!.free_text!);
@@ -168,13 +193,15 @@ describe("History (P2)", () => {
     );
   });
 
-  it("the answers in the line and in the details are bold", async () => {
+  it("the line shows a tag read with the answer; the details mark the chosen answer", async () => {
     mockPatientApi();
     renderHistory();
     const [, middle] = await items();
-    expect(
-      within(summaryOf(middle!)).getByText(s("answer.present")).tagName,
-    ).toBe("STRONG");
+    const tag = summaryOf(middle!).querySelector(".p-tag--present");
+    expect(tag).not.toBeNull();
+    expect(spokenText(tag!)).toBe(
+      `${s("symptom.diarrhea")} ${s("answer.present")}`,
+    );
     const chosen = rowOf(middle!, s("symptom.diarrhea")).querySelector(
       ".p-answer-cell--chosen strong",
     );
@@ -217,8 +244,11 @@ describe("History (P2)", () => {
     });
     renderHistory();
     const [only] = await items();
-    expect(summaryOf(only!)).toHaveTextContent(
+    expect(spokenText(summaryOf(only!))).toContain(
       `new question text ${s("answer.hard")}`,
+    );
+    expect(summaryOf(only!).querySelector(".p-tag--hard")).toHaveTextContent(
+      "new question text",
     );
   });
 

@@ -15,11 +15,15 @@ export function newestFirst(entries: readonly PatientEntry[]): PatientEntry[] {
   return [...entries].sort((a, b) => timeOf(b) - timeOf(a) || b.id - a.id);
 }
 
-export interface RecordedAtParts {
+/** 日付（YYYY-MM-DD）の月・日・曜日。 */
+export interface DateParts {
   month: number;
   day: number;
   /** 0 = 日曜 … 6 = 土曜（定型文 weekday.0〜weekday.6） */
   weekday: number;
+}
+
+export interface RecordedAtParts extends DateParts {
   /** "8:10"（時の先頭の 0 なし）。読めなければ null */
   time: string | null;
 }
@@ -27,11 +31,11 @@ export interface RecordedAtParts {
 type RecordedAt = Pick<PatientEntry, "recorded_at" | "record_date">;
 
 /**
- * 記録日（record_date。JST の日付）の月・日・曜日と、記録した時の表記（+09:00）のままの
- * 時:分。曜日は端末の時差によらず記録日から決める。記録日が読めなければ null。
+ * 暦に実在する YYYY-MM-DD の月・日・曜日。曜日は端末の時差によらず日付から決める。
+ * 読めなければ null。
  */
-export function recordedAtParts(entry: RecordedAt): RecordedAtParts | null {
-  const date = DATE_PATTERN.exec(entry.record_date);
+export function dateParts(value: string): DateParts | null {
+  const date = DATE_PATTERN.exec(value);
   if (!date) {
     return null;
   }
@@ -44,13 +48,43 @@ export function recordedAtParts(entry: RecordedAt): RecordedAtParts | null {
   if (utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
     return null;
   }
+  return { month, day, weekday: utc.getUTCDay() };
+}
+
+/**
+ * 記録日（record_date。JST の日付）の月・日・曜日と、記録した時の表記（+09:00）のままの
+ * 時:分。記録日が読めなければ null。
+ */
+export function recordedAtParts(entry: RecordedAt): RecordedAtParts | null {
+  const parts = dateParts(entry.record_date);
+  if (parts === null) {
+    return null;
+  }
   const time = TIME_PATTERN.exec(entry.recorded_at);
   return {
-    month,
-    day,
-    weekday: utc.getUTCDay(),
+    ...parts,
     time: time ? `${Number(time[1])}:${time[2]}` : null,
   };
+}
+
+function fillDate(parts: DateParts, t: (key: string) => string): string {
+  return fillTemplate(t("history.date"), {
+    month: parts.month,
+    day: parts.day,
+    weekday: t(`weekday.${parts.weekday}`),
+  });
+}
+
+/**
+ * 「11月9日（月）」の形（定型文 history.date と weekday.*）。今日の記録の見出しの
+ * 日付（サーバーの今日）に使う。読めなければ null（出さない）。
+ */
+export function formatDate(
+  value: string,
+  t: (key: string) => string,
+): string | null {
+  const parts = dateParts(value);
+  return parts === null ? null : fillDate(parts, t);
 }
 
 /**
@@ -65,10 +99,6 @@ export function formatRecordedAt(
   if (parts === null) {
     return entry.record_date;
   }
-  const date = fillTemplate(t("history.date"), {
-    month: parts.month,
-    day: parts.day,
-    weekday: t(`weekday.${parts.weekday}`),
-  });
+  const date = fillDate(parts, t);
   return parts.time === null ? date : `${date}${parts.time}`;
 }

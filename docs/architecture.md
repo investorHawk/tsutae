@@ -225,7 +225,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|---|
 | `POST /api/patient/register` | `{pid}` | `{ok: true}` + Cookie。未知の pid は 404 `{"error":"unknown_patient"}` |
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
-| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[]}` |
+| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない） |
 | `POST /api/patient/{pid}/entries` | `EntryCreate` | `{entry_id, notices: string[]}`（notices は patient_strings のキー。例 `["fixed_rule.fever_38"]`） |
 | `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}]}`（自分の記録のみ。AI の出力は含まない。`question_text` はその記録の skill_version の質問集の文で、見つからなければ null。フロントは null のとき `history.previous_question` を出す） |
 | `POST /api/visit` | `{reception_no}`（Cookie で患者識別） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |

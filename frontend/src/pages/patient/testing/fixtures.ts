@@ -56,6 +56,8 @@ export const QUESTIONS: readonly Question[] = [
 export const QUESTIONS_RESPONSE: QuestionsResponse = {
   skill_version: "regimen-folfox@1",
   questions: [...QUESTIONS],
+  /** サーバーの今日（2026-11-09 は月曜） */
+  today: "2026-11-09",
 };
 
 export function questionText(key: string): string {

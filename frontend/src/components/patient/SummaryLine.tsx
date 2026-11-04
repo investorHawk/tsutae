@@ -4,45 +4,76 @@ import { fillTemplate } from "../../strings/template";
 import type { SummaryItem } from "./entrySummary";
 import { useSymptomLabel } from "./useSymptomLabel";
 
-function Item({ item }: { item: SummaryItem }) {
+/** 画面には出さず読み上げにだけ残す文字（base.css の visually-hidden）。 */
+function Hidden({ children }: { children: string }) {
+  return <span className="visually-hidden">{children}</span>;
+}
+
+function Tag({ item }: { item: Exclude<SummaryItem, { kind: "all_none" }> }) {
   const { t } = usePatientStrings();
   const label = useSymptomLabel();
   switch (item.kind) {
-    case "too_sick":
-      return <strong>{t("history.too_sick")}</strong>;
-    case "all_none":
-      return <strong>{t("history.all_none")}</strong>;
-    case "free_text":
-      return (
-        <>
-          {t("history.free_text")}{" "}
-          <strong>{t("history.free_text_present")}</strong>
-        </>
-      );
     case "answer":
-      return (
-        <>
-          {label(item.questionKey, item.questionText)}{" "}
-          <strong>{t(`answer.${item.value}`)}</strong>
-        </>
+      return item.value === "hard" ? (
+        <span className="p-tag p-tag--hard">
+          {label(item.questionKey, item.questionText)}
+          <span className="p-tag-mark" aria-hidden="true">
+            {t("history.hard_mark")}
+          </span>
+          <Hidden>{` ${t("answer.hard")}`}</Hidden>
+        </span>
+      ) : (
+        <span className="p-tag p-tag--present">
+          {label(item.questionKey, item.questionText)}
+          <Hidden>{` ${t("answer.present")}`}</Hidden>
+        </span>
       );
     case "temperature":
       return (
-        <>
-          {label(item.questionKey, item.questionText)}{" "}
-          <strong>
-            {fillTemplate(t("history.temperature_value"), {
-              value: item.temperature.toFixed(1),
-            })}
-          </strong>
-        </>
+        <span className="p-tag p-tag--neutral">
+          <Hidden>{`${label(item.questionKey, item.questionText)} `}</Hidden>
+          {fillTemplate(t("history.temperature_value"), {
+            value: item.temperature.toFixed(1),
+          })}
+        </span>
+      );
+    case "free_text":
+      return (
+        <span className="p-tag p-tag--neutral">
+          {t("history.free_text")}
+          <Hidden>{` ${t("history.free_text_present")}`}</Hidden>
+        </span>
+      );
+    case "too_sick":
+      return (
+        <span className="p-tag p-tag--neutral">{t("history.too_sick")}</span>
+      );
+    case "proxy":
+      return (
+        <span className="p-tag p-tag--neutral">
+          <span aria-hidden="true">{t("history.proxy_short")}</span>
+          <Hidden>{t("history.proxy")}</Hidden>
+        </span>
       );
   }
 }
 
+function Item({ item }: { item: SummaryItem }) {
+  const { t } = usePatientStrings();
+  if (item.kind === "all_none") {
+    return <span className="p-tags-none">{t("history.all_none")}</span>;
+  }
+  return <Tag item={item} />;
+}
+
 /**
- * 記録1件の短い要約（「しびれ つらい／下痢 ある／体温 37.8℃」）。答えは太字。
- * 区切りの「／」は定型文 history.separator。summary の中にも置けるよう span だけで描く。
+ * 記録1件の短い要約。タグ（小さな角丸のラベル）を折り返して並べる。
+ * - ある: 淡い青の症状名（「下痢」）／つらい: 濃い紺の症状名と印（「しびれ !」）。
+ *   答えは読み上げにだけ残す（「しびれ つらい」）。なしはタグにしない
+ * - 体温（「37.2℃」）・書いたこと・つらくて書けない・代理は中立の見た目
+ * - 全て なしなら「どれも なし」を文で出す
+ * タグの間には読み上げ用の区切り（定型文 history.separator。見た目には出さない）を置く。
+ * summary の中に置けるよう span だけで描く。
  */
 export default function SummaryLine({
   items,
@@ -51,15 +82,11 @@ export default function SummaryLine({
 }) {
   const { t } = usePatientStrings();
   return (
-    <span className="p-summary">
+    <span className="p-tags">
       {items.map((item, i) => (
         <Fragment key={`${i}-${item.kind}`}>
-          {i > 0 && (
-            <span className="p-summary-sep">{t("history.separator")}</span>
-          )}
-          <span className="p-summary-item">
-            <Item item={item} />
-          </span>
+          {i > 0 && <Hidden>{t("history.separator")}</Hidden>}
+          <Item item={item} />
         </Fragment>
       ))}
     </span>

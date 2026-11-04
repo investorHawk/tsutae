@@ -52,6 +52,7 @@ describe("患者 API", () => {
           answer_type: "three_level",
         },
       ],
+      today: "2026-11-09",
     };
     const fetchMock = mockFetch(() => jsonResponse(body));
     await expect(getQuestions("P-DEMO0001")).resolves.toEqual(body);

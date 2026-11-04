@@ -64,11 +64,15 @@ function isQuestion(v: Item): boolean {
   );
 }
 
-/** GET questions: {skill_version, questions: Question[]}（key は重複しない） */
+/**
+ * GET questions: {skill_version, questions: Question[], today}（key は重複しない。
+ * today はサーバーの今日の YYYY-MM-DD）
+ */
 export function isQuestionsResponse(v: Item): boolean {
   return (
     isString(v.skill_version) &&
-    isListWithUniqueKeys(isQuestion, "key")(v.questions)
+    isListWithUniqueKeys(isQuestion, "key")(v.questions) &&
+    isIsoDate(v.today)
   );
 }
 

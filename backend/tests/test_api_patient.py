@@ -142,6 +142,17 @@ def test_questions_folfox(client: TestClient, pid: str) -> None:
     keys = [q["key"] for q in body["questions"]]
     assert keys == ["numbness", "diarrhea", "stomatitis", "nausea_appetite", "fever"]
     assert set(body["questions"][0]) == {"key", "text", "answer_type"}
+    assert set(body) == {"skill_version", "questions", "today"}
+
+
+def test_questions_has_the_server_today(
+    client: TestClient, pid: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """今日の記録の見出しの日付はサーバーの「今日」（端末の時計ではない）。"""
+    assert client.get(f"/api/patient/{pid}/questions").json()["today"] == "2026-11-09"
+    monkeypatch.setenv("TSUTAE_TODAY", "2026-11-30")
+    body = client.get(f"/api/patient/{pid}/questions").json()
+    assert body["today"] == "2026-11-30"
 
 
 def test_questions_capox(client: TestClient) -> None:

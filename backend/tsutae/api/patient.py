@@ -41,7 +41,7 @@ from tsutae.api.deps import (
     set_patient_cookie,
 )
 from tsutae.api.fixed_rules import notices_for
-from tsutae.config import PATIENT_STRINGS_PATH, Settings, now
+from tsutae.config import PATIENT_STRINGS_PATH, Settings, now, today
 from tsutae.schemas import AnswerType, Entry, EntryCreate, RegimenSkill
 from tsutae.skills import SkillValidationError, load_regimen_skill
 
@@ -120,11 +120,13 @@ def strings() -> dict[str, str]:
 def questions(
     pid: str, request: Request, conn: Conn, settings: AppSettings
 ) -> dict[str, Any]:
+    """今の質問集と、サーバーの今日（JST。今日の記録の見出しの日付に使う）。"""
     patient = require_patient(pid, request, conn)
     skill = _regimen_skill(patient, settings)
     return {
         "skill_version": skill.skill_version,
         "questions": [q.model_dump(mode="json") for q in skill.questions],
+        "today": today().isoformat(),
     }
 
 

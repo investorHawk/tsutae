@@ -52,13 +52,17 @@ const NO_ERRORS: ReadonlyMap<string, TemperatureProblem> = new Map();
  * 「つらくて書けない」は必ず確認してから送る。何も入れていなければ3秒で自動で送り、
  * 入れた内容があれば、それを捨てることを確かめてから（「はい」を押した時だけ）送る。
  * 記録した後は TodayDone（要約・取り消し・追加で記録する）。記録できたら onSaved を呼ぶ。
+ * 質問集の応答にあるサーバーの今日は onToday で親（見出し）へ渡す。
  */
 export default function TodayForm({
   pid,
   onSaved,
+  onToday,
 }: {
   pid: string;
   onSaved?: () => void;
+  /** 質問集を読めたら、サーバーの今日（YYYY-MM-DD）を渡す（見出しの日付） */
+  onToday?: (today: string) => void;
 }) {
   const { t } = usePatientStrings();
   const hintId = useId();
@@ -71,6 +75,13 @@ export default function TodayForm({
   const confirm = useTooSickConfirm(hasInput(form));
   const [focusRound, setFocusRound] = useState(0);
   const [infoKey, setInfoKey] = useState<string | null>(null);
+
+  const today = loaded.status === "ready" ? loaded.data.today : null;
+  useEffect(() => {
+    if (today !== null) {
+      onToday?.(today);
+    }
+  }, [today, onToday]);
 
   useEffect(() => {
     if (focusRound > 0) {

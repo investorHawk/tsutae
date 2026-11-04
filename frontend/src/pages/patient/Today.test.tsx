@@ -8,7 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
-import { PID, QUESTIONS, questionText, s } from "./testing/fixtures";
+import {
+  PID,
+  QUESTIONS,
+  QUESTIONS_RESPONSE,
+  questionText,
+  s,
+} from "./testing/fixtures";
 import { renderPatient, type InitialEntry } from "./testing/render";
 import History from "./History";
 import Today from "./Today";
@@ -109,7 +115,7 @@ describe("Today (P1): registration", () => {
 });
 
 describe("Today (P1): the proxy toggle", () => {
-  it("checked: the toggle is marked on (the page turns light orange in CSS)", async () => {
+  it("checked: the toggle is marked on (the page turns light purple in CSS)", async () => {
     mockPatientApi();
     renderToday();
     const checkbox = await screen.findByRole("checkbox", {
@@ -409,6 +415,7 @@ describe("Today (P1): two temperature questions", () => {
         jsonResponse({
           skill_version: "regimen-folfox@2",
           questions: [...QUESTIONS, EVENING],
+          today: QUESTIONS_RESPONSE.today,
         }),
     });
   }

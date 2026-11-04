@@ -97,6 +97,8 @@ export type PatientStrings = Readonly<Record<string, string>>;
 export interface QuestionsResponse {
   skill_version: string;
   questions: Question[];
+  /** サーバーの今日（JST の YYYY-MM-DD。今日の記録の見出しの日付） */
+  today: string;
 }
 
 export interface CreateEntryResponse {

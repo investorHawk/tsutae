@@ -25,6 +25,9 @@ const QUESTION = {
   answer_type: "three_level",
 };
 
+/** サーバーの今日（GET questions の today） */
+const TODAY = "2026-11-09";
+
 const ENTRY = {
   id: 1,
   recorded_at: "2026-11-01T20:00:00+09:00",
@@ -60,39 +63,81 @@ async function expectInvalid(body: unknown, call: () => Promise<unknown>) {
 
 describe("getQuestions の応答の検査", () => {
   it.each([
-    ["questions が無い", { skill_version: "regimen-folfox@1" }],
-    ["questions が null", { skill_version: "x", questions: null }],
+    ["questions が無い", { skill_version: "regimen-folfox@1", today: TODAY }],
+    [
+      "questions が null",
+      { skill_version: "x", today: TODAY, questions: null },
+    ],
     ["本文が配列", [QUESTION]],
     ["本文が null", null],
-    ["要素が文字列", { skill_version: "x", questions: ["diarrhea"] }],
+    [
+      "要素が文字列",
+      { skill_version: "x", today: TODAY, questions: ["diarrhea"] },
+    ],
     [
       "key が無い",
-      { skill_version: "x", questions: [{ ...QUESTION, key: 1 }] },
+      {
+        skill_version: "x",
+        today: TODAY,
+        questions: [{ ...QUESTION, key: 1 }],
+      },
     ],
     [
       "text が null",
-      { skill_version: "x", questions: [{ ...QUESTION, text: null }] },
+      {
+        skill_version: "x",
+        today: TODAY,
+        questions: [{ ...QUESTION, text: null }],
+      },
     ],
     [
       "answer_type が未知",
       {
         skill_version: "x",
+        today: TODAY,
         questions: [{ ...QUESTION, answer_type: "scale" }],
       },
     ],
-    ["skill_version が無い", { questions: [QUESTION] }],
-    ["skill_version が null", { skill_version: null, questions: [QUESTION] }],
-    ["skill_version が数", { skill_version: 1, questions: [QUESTION] }],
+    ["skill_version が無い", { today: TODAY, questions: [QUESTION] }],
+    [
+      "skill_version が null",
+      { skill_version: null, today: TODAY, questions: [QUESTION] },
+    ],
+    [
+      "skill_version が数",
+      { skill_version: 1, today: TODAY, questions: [QUESTION] },
+    ],
     [
       "質問の key が重複",
-      { skill_version: "x", questions: [QUESTION, { ...QUESTION }] },
+      {
+        skill_version: "x",
+        today: TODAY,
+        questions: [QUESTION, { ...QUESTION }],
+      },
+    ],
+    ["today が無い", { skill_version: "x", questions: [QUESTION] }],
+    [
+      "today が null",
+      { skill_version: "x", today: null, questions: [QUESTION] },
+    ],
+    [
+      "today が日時",
+      {
+        skill_version: "x",
+        today: "2026-11-09T10:00:00+09:00",
+        questions: [QUESTION],
+      },
     ],
   ])("%s は invalid_response", async (_label, body) => {
     await expectInvalid(body, () => getQuestions(PID));
   });
 
   it("正しい形はそのまま返す", async () => {
-    const body = { skill_version: "regimen-folfox@1", questions: [QUESTION] };
+    const body = {
+      skill_version: "regimen-folfox@1",
+      questions: [QUESTION],
+      today: TODAY,
+    };
     mockFetch(() => jsonResponse(body));
     await expect(getQuestions(PID)).resolves.toEqual(body);
   });

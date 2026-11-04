@@ -1,0 +1,18 @@
+--- a/regimen-folfox/SKILL.md
++++ b/regimen-folfox/SKILL.md
+@@ -9,6 +9,7 @@
+   - {key: numbness, text: 手足のしびれや冷たいものがさわりにくい感じはありましたか, answer_type: three_level}
+   - {key: diarrhea, text: 下痢はありましたか, answer_type: three_level}
+   - {key: stomatitis, text: 口の中の痛みや口内炎はありましたか, answer_type: three_level}
++  - {key: stomatitis_eating, text: 口の中のことで、食事がとりにくいことはありましたか, answer_type: three_level}
+   - {key: nausea_appetite, text: 吐き気や食欲の落ち込みはありましたか, answer_type: three_level}
+   - {key: fever, text: 熱を測りましたか, answer_type: temperature}
+ fixed_rules:
+@@ -80,6 +81,7 @@
+ | 手足のしびれ、冷たいものにさわるとピリピリする | 末梢性感覚ニューロパチー／錯感覚／異常感覚 | numbness |
+ | 下痢、お腹がゆるい | 下痢 | diarrhea |
+ | 口内炎、口の中が痛い | 口腔粘膜炎／口腔内痛 | stomatitis |
++| 口の中が痛くて食事がとれない、口内炎で食べにくい | 口腔粘膜炎／口腔内痛 | stomatitis_eating |
+ | 吐き気、吐いた、食欲がない | 悪心／嘔吐／食欲不振 | nausea_appetite |
+ | 熱が出た | 発熱 | fever |
+ | だるい、疲れやすい | 疲労／倦怠感 | null |

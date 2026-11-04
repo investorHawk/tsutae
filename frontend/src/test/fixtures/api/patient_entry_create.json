@@ -1,0 +1,27 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-DEMO0001/entries",
+  "request": {
+    "by_proxy": false,
+    "answers": [
+      {
+        "question_key": "fever",
+        "value": "measured",
+        "temperature": 38.2
+      },
+      {
+        "question_key": "diarrhea",
+        "value": "present",
+        "temperature": null
+      }
+    ],
+    "free_text": null
+  },
+  "status": 200,
+  "body": {
+    "entry_id": 92,
+    "notices": [
+      "fixed_rule.fever_38"
+    ]
+  }
+}

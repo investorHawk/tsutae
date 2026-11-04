@@ -1,0 +1,618 @@
+{
+  "format_version": 2,
+  "patient_id": "P-EVAL0002",
+  "course_no": 2,
+  "visit_date": "2026-09-21",
+  "model": "claude-opus-5-5",
+  "subagent_model": "claude-sonnet-5-5",
+  "prepared": {
+    "input": {
+      "regimen": "FOLFOX",
+      "regimen_skill_version": "regimen-folfox@1",
+      "report_skill_version": "report-format-default@1",
+      "schedule": {
+        "course_no": 2,
+        "infusion_date": "2026-09-08",
+        "day1_date": "2026-09-08",
+        "last_day_date": "2026-09-21",
+        "pump_removal_date": "2026-09-10",
+        "previous_infusion_date": "2026-08-18",
+        "delay_days": 7
+      },
+      "questions": [
+        {
+          "key": "numbness",
+          "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "diarrhea",
+          "text": "下痢はありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "stomatitis",
+          "text": "口の中の痛みや口内炎はありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "nausea_appetite",
+          "text": "吐き気や食欲の落ち込みはありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "fever",
+          "text": "熱を測りましたか",
+          "answer_type": "temperature"
+        }
+      ],
+      "entries": [
+        {
+          "entry_no": 1,
+          "record_date": "2026-09-08",
+          "day": 1,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "1週間おくれて2回目。帰りにつめたい水を飲んだらのどがピリッとした。"
+        },
+        {
+          "entry_no": 2,
+          "record_date": "2026-09-09",
+          "day": 2,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "食欲がなくてうどんを半分。吐き気はなかった。"
+        },
+        {
+          "entry_no": 3,
+          "record_date": "2026-09-11",
+          "day": 4,
+          "by_proxy": false,
+          "too_sick": true,
+          "answers": [],
+          "masked_free_text": null
+        },
+        {
+          "entry_no": 4,
+          "record_date": "2026-09-12",
+          "day": 5,
+          "by_proxy": true,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "hard",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "hard",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 37.2
+            }
+          ],
+          "masked_free_text": "妻です。ポンプを外した日の夜から口内炎がひどくて、食欲もなくてほとんど食べていません。"
+        },
+        {
+          "entry_no": 5,
+          "record_date": "2026-09-13",
+          "day": 6,
+          "by_proxy": false,
+          "too_sick": true,
+          "answers": [],
+          "masked_free_text": null
+        },
+        {
+          "entry_no": 6,
+          "record_date": "2026-09-14",
+          "day": 7,
+          "by_proxy": true,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "hard",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "妻です。きのうは一日ねていました。食欲はきのうより少しまし。下痢はしていません。"
+        },
+        {
+          "entry_no": 7,
+          "record_date": "2026-09-15",
+          "day": 8,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "おとといの夜は口がいたくてつらかった。今日は口内炎がしみる程度。"
+        },
+        {
+          "entry_no": 8,
+          "record_date": "2026-09-16",
+          "day": 9,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.9
+            }
+          ],
+          "masked_free_text": null
+        },
+        {
+          "entry_no": 9,
+          "record_date": "2026-09-16",
+          "day": 9,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [],
+          "masked_free_text": "夕方からおなかがはる感じ。"
+        },
+        {
+          "entry_no": 10,
+          "record_date": "2026-09-17",
+          "day": 10,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "口内炎はだいぶよくなった。まだ少ししみる。"
+        },
+        {
+          "entry_no": 11,
+          "record_date": "2026-09-19",
+          "day": 12,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.6
+            }
+          ],
+          "masked_free_text": "食欲はもどってきた。吐き気もない。"
+        },
+        {
+          "entry_no": 12,
+          "record_date": "2026-09-21",
+          "day": 14,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.5
+            }
+          ],
+          "masked_free_text": null
+        }
+      ]
+    },
+    "entry_ids": {
+      "1": 16,
+      "2": 17,
+      "3": 18,
+      "4": 19,
+      "5": 20,
+      "6": 21,
+      "7": 22,
+      "8": 23,
+      "9": 24,
+      "10": 25,
+      "11": 26,
+      "12": 27
+    },
+    "masked_texts": {
+      "1": "1週間おくれて2回目。帰りにつめたい水を飲んだらのどがピリッとした。",
+      "2": "食欲がなくてうどんを半分。吐き気はなかった。",
+      "4": "妻です。ポンプを外した日の夜から口内炎がひどくて、食欲もなくてほとんど食べていません。",
+      "6": "妻です。きのうは一日ねていました。食欲はきのうより少しまし。下痢はしていません。",
+      "7": "おとといの夜は口がいたくてつらかった。今日は口内炎がしみる程度。",
+      "9": "夕方からおなかがはる感じ。",
+      "10": "口内炎はだいぶよくなった。まだ少ししみる。",
+      "11": "食欲はもどってきた。吐き気もない。"
+    },
+    "unprocessed": []
+  },
+  "timeline": {
+    "events": [
+      {
+        "entry_no": 1,
+        "date": "2026-09-08",
+        "day": 1,
+        "course_no": 2,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "帰りにつめたい水を飲んだらのどがピリッとした",
+        "confidence": 0.4,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 2,
+        "date": "2026-09-09",
+        "day": 2,
+        "course_no": 2,
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "status": "present",
+        "source_quote": "食欲がなくてうどんを半分",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 2,
+        "date": "2026-09-09",
+        "day": 2,
+        "course_no": 2,
+        "term": "悪心",
+        "question_key": "nausea_appetite",
+        "status": "absent",
+        "source_quote": "吐き気はなかった",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 4,
+        "date": "2026-09-10",
+        "day": 3,
+        "course_no": 2,
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "status": "present",
+        "source_quote": "ポンプを外した日の夜から口内炎がひどくて",
+        "confidence": 0.9,
+        "recalled": true,
+        "by_proxy": true
+      },
+      {
+        "entry_no": 4,
+        "date": "2026-09-12",
+        "day": 5,
+        "course_no": 2,
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "status": "present",
+        "source_quote": "食欲もなくてほとんど食べていません",
+        "confidence": 0.8,
+        "recalled": false,
+        "by_proxy": true
+      },
+      {
+        "entry_no": 6,
+        "date": "2026-09-14",
+        "day": 7,
+        "course_no": 2,
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "status": "improving",
+        "source_quote": "食欲はきのうより少しまし",
+        "confidence": 0.7,
+        "recalled": false,
+        "by_proxy": true
+      },
+      {
+        "entry_no": 6,
+        "date": "2026-09-14",
+        "day": 7,
+        "course_no": 2,
+        "term": "下痢",
+        "question_key": "diarrhea",
+        "status": "absent",
+        "source_quote": "下痢はしていません",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": true
+      },
+      {
+        "entry_no": 7,
+        "date": "2026-09-13",
+        "day": 6,
+        "course_no": 2,
+        "term": "口腔内痛",
+        "question_key": "stomatitis",
+        "status": "present",
+        "source_quote": "おとといの夜は口がいたくてつらかった",
+        "confidence": 0.85,
+        "recalled": true,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 7,
+        "date": "2026-09-15",
+        "day": 8,
+        "course_no": 2,
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "status": "present",
+        "source_quote": "今日は口内炎がしみる程度",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 9,
+        "date": "2026-09-16",
+        "day": 9,
+        "course_no": 2,
+        "term": "腹部膨満",
+        "question_key": null,
+        "status": "present",
+        "source_quote": "夕方からおなかがはる感じ",
+        "confidence": 0.7,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 10,
+        "date": "2026-09-17",
+        "day": 10,
+        "course_no": 2,
+        "term": "口腔粘膜炎",
+        "question_key": "stomatitis",
+        "status": "improving",
+        "source_quote": "口内炎はだいぶよくなった。まだ少ししみる",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 11,
+        "date": "2026-09-19",
+        "day": 12,
+        "course_no": 2,
+        "term": "食欲不振",
+        "question_key": "nausea_appetite",
+        "status": "improving",
+        "source_quote": "食欲はもどってきた",
+        "confidence": 0.8,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 11,
+        "date": "2026-09-19",
+        "day": 12,
+        "course_no": 2,
+        "term": "悪心",
+        "question_key": "nausea_appetite",
+        "status": "absent",
+        "source_quote": "吐き気もない",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      }
+    ],
+    "contradictions": [
+      {
+        "entry_no": 10,
+        "date": "2026-09-17",
+        "day": 10,
+        "question_key": "stomatitis",
+        "closed_answer": "none",
+        "free_text_quote": "口内炎はだいぶよくなった。まだ少ししみる。"
+      }
+    ],
+    "unprocessed_entries": []
+  },
+  "fallback": false,
+  "error_code": null,
+  "stats": {
+    "duration_ms": 38368,
+    "num_turns": 4,
+    "tokens_in": 287917,
+    "tokens_out": 11470,
+    "cost_usd": 0.4152069
+  },
+  "hooks": {
+    "h1_blocks": 0,
+    "h2_timeline_denies": 0,
+    "h2_report_denies": 0
+  }
+}

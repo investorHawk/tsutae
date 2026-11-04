@@ -1,0 +1,36 @@
+{
+  "method": "GET",
+  "path": "/api/patient/P-DEMO0001/questions",
+  "request": null,
+  "status": 200,
+  "body": {
+    "skill_version": "regimen-folfox@1",
+    "questions": [
+      {
+        "key": "numbness",
+        "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "diarrhea",
+        "text": "下痢はありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "stomatitis",
+        "text": "口の中の痛みや口内炎はありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "nausea_appetite",
+        "text": "吐き気や食欲の落ち込みはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "fever",
+        "text": "熱を測りましたか",
+        "answer_type": "temperature"
+      }
+    ]
+  }
+}

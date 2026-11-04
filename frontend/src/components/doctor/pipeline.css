@@ -1,0 +1,296 @@
+/* D5 パイプライン可視化。デモ動画で見栄えがするよう、役ごとに色を分ける。 */
+
+.doctor-app .d-pl-lane--main {
+  --lane: #1a4f8b;
+  --lane-soft: #e8f0fa;
+}
+
+.doctor-app .d-pl-lane--date-normalizer {
+  --lane: #0f766e;
+  --lane-soft: #e0f4f1;
+}
+
+.doctor-app .d-pl-lane--term-mapper {
+  --lane: #b45309;
+  --lane-soft: #fdf0e1;
+}
+
+.doctor-app .d-pl-lane--contradiction-finder {
+  --lane: #7e22ce;
+  --lane-soft: #f3e8fd;
+}
+
+.doctor-app .d-pl-summary {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* --- Hook のタイル ------------------------------------------------------ */
+
+.doctor-app .d-pl-hooks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.doctor-app .d-pl-hook {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--d-surface);
+  border: 2px solid var(--d-border);
+  border-radius: 10px;
+  transition:
+    background 0.3s,
+    border-color 0.3s;
+}
+
+.doctor-app .d-pl-hook-id {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.doctor-app .d-pl-hook-label {
+  font-size: 0.85rem;
+}
+
+.doctor-app .d-pl-hook-count {
+  font-size: 0.8rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-pl-hook--fired {
+  background: #e7f4e8;
+  border-color: var(--d-ok);
+}
+
+.doctor-app .d-pl-hook--deny {
+  background: #fbe1e1;
+  border-color: var(--d-danger);
+}
+
+.doctor-app .d-pl-hook--deny .d-pl-hook-id {
+  color: var(--d-danger);
+}
+
+/* --- 3役のレーン -------------------------------------------------------- */
+
+.doctor-app .d-pl-lanes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.doctor-app .d-pl-lane {
+  min-height: 160px;
+  padding: 10px;
+  background: var(--lane-soft);
+  border-top: 6px solid var(--lane);
+  border-radius: 10px;
+}
+
+.doctor-app .d-pl-lane--waiting {
+  opacity: 0.55;
+}
+
+.doctor-app .d-pl-lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.doctor-app .d-pl-lane-title {
+  font-weight: 800;
+  color: var(--lane);
+  word-break: break-all;
+}
+
+.doctor-app .d-pl-lane-desc {
+  margin: 4px 0 8px;
+  font-size: 0.8rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-pl-state {
+  flex: none;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--d-muted);
+  border-radius: 999px;
+}
+
+.doctor-app .d-pl-state--running {
+  background: var(--lane);
+  animation: d-pl-pulse 1.4s ease-in-out infinite;
+}
+
+.doctor-app .d-pl-state--done {
+  background: var(--d-ok);
+}
+
+@keyframes d-pl-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.doctor-app .d-pl-chips {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.doctor-app .d-pl-chip {
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  background: #ffffff;
+  border-left: 3px solid var(--lane);
+  border-radius: 4px;
+  animation: d-pl-in 0.35s ease-out;
+}
+
+.doctor-app .d-pl-chip-time {
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--d-muted);
+}
+
+/* --- 時系列のカード ----------------------------------------------------- */
+
+.doctor-app .d-pl-timeline {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 0 0 0 16px;
+  margin: 0;
+  list-style: none;
+  border-left: 2px solid var(--d-border);
+}
+
+.doctor-app .d-pl-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid var(--d-border);
+  border-left: 5px solid var(--lane);
+  border-radius: 8px;
+  animation: d-pl-in 0.35s ease-out;
+}
+
+.doctor-app .d-pl-card::before {
+  position: absolute;
+  top: 14px;
+  left: -24px;
+  width: 12px;
+  height: 12px;
+  content: "";
+  background: var(--lane);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+}
+
+.doctor-app .d-pl-card--hook {
+  background: #f7f7fb;
+}
+
+.doctor-app .d-pl-card--deny {
+  background: #fdf0f0;
+  border-color: #e3a5a5;
+  border-left-color: var(--d-danger);
+}
+
+.doctor-app .d-pl-card--warn {
+  background: #fff8e5;
+}
+
+.doctor-app .d-pl-card-time {
+  display: grid;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.doctor-app .d-pl-elapsed {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.doctor-app .d-pl-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.doctor-app .d-pl-tag {
+  padding: 0 6px;
+  font-size: 0.72rem;
+  color: var(--d-muted);
+  border: 1px solid var(--d-border);
+  border-radius: 4px;
+}
+
+.doctor-app .d-pl-tag--lane {
+  color: var(--lane);
+  border-color: var(--lane);
+}
+
+.doctor-app .d-pl-card-title {
+  margin: 2px 0;
+  font-weight: 700;
+}
+
+.doctor-app .d-pl-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.doctor-app .d-pl-decision {
+  padding: 0 6px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.doctor-app .d-pl-tone--ok.d-pl-decision {
+  color: #ffffff;
+  background: var(--d-ok);
+}
+
+.doctor-app .d-pl-tone--deny.d-pl-decision {
+  color: #ffffff;
+  background: var(--d-danger);
+}
+
+.doctor-app .d-pl-chip.d-pl-tone--deny {
+  color: var(--d-danger);
+  font-weight: 700;
+}
+
+.doctor-app .d-pl-chip.d-pl-tone--warn {
+  background: #fff8e5;
+}
+
+@keyframes d-pl-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 960px) {
+  .doctor-app .d-pl-hooks,
+  .doctor-app .d-pl-lanes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/visits/999/unprocessed",
+  "request": null,
+  "status": 404,
+  "body": {
+    "error": "not_found"
+  }
+}

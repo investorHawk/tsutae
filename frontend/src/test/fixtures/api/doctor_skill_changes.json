@@ -1,0 +1,46 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/skill-changes",
+  "request": null,
+  "status": 200,
+  "body": {
+    "skill_changes": [
+      {
+        "id": 1,
+        "skill_name": "regimen-folfox",
+        "requested_text": "口内炎の質問で食事がとれたかも聞いて",
+        "diff": "--- a/regimen-folfox/SKILL.md\n+++ b/regimen-folfox/SKILL.md\n@@ -127,3 +127,4 @@\n - 質問を足すときは新しい `key`（英小文字で始まり、英小文字・数字・下線）を作る。既存の `key` を別の意味に使い回さない（過去の記録がその key を指している）\n - 質問文は患者の画面にそのまま出る。助言や説明の文を混ぜない\n - `fixed_rules` の `question_key` は `questions` にある key だけ\n+- 依頼: 口内炎の質問で食事がとれたかも聞いて\n",
+        "status": "approved",
+        "base_version": 1,
+        "new_version": 2,
+        "error_code": null,
+        "created_at": "2026-11-09T10:00:00+09:00",
+        "decided_at": "2026-11-09T10:00:00+09:00"
+      },
+      {
+        "id": 2,
+        "skill_name": "regimen-folfox",
+        "requested_text": "今のままでよい",
+        "diff": null,
+        "status": "failed",
+        "base_version": 1,
+        "new_version": null,
+        "error_code": "no_change",
+        "created_at": "2026-11-09T10:00:00+09:00",
+        "decided_at": "2026-11-09T10:00:00+09:00"
+      },
+      {
+        "id": 3,
+        "skill_name": "report-format-default",
+        "requested_text": "引用は短くして",
+        "diff": "--- a/report-format-default/SKILL.md\n+++ b/report-format-default/SKILL.md\n@@ -67,3 +67,4 @@\n - 欄の並べ替え・省略は `sections` を直す（header, attention, grid, per_symptom, quotes から選ぶ）\n - 数値の設定（引用の件数、「？」の下限、要確認の体温）は frontmatter の値を直し、本文の説明も同じ値に直す\n - frontmatter に無い項目は足さない（アプリの検査で拒否される）。本文だけを直しても印刷の見た目は変わらない\n+- 依頼: 引用は短くして\n",
+        "status": "rejected",
+        "base_version": 1,
+        "new_version": null,
+        "error_code": null,
+        "created_at": "2026-11-09T10:00:00+09:00",
+        "decided_at": "2026-11-09T10:00:00+09:00"
+      }
+    ]
+  }
+}

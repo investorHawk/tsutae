@@ -1,0 +1,202 @@
+/* 医師画面（院内 PC のブラウザ）。情報を一覧で見せる。 */
+
+.doctor-app {
+  --d-text: #111111;
+  --d-muted: #4a4a4a;
+  --d-bg: #ffffff;
+  --d-surface: #f4f5f7;
+  --d-border: #c4c8cf;
+  --d-primary: #1a4f8b;
+  --d-danger: #9b0000;
+  --d-ok: #1d5e20;
+
+  min-height: 100vh;
+  font-size: 15px;
+  color: var(--d-text);
+  background: var(--d-bg);
+}
+
+.doctor-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 24px;
+  color: #ffffff;
+  background: #22303f;
+}
+
+.doctor-brand {
+  font-weight: 700;
+}
+
+.doctor-nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.doctor-nav a {
+  padding: 6px 12px;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.doctor-nav a:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.doctor-nav a.active {
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+}
+
+.doctor-header .doctor-logout {
+  color: #ffffff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.doctor-main {
+  max-width: 1200px;
+  padding: 24px;
+  margin: 0 auto;
+}
+
+.doctor-app h1 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+
+.doctor-app h2 {
+  font-size: 1.15rem;
+  margin: 24px 0 8px;
+}
+
+/* --- 部品 -------------------------------------------------------------- */
+
+.doctor-app button {
+  min-height: 36px;
+  padding: 6px 14px;
+  color: var(--d-text);
+  background: var(--d-bg);
+  border: 1px solid var(--d-border);
+  border-radius: 6px;
+}
+
+.doctor-app button.d-primary {
+  color: #ffffff;
+  background: var(--d-primary);
+  border-color: var(--d-primary);
+}
+
+.doctor-app button.d-danger {
+  color: #ffffff;
+  background: var(--d-danger);
+  border-color: var(--d-danger);
+}
+
+.doctor-app input,
+.doctor-app select,
+.doctor-app textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--d-border);
+  border-radius: 6px;
+}
+
+.doctor-app textarea {
+  width: 100%;
+  min-height: 96px;
+}
+
+.doctor-app .d-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.doctor-app .d-table th,
+.doctor-app .d-table td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--d-border);
+}
+
+.doctor-app .d-table th {
+  font-weight: 700;
+  background: var(--d-surface);
+}
+
+.doctor-app .d-status {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.doctor-app .d-status--generating {
+  color: var(--d-muted);
+}
+
+.doctor-app .d-status--ready {
+  color: var(--d-primary);
+  font-weight: 700;
+}
+
+.doctor-app .d-status--printed {
+  color: var(--d-ok);
+}
+
+.doctor-app .d-status--failed {
+  color: var(--d-danger);
+  font-weight: 700;
+}
+
+.doctor-app .d-error {
+  color: var(--d-danger);
+}
+
+.doctor-app .d-muted {
+  color: var(--d-muted);
+}
+
+/* 差分（D4）。追加・削除は色と記号の両方で分かる */
+.doctor-app .d-diff {
+  padding: 12px;
+  overflow-x: auto;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 6px;
+}
+
+.doctor-app .d-diff .d-diff-add {
+  background: #dff3e0;
+}
+
+.doctor-app .d-diff .d-diff-del {
+  background: #fbe1e1;
+}
+
+/* 未処理の記載（D6）の原文。院内画面だけに出す */
+.doctor-app .d-raw {
+  padding: 12px;
+  white-space: pre-wrap;
+  background: #fff8e5;
+  border: 1px solid #c9a227;
+  border-radius: 6px;
+}
+
+@media print {
+  .doctor-header {
+    display: none;
+  }
+
+  .doctor-main {
+    padding: 0;
+  }
+}

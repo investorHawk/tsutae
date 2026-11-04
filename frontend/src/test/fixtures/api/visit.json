@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/api/visit",
+  "request": {
+    "reception_no": "A-023"
+  },
+  "status": 200,
+  "body": {
+    "ok": true,
+    "message_key": "visit.done"
+  }
+}

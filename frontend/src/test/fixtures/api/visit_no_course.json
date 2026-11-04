@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/visit",
+  "request": {
+    "reception_no": "B-7"
+  },
+  "status": 409,
+  "body": {
+    "error": "no_course"
+  }
+}

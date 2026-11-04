@@ -1,0 +1,389 @@
+/* つたえ レポート（A4 一枚・モノクロ印刷）。色は使わず、灰色の濃さ・斜線・記号で区別する */
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+html {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #000;
+  background: #fff;
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+    "Yu Gothic", "Meiryo", sans-serif;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+
+.sheet {
+  width: 190mm;
+  margin: 0 auto;
+}
+
+@media screen {
+  body {
+    background: #e6e6e6;
+  }
+  .sheet {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 6mm auto;
+    padding: 10mm;
+    background: #fff;
+    box-shadow: 0 0 2mm rgba(0, 0, 0, 0.35);
+  }
+}
+
+@media print {
+  .sheet {
+    width: auto;
+  }
+  section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  section.page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+}
+
+h1 {
+  margin: 0;
+  font-size: 12pt;
+}
+
+h2 {
+  margin: 2.2mm 0 1mm;
+  padding-bottom: 0.3mm;
+  border-bottom: 0.4mm solid #000;
+  font-size: 9.5pt;
+}
+
+.banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 1mm;
+  border-bottom: 0.6mm solid #000;
+}
+
+.synthetic {
+  padding: 0.2mm 1.5mm;
+  border: 0.4mm solid #000;
+  font-weight: bold;
+}
+
+.fallback-notice {
+  margin: 1.5mm 0;
+  padding: 1.2mm 2mm;
+  border: 0.9mm solid #000;
+  font-size: 12pt;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+table.fields {
+  width: 100%;
+  margin-top: 1.2mm;
+}
+
+.fields th,
+.fields td {
+  padding: 0.5mm 1.2mm;
+  border: 0.25mm solid #444;
+  text-align: left;
+}
+
+.fields th {
+  width: 16mm;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.fields .reception {
+  font-size: 12pt;
+  font-weight: bold;
+}
+
+.fields .delay {
+  padding: 0 1mm;
+  border: 0.3mm solid #000;
+}
+
+.attention ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attention li {
+  padding: 0.4mm 0;
+}
+
+.att-mark {
+  display: inline-block;
+  width: 4mm;
+}
+
+.att-title {
+  display: inline-block;
+  min-width: 26mm;
+  font-weight: bold;
+}
+
+.att-day {
+  display: inline-block;
+  min-width: 10mm;
+  margin-right: 2mm;
+  font-weight: bold;
+}
+
+.empty,
+.note {
+  margin: 0.5mm 0;
+}
+
+/* 経過表 */
+table.grid {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.grid col.label-col {
+  width: 22mm;
+}
+
+.grid th,
+.grid td {
+  padding: 0;
+  border: 0.25mm solid #444;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.grid td {
+  height: 5mm;
+  font-size: 8pt;
+}
+
+.grid th.row-label {
+  padding-left: 1mm;
+  font-size: 7.5pt;
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid th.col-head {
+  padding: 0.3mm 0;
+  font-size: 7pt;
+  font-weight: normal;
+  line-height: 1.15;
+}
+
+.col-head .day {
+  display: block;
+  font-size: 8pt;
+  font-weight: bold;
+}
+
+.col-head .date {
+  display: block;
+}
+
+.proxy-mark {
+  display: inline-block;
+  width: 3.6mm;
+  margin: 0 0.5mm;
+  border: 0.25mm solid #000;
+  background: #fff;
+  font-weight: bold;
+  line-height: 3.2mm;
+  text-align: center;
+}
+
+.col-head .proxy-mark {
+  display: block;
+  margin: 0.3mm auto 0;
+}
+
+.grid tr.course-sep th {
+  padding: 0.4mm 1mm;
+  border-left: none;
+  border-right: none;
+  font-size: 7.5pt;
+  text-align: left;
+}
+
+.grid tbody.previous th.row-label {
+  font-style: italic;
+}
+
+/* セル: 背景は「斜線（つらくて書けない）」と「網掛け（ある／つらい）」の2層 */
+.cell,
+.col-head {
+  background-image: var(--slash, none), var(--tint, none);
+}
+
+.st-present {
+  --tint: linear-gradient(#cdcdcd, #cdcdcd);
+}
+
+.st-hard {
+  --tint: linear-gradient(#8a8a8a, #8a8a8a);
+}
+
+.slash {
+  --slash: repeating-linear-gradient(
+    135deg,
+    transparent 0,
+    transparent 1.1mm,
+    #000 1.1mm,
+    #000 1.35mm
+  );
+}
+
+.cell .glyph {
+  color: #8a8a8a;
+}
+
+.st-not_asked .glyph {
+  color: #000;
+  letter-spacing: -0.05em;
+}
+
+.cell .mark {
+  font-size: 9pt;
+  font-weight: bold;
+}
+
+.cell .recalled {
+  font-size: 6pt;
+  font-weight: bold;
+  vertical-align: super;
+}
+
+.cell .temp {
+  font-size: 7pt;
+}
+
+.slash .glyph,
+.slash .mark,
+.slash .recalled,
+.slash .temp,
+.col-head.slash .day,
+.col-head.slash .date {
+  padding: 0 0.3mm;
+  background: #fff;
+}
+
+.grid td.out,
+.swatch.out {
+  border-style: dotted;
+  background-image: none;
+}
+
+/* 凡例（固定文言） */
+.legend {
+  margin-top: 1mm;
+  font-size: 7pt;
+  line-height: 1.6;
+}
+
+.legend .legend-title {
+  margin-right: 1.5mm;
+  font-weight: bold;
+}
+
+.legend .item {
+  display: inline-block;
+  margin-right: 2.2mm;
+  white-space: nowrap;
+}
+
+.swatch {
+  display: inline-block;
+  width: 5mm;
+  height: 3.6mm;
+  margin-right: 0.6mm;
+  border: 0.25mm solid #444;
+  font-size: 7pt;
+  line-height: 3.2mm;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* 症状別・引用 */
+table.symptoms,
+table.quote-list {
+  width: 100%;
+}
+
+.symptoms th,
+.symptoms td,
+.quote-list td {
+  padding: 0.4mm 1mm;
+  border-bottom: 0.2mm solid #888;
+  text-align: left;
+  vertical-align: top;
+}
+
+.symptoms th {
+  border-bottom: 0.3mm solid #000;
+  font-weight: normal;
+}
+
+.symptoms .term {
+  width: 40mm;
+}
+
+.symptoms .start {
+  width: 26mm;
+  white-space: nowrap;
+}
+
+.symptoms .low {
+  margin-left: 0.8mm;
+  font-weight: bold;
+}
+
+.quote-list .q-day {
+  width: 11mm;
+  white-space: nowrap;
+}
+
+.quote-list .q-date {
+  width: 10mm;
+  white-space: nowrap;
+}
+
+.quote-list .q-proxy {
+  width: 5mm;
+}
+
+.notes {
+  margin-top: 2mm;
+  padding-top: 0.6mm;
+  border-top: 0.3mm solid #000;
+  font-size: 6.8pt;
+}
+
+.notes p {
+  margin: 0.2mm 0;
+}

@@ -1,0 +1,16 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/visits/1/unprocessed",
+  "request": null,
+  "status": 200,
+  "body": {
+    "entries": [
+      {
+        "entry_id": 38,
+        "record_date": "2026-11-05",
+        "reason": "unknown_before_honorific",
+        "text": "磯鷲さんにもらった漢方をのんでみた。おなかがあったかい感じ"
+      }
+    ]
+  }
+}

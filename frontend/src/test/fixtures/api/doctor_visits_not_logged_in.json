@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/visits",
+  "request": null,
+  "status": 401,
+  "body": {
+    "error": "not_logged_in"
+  }
+}

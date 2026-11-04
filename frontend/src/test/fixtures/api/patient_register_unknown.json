@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/patient/register",
+  "request": {
+    "pid": "P-ZZZZ9999"
+  },
+  "status": 404,
+  "body": {
+    "error": "unknown_patient"
+  }
+}

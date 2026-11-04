@@ -1,0 +1,22 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/courses",
+  "request": {
+    "patient_id": "P-FIXT0001",
+    "course_no": 1,
+    "infusion_date": "2026-11-09",
+    "planned_date": "2026-11-09",
+    "next_visit": "2026-11-30",
+    "note": null
+  },
+  "status": 200,
+  "body": {
+    "id": 8,
+    "patient_id": "P-FIXT0001",
+    "course_no": 1,
+    "infusion_date": "2026-11-09",
+    "planned_date": "2026-11-09",
+    "next_visit": "2026-11-30",
+    "note": null
+  }
+}

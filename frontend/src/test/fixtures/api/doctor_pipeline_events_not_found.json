@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/pipeline/999/events",
+  "request": null,
+  "status": 404,
+  "body": {
+    "error": "not_found"
+  }
+}

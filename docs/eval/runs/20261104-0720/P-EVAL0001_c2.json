@@ -1,0 +1,692 @@
+{
+  "format_version": 2,
+  "patient_id": "P-EVAL0001",
+  "course_no": 2,
+  "visit_date": "2026-09-28",
+  "model": "claude-opus-5-5",
+  "subagent_model": "claude-sonnet-5-5",
+  "prepared": {
+    "input": {
+      "regimen": "FOLFOX",
+      "regimen_skill_version": "regimen-folfox@1",
+      "report_skill_version": "report-format-default@1",
+      "schedule": {
+        "course_no": 2,
+        "infusion_date": "2026-09-15",
+        "day1_date": "2026-09-15",
+        "last_day_date": "2026-09-28",
+        "pump_removal_date": "2026-09-17",
+        "previous_infusion_date": "2026-09-01",
+        "delay_days": 0
+      },
+      "questions": [
+        {
+          "key": "numbness",
+          "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "diarrhea",
+          "text": "下痢はありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "stomatitis",
+          "text": "口の中の痛みや口内炎はありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "nausea_appetite",
+          "text": "吐き気や食欲の落ち込みはありましたか",
+          "answer_type": "three_level"
+        },
+        {
+          "key": "fever",
+          "text": "熱を測りましたか",
+          "answer_type": "temperature"
+        }
+      ],
+      "entries": [
+        {
+          "entry_no": 1,
+          "record_date": "2026-09-15",
+          "day": 1,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "2回目おわった。今回もかえりの風がつめくて顔と指がピリピリ。"
+        },
+        {
+          "entry_no": 2,
+          "record_date": "2026-09-17",
+          "day": 3,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "hard",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "ボタンがとめにくい。指先のしびれが前よりつよい。"
+        },
+        {
+          "entry_no": 3,
+          "record_date": "2026-09-18",
+          "day": 4,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.9
+            }
+          ],
+          "masked_free_text": "点滴の次の日から冷たいものにさわれない。ペットボトルもタオルでつかんでる。"
+        },
+        {
+          "entry_no": 4,
+          "record_date": "2026-09-19",
+          "day": 5,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "熱は出なかったし吐き気もない。しびれはきのうよりまし。"
+        },
+        {
+          "entry_no": 5,
+          "record_date": "2026-09-21",
+          "day": 7,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.7
+            }
+          ],
+          "masked_free_text": null
+        },
+        {
+          "entry_no": 6,
+          "record_date": "2026-09-22",
+          "day": 8,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "先週木曜まではしびれがつよかったけど、いまはだいぶ楽。寒気もなかった。"
+        },
+        {
+          "entry_no": 7,
+          "record_date": "2026-09-23",
+          "day": 9,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.3
+            }
+          ],
+          "masked_free_text": null
+        },
+        {
+          "entry_no": 8,
+          "record_date": "2026-09-23",
+          "day": 9,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [],
+          "masked_free_text": "夕方つめたい風にあたったら手がピリピリしたけど、すぐおさまった。"
+        },
+        {
+          "entry_no": 9,
+          "record_date": "2026-09-24",
+          "day": 10,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "下痢のボタンまちがえておしちゃった。下痢はしてないです。"
+        },
+        {
+          "entry_no": 10,
+          "record_date": "2026-09-26",
+          "day": 12,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.5
+            }
+          ],
+          "masked_free_text": "しびれはほとんど気にならない。でもつめたい物はまだ少しピリッとする。"
+        },
+        {
+          "entry_no": 11,
+          "record_date": "2026-09-27",
+          "day": 13,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "not_measured",
+              "temperature": null
+            }
+          ],
+          "masked_free_text": "あしたは外来。今週はわりと元気だった。手先のしびれは少しのこってる。"
+        },
+        {
+          "entry_no": 12,
+          "record_date": "2026-09-28",
+          "day": 14,
+          "by_proxy": false,
+          "too_sick": false,
+          "answers": [
+            {
+              "question_key": "numbness",
+              "value": "present",
+              "temperature": null
+            },
+            {
+              "question_key": "diarrhea",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "stomatitis",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "nausea_appetite",
+              "value": "none",
+              "temperature": null
+            },
+            {
+              "question_key": "fever",
+              "value": "measured",
+              "temperature": 36.4
+            }
+          ],
+          "masked_free_text": null
+        }
+      ]
+    },
+    "entry_ids": {
+      "1": 13,
+      "2": 14,
+      "3": 15,
+      "4": 16,
+      "5": 17,
+      "6": 18,
+      "7": 19,
+      "8": 20,
+      "9": 21,
+      "10": 22,
+      "11": 23,
+      "12": 24
+    },
+    "masked_texts": {
+      "1": "2回目おわった。今回もかえりの風がつめくて顔と指がピリピリ。",
+      "2": "ボタンがとめにくい。指先のしびれが前よりつよい。",
+      "3": "点滴の次の日から冷たいものにさわれない。ペットボトルもタオルでつかんでる。",
+      "4": "熱は出なかったし吐き気もない。しびれはきのうよりまし。",
+      "6": "先週木曜まではしびれがつよかったけど、いまはだいぶ楽。寒気もなかった。",
+      "8": "夕方つめたい風にあたったら手がピリピリしたけど、すぐおさまった。",
+      "9": "下痢のボタンまちがえておしちゃった。下痢はしてないです。",
+      "10": "しびれはほとんど気にならない。でもつめたい物はまだ少しピリッとする。",
+      "11": "あしたは外来。今週はわりと元気だった。手先のしびれは少しのこってる。"
+    },
+    "unprocessed": []
+  },
+  "timeline": {
+    "events": [
+      {
+        "entry_no": 1,
+        "date": "2026-09-15",
+        "day": 1,
+        "course_no": 2,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "かえりの風がつめくて顔と指がピリピリ",
+        "confidence": 0.8,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 2,
+        "date": "2026-09-17",
+        "day": 3,
+        "course_no": 2,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "指先のしびれが前よりつよい",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 3,
+        "date": "2026-09-16",
+        "day": 2,
+        "course_no": 2,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "点滴の次の日から冷たいものにさわれない",
+        "confidence": 0.7,
+        "recalled": true,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 3,
+        "date": "2026-09-18",
+        "day": 4,
+        "course_no": 2,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "ペットボトルもタオルでつかんでる",
+        "confidence": 0.5,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 4,
+        "date": "2026-09-19",
+        "day": 5,
+        "course_no": 2,
+        "term": "発熱",
+        "question_key": "fever",
+        "status": "absent",
+        "source_quote": "熱は出なかった",
+        "confidence": 0.5,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 4,
+        "date": "2026-09-19",
+        "day": 5,
+        "course_no": 2,
+        "term": "悪心",
+        "question_key": "nausea_appetite",
+        "status": "absent",
+        "source_quote": "吐き気もない",
+        "confidence": 0.7,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 4,
+        "date": "2026-09-19",
+        "day": 5,
+        "course_no": 2,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "improving",
+        "source_quote": "しびれはきのうよりまし",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 6,
+        "date": "2026-09-17",
+        "day": 3,
+        "course_no": 2,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "先週木曜まではしびれがつよかった",
+        "confidence": 0.85,
+        "recalled": true,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 6,
+        "date": "2026-09-22",
+        "day": 8,
+        "course_no": 2,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "improving",
+        "source_quote": "いまはだいぶ楽",
+        "confidence": 0.75,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 8,
+        "date": "2026-09-23",
+        "day": 9,
+        "course_no": 2,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "夕方つめたい風にあたったら手がピリピリしたけど、すぐおさまった",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 9,
+        "date": "2026-09-24",
+        "day": 10,
+        "course_no": 2,
+        "term": "下痢",
+        "question_key": "diarrhea",
+        "status": "absent",
+        "source_quote": "下痢はしてないです",
+        "confidence": 0.8,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 10,
+        "date": "2026-09-26",
+        "day": 12,
+        "course_no": 2,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "improving",
+        "source_quote": "しびれはほとんど気にならない",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 10,
+        "date": "2026-09-26",
+        "day": 12,
+        "course_no": 2,
+        "term": "錯感覚",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "つめたい物はまだ少しピリッとする",
+        "confidence": 0.85,
+        "recalled": false,
+        "by_proxy": false
+      },
+      {
+        "entry_no": 11,
+        "date": "2026-09-27",
+        "day": 13,
+        "course_no": 2,
+        "term": "末梢性感覚ニューロパチー",
+        "question_key": "numbness",
+        "status": "present",
+        "source_quote": "手先のしびれは少しのこってる",
+        "confidence": 0.9,
+        "recalled": false,
+        "by_proxy": false
+      }
+    ],
+    "contradictions": [
+      {
+        "entry_no": 9,
+        "date": "2026-09-24",
+        "day": 10,
+        "question_key": "diarrhea",
+        "closed_answer": "present",
+        "free_text_quote": "下痢はしてないです。"
+      },
+      {
+        "entry_no": 10,
+        "date": "2026-09-26",
+        "day": 12,
+        "question_key": "numbness",
+        "closed_answer": "none",
+        "free_text_quote": "つめたい物はまだ少しピリッとする"
+      }
+    ],
+    "unprocessed_entries": []
+  },
+  "fallback": false,
+  "error_code": null,
+  "stats": {
+    "duration_ms": 83929,
+    "num_turns": 10,
+    "tokens_in": 185045,
+    "tokens_out": 12822,
+    "cost_usd": 0.3983499
+  },
+  "hooks": {
+    "h1_blocks": 0,
+    "h2_timeline_denies": 0,
+    "h2_report_denies": 0
+  }
+}

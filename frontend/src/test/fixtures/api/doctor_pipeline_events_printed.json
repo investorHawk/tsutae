@@ -1,0 +1,281 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/pipeline/1/events",
+  "request": null,
+  "status": 200,
+  "body": {
+    "status": "printed",
+    "events": [
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "input_prepared",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "out_of_range_count:26",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "run_start",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "skill_check",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "ok",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h1_allow",
+        "hook_name": "H1",
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "Skill",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "Skill",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "Skill",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "Skill",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "Agent",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "subagent_start",
+        "hook_name": null,
+        "agent_type": "date-normalizer",
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "subagent_stop",
+        "hook_name": null,
+        "agent_type": "date-normalizer",
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "Agent",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "Agent",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "subagent_start",
+        "hook_name": null,
+        "agent_type": "contradiction-finder",
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "subagent_stop",
+        "hook_name": null,
+        "agent_type": "contradiction-finder",
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "Agent",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "Agent",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "subagent_start",
+        "hook_name": null,
+        "agent_type": "term-mapper",
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "subagent_stop",
+        "hook_name": null,
+        "agent_type": "term-mapper",
+        "tool_name": null,
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "Agent",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_timeline",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h2_allow",
+        "hook_name": "H2",
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_timeline",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "emit_timeline",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_timeline",
+        "decision": "accept",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_timeline",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h4_allow",
+        "hook_name": "H4",
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_report",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "hook_h2_allow",
+        "hook_name": "H2",
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_report",
+        "decision": "allow",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "emit_report",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_report",
+        "decision": "accept",
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "tool_use",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": "mcp__tsutae__emit_report",
+        "decision": null,
+        "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "run_end",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "ok",
+        "duration_ms": 1000
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "visit_ready",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "ok",
+        "duration_ms": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/pipeline/2/events",
+  "request": null,
+  "status": 200,
+  "body": {
+    "status": "generating",
+    "events": []
+  }
+}

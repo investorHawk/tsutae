@@ -110,10 +110,10 @@ export const AfterScene: React.FC<SceneComponentProps> = ({
       {scene.title ? (
         <Caption text={scene.title} top={130} left={1160} />
       ) : null}
-      <div style={{ position: "absolute", top: 590, left: 1160 }}>
+      <div style={{ position: "absolute", top: 570, left: 1160 }}>
         <Clock
           seconds={elapsed}
-          size={170}
+          size={150}
           color={COLORS.navy}
           label="聞き取り"
         />

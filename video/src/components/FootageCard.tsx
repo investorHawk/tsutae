@@ -40,14 +40,16 @@ const DeviceOutline: React.FC<{ device: Device }> = ({ device }) => {
   );
 };
 
-const Row: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
+const Row: React.FC<{
+  label: string;
+  /** 見出しの列の幅（小さいカードは「撮る内容」を出さないので狭くてよい） */
+  labelWidth: number;
+  children: React.ReactNode;
+}> = ({ label, labelWidth, children }) => (
   <div style={{ display: "flex", gap: 24, alignItems: "baseline" }}>
     <div
       style={{
-        width: 200,
+        width: labelWidth,
         flexShrink: 0,
         color: COLORS.inkSoft,
         whiteSpace: "nowrap",
@@ -66,6 +68,7 @@ const CardInfo: React.FC<{
   compact: boolean;
 }> = ({ id, seconds, left, compact }) => {
   const spec = FOOTAGE[id];
+  const labelWidth = compact ? 110 : 200;
   return (
     <div
       style={{
@@ -90,12 +93,20 @@ const CardInfo: React.FC<{
           {spec.slug}
         </span>
       </div>
-      <Row label="場面">{spec.scene}</Row>
-      <Row label="端末">{DEVICE_LABEL[spec.device]}</Row>
-      <Row label="秒">
+      <Row label="場面" labelWidth={labelWidth}>
+        {spec.scene}
+      </Row>
+      <Row label="端末" labelWidth={labelWidth}>
+        {DEVICE_LABEL[spec.device]}
+      </Row>
+      <Row label="秒" labelWidth={labelWidth}>
         最低 {spec.minSeconds} 秒（ここで {seconds} 秒使う・残り {left}）
       </Row>
-      {compact ? null : <Row label="撮る内容">{spec.content}</Row>}
+      {compact ? null : (
+        <Row label="撮る内容" labelWidth={labelWidth}>
+          {spec.content}
+        </Row>
+      )}
       <div
         style={{
           marginTop: 8,

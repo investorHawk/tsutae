@@ -81,9 +81,9 @@ export const NODES: PipeNode[] = [
     id: "date",
     label: "日付",
     sub: "date-normalizer",
-    x: 1160,
+    x: 1150,
     y: 195,
-    w: 300,
+    w: 320,
     h: 96,
     tone: "role",
   },
@@ -91,9 +91,9 @@ export const NODES: PipeNode[] = [
     id: "term",
     label: "用語",
     sub: "term-mapper",
-    x: 1160,
+    x: 1150,
     y: 305,
-    w: 300,
+    w: 320,
     h: 96,
     tone: "role",
   },
@@ -101,9 +101,9 @@ export const NODES: PipeNode[] = [
     id: "contra",
     label: "食い違い",
     sub: "contradiction-finder",
-    x: 1160,
+    x: 1150,
     y: 415,
-    w: 300,
+    w: 320,
     h: 96,
     tone: "role",
   },
@@ -186,7 +186,7 @@ export const EDGES: PipeEdge[] = [
     to: "date",
     points: [
       [1090, 300],
-      [1160, 243],
+      [1150, 243],
     ],
   },
   {
@@ -194,7 +194,7 @@ export const EDGES: PipeEdge[] = [
     to: "term",
     points: [
       [1090, 325],
-      [1160, 353],
+      [1150, 353],
     ],
   },
   {
@@ -202,7 +202,7 @@ export const EDGES: PipeEdge[] = [
     to: "contra",
     points: [
       [1090, 350],
-      [1160, 463],
+      [1150, 463],
     ],
   },
   {
@@ -230,7 +230,7 @@ export const EDGES: PipeEdge[] = [
     ],
     tone: "normal",
     label: "受理",
-    labelAt: [1462, 578],
+    labelAt: [1446, 578],
   },
   {
     from: "H2",

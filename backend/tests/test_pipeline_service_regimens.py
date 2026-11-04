@@ -99,3 +99,20 @@ def test_regimen_skills_by_version_skips_broken_text(
     db.save_skill_version(conn, "regimen-ram-wptx", 1, "---\nname: x\n---\n", [])
     assert regimen_skills_by_version(conn, ["regimen-ram-wptx@1"]) == {}
     assert "regimen-ram-wptx@1" in caplog.text
+
+
+def test_regimen_skills_by_version_warns_on_version_mismatch(
+    conn: sqlite3.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    # 全文の frontmatter の版が skill_versions の版と違う（検査は通る）。黙って落とさない
+    from tsutae.pipeline.versions import regimen_skills_by_version
+
+    text = render_regimen_skill(extra_form("ram_wptx"), 1).replace(
+        "version: 1", "version: 9"
+    )
+    assert validate_skill_text("regimen-ram-wptx", text).version == 9
+    db.save_skill_version(conn, "regimen-ram-wptx", 1, text, [])
+    caplog.set_level("WARNING", logger="tsutae.pipeline.versions")
+    assert regimen_skills_by_version(conn, ["regimen-ram-wptx@1"]) == {}
+    assert "regimen-ram-wptx@1" in caplog.text
+    assert "だるさ" not in caplog.text

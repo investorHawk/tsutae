@@ -74,3 +74,13 @@ def test_script_fallback(tmp_path: Path) -> None:
     proc = _run("--fallback", "--out", str(out))
     assert proc.returncode == 0, proc.stderr
     assert "AI変換なし" in out.read_text(encoding="utf-8")
+
+
+def test_prepared_carries_entry_versions() -> None:
+    sample = load_demo_inputs()
+    prepared = sample.prepared
+    by_id = {e.id: e for e in sample.entries}
+    assert set(prepared.entry_versions) == set(prepared.entry_ids)
+    for no, entry_id in prepared.entry_ids.items():
+        assert prepared.entry_versions[no] == by_id[entry_id].skill_version
+    assert prepared.other_versions == {}  # デモ患者の記録は全て今の版

@@ -492,7 +492,7 @@ class PreparedInput(Frozen):
     term_keys: dict[str, str | None] = Field(default_factory=dict)
     # 記録の版（entry_no -> Entry.skill_version）と、入力の版と違う版の対応の材料（v1.1）。
     # checks・紙の照合は記録ごとにその版の対応を使う（`skills.term_keys.entry_term_keys`）。
-    # 版の分からない記録・材料の無い版は入力の版の対応（gate が材料の欠けを止める）。
+    # 材料を引けなかった版は空の材料で全て null。版の無い記録・材料の欠けは gate が止める。
     # ここまでの3つは Claude に送る JSON（input）には入れない
     entry_versions: dict[int, str] = Field(default_factory=dict)
     other_versions: dict[str, VersionTermKeys] = Field(default_factory=dict)

@@ -8,13 +8,16 @@ architecture 9c「記録ごとに（Entry.skill_version）その版の対応を�
 - prepare_input は記録の版（entry_no → skill_version）と、入力の版と違う版の term_keys・
   質問の key を PreparedInput に写す（Claude に送る PipelineInput の JSON には入れない）
 - checks（OutputContext）・report/validate は記録の版の対応で照合する
-- 版の材料を渡さない（version_skills なし）・版の分からない記録は、入力の版の対応のまま
-- 入口（gate）は記録の版と、他の版の質問の key が記録・版の質問集と同じかを確かめる
-  （版の材料を渡さずに作った版の混ざる入力も通さない）
+- 版の材料を引けなかった版（version_skills に無い。skill_versions の全文が今の検査に
+  通らない古い版など）の記録は安全側: 空の材料を置き、どの用語も null（○ を付けない。
+  出来事は紙に残る）。版の名前と番号だけを警告に残す
+- 入口（gate）は送った記録の全てに版があること、他の版の材料が送った版とちょうど同じ
+  こと、材料の質問の key が版の質問集と同じ（空の材料は可）ことを確かめる
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 
 import pytest
@@ -36,6 +39,7 @@ from tsutae.schemas import (
     RegimenSkill,
     Timeline,
     TimelineEvent,
+    VersionTermKeys,
 )
 from tsutae.skills import validate_skill_text
 from tsutae.skills.term_keys import entry_term_keys
@@ -146,10 +150,33 @@ def test_entry_term_keys_follow_record_version() -> None:
     assert entry_term_keys(prepared, 1)["末梢性感覚ニューロパチー"] == "neuropathy"
 
 
-def test_without_version_skills_uses_input_version() -> None:
+def test_missing_version_material_maps_every_term_to_null(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # 版1 の材料を引けない: 版1 の記録は今の版の対応（倦怠感 → fatigue）を当てずに全て null
+    caplog.set_level(logging.WARNING, logger="tsutae.pipeline.inputs")
     prepared = _prepared(with_versions=False)
-    assert prepared.other_versions == {}
-    assert entry_term_keys(prepared, 1)["倦怠感"] == "fatigue"  # 今までどおり
+    assert prepared.other_versions == {V1: VersionTermKeys()}
+    keys = entry_term_keys(prepared, 1)
+    assert keys["倦怠感"] is None and keys["末梢性感覚ニューロパチー"] is None
+    assert all(v is None for v in keys.values())
+    assert entry_term_keys(prepared, 2)["倦怠感"] == "fatigue"  # 今の版の記録は今の対応
+    warned = [r for r in caplog.records if r.name == "tsutae.pipeline.inputs"]
+    assert len(warned) == 1 and warned[0].levelno == logging.WARNING
+    assert V1 in warned[0].getMessage()
+    assert "だるい" not in caplog.text
+
+
+def test_missing_version_material_checks_and_report_use_null() -> None:
+    prepared = _prepared(with_versions=False)
+    ctx = OutputContext.from_prepared(prepared)
+    assert ctx.term_keys_for(1)["倦怠感"] is None
+    ok = [_event(1, None, "今日はだるい"), _event(2, "fatigue", "今日もだるい")]
+    assert timeline_problems(ok, [], ctx) == []
+    by_id = {e.id: e for e in ENTRIES}
+    events = ok + [_event(1, "fatigue", "今日はだるい")]
+    kept = usable_events(Timeline(events=events), prepared, by_id)
+    assert [(e.entry_no, e.question_key) for e in kept] == [(1, None), (2, "fatigue")]
 
 
 def test_checks_use_record_version_mapping() -> None:
@@ -198,11 +225,18 @@ def test_gate_accepts_record_versions() -> None:
     _check(_prepared())
 
 
-def test_gate_rejects_mixed_versions_without_version_skills() -> None:
-    # 版の材料を渡さずに作った入力は、版1 の記録にも版2 の対応を当ててしまう
+def test_gate_accepts_missing_version_material() -> None:
+    # 材料を引けなかった版は空の材料（全て null。○ は減る向きにしか効かない）で通す。
+    # T95 の直後はここで skill_mismatch になり、フォールバックの紙も出なかった
+    _check(_prepared(with_versions=False))
+
+
+def test_gate_rejects_entries_without_version() -> None:
+    prepared = _prepared()
+    tampered = prepared.model_copy(update={"entry_versions": {2: V2}})
     with pytest.raises(ReportBuildError) as exc:
-        _check(_prepared(with_versions=False))
-    assert exc.value.code == "skill_mismatch"
+        _check(tampered)
+    assert exc.value.code == "entry_mismatch"
 
 
 @pytest.mark.parametrize(
@@ -211,6 +245,9 @@ def test_gate_rejects_mixed_versions_without_version_skills() -> None:
         {"entry_versions": {1: V2, 2: V2}},  # 記録の版を差し替えた
         {"entry_versions": {1: V1, 2: V2, 9: V1}},  # 送っていない entry_no
         {"other_versions": {}},  # 版1 の対応を落とした
+        {"entry_versions": {1: V1}},  # 送った記録の版が欠けた
+        # 送っていない版の材料（空でも）
+        {"other_versions": {V1: {}, "regimen-ram-wptx@7": {}}},
         {"other_versions": {V2: {"term_keys": {}, "question_keys": ["fatigue"]}}},
     ],
 )

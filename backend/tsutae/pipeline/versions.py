@@ -3,7 +3,9 @@
 - `questions_by_version(conn, versions=None)`: 版 → その版の質問集（経過表の未設問の判定）
 - `regimen_skills_by_version(conn, versions)`: 版 → その版の RegimenSkill（保存した全文を
   検査して読む。記録ごとの用語 → 質問 key の対応に使う。spec 9.1）。登録の無い版・
-  検査に通らない全文は入れない（後者は版の文字列と型名だけを警告に残す）
+  検査に通らない全文・frontmatter の版や種類が登録と違う全文は入れない（後の2つは
+  版の文字列と型名だけを警告に残す）。入れなかった版の記録は prepare_input が安全側に
+  倒す（どの用語も質問につなげない）
 - regimen Skill は FOLFOX/CAPOX に限らない（`regimen-` で始まる正しい Skill 名）
 """
 
@@ -114,6 +116,8 @@ def regimen_skills_by_version(
         except SkillValidationError as exc:
             _log.warning("skill %s の全文を読めない: %s", key, type(exc).__name__)
             continue
-        if isinstance(skill, RegimenSkill) and skill.version == version:
-            found[key] = skill
+        if not isinstance(skill, RegimenSkill) or skill.version != version:
+            _log.warning("skill %s の全文の版・種類が登録と違う", key)
+            continue
+        found[key] = skill
     return found

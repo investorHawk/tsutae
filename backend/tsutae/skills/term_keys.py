@@ -6,8 +6,9 @@
   無いので全体の対応のまま（評価済みの依頼文が変わらない）
 - `asked_term_keys`: その版の質問に無い key は null（checks・紙の照合で同じ規則）
 - `entry_term_keys(prepared, entry_no)`: その記録の版（Entry.skill_version）の対応
-  （spec 9.1）。入力の版と違う版は PreparedInput.other_versions の材料で、版の分からない
-  記録・材料の無い版は入力の版の対応（材料の欠けは report の gate が止める）
+  （spec 9.1）。入力の版と違う版は PreparedInput.other_versions の材料。材料を引けなかった
+  版は空の材料（`version_materials`）で全ての用語が null（○ を付けない側に倒す）。
+  版の無い記録・材料の欠けは report の gate が entry_mismatch・skill_mismatch で止める
 """
 
 from __future__ import annotations

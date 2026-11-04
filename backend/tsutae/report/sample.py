@@ -6,6 +6,8 @@
   SAMPLE_CONFIDENCE と置く
 - 伏せ字は report.gate.mask_free_text（変換の入力と同じ整形・一次・二次）。二次検出に
   掛かった記録は記録ごと外して未処理にする
+- 記録の版（entry_versions）と他の版の材料も変換の入力と同じ形で埋める（他の版の材料は
+  引かないので空。その版の記録の出来事は質問につながらない）
 - 症例は全て合成
 """
 
@@ -39,6 +41,7 @@ from tsutae.schemas import (
     Timeline,
     TimelineEvent,
     UnprocessedEntry,
+    VersionTermKeys,
 )
 from tsutae.skills import load_regimen_skill, load_report_skill
 from tsutae.synthetic import load_labels, load_patient
@@ -152,6 +155,8 @@ def prepare_sample_input(
         key=lambda e: (e.recorded_at, e.id),
     )
     masked = _mask_entries(picked, schedule, courses)
+    versions = {e.id: e.skill_version for e in picked}
+    entry_versions = {no: versions[eid] for no, eid in masked.entry_ids.items()}
     return PreparedInput(
         input=PipelineInput(
             regimen=regimen_skill.regimen,
@@ -164,7 +169,20 @@ def prepare_sample_input(
         entry_ids=masked.entry_ids,
         masked_texts=masked.texts,
         unprocessed=masked.unprocessed,
+        term_keys=dict(regimen_skill.term_keys or {}),
+        entry_versions=entry_versions,
+        other_versions=_version_materials(entry_versions, regimen_skill),
     )
+
+
+def _version_materials(
+    entry_versions: dict[int, str], regimen_skill: RegimenSkill
+) -> dict[str, VersionTermKeys]:
+    """他の版の材料は持たない（変換の入力と同じく、その版の記録は質問につなげない）。"""
+    # pipeline/__init__ は orchestrator（SDK）を読み込むので、呼ぶときに読み込む
+    from tsutae.pipeline.inputs import version_materials
+
+    return version_materials(entry_versions, regimen_skill, None)
 
 
 def _events(no: int, me: MaskedEntry, label: EntryLabel) -> list[TimelineEvent]:

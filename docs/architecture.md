@@ -49,7 +49,7 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 
 | 表 | 列 |
 |---|---|
-| patients | id TEXT PK（仮名ID。`P-` + 英大文字数字8桁、`secrets` で生成）, regimen TEXT CHECK(FOLFOX/CAPOX), created_at |
+| patients | id TEXT PK（仮名ID。`P-` + 英大文字数字8桁、`secrets` で生成）, regimen TEXT（v1.0 は CHECK(FOLFOX/CAPOX)。v1.1 で外す。API の入口で `list_regimens` と照合）, created_at |
 | courses | id INTEGER PK, patient_id FK, course_no INT, infusion_date, planned_date NULL, next_visit NULL, note NULL, UNIQUE(patient_id, course_no) |
 | entries | id INTEGER PK, patient_id FK, recorded_at, record_date（recorded_at の JST 日付）, kind CHECK(too_sick/answers/free_text/mixed), by_proxy INT, skill_version TEXT（例 `regimen-folfox@1`） |
 | closed_answers | entry_id FK ON DELETE CASCADE, question_key, value CHECK(none/present/hard/not_measured/measured), temperature REAL NULL, PK(entry_id, question_key), CHECK((value='measured') = (temperature IS NOT NULL)) |
@@ -58,9 +58,12 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | timelines | visit_id PK FK ON DELETE CASCADE, json TEXT（`Timeline`） |
 | reports | visit_id PK FK ON DELETE CASCADE, html TEXT, data_json TEXT（`ReportData`） |
 | doctor_masks | visit_id FK ON DELETE CASCADE, entry_id FK ON DELETE CASCADE, spans_json TEXT（原文の伏せる区間 `[[start, end], …]`）, confirmed_clear INT CHECK(0/1), allowed_json TEXT（確かめた時に許す区間。伏せた後の文の位置）, created_at, PK(visit_id, entry_id) — D6 の医師の伏せ字。**位置と真偽だけで文面は入れない**。印刷済み・期限切れで reports と一緒に消す（2026-11-04 夜） |
-| pipeline_logs | id PK, run_kind CHECK(visit/skill_change), run_id INT, ts, event TEXT, hook_name NULL, agent_type NULL, tool_name NULL, decision NULL, duration_ms NULL, tokens_in NULL, tokens_out NULL, cost_usd NULL — **文面は入れない** |
+| pipeline_logs | id PK, run_kind CHECK(visit/skill_change/regimen_chat。regimen_chat は v1.1), run_id INT, ts, event TEXT, hook_name NULL, agent_type NULL, tool_name NULL, decision NULL, duration_ms NULL, tokens_in NULL, tokens_out NULL, cost_usd NULL — **文面は入れない** |
 | skill_changes | id PK, skill_name, requested_text, diff TEXT NULL, new_text TEXT NULL, base_version INT, new_version INT NULL, status CHECK(pending/approved/rejected/failed), error_code TEXT NULL, created_at, decided_at NULL |
 | skill_versions | skill_name, version INT, content TEXT（SKILL.md 全文）, questions_json TEXT NULL（regimen のみ）, approved_at, PK(skill_name, version) |
+| regimen_forms（v1.1） | skill_name, version INT, form_json TEXT, sources_json TEXT, created_at, PK(skill_name, version) — D4 で採用した版のフォーム。FOLFOX/CAPOX@1 はリポジトリの `regimen_forms/*.json` |
+| regimen_drafts（v1.1） | id PK, regimen TEXT NULL, base_skill TEXT NULL, base_version INT NULL, form_json, sources_json, chat_json, generation INT, status CHECK(open/working/adopted/discarded), turns INT, cost_usd REAL, created_at, updated_at |
+| question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
 
 `skill_versions` は「その日の記録に使った質問集」を後から引くためのスナップショット（未設問「−−」の表示に使う）。起動時に現在の SKILL.md が未登録なら登録する。
 
@@ -106,7 +109,7 @@ fixed_rules:
 ```
 - `parse_skill_md(text) -> tuple[dict, str]`（frontmatter と本文。壊れていれば `SkillFormatError`）
 - `validate_skill_text(skill_name: str, text: str) -> RegimenSkill | ReportFormatSkill`（名前の接頭辞で型を選ぶ。frontmatter の name とディレクトリ名の一致も検査。失敗は `SkillValidationError(code: str)`）
-- `load_skill(skill_name, skills_dir: Path | None = None)`, `load_regimen_skill(regimen, skills_dir=None) -> RegimenSkill`（FOLFOX→regimen-folfox, CAPOX→regimen-capox）, `load_report_skill(name="report-format-default", skills_dir=None) -> ReportFormatSkill`, `read_skill_text(skill_name, skills_dir=None) -> str`, `skill_path(skill_name, skills_dir=None) -> Path`
+- `load_skill(skill_name, skills_dir: Path | None = None)`, `load_regimen_skill(regimen, skills_dir=None) -> RegimenSkill`（v1.0 は FOLFOX→regimen-folfox, CAPOX→regimen-capox の固定。v1.1 は `regimen-` + 識別名の小文字の規則で引き、Skill 名と frontmatter の regimen の一致もこの規則で検査する）, `load_report_skill(name="report-format-default", skills_dir=None) -> ReportFormatSkill`, `read_skill_text(skill_name, skills_dir=None) -> str`, `skill_path(skill_name, skills_dir=None) -> Path`
 - `SKILL_NAME_PATTERN = r"^(regimen|report-format)-[a-z0-9-]+$"`（H3 の書き込み先検査にも使う）
 - CAPOX: cycle_days 21、pump_removal_day なし、手足症候群（`hand_foot`）を追加
 
@@ -340,6 +343,29 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - `approve_change(conn, change_id, *, skills_home) -> int`: pending のみ。`base_version` が今の版と違えば `failed`・`stale`。new_text の frontmatter の version を base+1 にして再検証 → 本体へ原子的に書く（同じディレクトリの一時ファイル → `os.replace`）→ `save_skill_version` → approved。**git commit はしない**（版の履歴は `skill_versions` に残す）
 - `reject_change(conn, change_id) -> None`: pending のみ rejected
 - ログは `PipelineLogger(conn, "skill_change", change_id)`（文面なし）
+
+### 9c. D4 レジメン — フォームとチャット（v1.1、`tsutae.regimen`。spec 9.1、`docs/plan-d4-regimen.md`）
+- **形**: `RegimenForm`（pydantic、frozen）
+  - `basic`: display_name・code・target・cycle_days
+  - `drugs[]`: row_id・name・route `infusion|oral|pump`・`days: list[DayRange]`（`DayRange(start, end)`、複数可）・times_per_day・start_note
+  - `side_effects[]`: row_id・phrases・ctcae_terms[]・question_key|None
+  - `questions[]`: row_id・key・label・text・answer_type
+  - `notes`（補足の指示）
+  - `prose: RegimenProse | None`（描画用の文。画面に出さず、`set_fields`・PATCH では書けない。FOLFOX/CAPOX の JSON が埋め、新規は None で既定の文、版 N+1 は版 N から引き継ぐ。中身は既存2本の差分から決める: 冒頭の注記・1コースの補足（「（3週）」）・点滴の日の括弧・持続ポンプの文・内服の補足・improving の例・食い違いの例・まとめた質問の行）
+  - `FieldSources`: 欄の id（`basic.cycle_days`・`drugs.<row_id>.start_note` など）→ `doctor_text|standard|doctor_edit`
+- **描画（T91）**: `render_regimen_skill(form, version) -> str`（純関数。DB・部品集を見ない。Jinja2 は `StrictUndefined`・`autoescape=False`・`keep_trailing_newline=True`）。FOLFOX/CAPOX は `regimen_forms/folfox.json`・`capox.json` から描いて**今の SKILL.md とバイト一致**（テスト）。frontmatter は v1.0 の鍵＋任意の `display_name`（code と違うときだけ）・`term_keys`（全体の対応と違うものだけ）。質問の label は frontmatter に書かない。描いた結果は必ず `validate_skill_text`（strict）を通す
+  - **日付の言い方の表**: 点滴の日の集合 I（route=infusion の全 Day。pump は入れない）・ポンプ抜去日 P（pump の最後の Day）・内服の範囲 O。|I|=1 なら今の行（「点滴の日・投与日・病院で点滴した日（・飲み薬を始めた日）| Day1」）。|I|≥2 なら「記録日以前で最も近い点滴の日（Day1・8・15）。confidence を下げる」と候補を列挙し、「点滴の次の日」はその次の日。P があれば「ポンプを外した日 | DayP」「ポンプを外した次の日 | DayP+1」、無ければ CAPOX と同じ「『ポンプ』が出てくる表現」の行。O は範囲ごとに終わりの日の行、範囲の間と最後の範囲の後を「飲み薬が休みの日・休薬に入った日」の行（範囲が1つなら今の CAPOX の文言。範囲が cycle_days まで続くなら休薬の行は出さない）。直し方の Day が同じ言い方は1行にまとめる。曜日の3行は共通
+  - **まとめた質問の行**（§5）: questions にある key だけを並べる（既知の3つは今の文、それ以外は side_effects の phrases から）。1つも無ければ描かない
+  - **補足の指示**: 空でなければ最後の節の後に「## 10. 補足の指示（施設の決まり）」と本文。空なら描かない。ファイルは改行1つで終える
+- **値の検査**（`set_fields`・PATCH の両方）: 投与スケジュールの規則（spec 9.1）、`detect_identifiers`、薬の量の語、frontmatter に入る値は YAML で読み戻して同じか、表のセルに改行・`|` が無いか。掛かれば欄の id と理由を返す
+- **逆向き**: 既存の版を開くとき `form_from_skill(name, version)`。FOLFOX/CAPOX@1 は上の JSON、D4 で採用した版は `regimen_forms`（SKILL.md を読み戻して解析はしない）
+- **用語と質問の対応**: `term_keys_for(skill_version)` = `ctcae_terms.json` の全体の対応 ＋ その版の `term_keys`。`checks.py`（OutputContext）・`report/validate.py`・term-mapper の依頼文は、記録ごとに（Entry.skill_version）その版の対応を使う。FOLFOX/CAPOX@1 は `term_keys` が無いので今と同じ
+- **下書き（T93）**: `regimen_drafts`。状態 `open → working（1往復の間）→ open`、`adopted`・`discarded` で閉じる。既存の版から作った下書きは同じ regimen に open/working が1つ。新規は code が決まるまで regimen NULL。`working` の間の PATCH・preview・adopt・discard は 409。往復ごとに `generation` を上げ、結果は世代が同じときだけ反映する。`working` のまま上限を過ぎた行は open に戻し、会話に失敗の行を残す
+- **1往復（T94）**: `RegimenChat` プロトコル `async turn(draft, text) -> TurnResult`。`SdkRegimenChat` は `query()`（cwd は空の一時ディレクトリ・`setting_sources=[]`・`--no-session-persistence`・`env=NO_CLAUDE_MD_ENV`・`max_turns`・`max_budget_usd`・`allowed_tools` は `mcp__tsutae_regimen__{set_fields,ask,propose_questions}` だけ・`disallowed_tools` は 9b の一覧＋Read/Edit/Write/Task/Agent/Skill・hooks は H1 と H4（サブエージェント無し））。HTTP は応答まで待つ（上限 `regimen_turn_timeout_s`、既定 90 秒）。query の前に依頼文の全体に `detect_identifiers`（掛かれば Claude を呼ばず失敗）。ツールの入力は上の検査を通し、通らなければ理由を返して直させる。`doctor_edit` の欄への `set_fields` は `overwrite_requested=true` のときだけ。会話の文面は `regimen_drafts.chat_json` だけに置き、`PipelineLogger(conn, "regimen_chat", draft_id)` には種類・回数・費用・秒だけ。`REGIMEN_ALLOWED_TOOLS`・disallowed・H4 の許可一覧は値でテストに固定し、`decisions.md` に記録
+- **確認と採用（T93）**: `preview(draft)` は AI の値の一覧・SKILL.md（新規は全文、既存は unified diff）・患者の見本・検査結果と `confirm_token`（正規化した form_json＋sources_json＋base_version のハッシュ）を返す。`adopt(conn, draft_id, confirm_token, ai_values_confirmed, *, skills_home)` は必須・描画・バリデータ・token の照合・stale・「患者のいるレジメンで日数・Day・抜去日を変えていない」をやり直す。新規は `regimen-<code>/` を排他で作り（既にあれば 409 `code_taken`）SKILL.md を原子的に置いて版1、既存は版 N+1（`base_version` が今と違えば `stale`）。`skill_versions` と `regimen_forms` を同じトランザクションで書く。新しい質問を `question_library` に入れる。採用・破棄で `chat_json` の文面を消す
+- **DB の移行（T93 で仕組み、T94・T95 で使う）**: `migrate_db(conn)` を `init_db` の中で schema.sql の前に呼ぶ。`sqlite_master` の CREATE 文を見て、古い CHECK があるときだけ SQLite の「12-step generalized ALTER TABLE」で表を作り直す（トランザクションの外で `PRAGMA foreign_keys=OFF` → `BEGIN IMMEDIATE` → 新しい表 → 全行を写す → DROP → RENAME → 索引を作り直す → `PRAGMA foreign_key_check` が空でなければ ROLLBACK → COMMIT → finally で `foreign_keys=ON`）。対象は `pipeline_logs`（run_kind に regimen_chat。T94 より前に要る）と `patients`（regimen の CHECK を外す。T95）。何度呼んでもよく、行数と中身が変わらないことをテストで確かめる
+- **レジメンの一覧（T95）**: `list_regimens(skills_dir)` は `regimen-*` の frontmatter から識別名・版・表示名（`display_name`、無ければ識別名）を作る。`schemas.Regimen` は `str`（API の入口で一覧と照合）。紙の短い名前は既知の6問は `SHORT_LABELS`、それ以外は版の form JSON の label。紙のヘッダは表示名
+- **旧 D4 の制限（T95）**: `POST /skill-changes` と `request_change` は `regimen-*` を 400 `use_regimen_editor`。テスト・`run_demo_skill_change.py` の既定は `report-format-default` に移す
 
 ## 9. フロント（W1 骨組み → W4 画面）
 - React 18 + Vite 5 + TypeScript + react-router 6。vitest + Testing Library（jsdom）。Prettier（2 スペース、セミコロンあり）

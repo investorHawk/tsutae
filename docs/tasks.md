@@ -148,7 +148,7 @@ T03 で確かめる4点:
 
 | ID | タスク | 依存 |
 |---|---|---|
-| T90 | spec.md D4・H3/H4、architecture.md §9c の更新（先生が差分を見る） | — |
+| T90 | spec.md v1.1・architecture.md §2・§4・§9c・plan の更新（4観点のレビューを反映。先生が差分を見る） | — |
 | T91 | `RegimenForm` と Jinja2 で SKILL.md を描く。FOLFOX/CAPOX とバイト一致 | — |
 | T92 | 部品集（表・seed 6 問・API） | T10 |
 | T93 | 下書き（表・API・preview・adopt。既存は版 N+1） | T91 |

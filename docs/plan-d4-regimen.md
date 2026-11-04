@@ -14,12 +14,15 @@
 
 | 決めたこと | 理由 |
 |---|---|
-| **左のフォームが正本。SKILL.md はフォームの値からコードが決まった形（Jinja2）で描く。Claude に SKILL.md を書かせない** | レポートを `ReportData` から決定的に描くのと同じ考え。H3（書き込み先の制限）が要らなくなり、今より安全。FOLFOX/CAPOX の SKILL.md の差は 63 行で全て「型のある部分」（日数・薬・日付の言い方・用語と質問）だった |
+| **左のフォームが正本。SKILL.md はフォームの値からコードが決まった形（Jinja2）で描く。Claude に SKILL.md を書かせない** | レポートを `ReportData` から決定的に描くのと同じ考え。H3（書き込み先の制限）が要らなくなり、今より安全。FOLFOX/CAPOX の SKILL.md の差は 63 行で、大半は型のある部分（日数・薬・日付の言い方・用語と質問）。残る数文（冒頭の注記・「（3週）」・例文など）は画面に出さない描画用の文 `prose` として JSON に持つ（T90 のレビュー） |
 | **Claude が触るのは欄の値だけ。専用ツール（`set_fields` / `ask` / `propose_questions`）で返し、pydantic で検査する** | `emit_timeline` と同じ作り。自由文を解釈して欄に入れる処理をコードに持たない |
 | **チャットは「1 回送ると 1 回答える」。応答中は左の欄を編集できない** | 医師の入力と Claude の書き換えがぶつからない。長く待つ状態・取り残しが起きない（`AskUserQuestion` で止めて待つ方式は採らない） |
 | **Claude が入れた値には出どころを持たせる**: 先生の文から（青）／標準の値から（橙の点線・未確認）。先生が直接入れた欄は、先生が頼まない限り Claude は書き換えない | 先生の判断「標準の値も入れてよい」を、確かめる手順とセットにする |
-| **採用の前に「AI が入れた値」を一括で一覧し、チェック 1 回で確かめる。一覧の行ごとに「削除」が付く** | 欄ごとの確認は 30 回押すことになり重かった（モックで確認）。不要な候補はその場で落とせる |
-| **既存レジメンを開いて欄を直接直しても、チャットで頼んでも、「版 N+1 の下書き」になる。採用まで患者の画面は変わらない。変わるのは次の記録から** | 今の版の扱いと同じ。差分は版 N との unified diff で見せる |
+| **採用の前に「AI が入れた値」を一括で一覧し、チェック 1 回で確かめる。一覧の行ごとに「削除」が付く。確かめは確認の画面に出した版の印（ハッシュ）に結びつけ、その後に値が変われば採用できない** | 欄ごとの確認は 30 回押すことになり重かった（モックで確認）。不要な候補はその場で落とせる。フラグ式は外れ忘れが起きる（T90 のレビュー） |
+| **既存レジメンを開いて欄を直接直しても、チャットで頼んでも、「版 N+1 の下書き」になる。採用まで患者の画面は変わらない。変わるのは次の記録から**。ただし患者のいるレジメンでは 1コースの日数・薬の Day・抜去日を変えられない | 今の版の扱いと同じ。差分は版 N との unified diff で見せる。日程は過去のコースも今の版で計算するため |
+| **frontmatter の鍵は v1.0 のまま（任意の `display_name`・`term_keys` だけ足す）。それ以外は form JSON（`regimen_forms`）に持つ** | `RegimenSkill` は extra=forbid・strict。描画を純関数に保つ |
+| **用語 → 質問の対応を版ごとに持つ（`term_keys`）** | 全体の対応 1 つだと、足した質問（だるさ等）に自由記載がつながらない |
+| **D2 で登録するのは Day1 だけ。Day8・15 の延期は記録しない。回が決まらない言い方は confidence を「？」の境目より下げる** | 締切内に収める。紙の「？」で医師が確かめる |
 | **質問の「部品集」を DB に持つ**（初期値は今の 6 問。採用した新しい質問は部品集にも入る）。選ぶのは画面内の小窓 | 短い名前（label）を部品に持たせるので、医師画面に `tearing` のような key がそのまま出ない |
 | **FOLFOX/CAPOX の 2 つ固定を外す**（`Regimen` 型・`REGIMEN_SKILL_NAMES`・`REGIMENS`・`schema.sql` の CHECK・患者登録の選択肢） | DB は表を作り直して行を移す（先生の判断。既存の合成データは残す） |
 | 薬の量（mg/m² など）は持たない | 変換に要らず、誤りの害が大きい（先生の判断） |
@@ -44,7 +47,8 @@ AI が入れた = 橙の点線（採用の前に確かめる）／先生が入�
 ## 2. 壊してはいけないこと（既存の決まりとの整合）
 
 - 患者に届くのは**採用された質問文**だけ。Claude の文は院内の画面（チャット）にだけ出る
-- 先生のチャットの文は毎回 H1（`detect_identifiers`）を通す。掛かれば送らず 400 を返す
+- 下書きに入る文は全て（チャット・直接入力・Claude のツールの値）H1 の検出を通す。query の前に依頼文の全体にも掛ける。掛かれば保存も送信もしない（欄の id を返す）
+- 薬の量（数値＋mg 等）は欄に入れられない
 - チャットの文面は DB の下書きに置く（院内だけ）。ログ（`PipelineLogger`）には種類と回数だけ残し、文面を入れない
 - エージェントは Read/Edit/Write を持たない（H4 は専用ツールだけ許す）。`--no-session-persistence`・`setting_sources=[]` は今のまま
 - `regimen-folfox@1` / `regimen-capox@1` は評価済みの版。**同じ描き方で描くと今の SKILL.md と一致する**テストを置き、版は上げない
@@ -58,13 +62,13 @@ AI が入れた = 橙の点線（採用の前に確かめる）／先生が入�
 | ID | タスク | 完了条件 | 依存 |
 |---|---|---|---|
 | T90 | 仕様と設計の更新: `spec.md` D4 の項（レジメンは新画面、形式は一文のまま）・H3/H4 の記述、`architecture.md` §9c（下書き・部品集・1 往復の契約）、`decisions.md` は記入済み | 先生が差分を見て OK | — |
-| T91 | **フォーム → SKILL.md の描画**: `RegimenForm`（pydantic。基本・薬・副作用・質問・補足）と Jinja2 テンプレート。`render_regimen_skill(form) -> str`。FOLFOX/CAPOX の値を `backend/tsutae/skills/regimen_forms/` に置く | `render(folfox_form) == 今の regimen-folfox/SKILL.md`（capox も）がバイト一致。`validate_skill_text` を通る。日付の言い方の表は薬の表から導く | — |
+| T91 | **フォーム → SKILL.md の描画**: `RegimenForm`（pydantic。基本・薬・副作用・質問・補足・`prose`・行 id）と Jinja2 テンプレート。`render_regimen_skill(form, version) -> str`（純関数）。FOLFOX/CAPOX の値を `backend/tsutae/skills/regimen_forms/` に置く。日付の言い方の表・まとめた質問の行・補足の節の規則（architecture 9c）。値の検査（投与スケジュールの規則・薬の量・YAML の読み戻し・表のセル） | `render(folfox_form) == 今の regimen-folfox/SKILL.md`（capox も）がバイト一致。§5 の3レジメンも描けて strict の `validate_skill_text` を通り、frontmatter は v1.0 の鍵＋任意の2つだけ。ロンサーフの「飲み薬が休みの日」・RAM の「点滴の日」の行が出る | — |
 | T92 | **部品集**: `question_library` 表（key・label・text・answer_type・出どころ）、初期 6 問の seed、`GET/POST/DELETE /api/doctor/question-library` | 初期 6 問が入り、追加・削除できる。key の重複と H1 に掛かる key/text を拒否 | T10 |
-| T93 | **下書きと採用**: `regimen_drafts` 表（regimen 名・もとにした Skill と版・form JSON・欄ごとの出どころ・チャット・状態）、`POST /regimen-drafts`（新規 or 既存から）、`PATCH .../fields`（直接編集。応答中は 409）、`POST .../discard`、`GET .../preview`（SKILL.md 全文 or 版 N との diff・患者見本・検査結果）、`POST .../adopt`（新規: Skill フォルダ作成＋`skill_versions` 版 1、既存: 版 N+1） | 採用後 `load_regimen_skill` で読める。既存の記録は当時の版で表示される（既存テストが通る）。adopt は「AI が入れた値の確認済み」フラグが無ければ 409 | T91 |
-| T94 | **Claude の 1 往復**: `POST .../turns {text}`。H1 → Agent SDK `query()`（同一プロセスの MCP ツール `set_fields`・`ask`・`propose_questions`、`allowed_tools` はこの 3 つだけ、H4 で他を deny、`max_turns`・`max_budget_usd`）→ pydantic 検査 → 下書きに反映（先生が入れた欄への書き込みは `overwrite_requested` が無ければ拒否し理由を返す）→ 返答とチャットを保存。依頼文には今のフォーム・直近の会話・部品集・CTCAE の一覧・「先生の文に無い値は標準の値として `source=standard` を付ける」を入れる | 偽の query で: 欄が埋まる／`ask` が欄 id と選択肢を返す／先生の欄が守られる／H1 で止まる／時間切れで failed。ログに文面が無い | T92, T93 |
-| T95 | **2 レジメン固定の解除**: `schemas.Regimen` を str にし読み込んだ Skill と照合、`REGIMEN_SKILL_NAMES` を frontmatter から、`repo_patients.REGIMENS`、`schema.sql` の CHECK を外す移行（表を作り直して行を移す。起動時に 1 回）、`api/doctor.py`、フロントの `Regimen` 型と `PatientCreateForm`（API から一覧）、医師画面の短い名前は部品集の label から | 既存 DB（CHECK あり）を起動で移行し全行が残るテスト。SOX の患者を登録して記録 → 受診 → レポートまで通る（API を呼ばない構成） | T93 |
+| T93 | **下書きと採用**: `regimen_drafts`・`regimen_forms` 表、`migrate_db`（12-step の表の作り直し。まず `pipeline_logs` の run_kind に regimen_chat）、`POST /regimen-drafts`（新規 or 既存から。新規は体温の質問を初めから持つ）、`PATCH .../fields`（直接編集・行の削除。検査に掛かれば 422、応答中は 409）、`POST .../discard`、`GET .../preview`（AI の値の一覧・SKILL.md 全文 or 版 N との diff・患者見本・検査結果・`confirm_token`）、`POST .../adopt`（token 照合・検査のやり直し・新規はフォルダを排他で作る・既存は版 N+1・`skill_versions` と `regimen_forms` を同じトランザクション・新しい質問を部品集へ・会話の文面を消す） | 採用後 `load_regimen_skill` で読める。既存の記録は当時の版で表示される（既存テストが通る）。token が古い・確かめが無い・患者のいるレジメンで日程を変えた なら 409。古い CHECK の DB を移行して全行が残る | T91 |
+| T94 | **Claude の 1 往復**: `POST .../turns {text}`（応答まで待つ。上限 90 秒・世代番号）。入力と依頼文全体の H1 → Agent SDK `query()`（同一プロセスの MCP ツール `set_fields`・`ask`・`propose_questions`、`allowed_tools` はこの 3 つだけ、H4 で他を deny、`max_turns`・`max_budget_usd`）→ pydantic 検査 → 下書きに反映（先生が入れた欄への書き込みは `overwrite_requested` が無ければ拒否し理由を返す）→ 返答とチャットを保存。依頼文には今のフォーム・直近の会話・部品集・CTCAE の一覧・「先生の文に無い値は標準の値として `source=standard` を付ける」を入れる | 偽の query で: 欄が埋まる／`ask` が欄 id と選択肢を返す／先生の欄が守られる／H1 で止まる（入力・依頼文・ツールの値）／薬の量を拒否／時間切れで下書きが open に戻り会話に失敗の行／古い世代の結果を捨てる。`regimen_chat` のログが書けて文面が無い。`REGIMEN_ALLOWED_TOOLS`・disallowed・H4 を値で固定するテストと `decisions.md` | T92, T93 |
+| T95 | **2 レジメン固定の解除と周辺**: `schemas.Regimen` を str にし `list_regimens` と照合、Skill 名の規則（`regimen-` + 小文字）、`repo_patients.REGIMENS`、`patients` の CHECK を外す移行（`migrate_db`）、`api/doctor.py`・`GET /regimens`、フロントの `Regimen` 型と `PatientCreateForm`（API から一覧）。**用語→質問の対応を版ごとに**（`checks.py`・`report/validate.py`・term-mapper の依頼文が記録の版の `term_keys` を使う）。紙と医師画面の短い名前（既知6問は今のまま、それ以外は form の label）、紙のヘッダに表示名。**旧 D4 の制限**（`regimen-*` は 400 `use_regimen_editor`、テストと `run_demo_skill_change.py` の既定を report-format へ）。アーキテクチャテストに `regimen_drafts` を足す | 既存 DB（CHECK あり）を起動で移行し全行が残るテスト。**RAM＋wPTX の患者を登録して記録 → 受診 → レポートまで通る**（API を呼ばない構成。テストの fixture で、評価用の合成記録ではない）。足した質問に自由記載の出来事がつながる。FOLFOX の既存テストと eval の依頼文が変わらない | T93 |
 | T96 | **画面 D4 レジメン**（`frontend/src/pages/doctor/Settings.tsx` を分割）: タブ／左フォーム 5 節＋Day の帯／欄の 4 状態／右チャット（固定・自動スクロール・応答中の表示・変えた欄の札・選択肢）／下のバー／確認（AI 一覧＋行の削除＋チェック・SKILL.md or diff・スマホ見本）／登録済み／部品集の小窓／CAPOX の切り替え／直接編集 → 版 N+1 | モックの 2 本の流れ（新規・既存の直接編集）が vitest で通る。IME 変換中の Enter で送らない | T93, T94 |
-| T97 | **通しと記録**: `scripts/run_demo_regimen.py`（本物の Claude で SOX を 1 往復。先生が `!` で実行）、ブラウザ通し、`docs/decisions.md` に実測（費用・秒・拒否回数）、`demo-script.md`、README の D4 の説明と画像、テスト件数 | smoke が OK。README の数値は実測だけ | T96 |
+| T97 | **通しと記録**: `scripts/run_demo_regimen.py`（本物の Claude で §5 のうち1つを作る往復。候補は FOLFIRI＋BV。先生が `!` で実行）、ブラウザ通し（28日・質問7問・前コースありで紙が読めるか）、`docs/decisions.md` に実測（費用・秒・拒否回数）、`demo-script.md` の手順9を新しい D4 に（一文 D4 は report-format の短い場面に）、README の D4 の説明と画像、テスト件数 | smoke が OK。README の数値は実測だけ | T96 |
 
 ## 4. 範囲（先生の判断 2026-11-04 夜: **落とさず全部作る**）
 
@@ -72,7 +76,34 @@ T90〜T97 を全て作る。補足の指示（自由記載）の欄も持たせ�
 勝手に削らず先生に確認する。そのときの候補の順（参考）: 部品集の小窓 → 既存の直接編集 → 補足の指示欄 →
 CAPOX の切り替え。どの場合も **T91 のバイト一致テスト・H1・採用前の確認** は落とさない。
 
-## 5. 先生にしか決められないこと（残り）
+## 5. デモ・テストで足すレジメン（先生の指定 2026-11-04 夜）
 
-- デモで足すレジメンの名前と内容（モックは SOX の例。合成なら何でもよい）
+モックの SOX は画面の例で、実装・テスト・デモには使わない。実装のテスト・デモ台本・`run_demo_regimen.py` は次の3つを使う
+（値はテストとデモのための例。**先生が確かめる**。薬の量は持たない）。
+
+| レジメン | 対象 | 1コース | 投与スケジュール（例） | 形の上で試すこと |
+|---|---|---|---|---|
+| RAM＋wPTX | 胃がん | 28日 | パクリタキセル 点滴 Day1・8・15／ラムシルマブ 点滴 Day1・15 | コース内に点滴が複数回。「点滴の日」は記録日以前で最も近い点滴の日 |
+| FOLFIRI＋BV | 大腸がん | 14日 | ベバシズマブ・イリノテカン・レボホリナート 点滴 Day1／フルオロウラシル（急速静注） 点滴 Day1（FOLFOX と同じく経路は点滴に含める）／フルオロウラシル（46時間） 持続ポンプ Day1〜3 | 持続ポンプ（抜去日 Day3）。FOLFOX に近い形 |
+| ロンサーフ＋BV | 大腸がん | 28日 | トリフルリジン・チピラシル 内服 1日2回（朝・夕食後）Day1〜5・8〜12、飲み始め Day1 の朝から／ベバシズマブ 点滴 Day1・15 | 内服が途中で休む（Day の範囲が2つ）。「飲み薬が休みの日」 |
+
+- このため `drugs[].days` は Day の範囲を**複数**持てる形にする（spec 9.1・architecture 9c）
+- 3つの合成記録・評価は作らない（spec 17.1・20）。T95 の通しで患者と記録を作るのはテストの fixture
+
+**患者への質問の目安（T90 の臨床の観点のレビュー。Claude の `propose_questions` の依頼文と、テストの期待値に使う。先生が確かめる）**
+
+| レジメン | 部品集から | 足す候補（新しい質問。3択、独自の文言） |
+|---|---|---|
+| RAM＋wPTX | 下痢・口内炎・吐き気・食欲・体温 | しびれ（パクリタキセル向けの文「手足のしびれはありましたか」。FOLFOX の寒冷の文は使い回さない）、だるさ「だるさや疲れやすさはありましたか」、出血「鼻血や歯ぐきからの出血はありましたか」、関節・筋肉の痛み、手足のむくみ |
+| FOLFIRI＋BV | 下痢・吐き気・食欲・口内炎・体温 | だるさ、出血。しびれは前治療のしびれを追うときだけ |
+| ロンサーフ＋BV | 吐き気・食欲・下痢・体温 | だるさ、出血。口内炎は任意 |
+
+- 高血圧・蛋白尿・好中球減少・貧血は検査の値なので患者への質問にしない（血圧の数値の回答は範囲外）
+- 用語の一覧（`ctcae_terms.json`、34語）に高血圧・四肢浮腫・歯肉出血・末梢性運動ニューロパチー などが無い。足すには先生の確認が要り、足すと FOLFOX の term-mapper の依頼文が変わる（eval の数字がずれうる）。**T91〜T97 では一覧を変えない**（一覧に無い症状は補足の指示に書く）
+
+## 6. 先生にしか決められないこと（残り）
+
 - T90 の spec 差分の承認
+- 上の3つの投与スケジュールの値と、質問の目安（例として置いた）の確認
+- T97 の smoke に使うレジメン（候補は FOLFIRI＋BV）
+- 用語の一覧（`ctcae_terms.json`）に語を足すか（足すなら JCOG 版の原本との照合と、FOLFOX の eval の測り直し）。足さない場合は一覧に無い症状を補足の指示に書く

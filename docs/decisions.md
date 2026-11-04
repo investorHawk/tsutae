@@ -416,3 +416,16 @@
 | 「変えた欄」の札のうち AI が入れた欄には、読み上げ用に「（AI が入れた）」を添える | 色と点線だけでは読み上げで区別できない | 検証の指摘 |
 | 新規の登録済みの文は「部品集に無かった質問があれば、それも部品集に入れました」（条件の文） | 採用の応答は部品集に足した数を返さない。部品集の質問だけで作ったときに事実と違う文にしない（backend は触らない） | 検証の指摘 |
 | 確認（preview と確かめの印）は取りに行った下書きの id と一緒に持ち、今の下書きと違えば無いものとして扱う。別のタブの下書きを開いている間（editor.loading）は、今の下書きの欄・確認へ進む・捨てる・チャットを止める | タブを押して新しい下書きの POST が返る前に「確認へ進む」を押すと、前の下書きの確認が新しい下書きの画面に出て、その token で採用を送っていた（サーバーが token_mismatch で断るのでデータは壊れない） | 確かめ直しの指摘 |
+
+### T97 通しと記録（2026-11-05）
+| 決定 | 理由 | 出どころ |
+|---|---|---|
+| `scripts/run_demo_regimen.py` は一時ディレクトリの DB と skills_home の写し（`backend/skills_home` を丸ごと）を指したアプリ（`create_app`）を TestClient で起こし、医師 API（`POST /regimen-drafts {from:"new"}` → `POST .../turns` → `GET .../preview` →（`--adopt` のときだけ）`POST .../adopt` → `GET /api/doctor/regimens`）を順に呼ぶ。本物の skills_home と data/ の DB には `--adopt` でも触れない | 画面と同じ経路（起動処理の部品集の seed・回復・医師 API の検査）を通す。`run_demo_skill_change.py`・`run_demo_visit.py` は service を直に呼ぶが、こちらは患者の登録の選択肢（GET /regimens）まで確かめたいので API にした。署名鍵と医師のパスワードは実行ごとの乱数（既定の値で起動を止める検査に掛からないように） | 技術判断 |
+| 往復の文は決まった順: 最初の文（plan §5 の FOLFIRI＋BV）→ Claude が聞いていれば選択肢の1つ目で答える（「「…」でお願いします」）→ 質問の提案をまだ頼んでいなければ「患者への質問を提案してください。足りない欄があれば標準の値で埋めてください」→ 未入力が残れば「まだ空いている欄を標準の値で埋めてください」。未入力 0 で質問の提案が済めば止め、往復は `--max-turns`（既定 6）まで | Claude の ask の中身は前もって分からないので、決まった規則で答える。費用を上限で抑える。決まった文が H1 に掛からないことをテストで確かめた（`test_canned_texts_pass_h1`）。質問の提案は1回だけ頼む（何も足されなくても繰り返さない） | 技術判断 |
+| 往復ごとの数字は `regimen_chat` のログ（run_id は下書きの id）を往復の前後で切り出して読む: turn_end（秒・トークン・費用。費用は ResultMessage の total_cost_usd）・turn_counts（SDK の回数・ツールの呼び出しと拒否）・H4 の allow 以外。変えた欄・AI の欄・未入力・ask・提案した質問は往復の後の下書きから。ツールの拒否と H4 の拒否は分けて出す | ログには文面が無い（数字とコードだけ）ので、そのまま docs/eval に写せる。ツールの拒否（検査で直させた）と H4 の拒否（許可外のツール）は意味が違う | 技術判断 |
+| `--json` で `docs/eval/demo-regimen-<YYYYMMDD-HHMM>.json`（往復の数字・送った文・Claude の返答と ask・最後のフォームと出どころ・確認の結果・上限の設定 `regimen_max_turns`・`regimen_max_budget_usd`・`regimen_turn_timeout_s`）と、描けたら同じ名前の `.md`（SKILL.md の全文）を書く。往復が失敗しても（turn_error・4xx）そこで止めて JSON は書く | 上限（12 回・1.0 ドル）の見直しは失敗の往復の数字こそ要る。会話の文は院内の画面に出る文で、合成のレジメンだけ（患者のデータは無い） | 技術判断 |
+| Claude の代わりの偽物は `main(argv, chat_factory=...)` で差し込む（`--dry-run` は作らない）。`backend/tests/test_run_demo_regimen.py` は往復ごとに違う手順の ScriptChat と、SdkRegimenChat＋偽の query（H4 の拒否・ResultMessage の費用）で通し、本体の skills_home が1バイトも変わらないこと、アプリに渡す設定の DB と Skill が一時ディレクトリの中で data/ の DB が変わらないこと（`create_app` を差し替えて設定を捕まえる）を確かめる | 偽の手順はテストの部品（`regimen_chat_fakes`）にあり、scripts から import しない。API キーが無ければ終了コード 2 | 技術判断 |
+| smoke に使うレジメンは FOLFIRI＋BV（plan §5・§6 の候補）。値は例で、先生が確かめる | FOLFOX に近い形（持続ポンプ・抜去日 Day3）で、紙の読み比べがしやすい | plan §5 |
+| 実測（1往復の秒・費用・SDK の回数・ツールと H4 の拒否の回数・ask の数）: **先生の smoke の後に記入**（`! .venv/bin/python scripts/run_demo_regimen.py --json`、採用まで見るなら `--adopt`）。README の D4 の数値もそこから写す | 評価の数字は実測だけを書く（CLAUDE.md） | 決まり |
+| `regimen_max_turns`=12・`regimen_max_budget_usd`=1.0 は今のまま。見直すかは smoke の実測の後に先生と決める（plan §6） | 実測が無い | 決まり |
+| デモの台本（`docs/demo-script.md`）は D4 を 9〜12（作る・確かめて採用・登録の選択肢・一文の D4）に分け、秒の合計は約295秒（前は240秒）。削る候補を「注意」に書き、どれを削るかは先生が大会の規定を見て決める。9 の Claude が足す質問は例（plan §5 の目安）と書き、smoke の後に直す | 目玉の D4 は作る所と採用の前の確認の両方を見せたい。本物の Claude の出力はまだ見ていない | 決まり |

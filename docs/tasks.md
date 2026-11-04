@@ -148,11 +148,16 @@ T03 で確かめる4点:
 
 | ID | タスク | 依存 |
 |---|---|---|
-| T90 | spec.md v1.1・architecture.md §2・§4・§9c・plan の更新（4観点のレビューを反映。先生が差分を見る） | — |
-| T91 | `RegimenForm` と Jinja2 で SKILL.md を描く。FOLFOX/CAPOX とバイト一致 | — |
-| T92 | 部品集（表・seed 6 問・API） | T10 |
-| T93 | 下書き（表・API・preview・adopt。既存は版 N+1） | T91 |
-| T94 | Claude の 1 往復（Agent SDK、`set_fields`/`ask`/`propose_questions`、H1・H4） | T92, T93 |
-| T95 | 2 レジメン固定の解除（型・ローダー・DB 移行・患者登録） | T93 |
-| T96 | 画面 D4 レジメン（左フォーム・右チャット・確認・登録・小窓） | T93, T94 |
-| T97 | 通し・smoke（`run_demo_regimen.py` は先生が実行）・記録・README | T96 |
+| T90 | ✅ spec.md v1.1・architecture.md §2・§4・§9c・plan の更新（4観点のレビューを反映。先生が差分を見る） | — |
+| T91 | ✅ `RegimenForm` と Jinja2 で SKILL.md を描く。FOLFOX/CAPOX とバイト一致 | — |
+| T92 | ✅ 部品集（表・seed 6 問・API） | T10 |
+| T93 | ✅ 下書き（表・API・preview・adopt。既存は版 N+1） | T91 |
+| T94 | ✅ Claude の 1 往復（Agent SDK、`set_fields`/`ask`/`propose_questions`、H1・H4） | T92, T93 |
+| T95 | ✅ 2 レジメン固定の解除（型・ローダー・DB 移行・患者登録） | T93 |
+| T96 | ✅ 画面 D4 レジメン（左フォーム・右チャット・確認・登録・小窓） | T93, T94 |
+| T97 | 通し・smoke（`run_demo_regimen.py` は先生が実行）・記録・README。**smoke（先生）待ち**: スクリプト（API を呼ばないテストつき）・demo-script の手順9〜12・README の D4・decisions の T97 は済み。実測（費用・秒・拒否の回数）は smoke の後に decisions と README へ | T96 |
+
+T97 の残り（先生。サンドボックスの外で）:
+1. `! .venv/bin/python scripts/run_demo_regimen.py --json`（本物の Claude で FOLFIRI＋BV をチャットで作る。一時の DB と Skill の写しの上。結果は `docs/eval/demo-regimen-*.json|md`）。採用まで見るなら `--adopt` を足す
+2. ブラウザの通し（28日のレジメン・質問7問・前コースありで紙が読めるか。`docs/plan-d4-regimen.md` §3 の T97）
+3. `docs/plan-d4-regimen.md` §6 の「先生に確かめてもらうこと」

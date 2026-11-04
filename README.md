@@ -9,9 +9,9 @@
 | 項目 | 値 |
 |---|---|
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
-| テスト件数 | 5624件 通過 / 全5624件（backend 3826/3826、frontend 1798/1798。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
+| テスト件数 | 5640件 通過 / 全5640件（backend 3842/3842、frontend 1798/1798。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 2回実測（`docs/eval/2026-11-04.md`・`2026-11-04-2.md`、合成2人・4コース・出来事61件）。2回目: 日付 93.4%、用語 75.4%、食い違い 再現率 100%・適合率 100%、改善中→なし 0件（9件中）、否定→あり 0件（18件中）、引用 100%。失敗 15 件のうち 11 件は「異常感覚」と「錯感覚」の当て分け（正解ラベルの臨床レビュー待ち） |
-| 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で5回）。**本物の Claude**: Agent SDK のスモーク7項目が全て OK、デモ患者の変換が1回で成功（ready・AI変換なしでない・H2 の拒否0回、2026-11-04）。D4 の本物の書き換えも1回で成功（pending・差分 2 行追加・H3 の拒否0回・約 0.10 ドル、2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`） |
+| 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で5回）。**本物の Claude**: Agent SDK のスモーク7項目が全て OK、デモ患者の変換が1回で成功（ready・AI変換なしでない・H2 の拒否0回、2026-11-04）。一文で頼む D4（当時は regimen-folfox に質問を足す書き換え。今はレポートの形式だけ）の本物の書き換えも1回で成功（pending・差分 2 行追加・H3 の拒否0回・約 0.10 ドル、2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`）。新しい D4 レジメン（チャットで作る）の本物の通しは先生の smoke の後に記入 |
 
 ## 何をするか
 
@@ -27,7 +27,7 @@
 |---|---|
 | P0〜P3 患者 | 登録（QR）／今日の記録（なし・ある・つらい、体温、自由記載、「つらくて書けない」、家族の代理入力）／これまでの記録／受付 |
 | D1〜D3 医師 | 患者とコース（実投与日・延期）／印刷待ち（5秒ごとに更新）／レポート |
-| D4 設定を変える | 一文で頼むと Claude が Skill（SKILL.md）を書き換え、**差分を見て承認したものだけ**が反映される |
+| D4 設定を変える | **レジメン**: 左のフォーム（基本・投与スケジュール・副作用・患者への質問・補足の指示）と右の Claude とのチャット。先生の文から Claude が欄の値を入れ（迷えば選択肢つきで1問ずつ聞く）、先生は **AI が入れた値を一覧で確かめてから採用**する。SKILL.md はフォームの値からコードが決まった形で描き、採用したレジメンは患者の登録で選べる。既存のレジメンを直すと版 N+1 の下書きになる。**レポートの形式**: 一文で頼むと Claude が SKILL.md の写しを書き換え、差分を見て承認したものだけが反映される |
 | D5 変換ログ | Hook の発火・サブエージェントの動き・所要時間（文面は出さない） |
 | D6 未処理 | 伏せ字漏れの疑いで Claude に送らなかった記録の原文（院内画面だけ。紙には件数だけ） |
 
@@ -69,9 +69,12 @@ flowchart LR
   P3 --> M1
   R --> D3[医師: 印刷待ち → 印刷 → 印刷済みで削除]
   FB --> D3
-  subgraph D4 [医師の設定 D4]
-    S1[一文で依頼] --> S2[Claude が SKILL.md の<br/>一時コピーを編集<br/>H3・検証の Hook]
-    S2 --> S3[差分を見て承認] --> S4[版が上がり<br/>次の記録から新しい質問]
+  subgraph D4 [医師の設定 D4 レジメン]
+    S1[先生の文<br/>チャット] --> S2{H1<br/>文と依頼文全体}
+    S2 --> S3[Claude が欄の値を返す<br/>set_fields・ask・propose_questions<br/>H4 はこの3つだけ]
+    S3 --> S4[フォーム＝正本<br/>pydantic で検査]
+    S4 --> S5[AI の値を一覧で確かめて採用<br/>SKILL.md は Jinja2 で描く]
+    S5 --> S6[版が上がり<br/>次の記録から新しい質問<br/>患者の登録で選べる]
   end
 ```
 
@@ -86,9 +89,11 @@ flowchart LR
   - 他に、発火と所要時間だけを記録する Hook（D5 用）
 - 失敗・タイムアウト・上限超過では、クローズ回答の経過表と原文引用だけの「AI変換なし」レポートを必ず作る
 
-**Skill（`backend/skills_home/.claude/skills/`）**: `regimen-folfox`・`regimen-capox`（投与日程・質問集・38.0℃の固定規則）、`report-format-default`（レポート形式）。YAML frontmatter をアプリが読み、本文を Claude が読む。
+**Skill（`backend/skills_home/.claude/skills/`）**: `regimen-folfox`・`regimen-capox`（投与日程・質問集・38.0℃の固定規則）と D4 で採用したレジメン（`regimen-<識別名>`）、`report-format-default`（レポート形式）。YAML frontmatter をアプリが読み、本文を Claude が読む。レジメンの SKILL.md はフォームの値（`regimen_forms`）から Jinja2 で描く（FOLFOX/CAPOX は今の SKILL.md とバイト一致）。
 
-**D4 の書き換えループ（`backend/tsutae/skillchange/`）**: 医師の一文 → 一時コピーを Claude が編集（H1・H3・H4 付き）→ サーバーが検証して unified diff → 医師が承認すると version を上げて本体へ書き込み、次の記録から新しい質問集が出る。却下なら一時コピーを捨てるだけ。記録ごとに Skill の版を持つので、過去の記録は当時の質問集で表示される（経過表の「−−」＝未設問）。
+**D4 レジメン（`backend/tsutae/regimen/`）**: 左のフォームが正本。先生がチャットに書くと、Claude は専用の3つのツール（`set_fields`・`ask`・`propose_questions`。同じプロセスの MCP サーバー）で欄の値だけを返し、サーバーが pydantic とコードで検査して下書きに入れる（Claude は SKILL.md もファイルも触らない。H4 で3つ以外のツールを拒否）。1回送ると1回答える（応答中は欄を直せない）。先生の文・依頼文の全体・ツールの値に H1 を掛け、掛かれば送らない。Claude が入れた値には出どころ（先生の文から／標準の値）を持たせ、先生が直接入れた欄は頼まない限り書き換えさせない。採用の前に AI が入れた値を一覧で確かめ（確かめは確認の画面の印に結びつき、その後に値が変われば採用できない）、採用すると SKILL.md を描いて版を上げる。患者のいるレジメンは日程を変えられない。記録ごとに Skill の版を持つので、過去の記録は当時の質問集で表示される（経過表の「−−」＝未設問）。
+
+**D4 レポートの形式（`backend/tsutae/skillchange/`）**: 医師の一文 → 一時コピーを Claude が編集（H1・H3・H4 付き）→ サーバーが検証して unified diff → 医師が承認すると version を上げて本体へ書き込む。却下なら一時コピーを捨てるだけ。
 
 **開発での使い方**: 仕様（`docs/spec.md`）と実装の契約（`docs/architecture.md`）を先に固め、Claude Code のワークフローで実装担当（Claude Opus）を並列に動かした。各担当の成果は Claude と Codex（読み取り専用）の2系統でレビューし、指摘を直してから統合した。決めたことと理由は `docs/decisions.md`。
 
@@ -133,7 +138,8 @@ make dev-web                           # http://127.0.0.1:5173
 - Agent SDK の動作確認: `make smoke`／精度評価: `make eval`（どちらも API を呼ぶ）
 - 見本のレポート: `.venv/bin/python scripts/render_sample_report.py [--fallback]`
 - 本物の Claude でデモ患者の受診を1回生成: `.venv/bin/python scripts/run_demo_visit.py`（一時 DB を使う。結果は `docs/eval/demo-visit-*.html|json`。`--dry-run` なら API を呼ばない）
-- 本物の Claude で D4 の書き換えを1回試す: `.venv/bin/python scripts/run_demo_skill_change.py [--request 依頼文] [--approve]`（一時コピーの上で行い、本体の SKILL.md は変えない。差分は `docs/eval/demo-skill-change-*.diff`）
+- 本物の Claude で D4 レジメンを1つ作る: `.venv/bin/python scripts/run_demo_regimen.py [--json] [--adopt]`（FOLFIRI＋BV をチャットで作る数往復。一時の DB と Skill の写しの上で行い、本体は変えない。往復ごとの秒・費用・拒否の回数を表で出し、`--json` で `docs/eval/demo-regimen-*.json|md` に書く）
+- 本物の Claude で D4 レポートの形式の書き換えを1回試す: `.venv/bin/python scripts/run_demo_skill_change.py [--request 依頼文] [--approve]`（一時コピーの上で行い、本体の SKILL.md は変えない。差分は `docs/eval/demo-skill-change-*.diff`）
 
 ## 既知の限界
 - 伏せ字の見逃し（`backend/tsutae/masking/__init__.py` に一覧）: 番地の無い住所、敬称の付かない名前（「孫の蓮が来た」）・英語の敬称。1字の名＋さん・くん・ちゃん（「翔さん」「孫の蓮くん」「葵ちゃん」）は二次で拾い、送らない（続柄の1字は許可語で通す）

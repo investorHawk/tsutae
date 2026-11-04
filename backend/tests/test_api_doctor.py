@@ -80,6 +80,7 @@ def test_routers_are_mounted(client: TestClient) -> None:
         "tsutae.api.doctor",
         "tsutae.api.doctor_skills",
         "tsutae.api.doctor_question_library",
+        "tsutae.api.doctor_regimen_drafts",
     )
 
 

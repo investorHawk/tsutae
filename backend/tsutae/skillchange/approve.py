@@ -20,10 +20,7 @@ approved まで進む（save_skill_version は同じ内容なら何もしない�
 
 from __future__ import annotations
 
-import os
 import sqlite3
-import stat
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +28,7 @@ from tsutae import db
 from tsutae.config import now
 from tsutae.pipeline.logs import EventLogger, PipelineLogger
 from tsutae.schemas import RegimenSkill, ReportFormatSkill
+from tsutae.skillchange.atomic import write_atomic as _write_atomic
 from tsutae.skillchange.diff import set_version, unified
 from tsutae.skillchange.errors import SkillChangeError
 from tsutae.skillchange.lock import skill_lock
@@ -71,22 +69,6 @@ def _ready(conn: sqlite3.Connection, change_id: object) -> dict[str, Any]:
     if change["new_text"] is None or change["diff"] is None:
         raise SkillChangeError("not_ready")
     return change
-
-
-def _write_atomic(path: Path, data: bytes) -> None:
-    """同じディレクトリの一時ファイルに書いてから os.replace で置き換える。"""
-    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
-    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-        os.chmod(tmp, mode)
-        os.replace(tmp, path)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
 
 
 def _read_current(path: Path, name: str) -> tuple[bytes, str, int]:

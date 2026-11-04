@@ -21,7 +21,12 @@ import yaml
 from pydantic import ValidationError
 
 from tsutae.config import PATIENT_STRINGS_PATH, get_settings
-from tsutae.schemas import Regimen, RegimenSkill, ReportFormatSkill
+from tsutae.schemas import (
+    REGIMEN_CODE_PATTERN,
+    Regimen,
+    RegimenSkill,
+    ReportFormatSkill,
+)
 
 SKILL_NAME_PATTERN = r"^(regimen|report-format)-[a-z0-9-]+$"
 SKILL_FILE_NAME = "SKILL.md"
@@ -37,6 +42,8 @@ _SKILL_MODELS: tuple[tuple[str, type[RegimenSkill] | type[ReportFormatSkill]], .
     ("report-format-", ReportFormatSkill),
 )
 _SKILL_NAME_RE = re.compile(SKILL_NAME_PATTERN)
+_REGIMEN_CODE_RE = re.compile(REGIMEN_CODE_PATTERN)
+_REGIMEN_CODE_MAX = 30  # RegimenSkill.regimen の max_length と同じ
 _FENCE = "---"
 # 固定規則の閾値（℃）として受け付ける範囲。ReportFormatSkill.fever_attention_celsius と同じ
 _THRESHOLD_MIN_CELSIUS = 35.0
@@ -307,14 +314,34 @@ def load_skill(
     return validate_skill_text(skill_name, read_skill_text(skill_name, skills_dir))
 
 
+def regimen_skill_name(regimen: object) -> str | None:
+    """識別名 → Skill 名（FOLFOX → regimen-folfox。D4 で採用した FOLFIRI-BV →
+    regimen-folfiri-bv）。識別名の書式でなければ None。"""
+    if not isinstance(regimen, str):
+        return None
+    if regimen in REGIMEN_SKILL_NAMES:
+        return REGIMEN_SKILL_NAMES[regimen]
+    if len(regimen) > _REGIMEN_CODE_MAX or not _REGIMEN_CODE_RE.fullmatch(regimen):
+        return None
+    return "regimen-" + regimen.lower()
+
+
 def load_regimen_skill(
-    regimen: Regimen, skills_dir: Path | None = None
+    regimen: Regimen | str, skills_dir: Path | None = None
 ) -> RegimenSkill:
-    """FOLFOX → regimen-folfox、CAPOX → regimen-capox。"""
-    name = REGIMEN_SKILL_NAMES.get(regimen) if isinstance(regimen, str) else None
+    """識別名のレジメン Skill（FOLFOX → regimen-folfox、FOLFIRI-BV → regimen-folfiri-bv）。
+
+    置かれていない・書式の違う識別名は unknown_regimen。
+    """
+    name = regimen_skill_name(regimen)
     if name is None:
         raise SkillValidationError("unknown_regimen", "未知のレジメン")
-    skill = load_skill(name, skills_dir)
+    try:
+        skill = load_skill(name, skills_dir)
+    except SkillNotFoundError:
+        if regimen in REGIMEN_SKILL_NAMES:
+            raise
+        raise SkillValidationError("unknown_regimen", "未知のレジメン") from None
     if not isinstance(skill, RegimenSkill):  # 接頭辞で決まるので通常は起きない
         raise SkillValidationError("unknown_kind", f"{name} がレジメン Skill でない")
     if skill.regimen != regimen:

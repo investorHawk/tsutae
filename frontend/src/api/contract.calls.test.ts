@@ -53,6 +53,20 @@ import type {
   MaskSaveRequest,
   Regimen,
 } from "./types";
+import {
+  adoptRegimenDraft,
+  createRegimenDraft,
+  discardRegimenDraft,
+  getRegimenDraft,
+  listRegimenDrafts,
+  patchRegimenFields,
+  previewRegimenDraft,
+} from "./regimenDrafts";
+import type {
+  AdoptRegimenRequest,
+  CreateRegimenDraftRequest,
+  PatchRegimenFieldsRequest,
+} from "./regimenTypes";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -113,6 +127,15 @@ const approve: Call = (f) => approveSkillChange(idIn(f));
 const reject: Call = (f) => rejectSkillChange(idIn(f));
 const addQuestion: Call = (f) =>
   addLibraryQuestion(f.request as AddLibraryQuestionRequest);
+const draftCreate: Call = (f) =>
+  createRegimenDraft(f.request as CreateRegimenDraftRequest);
+const draftGet: Call = (f) => getRegimenDraft(idIn(f));
+const draftFields: Call = (f) =>
+  patchRegimenFields(idIn(f), f.request as PatchRegimenFieldsRequest);
+const draftPreview: Call = (f) => previewRegimenDraft(idIn(f));
+const draftAdopt: Call = (f) =>
+  adoptRegimenDraft(idIn(f), f.request as AdoptRegimenRequest);
+const draftDiscard: Call = (f) => discardRegimenDraft(idIn(f));
 /** 経路の最後の質問 key（DELETE question-library/{key}）。 */
 const hideQuestion: Call = (f) =>
   hideLibraryQuestion(f.path.replace(/^.*\//, ""));
@@ -187,6 +210,21 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_question_library_add_taken: addQuestion,
   doctor_question_library_hide: hideQuestion,
   doctor_question_library_hide_seed: hideQuestion,
+  doctor_regimen_drafts: () => listRegimenDrafts(),
+  doctor_regimen_draft: draftGet,
+  doctor_regimen_draft_missing: draftGet,
+  doctor_regimen_draft_create: draftCreate,
+  doctor_regimen_draft_create_existing: draftCreate,
+  doctor_regimen_draft_fields: draftFields,
+  doctor_regimen_draft_fields_existing: draftFields,
+  doctor_regimen_draft_fields_invalid: draftFields,
+  doctor_regimen_draft_preview: draftPreview,
+  doctor_regimen_draft_preview_diff: draftPreview,
+  doctor_regimen_draft_adopt: draftAdopt,
+  doctor_regimen_draft_adopt_unconfirmed: draftAdopt,
+  doctor_regimen_draft_adopt_token_mismatch: draftAdopt,
+  doctor_regimen_draft_discard: draftDiscard,
+  doctor_regimen_draft_discard_closed: draftDiscard,
 };
 
 const NAMES = fixtureNames();

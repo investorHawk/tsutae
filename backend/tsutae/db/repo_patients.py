@@ -104,6 +104,14 @@ def list_patients(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [_patient_row(r) for r in rows]
 
 
+def regimen_has_patients(conn: sqlite3.Connection, regimen: str) -> bool:
+    """そのレジメン（識別名）の患者が1人でもいるか（D4 の日程の変更を止める）。"""
+    row = conn.execute(
+        "SELECT 1 FROM patients WHERE regimen = ? LIMIT 1", (regimen,)
+    ).fetchone()
+    return row is not None
+
+
 # ---------------------------------------------------------------------------
 # コース
 # ---------------------------------------------------------------------------

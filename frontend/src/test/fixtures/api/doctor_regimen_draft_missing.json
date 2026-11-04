@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/regimen-drafts/999",
+  "request": null,
+  "status": 404,
+  "body": {
+    "error": "not_found"
+  }
+}

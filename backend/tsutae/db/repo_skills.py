@@ -183,6 +183,45 @@ def _version_row(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def insert_skill_version_row(
+    conn: sqlite3.Connection,
+    skill_name: str,
+    version: int,
+    content: str,
+    questions: list[Question] | None,
+    *,
+    approved_at: datetime | None = None,
+) -> None:
+    """版を1つ入れる。呼び出し側で write_transaction を開くこと（D4 の採用が同じ
+    トランザクションで regimen_forms も書くため）。
+
+    既にあれば同じ内容なら何もしない、違えば ValueError。
+    """
+    _validate_name(skill_name)
+    _validate_version("version", version)
+    if not isinstance(content, str):
+        raise ValueError("content は文字列")
+    questions_json = _questions_to_db(questions)
+    conn.execute(
+        f"INSERT INTO skill_versions ({_VERSION_COLUMNS}) VALUES (?, ?, ?, ?, ?)"
+        " ON CONFLICT (skill_name, version) DO NOTHING",
+        (
+            skill_name,
+            version,
+            content,
+            questions_json,
+            dt_to_db(approved_at if approved_at is not None else clock_now()),
+        ),
+    )
+    row = conn.execute(
+        "SELECT content, questions_json FROM skill_versions"
+        " WHERE skill_name = ? AND version = ?",
+        (skill_name, version),
+    ).fetchone()
+    if row["content"] != content or row["questions_json"] != questions_json:
+        raise ValueError(f"{skill_name}@{version} は既に別の内容で保存されている")
+
+
 def save_skill_version(
     conn: sqlite3.Connection,
     skill_name: str,
@@ -197,26 +236,10 @@ def save_skill_version(
     _validate_version("version", version)
     if not isinstance(content, str):
         raise ValueError("content は文字列")
-    questions_json = _questions_to_db(questions)
     with write_transaction(conn):
-        conn.execute(
-            f"INSERT INTO skill_versions ({_VERSION_COLUMNS}) VALUES (?, ?, ?, ?, ?)"
-            " ON CONFLICT (skill_name, version) DO NOTHING",
-            (
-                skill_name,
-                version,
-                content,
-                questions_json,
-                dt_to_db(approved_at if approved_at is not None else clock_now()),
-            ),
+        insert_skill_version_row(
+            conn, skill_name, version, content, questions, approved_at=approved_at
         )
-    row = conn.execute(
-        "SELECT content, questions_json FROM skill_versions"
-        " WHERE skill_name = ? AND version = ?",
-        (skill_name, version),
-    ).fetchone()
-    if row["content"] != content or row["questions_json"] != questions_json:
-        raise ValueError(f"{skill_name}@{version} は既に別の内容で保存されている")
 
 
 def get_skill_version(

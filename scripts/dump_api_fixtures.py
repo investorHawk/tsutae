@@ -38,8 +38,10 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTS_DIR = REPO_ROOT / "backend" / "tests"
-if str(TESTS_DIR) not in sys.path:
-    sys.path.insert(0, str(TESTS_DIR))
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+for _path in (TESTS_DIR, SCRIPTS_DIR):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 import httpx  # noqa: E402
 from api_helpers import (  # noqa: E402
@@ -49,6 +51,7 @@ from api_helpers import (  # noqa: E402
     seed_synthetic,
     set_patient_cookie,
 )
+from dump_api_regimen import regimen_drafts_flow  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from pipeline_fakes import (  # noqa: E402
@@ -139,6 +142,13 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/doctor/question-library"),
         ("POST", "/api/doctor/question-library"),
         ("DELETE", "/api/doctor/question-library/{}"),
+        ("POST", "/api/doctor/regimen-drafts"),
+        ("GET", "/api/doctor/regimen-drafts"),
+        ("GET", "/api/doctor/regimen-drafts/{}"),
+        ("PATCH", "/api/doctor/regimen-drafts/{}/fields"),
+        ("POST", "/api/doctor/regimen-drafts/{}/discard"),
+        ("GET", "/api/doctor/regimen-drafts/{}/preview"),
+        ("POST", "/api/doctor/regimen-drafts/{}/adopt"),
     }
 )
 
@@ -772,6 +782,7 @@ def _run(app: FastAPI, home: Path) -> Dump:
         _patient_admin_flow(rec)
         _skill_flow(rec, home)
         _question_library_flow(rec)
+        regimen_drafts_flow(rec)
         rec.call("doctor_logout", "POST", "/api/doctor/logout")
         return Dump(
             fixtures=dict(sorted(rec.fixtures.items())),

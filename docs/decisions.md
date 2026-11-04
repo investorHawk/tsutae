@@ -307,3 +307,34 @@
 | 削除は選択肢から外すだけ（hidden。行は残し、同じ key は作り直せない）。初期の6問と、どれかの版の `questions_json` が使っている key は外せない（409）。読めない `questions_json` は使っているとみなす | 部品集は小窓の候補で SKILL.md に影響しないが、同じ key を別の文で作り直すと過去の記録の意味がずれる。読めないときは安全側に倒す | 技術判断 |
 | API は本文の形の大枠の誤り（未知の鍵・型違い・極端な長さ）を 422 `invalid_input`、値の細かい誤りを 422 `{error, field}`（欄つき）、key の重複を 409 `key_taken` にする | 画面が欄ごとに赤枠を出せるように。既存の医師 API の 409 の慣例に合わせる | 技術判断 |
 | 並びは入れた時刻の順、同じ時刻の中は初期の6問の順。rowid だけには頼らない | VACUUM や移行（12-step）で表を作り直すと rowid が振り直されうる | 技術判断（検証者の指摘） |
+
+### T93 下書きと採用（2026-11-05）
+| 決定 | 理由 | 出どころ |
+|---|---|---|
+| 既存のレジメンに開いた（open・working）下書きがあるときの `POST /regimen-drafts {skill}` は 409 にせず、その下書きを返す（`created: false`）。DB は部分 UNIQUE 索引（regimen が NULL でなく open・working）で1つに保ち、同時に作られたら読み直して返す | 画面（T96）がタブを開き直すたびに 409 を扱わずに済む。1レジメンに1つの決まりは索引で守れる | 技術判断 |
+| `regimen_drafts.regimen` は識別名（`FOLFIRI-BV`）を持つ（Skill 名ではない）。新規の下書きは識別名の欄が入った時に埋まり、同じ索引で「開いている別の下書きと同じ識別名」を拒む | patients.regimen と同じ値で引ける（患者のいるレジメンの判定）。spec 9.1「既存の Skill・開いている別の下書きと同じなら欄のエラー」を索引と検査の2重で守る | 技術判断 |
+| PATCH の形は `{changes:[{field_id,value}], adds:[{section,row_id}], deletes:["<節>.<row_id>"]}`。当てる順は削除 → 追加 → 欄の変更。欄の id は T91 の `field_ids` の形。行の id は画面が決める（書式は `ROW_ID_PATTERN`）。同じ関数（`regimen.edit.apply_patch`）を T94 の `set_fields` が出どころを変えて使う | 欄の id を画面・Claude・検査で1つに揃える。行の id をサーバーが振ると、画面が足した行の出どころを引けない | 技術判断 |
+| 値を空にした欄（None・""・[]）と消した行の出どころは外す（doctor_edit を残さない） | 確認の画面の「削除」は欄を空にする直接編集（spec 9.1）。空の欄に doctor_edit が残ると、次の往復で Claude が埋め直せない | 技術判断 |
+| 検査に掛かった PATCH は 422 `{error:"invalid_fields", issues:[{field_id, code, message}]}`。H1 に掛かった欄も同じ形（code は identifier、message に入力の文面は入れない）で、保存しない。保存した下書きは常に `validate_form` を通っている | 画面が赤枠を欄ごとに出せる。下書きに入る文は全て H1 を通す（spec 9.1） | 技術判断 |
+| 識別名の変更は新規の下書きだけ（既存の版の下書きでは 422 `code_locked`）。体温の質問を無くす変更（行の削除・型の変更）は 422 `temperature_required` | spec 9.1（識別名は既存の版では変えられない・体温の質問は外せない） | 技術判断 |
+| 「患者のいるレジメンで日程を変えた」の判定は、版 N と下書きの 1コースの日数・点滴の Day の集合・ポンプ抜去日・内服の範囲（`build_schedule` の値）を比べる。薬の名前・薬の行の足し引きでも、この値が変わらなければ通す。患者の有無は `patients.regimen = 識別名` | 日付の言い方の表と過去のコースの Day が依存するのはこの値だけ | 技術判断 |
+| confirm_token は `正規化した form JSON` ＋ `正規化した出どころ` ＋ `base_version` の sha256（区切りは改行）。下書きの form_json も同じ正規化（キー順・区切りを固定した JSON）で保存する。照合は `hmac.compare_digest` | 照合の経路を1つにする | 技術判断 |
+| 採用で「確かめ」（`ai_values_confirmed: true`）を求めるのは AI の値（出どころ standard・doctor_text）が1つ以上あるときだけ。無ければ false でも採用できる | 確かめる対象が無いときに画面にチェックを出さずに済む。token の照合はいつも行う | 技術判断 |
+| 採用の検査で止める code: 409 は `token_mismatch`・`ai_values_unconfirmed`・`stale`・`schedule_locked`・`code_taken`・`working`・`not_open`・`busy`・`version_conflict`、422 は `invalid_form`（必須・値。issues つき）。採用の最後の UPDATE は「確かめた時と同じ form・出どころの open の下書き」に条件を付け、当たらなければ `token_mismatch` で全て巻き戻す | 確認の後のチャット・直接編集で値が変わった下書きを採用しない（spec 9.1） | 技術判断 |
+| 採用の書き順は旧 D4 の承認と同じ「ファイルが先・DB が後」。新規は `os.mkdir` で排他にフォルダを作り（`FileExistsError` は `code_taken`）、その中で Skill のロックを取って SKILL.md を原子的に置く。DB が落ちたらフォルダごと消す。既存はロックの内側で今の版を読み直し（違えば `stale`）、DB が落ちたら自分が書いた内容のときだけ元に戻す。原子的な書き込みは `skillchange/atomic.py` に出して承認と共有した | 識別名が取り残しで永久に使えなくならないように。今の承認の作りと同じ決まりにする | 技術判断 |
+| skill_versions・regimen_forms・部品集・下書きの状態は1つの write_transaction で書く。そのため `save_skill_version` の中身を `insert_skill_version_row`（トランザクションは呼び出し側）に分けた | `save_skill_version` は中で commit するので、そのまま呼ぶと同じトランザクションにならない | 技術判断 |
+| 部品集に入れるのは採用した版の3択の質問のうち部品集の検査（`validate_library_question`）を通るものだけ（origin=adopted、同じ key があれば何もしない）。体温は入れない。通らない質問は部品集に入れず、採用は止めない | 体温は初期の fever だけ（T92）。部品集は小窓の候補なので、採用そのものを止める理由にしない | 技術判断 |
+| `regimen_forms` には出どころを持たない。採用した版から版 N+1 の下書きを作るときは出どころが空から始まる | 採用の時に AI の値は確かめ済み。form だけで描画は決まる | 技術判断 |
+| 下書きの往復の回数・費用の列（architecture §2 の案にあった turns・cost_usd）は作らない。T94 は `PipelineLogger(conn, "regimen_chat", draft_id)` に回数・費用・秒を残す | 文面の無い数字はログに置く決まり（9c）。同じ数字を2か所に持たない | 技術判断 |
+| working のまま `regimen_turn_timeout_s`（既定 90、`TSUTAE_REGIMEN_TURN_TIMEOUT_S`）を過ぎた下書きは、下書きの API の読み出しの前に open に戻し、会話に `{role:"system", kind:"turn_failed", reason:"timeout", generation, at}` を足す。generation は上げない（遅れた結果は「working かつ同じ generation」の条件で捨てられる） | 再起動などで取り残された下書きが動かなくなるのを防ぐ。T94 の結果の反映の条件と食い違わない | 技術判断 |
+| `migrate_db` の対象は `TableMigration(table, is_outdated, create_sql, copy_sql=None)` の一覧。新しい CREATE 文は schema.sql から表名で引く。索引・トリガーは古い表の `sqlite_master` から控えて作り直す。今回は pipeline_logs（run_kind に regimen_chat）。Python 側の `RUN_KINDS` にも regimen_chat を足した | T95 は patients の1行を足すだけで同じ仕組みが使える。同じ CREATE 文を2か所に書かない | 技術判断 |
+| `load_regimen_skill` は識別名から `regimen-<小文字>` を引く（FOLFOX/CAPOX は今の対応のまま）。置かれていない識別名は今と同じ `unknown_regimen`。記録の版の解決（`pipeline/service.py` の `_parse_version`・`_scan_pairs` が FOLFOX/CAPOX 固定）は T95 で広げる | T93 は Skill を読む側だけ広げる（患者の regimen の型は T95）。既存のテスト（XELOX → unknown_regimen）を変えない | 技術判断 |
+| API の失敗の本文は `{error}` だけの決まりに、D4 レジメンの検査の失敗だけ `issues` を足す。frontend の `ApiError` に失敗の本文（`body`）を持たせ、`fieldIssuesOf(err)` で取り出す。PATCH を `http.ts` に足した | 画面（T96）が欄ごとの理由を出すため | 技術判断 |
+| 確認の印の照合は `hmac.compare_digest` を bytes（UTF-8）で行う。`confirm_token` の形（16進64桁）は API の入口で縛らない | str どうしの compare_digest は ASCII 以外で TypeError（500）になる。形で縛ると「印が違う」が 422 と 409 に分かれ、画面の扱いが2つになる | 検証の指摘 |
+| 採用は、書き込みのトランザクションの中（最初の INSERT で書き込みのロックを取った後）で「患者のいるレジメンで日程を変えていない」をもう一度確かめる。最後の UPDATE が当たらなければ、下書きを読み直して `working`・`not_open`、どちらでもなければ `token_mismatch` を返す | 確かめた後に患者が入った・別のタブが破棄した場合に、患者のいるレジメンの日程を変えない／本当の理由を画面に出す | 検証の指摘 |
+| PATCH の書き込みは「読んだ時と同じ form_json・sources_json」に条件を付ける（`update_draft_form` の `expected_*`）。当たらなければ 409 `conflict`（画面は読み直す） | T94 の往復の結果が PATCH の読みと書きの間に入ったとき、AI の値を黙って消さない | 検証の指摘 |
+| working から戻す条件に「working_since が今より先」「working_since が無い」を足す | TSUTAE_TODAY の時計はプロセスの起動を基準にするので、起動し直すと過去に戻り、取り残された下書きが長く 409 のままになる | 検証の指摘 |
+| 「ファイルが先・DB が後」のクラッシュ窓（SKILL.md を置いた後・commit の前に落ちる）は、起動時の `recover_interrupted_adoptions` で補う: 開いた下書きを今の値で描いた文が、`ensure_skill_versions` が登録した版の文とバイトで一致するときだけ regimen_forms・部品集・adopted を1つのトランザクションで書く。一致しなければ補わず警告（Skill 名・版・下書きの id）。新規で SKILL.md の無いフォルダが残れば、書き込みの一時ファイルだけのときに消す | 旧 D4 の承認は ensure_skill_versions だけで戻るが、D4 レジメンは regimen_forms が欠けると既存は form_unavailable・新規は code_taken で二度と開けない。描画は純関数なので、一致すれば「その下書きを採用した」と言える | 検証の指摘 |
+| 回復は下書きごとに例外を捕まえ、読めない下書きがあっても起動を止めない（警告は下書きの id と例外の型名だけ）。回復でも「患者のいるレジメンの日程の変更」はやり直して確定しない。警告（`regimen.recover_mismatch`・`recover_skipped`・`recover_failed`）が出たときは手で戻す: 下書きを破棄し、SKILL.md を `skill_versions` の前の版の文に戻す（または その版の form を regimen_forms に入れる）。旧 D4 で regimen-* に版が足された場合の誤った警告は T95 の制限（`use_regimen_editor`）で起きなくなる | `ensure_skill_versions` と同じ「起動を止めない」方針。adopt が断る版を回復が通すと決まりが崩れる | 確かめ直しの指摘 |
+| 新規の採用の後始末は SKILL.md と書き込みの一時ファイルだけを消す。他のファイル（.DS_Store など）があればフォルダを残し、警告に名前を残す（先生が手で片付ける）。新規の SKILL.md の書き込みの OSError は既存と同じ `write_error` | 自分の書いていないファイルは消さない。失敗の code を新規と既存でそろえる | 検証の指摘 |
+| 「同じ generation のときだけ往復の結果を反映する」書き込みと、回復の上限に余裕（往復の上限＋数秒）を足すことは T94 で行う（今は回復の上限＝`regimen_turn_timeout_s`） | 往復の結果を書く関数が T94 にしか無い。既定の 90 秒は設定のテストで固定している | 検証の指摘（T94 へ送る） |

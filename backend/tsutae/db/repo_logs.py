@@ -17,7 +17,7 @@ from typing import Any
 from tsutae.config import now as clock_now
 from tsutae.db.connection import dt_from_db, dt_to_db, write_transaction
 
-RUN_KINDS = ("visit", "skill_change")
+RUN_KINDS = ("visit", "skill_change", "regimen_chat")
 IDENTIFIER_MAX = 100
 IDENTIFIER_PATTERN = re.compile(rf"[A-Za-z0-9_.:/@-]{{1,{IDENTIFIER_MAX}}}")
 

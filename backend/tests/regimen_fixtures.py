@@ -237,3 +237,30 @@ EXTRA_REGIMENS = {
 
 def extra_form(name: str) -> RegimenForm:
     return RegimenForm.model_validate(EXTRA_REGIMENS[name]())
+
+
+def fill_patch(base: RegimenForm, target: RegimenForm) -> Any:
+    """base（新しい下書きの空のフォーム）を target の値にする FormPatch（テスト用）。
+
+    base の行を全て消して target の行を同じ順に足し、全ての欄（識別名を含む）を target の
+    値にする（行の並びも target と同じになる）。
+    """
+    from tsutae.regimen.edit import FieldChange, FormPatch, RowAdd
+    from tsutae.regimen.form import field_ids
+
+    sections = ("drugs", "side_effects", "questions")
+    deletes = tuple(f"{s}.{r.row_id}" for s in sections for r in getattr(base, s))
+    adds = tuple(RowAdd(s, r.row_id) for s in sections for r in getattr(target, s))
+    data = target.model_dump(mode="json")
+    changes = []
+    for fid in field_ids(target):
+        parts = fid.split(".")
+        if len(parts) == 1:
+            value = data[parts[0]]
+        elif len(parts) == 2:
+            value = data[parts[0]][parts[1]]
+        else:
+            row = next(r for r in data[parts[0]] if r["row_id"] == parts[1])
+            value = row[parts[2]]
+        changes.append(FieldChange(fid, value))
+    return FormPatch(changes=tuple(changes), adds=adds, deletes=deletes)

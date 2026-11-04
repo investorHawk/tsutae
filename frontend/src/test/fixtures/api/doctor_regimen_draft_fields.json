@@ -1,0 +1,699 @@
+{
+  "method": "PATCH",
+  "path": "/api/doctor/regimen-drafts/1/fields",
+  "request": {
+    "changes": [
+      {
+        "field_id": "basic.display_name",
+        "value": "FOLFIRI＋BV"
+      },
+      {
+        "field_id": "basic.code",
+        "value": "FOLFIRI-BV"
+      },
+      {
+        "field_id": "basic.target",
+        "value": "大腸がん"
+      },
+      {
+        "field_id": "basic.cycle_days",
+        "value": 14
+      },
+      {
+        "field_id": "drugs.d-bv.name",
+        "value": "ベバシズマブ"
+      },
+      {
+        "field_id": "drugs.d-bv.route",
+        "value": "infusion"
+      },
+      {
+        "field_id": "drugs.d-bv.days",
+        "value": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ]
+      },
+      {
+        "field_id": "drugs.d-bv.times_per_day",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-bv.start_note",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-iri.name",
+        "value": "イリノテカン"
+      },
+      {
+        "field_id": "drugs.d-iri.route",
+        "value": "infusion"
+      },
+      {
+        "field_id": "drugs.d-iri.days",
+        "value": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ]
+      },
+      {
+        "field_id": "drugs.d-iri.times_per_day",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-iri.start_note",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-lv.name",
+        "value": "レボホリナート"
+      },
+      {
+        "field_id": "drugs.d-lv.route",
+        "value": "infusion"
+      },
+      {
+        "field_id": "drugs.d-lv.days",
+        "value": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ]
+      },
+      {
+        "field_id": "drugs.d-lv.times_per_day",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-lv.start_note",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-fu.name",
+        "value": "フルオロウラシル（急速静注）"
+      },
+      {
+        "field_id": "drugs.d-fu.route",
+        "value": "infusion"
+      },
+      {
+        "field_id": "drugs.d-fu.days",
+        "value": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ]
+      },
+      {
+        "field_id": "drugs.d-fu.times_per_day",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-fu.start_note",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-fu-pump.name",
+        "value": "フルオロウラシル（46時間）"
+      },
+      {
+        "field_id": "drugs.d-fu-pump.route",
+        "value": "pump"
+      },
+      {
+        "field_id": "drugs.d-fu-pump.days",
+        "value": [
+          {
+            "start": 1,
+            "end": 3
+          }
+        ]
+      },
+      {
+        "field_id": "drugs.d-fu-pump.times_per_day",
+        "value": null
+      },
+      {
+        "field_id": "drugs.d-fu-pump.start_note",
+        "value": null
+      },
+      {
+        "field_id": "side_effects.se-diarrhea.phrases",
+        "value": [
+          "下痢",
+          "お腹がゆるい"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-diarrhea.ctcae_terms",
+        "value": [
+          "下痢"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-diarrhea.question_key",
+        "value": "diarrhea"
+      },
+      {
+        "field_id": "side_effects.se-nausea_appetite.phrases",
+        "value": [
+          "吐き気",
+          "吐いた",
+          "食欲がない"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-nausea_appetite.ctcae_terms",
+        "value": [
+          "悪心",
+          "嘔吐",
+          "食欲不振"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-nausea_appetite.question_key",
+        "value": "nausea_appetite"
+      },
+      {
+        "field_id": "side_effects.se-stomatitis.phrases",
+        "value": [
+          "口内炎",
+          "口の中が痛い"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-stomatitis.ctcae_terms",
+        "value": [
+          "口腔粘膜炎",
+          "口腔内痛"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-stomatitis.question_key",
+        "value": "stomatitis"
+      },
+      {
+        "field_id": "side_effects.se-fatigue.phrases",
+        "value": [
+          "だるい",
+          "疲れやすい"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-fatigue.ctcae_terms",
+        "value": [
+          "疲労",
+          "倦怠感"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-fatigue.question_key",
+        "value": "fatigue"
+      },
+      {
+        "field_id": "side_effects.se-bleeding.phrases",
+        "value": [
+          "鼻血が出た"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-bleeding.ctcae_terms",
+        "value": [
+          "鼻出血"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-bleeding.question_key",
+        "value": "bleeding"
+      },
+      {
+        "field_id": "side_effects.se-fever.phrases",
+        "value": [
+          "熱が出た"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-fever.ctcae_terms",
+        "value": [
+          "発熱"
+        ]
+      },
+      {
+        "field_id": "side_effects.se-fever.question_key",
+        "value": "fever"
+      },
+      {
+        "field_id": "questions.q-diarrhea.key",
+        "value": "diarrhea"
+      },
+      {
+        "field_id": "questions.q-diarrhea.label",
+        "value": "下痢"
+      },
+      {
+        "field_id": "questions.q-diarrhea.text",
+        "value": "下痢はありましたか"
+      },
+      {
+        "field_id": "questions.q-diarrhea.answer_type",
+        "value": "three_level"
+      },
+      {
+        "field_id": "questions.q-nausea_appetite.key",
+        "value": "nausea_appetite"
+      },
+      {
+        "field_id": "questions.q-nausea_appetite.label",
+        "value": "吐き気・食欲"
+      },
+      {
+        "field_id": "questions.q-nausea_appetite.text",
+        "value": "吐き気や食欲の落ち込みはありましたか"
+      },
+      {
+        "field_id": "questions.q-nausea_appetite.answer_type",
+        "value": "three_level"
+      },
+      {
+        "field_id": "questions.q-stomatitis.key",
+        "value": "stomatitis"
+      },
+      {
+        "field_id": "questions.q-stomatitis.label",
+        "value": "口内炎"
+      },
+      {
+        "field_id": "questions.q-stomatitis.text",
+        "value": "口の中の痛みや口内炎はありましたか"
+      },
+      {
+        "field_id": "questions.q-stomatitis.answer_type",
+        "value": "three_level"
+      },
+      {
+        "field_id": "questions.q-fatigue.key",
+        "value": "fatigue"
+      },
+      {
+        "field_id": "questions.q-fatigue.label",
+        "value": "だるさ"
+      },
+      {
+        "field_id": "questions.q-fatigue.text",
+        "value": "だるさや疲れやすさはありましたか"
+      },
+      {
+        "field_id": "questions.q-fatigue.answer_type",
+        "value": "three_level"
+      },
+      {
+        "field_id": "questions.q-bleeding.key",
+        "value": "bleeding"
+      },
+      {
+        "field_id": "questions.q-bleeding.label",
+        "value": "出血"
+      },
+      {
+        "field_id": "questions.q-bleeding.text",
+        "value": "鼻血や歯ぐきからの出血はありましたか"
+      },
+      {
+        "field_id": "questions.q-bleeding.answer_type",
+        "value": "three_level"
+      },
+      {
+        "field_id": "questions.q-fever.key",
+        "value": "fever"
+      },
+      {
+        "field_id": "questions.q-fever.label",
+        "value": "体温"
+      },
+      {
+        "field_id": "questions.q-fever.text",
+        "value": "熱を測りましたか"
+      },
+      {
+        "field_id": "questions.q-fever.answer_type",
+        "value": "temperature"
+      },
+      {
+        "field_id": "notes",
+        "value": ""
+      }
+    ],
+    "adds": [
+      {
+        "section": "drugs",
+        "row_id": "d-bv"
+      },
+      {
+        "section": "drugs",
+        "row_id": "d-iri"
+      },
+      {
+        "section": "drugs",
+        "row_id": "d-lv"
+      },
+      {
+        "section": "drugs",
+        "row_id": "d-fu"
+      },
+      {
+        "section": "drugs",
+        "row_id": "d-fu-pump"
+      },
+      {
+        "section": "side_effects",
+        "row_id": "se-diarrhea"
+      },
+      {
+        "section": "side_effects",
+        "row_id": "se-nausea_appetite"
+      },
+      {
+        "section": "side_effects",
+        "row_id": "se-stomatitis"
+      },
+      {
+        "section": "side_effects",
+        "row_id": "se-fatigue"
+      },
+      {
+        "section": "side_effects",
+        "row_id": "se-bleeding"
+      },
+      {
+        "section": "side_effects",
+        "row_id": "se-fever"
+      },
+      {
+        "section": "questions",
+        "row_id": "q-diarrhea"
+      },
+      {
+        "section": "questions",
+        "row_id": "q-nausea_appetite"
+      },
+      {
+        "section": "questions",
+        "row_id": "q-stomatitis"
+      },
+      {
+        "section": "questions",
+        "row_id": "q-fatigue"
+      },
+      {
+        "section": "questions",
+        "row_id": "q-bleeding"
+      },
+      {
+        "section": "questions",
+        "row_id": "q-fever"
+      }
+    ],
+    "deletes": [
+      "questions.q-fever"
+    ]
+  },
+  "status": 200,
+  "body": {
+    "draft": {
+      "id": 1,
+      "regimen": "FOLFIRI-BV",
+      "skill_name": "regimen-folfiri-bv",
+      "display_name": "FOLFIRI＋BV",
+      "base_version": null,
+      "version": 1,
+      "status": "open",
+      "updated_at": "2026-11-09T10:00:00+09:00",
+      "generation": 0,
+      "form": {
+        "basic": {
+          "display_name": "FOLFIRI＋BV",
+          "code": "FOLFIRI-BV",
+          "target": "大腸がん",
+          "cycle_days": 14
+        },
+        "drugs": [
+          {
+            "row_id": "d-bv",
+            "name": "ベバシズマブ",
+            "route": "infusion",
+            "days": [
+              {
+                "start": 1,
+                "end": 1
+              }
+            ],
+            "times_per_day": null,
+            "start_note": null
+          },
+          {
+            "row_id": "d-iri",
+            "name": "イリノテカン",
+            "route": "infusion",
+            "days": [
+              {
+                "start": 1,
+                "end": 1
+              }
+            ],
+            "times_per_day": null,
+            "start_note": null
+          },
+          {
+            "row_id": "d-lv",
+            "name": "レボホリナート",
+            "route": "infusion",
+            "days": [
+              {
+                "start": 1,
+                "end": 1
+              }
+            ],
+            "times_per_day": null,
+            "start_note": null
+          },
+          {
+            "row_id": "d-fu",
+            "name": "フルオロウラシル（急速静注）",
+            "route": "infusion",
+            "days": [
+              {
+                "start": 1,
+                "end": 1
+              }
+            ],
+            "times_per_day": null,
+            "start_note": null
+          },
+          {
+            "row_id": "d-fu-pump",
+            "name": "フルオロウラシル（46時間）",
+            "route": "pump",
+            "days": [
+              {
+                "start": 1,
+                "end": 3
+              }
+            ],
+            "times_per_day": null,
+            "start_note": null
+          }
+        ],
+        "side_effects": [
+          {
+            "row_id": "se-diarrhea",
+            "phrases": [
+              "下痢",
+              "お腹がゆるい"
+            ],
+            "ctcae_terms": [
+              "下痢"
+            ],
+            "question_key": "diarrhea"
+          },
+          {
+            "row_id": "se-nausea_appetite",
+            "phrases": [
+              "吐き気",
+              "吐いた",
+              "食欲がない"
+            ],
+            "ctcae_terms": [
+              "悪心",
+              "嘔吐",
+              "食欲不振"
+            ],
+            "question_key": "nausea_appetite"
+          },
+          {
+            "row_id": "se-stomatitis",
+            "phrases": [
+              "口内炎",
+              "口の中が痛い"
+            ],
+            "ctcae_terms": [
+              "口腔粘膜炎",
+              "口腔内痛"
+            ],
+            "question_key": "stomatitis"
+          },
+          {
+            "row_id": "se-fatigue",
+            "phrases": [
+              "だるい",
+              "疲れやすい"
+            ],
+            "ctcae_terms": [
+              "疲労",
+              "倦怠感"
+            ],
+            "question_key": "fatigue"
+          },
+          {
+            "row_id": "se-bleeding",
+            "phrases": [
+              "鼻血が出た"
+            ],
+            "ctcae_terms": [
+              "鼻出血"
+            ],
+            "question_key": "bleeding"
+          },
+          {
+            "row_id": "se-fever",
+            "phrases": [
+              "熱が出た"
+            ],
+            "ctcae_terms": [
+              "発熱"
+            ],
+            "question_key": "fever"
+          }
+        ],
+        "questions": [
+          {
+            "row_id": "q-diarrhea",
+            "key": "diarrhea",
+            "label": "下痢",
+            "text": "下痢はありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-nausea_appetite",
+            "key": "nausea_appetite",
+            "label": "吐き気・食欲",
+            "text": "吐き気や食欲の落ち込みはありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-stomatitis",
+            "key": "stomatitis",
+            "label": "口内炎",
+            "text": "口の中の痛みや口内炎はありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-fatigue",
+            "key": "fatigue",
+            "label": "だるさ",
+            "text": "だるさや疲れやすさはありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-bleeding",
+            "key": "bleeding",
+            "label": "出血",
+            "text": "鼻血や歯ぐきからの出血はありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-fever",
+            "key": "fever",
+            "label": "体温",
+            "text": "熱を測りましたか",
+            "answer_type": "temperature"
+          }
+        ],
+        "notes": ""
+      },
+      "sources": {
+        "basic.code": "doctor_edit",
+        "basic.cycle_days": "doctor_edit",
+        "basic.display_name": "doctor_edit",
+        "basic.target": "doctor_edit",
+        "drugs.d-bv.days": "doctor_edit",
+        "drugs.d-bv.name": "doctor_edit",
+        "drugs.d-bv.route": "doctor_edit",
+        "drugs.d-fu-pump.days": "doctor_edit",
+        "drugs.d-fu-pump.name": "doctor_edit",
+        "drugs.d-fu-pump.route": "doctor_edit",
+        "drugs.d-fu.days": "doctor_edit",
+        "drugs.d-fu.name": "doctor_edit",
+        "drugs.d-fu.route": "doctor_edit",
+        "drugs.d-iri.days": "doctor_edit",
+        "drugs.d-iri.name": "doctor_edit",
+        "drugs.d-iri.route": "doctor_edit",
+        "drugs.d-lv.days": "doctor_edit",
+        "drugs.d-lv.name": "doctor_edit",
+        "drugs.d-lv.route": "doctor_edit",
+        "questions.q-bleeding.answer_type": "doctor_edit",
+        "questions.q-bleeding.key": "doctor_edit",
+        "questions.q-bleeding.label": "doctor_edit",
+        "questions.q-bleeding.text": "doctor_edit",
+        "questions.q-diarrhea.answer_type": "doctor_edit",
+        "questions.q-diarrhea.key": "doctor_edit",
+        "questions.q-diarrhea.label": "doctor_edit",
+        "questions.q-diarrhea.text": "doctor_edit",
+        "questions.q-fatigue.answer_type": "doctor_edit",
+        "questions.q-fatigue.key": "doctor_edit",
+        "questions.q-fatigue.label": "doctor_edit",
+        "questions.q-fatigue.text": "doctor_edit",
+        "questions.q-fever.answer_type": "doctor_edit",
+        "questions.q-fever.key": "doctor_edit",
+        "questions.q-fever.label": "doctor_edit",
+        "questions.q-fever.text": "doctor_edit",
+        "questions.q-nausea_appetite.answer_type": "doctor_edit",
+        "questions.q-nausea_appetite.key": "doctor_edit",
+        "questions.q-nausea_appetite.label": "doctor_edit",
+        "questions.q-nausea_appetite.text": "doctor_edit",
+        "questions.q-stomatitis.answer_type": "doctor_edit",
+        "questions.q-stomatitis.key": "doctor_edit",
+        "questions.q-stomatitis.label": "doctor_edit",
+        "questions.q-stomatitis.text": "doctor_edit",
+        "side_effects.se-bleeding.ctcae_terms": "doctor_edit",
+        "side_effects.se-bleeding.phrases": "doctor_edit",
+        "side_effects.se-bleeding.question_key": "doctor_edit",
+        "side_effects.se-diarrhea.ctcae_terms": "doctor_edit",
+        "side_effects.se-diarrhea.phrases": "doctor_edit",
+        "side_effects.se-diarrhea.question_key": "doctor_edit",
+        "side_effects.se-fatigue.ctcae_terms": "doctor_edit",
+        "side_effects.se-fatigue.phrases": "doctor_edit",
+        "side_effects.se-fatigue.question_key": "doctor_edit",
+        "side_effects.se-fever.ctcae_terms": "doctor_edit",
+        "side_effects.se-fever.phrases": "doctor_edit",
+        "side_effects.se-fever.question_key": "doctor_edit",
+        "side_effects.se-nausea_appetite.ctcae_terms": "doctor_edit",
+        "side_effects.se-nausea_appetite.phrases": "doctor_edit",
+        "side_effects.se-nausea_appetite.question_key": "doctor_edit",
+        "side_effects.se-stomatitis.ctcae_terms": "doctor_edit",
+        "side_effects.se-stomatitis.phrases": "doctor_edit",
+        "side_effects.se-stomatitis.question_key": "doctor_edit"
+      },
+      "chat": [],
+      "missing": [],
+      "schedule_locked": false,
+      "created_at": "2026-11-09T10:00:00+09:00"
+    }
+  }
+}

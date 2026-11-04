@@ -35,6 +35,7 @@ from tsutae.db.repo_patients import (
     get_patient,
     list_courses,
     list_patients,
+    regimen_has_patients,
     upsert_course,
 )
 from tsutae.db.repo_question_library import (
@@ -51,6 +52,7 @@ from tsutae.db.repo_skills import (
     create_skill_change,
     get_skill_change,
     get_skill_version,
+    insert_skill_version_row,
     latest_skill_version,
     list_skill_changes,
     save_skill_version,
@@ -100,6 +102,7 @@ __all__ = [
     "get_visit",
     "hide_library_question",
     "init_db",
+    "insert_skill_version_row",
     "latest_skill_version",
     "list_courses",
     "list_doctor_masks",
@@ -113,6 +116,7 @@ __all__ = [
     "list_visits",
     "mark_printed",
     "purge_expired",
+    "regimen_has_patients",
     "save_doctor_masks",
     "save_report",
     "save_skill_version",

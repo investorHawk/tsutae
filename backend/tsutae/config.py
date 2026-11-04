@@ -56,6 +56,8 @@ class Settings:
     pipeline_max_budget_usd: float
     skills_dir: Path
     public_base_url: str
+    # D4 レジメンの Claude の1往復の上限（秒。T94）。working のまま過ぎた下書きは open に戻す
+    regimen_turn_timeout_s: float = 90.0
 
 
 def get_settings() -> Settings:
@@ -74,6 +76,9 @@ def get_settings() -> Settings:
         skills_dir=Path(os.environ.get("TSUTAE_SKILLS_DIR", str(SKILLS_DIR))),
         public_base_url=os.environ.get(
             "TSUTAE_PUBLIC_BASE_URL", "http://localhost:5173"
+        ),
+        regimen_turn_timeout_s=float(
+            os.environ.get("TSUTAE_REGIMEN_TURN_TIMEOUT_S", "90")
         ),
     )
 

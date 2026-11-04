@@ -1,0 +1,57 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/regimen-drafts/2/preview",
+  "request": null,
+  "status": 200,
+  "body": {
+    "draft_id": 2,
+    "skill_name": "regimen-capox",
+    "base_version": 1,
+    "version": 2,
+    "ai_values": [],
+    "skill_md": {
+      "kind": "diff",
+      "text": "--- a/regimen-capox/SKILL.md\n+++ b/regimen-capox/SKILL.md\n@@ -1,7 +1,7 @@\n ---\n name: regimen-capox\n description: CAPOX の投与スケジュール・クローズ質問集・固定規則。記録の変換時に使う\n-version: 1\n+version: 2\n regimen: CAPOX\n cycle_days: 21\n pump_removal_day: null\n@@ -130,3 +130,7 @@\n - 質問を足すときは新しい `key`（英小文字で始まり、英小文字・数字・下線）を作る。既存の `key` を別の意味に使い回さない（過去の記録がその key を指している）\n - 質問文は患者の画面にそのまま出る。助言や説明の文を混ぜない\n - `fixed_rules` の `question_key` は `questions` にある key だけ\n+\n+## 10. 補足の指示（施設の決まり）\n+\n+施設の決まりを書く欄\n"
+    },
+    "patient_preview": [
+      {
+        "key": "numbness",
+        "label": "しびれ",
+        "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "diarrhea",
+        "label": "下痢",
+        "text": "下痢はありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "stomatitis",
+        "label": "口内炎",
+        "text": "口の中の痛みや口内炎はありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "nausea_appetite",
+        "label": "吐き気・食欲",
+        "text": "吐き気や食欲の落ち込みはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "hand_foot",
+        "label": "手のひら・足の裏",
+        "text": "手のひらや足の裏の赤み・痛み・ひび割れはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "key": "fever",
+        "label": "体温",
+        "text": "熱を測りましたか",
+        "answer_type": "temperature"
+      }
+    ],
+    "issues": [],
+    "confirm_token": "2c294fe9c82db578d303f8f3fd1599418d7560bc3db1b62edc87c501ac086647"
+  }
+}

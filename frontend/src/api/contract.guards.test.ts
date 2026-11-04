@@ -8,6 +8,13 @@ import { describe, expect, it } from "vitest";
 import { apiFixture, fixtureBody, fixtureNames } from "../test/apiFixtures";
 import { validatePatientStrings } from "../strings/PatientStrings";
 import {
+  isAdoptRegimenResponse,
+  isCreateRegimenDraftResponse,
+  isRegimenDraftResponse,
+  isRegimenDraftsResponse,
+  isRegimenPreviewResponse,
+} from "./regimenGuards";
+import {
   isAddLibraryQuestionResponse,
   isApproveResponse,
   isCoursesResponse,
@@ -84,6 +91,16 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_question_library: isQuestionLibraryResponse,
   doctor_question_library_add: isAddLibraryQuestionResponse,
   doctor_question_library_hide: isDoctorOk,
+  doctor_regimen_drafts: isRegimenDraftsResponse,
+  doctor_regimen_draft: isRegimenDraftResponse,
+  doctor_regimen_draft_create: isCreateRegimenDraftResponse,
+  doctor_regimen_draft_create_existing: isCreateRegimenDraftResponse,
+  doctor_regimen_draft_fields: isRegimenDraftResponse,
+  doctor_regimen_draft_fields_existing: isRegimenDraftResponse,
+  doctor_regimen_draft_preview: isRegimenPreviewResponse,
+  doctor_regimen_draft_preview_diff: isRegimenPreviewResponse,
+  doctor_regimen_draft_adopt: isAdoptRegimenResponse,
+  doctor_regimen_draft_discard: isDoctorOk,
 };
 
 function guardOf(name: string): Guard {
@@ -117,6 +134,67 @@ type Mutate = (body: any) => void;
 
 /** [fixture, 壊し方の説明, 壊す操作]。壊した本文は guard に拒まれる。 */
 const BROKEN: Array<[string, string, Mutate]> = [
+  // D4 レジメンの下書き（v1.1）
+  ["doctor_regimen_drafts", "未知の状態", (b) => (b.drafts[0].status = "x")],
+  ["doctor_regimen_drafts", "version が 0", (b) => (b.drafts[0].version = 0)],
+  [
+    "doctor_regimen_drafts",
+    "updated_at に時差が無い",
+    (b) => (b.drafts[0].updated_at = "2026-11-09T10:00:00"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "regimen が無い（null でなく省略）",
+    (b) => delete b.draft.regimen,
+  ],
+  [
+    "doctor_regimen_draft",
+    "未知の出どころ",
+    (b) => (b.draft.sources["basic.code"] = "ai"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "未知の経路",
+    (b) => (b.draft.form.drugs[0].route = "iv"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "Day の範囲が数でない",
+    (b) => (b.draft.form.drugs[0].days[0].start = "1"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "描画用の文 prose が出ている",
+    (b) => (b.draft.form.prose = {}),
+  ],
+  [
+    "doctor_regimen_draft",
+    "schedule_locked が無い",
+    (b) => delete b.draft.schedule_locked,
+  ],
+  ["doctor_regimen_draft_create", "created が無い", (b) => delete b.created],
+  [
+    "doctor_regimen_draft_preview",
+    "AI の値の出どころが doctor_edit",
+    (b) => (b.ai_values[0].source = "doctor_edit"),
+  ],
+  [
+    "doctor_regimen_draft_preview",
+    "検査の結果があるのに SKILL.md がある",
+    (b) => (b.issues = [{ field_id: "notes", code: "x", message: "x" }]),
+  ],
+  [
+    "doctor_regimen_draft_preview",
+    "confirm_token の形が違う",
+    (b) => (b.confirm_token = "abc"),
+  ],
+  [
+    "doctor_regimen_draft_preview_diff",
+    "SKILL.md の種類が未知",
+    (b) => (b.skill_md.kind = "patch"),
+  ],
+  ["doctor_regimen_draft_adopt", "ok が false", (b) => (b.ok = false)],
+  ["doctor_regimen_draft_adopt", "version が無い", (b) => delete b.version],
   // 質問の部品集（v1.1）
   [
     "doctor_question_library",

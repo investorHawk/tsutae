@@ -87,11 +87,13 @@ def test_generation_is_deterministic(
 def test_envelopes_have_the_same_shape(generated: dict[str, Any]) -> None:
     for name, envelope in generated.items():
         assert set(envelope) == ENVELOPE_KEYS, name
-        assert envelope["method"] in ("GET", "POST", "DELETE"), name
+        assert envelope["method"] in ("GET", "POST", "PATCH", "DELETE"), name
         assert envelope["path"].startswith("/api/"), name
         assert isinstance(envelope["status"], int), name
         if envelope["status"] >= 400:
-            assert set(envelope["body"]) == {"error"}, name
+            # D4 レジメンの検査の失敗だけは欄の id と理由（issues）を添える
+            keys = set(envelope["body"])
+            assert keys in ({"error"}, {"error", "issues"}), name
 
 
 def test_json_routes_match_the_app(script: ModuleType, tmp_path: Path) -> None:
@@ -130,6 +132,10 @@ def test_representative_failures(generated: dict[str, Any]) -> None:
         (409, "not_pending"),
         (422, "invalid_input"),
         (400, "invalid_name"),
+        (409, "token_mismatch"),
+        (409, "ai_values_unconfirmed"),
+        (409, "not_open"),
+        (422, "invalid_fields"),
     }
 
 

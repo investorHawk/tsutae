@@ -45,3 +45,10 @@ def test_fixed_today_clock_moves_forward(monkeypatch) -> None:
     real[0] = real[0] + timedelta(hours=2)
     assert config.now() == datetime(2026, 11, 10, 1, 0, tzinfo=config.JST)
     assert config.today() == date(2026, 11, 10)
+
+
+def test_regimen_turn_timeout_default_and_env(monkeypatch) -> None:
+    monkeypatch.delenv("TSUTAE_REGIMEN_TURN_TIMEOUT_S", raising=False)
+    assert config.get_settings().regimen_turn_timeout_s == 90.0
+    monkeypatch.setenv("TSUTAE_REGIMEN_TURN_TIMEOUT_S", "45")
+    assert config.get_settings().regimen_turn_timeout_s == 45.0

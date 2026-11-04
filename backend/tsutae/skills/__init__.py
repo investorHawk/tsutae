@@ -15,6 +15,7 @@ from tsutae.skills.loader import (
     load_skill,
     parse_skill_md,
     read_skill_text,
+    regimen_skill_name,
     skill_path,
     validate_skill_text,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "load_skill",
     "parse_skill_md",
     "read_skill_text",
+    "regimen_skill_name",
     "skill_path",
     "validate_skill_text",
 ]

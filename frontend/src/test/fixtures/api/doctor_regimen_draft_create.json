@@ -1,0 +1,73 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/regimen-drafts",
+  "request": {
+    "from": "new"
+  },
+  "status": 200,
+  "body": {
+    "draft": {
+      "id": 1,
+      "regimen": null,
+      "skill_name": null,
+      "display_name": null,
+      "base_version": null,
+      "version": 1,
+      "status": "open",
+      "updated_at": "2026-11-09T10:00:00+09:00",
+      "generation": 0,
+      "form": {
+        "basic": {
+          "display_name": null,
+          "code": null,
+          "target": null,
+          "cycle_days": null
+        },
+        "drugs": [],
+        "side_effects": [],
+        "questions": [
+          {
+            "row_id": "q-fever",
+            "key": "fever",
+            "label": "体温",
+            "text": "熱を測りましたか",
+            "answer_type": "temperature"
+          }
+        ],
+        "notes": ""
+      },
+      "sources": {},
+      "chat": [],
+      "missing": [
+        {
+          "field_id": "basic.display_name",
+          "code": "required",
+          "message": "入力が要る"
+        },
+        {
+          "field_id": "basic.code",
+          "code": "required",
+          "message": "入力が要る"
+        },
+        {
+          "field_id": "basic.cycle_days",
+          "code": "required",
+          "message": "入力が要る"
+        },
+        {
+          "field_id": "drugs",
+          "code": "required",
+          "message": "薬を1剤以上入れる"
+        },
+        {
+          "field_id": "side_effects",
+          "code": "required",
+          "message": "注意する症状を1つ以上入れる"
+        }
+      ],
+      "schedule_locked": false,
+      "created_at": "2026-11-09T10:00:00+09:00"
+    },
+    "created": true
+  }
+}

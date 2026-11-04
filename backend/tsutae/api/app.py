@@ -17,7 +17,7 @@
   （稼働中に生成が DB を開けずに抜けた受診を、再起動を待たずに回収する）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
 - 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`・
-  `tsutae.api.doctor_question_library`）は、モジュールがあれば
+  `tsutae.api.doctor_question_library`・`tsutae.api.doctor_regimen_drafts`）は、モジュールがあれば
   `router` を載せる（無ければ飛ばす。中の import の失敗は隠さない）
 - モジュールの `app` は初めて参照されたときに作る（`.env` もそのとき読む）
 """
@@ -45,6 +45,7 @@ from tsutae.api.settings_check import check_settings
 from tsutae.config import Settings, get_settings, load_env_file, now
 from tsutae.pipeline.runner import SdkRunner
 from tsutae.pipeline.service import ensure_skill_versions
+from tsutae.regimen.recover import recover_interrupted_adoptions
 
 __all__ = [
     "OPTIONAL_ROUTERS",
@@ -58,6 +59,7 @@ OPTIONAL_ROUTERS = (
     "tsutae.api.doctor",
     "tsutae.api.doctor_skills",
     "tsutae.api.doctor_question_library",
+    "tsutae.api.doctor_regimen_drafts",
 )
 SKILLCHANGE_MODULE = "tsutae.skillchange"
 PURGE_INTERVAL_S = 600.0
@@ -72,6 +74,9 @@ def startup(settings: Settings) -> int:
         db.init_db(conn)
         ensure_skill_versions(conn, settings.skills_dir)
         db.seed_question_library(conn)
+        recovered = recover_interrupted_adoptions(conn, settings.skills_dir)
+        if recovered:
+            _log.info("採用の途中で止まった下書き %d 件を補った", recovered)
         return db.purge_expired(conn, now())
     finally:
         conn.close()

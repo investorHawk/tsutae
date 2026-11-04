@@ -92,7 +92,8 @@ CREATE TABLE IF NOT EXISTS doctor_masks (
 -- 文面（プロンプト・記録・引用・出力）は入れない。識別子と数値だけ
 CREATE TABLE IF NOT EXISTS pipeline_logs (
     id INTEGER PRIMARY KEY,
-    run_kind TEXT NOT NULL CHECK (run_kind IN ('visit', 'skill_change')),
+    run_kind TEXT NOT NULL
+        CHECK (run_kind IN ('visit', 'skill_change', 'regimen_chat')),
     run_id INTEGER NOT NULL,
     ts TEXT NOT NULL,
     event TEXT NOT NULL,
@@ -144,4 +145,44 @@ CREATE TABLE IF NOT EXISTS question_library (
     origin TEXT NOT NULL CHECK (origin IN ('seed', 'doctor', 'adopted')),
     hidden INTEGER NOT NULL DEFAULT 0 CHECK (hidden IN (0, 1)),
     created_at TEXT NOT NULL
+);
+
+-- D4 レジメンの下書き（v1.1。spec 9.1・architecture 9c）。院内だけ。
+-- regimen は識別名（例: FOLFIRI-BV）。新規の下書きは識別名が決まるまで NULL。
+-- base_version は既存の版から作った下書きの元の版（新規は NULL。採用で版1）。
+-- 状態 open → working（Claude の1往復の間）→ open。adopted・discarded で閉じる。
+-- generation は往復ごとに上がる（結果は世代が同じときだけ反映する。T94）。
+-- chat_json は会話の文面（院内の画面だけに出す。採用・破棄で '[]' にする）
+CREATE TABLE IF NOT EXISTS regimen_drafts (
+    id INTEGER PRIMARY KEY,
+    regimen TEXT,
+    base_version INTEGER CHECK (base_version IS NULL OR base_version >= 1),
+    status TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'working', 'adopted', 'discarded')),
+    generation INTEGER NOT NULL DEFAULT 0 CHECK (generation >= 0),
+    form_json TEXT NOT NULL,
+    sources_json TEXT NOT NULL DEFAULT '{}',
+    chat_json TEXT NOT NULL DEFAULT '[]',
+    adopted_version INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    working_since TEXT,
+    closed_at TEXT,
+    CHECK ((status = 'working') = (working_since IS NOT NULL))
+);
+
+-- 1つのレジメンに開いている（open・working）下書きは1つまで
+CREATE UNIQUE INDEX IF NOT EXISTS idx_regimen_drafts_active
+    ON regimen_drafts (regimen)
+    WHERE regimen IS NOT NULL AND status IN ('open', 'working');
+
+-- D4 で採用した版の form JSON（skill_versions と同じ版に結びつく）。FOLFOX/CAPOX@1 は
+-- リポジトリの regimen_forms/*.json に持つのでここには無い
+CREATE TABLE IF NOT EXISTS regimen_forms (
+    skill_name TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    form_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (skill_name, version),
+    FOREIGN KEY (skill_name, version) REFERENCES skill_versions (skill_name, version)
 );

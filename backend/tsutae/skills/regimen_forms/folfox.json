@@ -1,0 +1,179 @@
+{
+  "basic": {
+    "display_name": "FOLFOX",
+    "code": "FOLFOX",
+    "target": "大腸がん",
+    "cycle_days": 14
+  },
+  "drugs": [
+    {
+      "row_id": "d-oxaliplatin",
+      "name": "オキサリプラチン",
+      "route": "infusion",
+      "days": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ]
+    },
+    {
+      "row_id": "d-levofolinate",
+      "name": "レボホリナート",
+      "route": "infusion",
+      "days": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ]
+    },
+    {
+      "row_id": "d-fu-bolus",
+      "name": "フルオロウラシル（急速静注）",
+      "route": "infusion",
+      "days": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ]
+    },
+    {
+      "row_id": "d-fu-pump",
+      "name": "フルオロウラシル（46時間）",
+      "route": "pump",
+      "days": [
+        {
+          "start": 1,
+          "end": 3
+        }
+      ]
+    }
+  ],
+  "side_effects": [
+    {
+      "row_id": "se-numbness",
+      "phrases": [
+        "手足のしびれ",
+        "冷たいものにさわるとピリピリする"
+      ],
+      "ctcae_terms": [
+        "末梢性感覚ニューロパチー",
+        "錯感覚",
+        "異常感覚"
+      ],
+      "question_key": "numbness"
+    },
+    {
+      "row_id": "se-diarrhea",
+      "phrases": [
+        "下痢",
+        "お腹がゆるい"
+      ],
+      "ctcae_terms": [
+        "下痢"
+      ],
+      "question_key": "diarrhea"
+    },
+    {
+      "row_id": "se-stomatitis",
+      "phrases": [
+        "口内炎",
+        "口の中が痛い"
+      ],
+      "ctcae_terms": [
+        "口腔粘膜炎",
+        "口腔内痛"
+      ],
+      "question_key": "stomatitis"
+    },
+    {
+      "row_id": "se-nausea-appetite",
+      "phrases": [
+        "吐き気",
+        "吐いた",
+        "食欲がない"
+      ],
+      "ctcae_terms": [
+        "悪心",
+        "嘔吐",
+        "食欲不振"
+      ],
+      "question_key": "nausea_appetite"
+    },
+    {
+      "row_id": "se-fever",
+      "phrases": [
+        "熱が出た"
+      ],
+      "ctcae_terms": [
+        "発熱"
+      ],
+      "question_key": "fever"
+    },
+    {
+      "row_id": "se-fatigue",
+      "phrases": [
+        "だるい",
+        "疲れやすい"
+      ],
+      "ctcae_terms": [
+        "疲労",
+        "倦怠感"
+      ],
+      "question_key": null
+    }
+  ],
+  "questions": [
+    {
+      "row_id": "q-numbness",
+      "key": "numbness",
+      "label": "しびれ",
+      "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+      "answer_type": "three_level"
+    },
+    {
+      "row_id": "q-diarrhea",
+      "key": "diarrhea",
+      "label": "下痢",
+      "text": "下痢はありましたか",
+      "answer_type": "three_level"
+    },
+    {
+      "row_id": "q-stomatitis",
+      "key": "stomatitis",
+      "label": "口内炎",
+      "text": "口の中の痛みや口内炎はありましたか",
+      "answer_type": "three_level"
+    },
+    {
+      "row_id": "q-nausea-appetite",
+      "key": "nausea_appetite",
+      "label": "吐き気・食欲",
+      "text": "吐き気や食欲の落ち込みはありましたか",
+      "answer_type": "three_level"
+    },
+    {
+      "row_id": "q-fever",
+      "key": "fever",
+      "label": "体温",
+      "text": "熱を測りましたか",
+      "answer_type": "temperature"
+    }
+  ],
+  "notes": "",
+  "prose": {
+    "pump_sentence": "Day1 に外来で点滴し、続けてフルオロウラシルを46時間かけて入れる持続ポンプ（携帯型）をつけて帰宅する",
+    "improving_examples": [
+      "しびれはだいぶ楽",
+      "口内炎は治ってきた",
+      "昨日よりまし"
+    ],
+    "contradiction_example": {
+      "closed_label": "下痢",
+      "question_key": "diarrhea",
+      "quote": "昼過ぎに下痢"
+    }
+  }
+}

@@ -335,7 +335,7 @@ def test_validate_rejects_version_zero() -> None:
         ("version: 1", 'version: "1"'),  # 文字列を数に直さない
         ("version: 1", "version: true"),
         ("cycle_days: 14", "cycle_days: 14.5"),
-        ("regimen: FOLFOX", "regimen: XELOX"),  # 未知のレジメン
+        ("regimen: FOLFOX", "regimen: folfox"),  # 識別名の書式（英大文字）
         ("cycle_days: 14", "cycle_days: 3"),
         ("answer_type: three_level", "answer_type: five_level"),
         ("{key: diarrhea,", "{key: Diarrhea,"),  # key の書式

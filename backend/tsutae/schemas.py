@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -26,6 +26,8 @@ VisitStatus = Literal["generating", "ready", "printed", "failed"]
 SkillChangeStatus = Literal["pending", "approved", "rejected", "failed"]
 
 QUESTION_KEY_PATTERN = r"^[a-z][a-z0-9_]{1,40}$"
+# レジメンの識別名（v1.1。英大文字・数字・`-`。Skill 名は `regimen-` + 小文字）
+REGIMEN_CODE_PATTERN = r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$"
 
 
 class Frozen(BaseModel):
@@ -52,15 +54,22 @@ class FixedRule(Frozen):
     patient_string_key: str
 
 
+QuestionKey = Annotated[str, Field(pattern=QUESTION_KEY_PATTERN)]
+
+
 class RegimenSkill(Frozen):
     name: str
     description: str
     version: int = Field(ge=1)
-    regimen: Regimen
+    # v1.1: FOLFOX/CAPOX 以外も持てる（患者の regimen の型 `Regimen` は T95 で広げる）
+    regimen: str = Field(pattern=REGIMEN_CODE_PATTERN, max_length=30)
     cycle_days: int = Field(ge=7, le=42)
     pump_removal_day: int | None = Field(default=None, ge=1)
     questions: list[Question] = Field(min_length=1)
     fixed_rules: list[FixedRule] = Field(default_factory=list)
+    # v1.1 の任意の鍵（spec 9.1）。識別名と違う表示名・全体の対応と違う用語→質問だけ
+    display_name: str | None = Field(default=None, min_length=1, max_length=40)
+    term_keys: dict[str, QuestionKey | None] | None = None
 
     @model_validator(mode="after")
     def _keys_unique_and_rules_valid(self) -> RegimenSkill:
@@ -73,6 +82,9 @@ class RegimenSkill(Frozen):
                 raise ValueError(f"fixed_rule {rule.key} が未知の質問を参照している")
             if by_key[rule.question_key].answer_type != "temperature":
                 raise ValueError(f"fixed_rule {rule.key} は体温の質問だけを参照できる")
+        for term, key in (self.term_keys or {}).items():
+            if key is not None and key not in by_key:
+                raise ValueError(f"term_keys の {term} が未知の質問を参照している")
         if (
             self.pump_removal_day is not None
             and self.pump_removal_day > self.cycle_days

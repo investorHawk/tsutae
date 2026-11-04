@@ -34,6 +34,20 @@
   gap: 8px;
 }
 
+/* 印刷待ちの操作の列は、ボタンが全部並ぶ幅を先に取る（「AI でもう一度変換」がある行で
+   「変換ログ」だけ次の行に落ちないように。D2-4）。確かめの表示中は折り返してよい */
+.doctor-app .d-visit-actions {
+  min-width: 34rem;
+}
+
+/* 操作の列が広がっても（「印刷済み」の確かめの表示中など）、状態のバッジや受付の時刻は
+   縦に折らない */
+.doctor-app .d-visit .d-status,
+.doctor-app .d-visit .d-status-note,
+.doctor-app .d-visit td:nth-child(-n + 4) {
+  white-space: nowrap;
+}
+
 .doctor-app .d-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -102,7 +102,7 @@ export default function VisitRow({
           <span className="d-muted">—</span>
         )}
       </td>
-      <td>
+      <td className="d-visit-actions">
         <Actions
           visit={visit}
           onPrinted={onPrinted}

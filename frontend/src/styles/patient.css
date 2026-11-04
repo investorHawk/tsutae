@@ -11,7 +11,16 @@
   --p-border: #333333;
   --p-primary: #00448f; /* 白文字とのコントラスト約 9:1 */
   --p-primary-text: #ffffff;
-  --p-too-sick: #4a2373; /* 白文字とのコントラスト約 12:1 */
+  /* 「つらくて書けない」: 他のボタンと同じ紺の系統で、より濃い（白文字とのコントラスト約 16:1） */
+  --p-too-sick: #001a40;
+  /* 選んだ「つらい」: 「ある」（--p-primary）より濃い紺（白文字とのコントラスト約 16:1） */
+  --p-hard: #001a40;
+  /* 選んだ「なし」「測っていない」: 薄い紺の塗り（黒文字とのコントラスト約 15:1） */
+  --p-choice-light: #dbe6f4;
+  --p-disabled-border: #8c8c8c;
+  --p-focus: #111111;
+  /* 下のタブの高さ（タブ 56px ＋ 上下の余白 ＋ 上の線） */
+  --p-nav-h: 80px;
   --p-error: #9b0000;
   --p-notice-bg: #fff3cc;
   --p-notice-border: #7a5200;
@@ -28,6 +37,31 @@
   max-width: 560px;
   margin: 0 auto;
   padding: 16px 16px 48px;
+}
+
+/* 本文の外の「症例は全て架空」の注記。本文と同じ幅・左右の余白（PC-1） */
+.patient-footer {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+
+/* 下のタブのある画面: 最後（架空の注記）がタブに隠れないよう下をあける（PC-2） */
+.patient-app--with-nav {
+  padding-bottom: calc(var(--p-nav-h) + env(safe-area-inset-bottom, 0px));
+}
+
+/* focus で画面の下へ送られた要素が、固定したタブの裏に隠れないようにする */
+.patient-app--with-nav :is(a, button, input, textarea, select, summary) {
+  scroll-margin-bottom: calc(
+    var(--p-nav-h) + env(safe-area-inset-bottom, 0px) + 16px
+  );
+}
+
+/* focus の輪（キーボードで動かした時）。押せないボタンの見た目とは別の太い実線 */
+.patient-app :focus-visible {
+  outline: 4px solid var(--p-focus);
+  outline-offset: 3px;
 }
 
 .patient-app h1 {
@@ -71,10 +105,12 @@
   touch-action: manipulation;
 }
 
+/* 押せないボタン: 灰色の塗りと細い灰色の実線（点線は focus の輪と紛らわしいので使わない）。
+   押せない理由は直前の p-hint に出す（P2-2） */
 .patient-app button:disabled {
   color: var(--p-muted);
   background: var(--p-surface);
-  border-style: dashed;
+  border-color: var(--p-disabled-border);
 }
 
 .patient-app .p-button--primary {
@@ -83,6 +119,7 @@
   border-color: var(--p-primary);
 }
 
+/* 「つらくて書けない」: 濃い紺の塗り＋白文字で、他の紺のボタンより大きい（P2-6） */
 .patient-app .p-button--too-sick {
   min-height: 80px;
   font-size: 1.25rem;
@@ -100,14 +137,51 @@
 }
 
 .patient-app .p-choices > button {
+  position: relative;
   margin: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
 }
 
+/* 選んだボタン: 太枠と ✓ はどの答えでも同じ（色に頼らず選んだことが分かる） */
 .patient-app button[aria-pressed="true"] {
   color: var(--p-primary-text);
   background: var(--p-primary);
   border-color: var(--p-text);
   border-width: 4px;
+}
+
+/* ✓ は文字の前に並べず左端に重ねる（3列のボタンで「つらい」が折れて行の高さが
+   変わらないように） */
+.patient-app .p-choice[aria-pressed="true"]::before {
+  content: "\2713";
+  content: "\2713" / "";
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  font-size: 0.85em;
+}
+
+/* 「なし」「測っていない」: 薄い紺の塗り＋黒文字（P2-1） */
+.patient-app .p-choice--none[aria-pressed="true"],
+.patient-app .p-choice--not_measured[aria-pressed="true"] {
+  color: var(--p-text);
+  background: var(--p-choice-light);
+}
+
+/* 「ある」「測った」: 紺の塗り＋白文字 */
+.patient-app .p-choice--present[aria-pressed="true"],
+.patient-app .p-choice--measured[aria-pressed="true"] {
+  color: var(--p-primary-text);
+  background: var(--p-primary);
+}
+
+/* 「つらい」: より濃い紺＋内側の白い輪（色の違いが分かりにくくても形で分かる。P2-1） */
+.patient-app .p-choice--hard[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--p-hard);
+  box-shadow: inset 0 0 0 3px #ffffff;
 }
 
 /* --- 入力欄 ------------------------------------------------------------ */
@@ -214,6 +288,45 @@
   color: var(--p-muted);
 }
 
+/* 入力の補足（押せない理由・入力例）。押せないボタン・入力欄の直前に出す */
+.patient-app .p-hint {
+  margin: 0 0 8px;
+  color: var(--p-muted);
+}
+
+/* --- 記録した後（要約・取り消し・追加で記録する） ------------------------- */
+
+.patient-app .p-saved {
+  padding: 12px 16px;
+  margin: 0 0 20px;
+  background: var(--p-surface);
+  border-radius: 12px;
+}
+
+.patient-app .p-saved-title {
+  font-size: max(18px, 1em);
+  margin-bottom: 4px;
+}
+
+.patient-app .p-button--undo {
+  margin-bottom: 20px;
+}
+
+/* 一行の要約（「しびれ つらい／下痢 ある」）。答えは太字 */
+.patient-app .p-summary strong {
+  font-weight: 700;
+}
+
+.patient-app .p-summary-sep {
+  padding: 0 4px;
+  color: var(--p-muted);
+}
+
+/* 「下痢 つらい」の一組は途中で折らない（「つら／い」にしない）。折るのは組の間だけ */
+.patient-app .p-summary-item {
+  white-space: nowrap;
+}
+
 /* --- 記録一覧 ----------------------------------------------------------- */
 
 .patient-app .p-entries {
@@ -223,11 +336,55 @@
 }
 
 .patient-app .p-entry {
-  padding: 16px;
   margin: 0 0 12px;
   background: var(--p-surface);
   border: 1px solid #8c8c8c;
   border-radius: 12px;
+}
+
+/* 1件1行（P3-1）。押す面は行全体・高さ 56px 以上。開くと p-entry-detail が出る */
+.patient-app .p-entry-summary {
+  position: relative;
+  display: block;
+  min-height: var(--p-tap);
+  padding: 12px 48px 12px 16px;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+/* 開けることを示す右端の矢印（閉じているとき下向き、開くと上向き）。文字ではなく線で描く */
+.patient-app .p-entry-summary::after {
+  content: "";
+  position: absolute;
+  top: 24px;
+  right: 20px;
+  width: 10px;
+  height: 10px;
+  border-right: 3px solid var(--p-text);
+  border-bottom: 3px solid var(--p-text);
+  transform: rotate(45deg);
+}
+
+.patient-app details[open] > .p-entry-summary::after {
+  top: 30px;
+  transform: rotate(-135deg);
+}
+
+/* 日時は1行目に置き、要約は次の行から */
+.patient-app .p-entry-time {
+  display: block;
+  font-weight: 700;
+}
+
+.patient-app .p-entry-detail {
+  padding: 0 16px 16px;
+  border-top: 1px solid #8c8c8c;
+}
+
+/* 答え（つらい・ある）は質問文より目立たせる（P3-2） */
+.patient-app .p-entry dd {
+  margin: 0 0 12px;
+  font-weight: 700;
 }
 
 /* 自由記載の原文。改行を保ち、長い英数字（URL・型番など）も枠の中で折り返す */
@@ -236,16 +393,29 @@
   overflow-wrap: anywhere;
 }
 
-/* --- 下部のナビゲーション（今日の記録／これまでの記録） --------------------- */
+/* --- 下のタブ（今日の記録／これまでの記録）。画面の下に固定（PC-2） ------------ */
 
 .patient-app .p-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--p-bg);
+  border-top: 2px solid var(--p-border);
+}
+
+.patient-app .p-nav-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin: 24px 0 0;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .patient-app .p-nav a {
+  text-decoration: none;
   display: flex;
   align-items: center;
   justify-content: center;

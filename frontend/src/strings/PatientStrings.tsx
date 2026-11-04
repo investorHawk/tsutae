@@ -22,6 +22,8 @@ import { BUNDLED_STRINGS, REQUIRED_KEYS } from "./bundledStrings";
 export interface PatientStringsValue {
   /** 定型文を返す。未知のキーは空文字（console.warn を出す）。 */
   t: (key: string) => string;
+  /** そのキーの定型文があるか（任意の定型文の有無を、警告を出さずに見る）。 */
+  has: (key: string) => boolean;
 }
 
 const PatientStringsContext = createContext<PatientStringsValue | null>(null);
@@ -99,7 +101,13 @@ function useTranslator(strings: PatientStrings): PatientStringsValue {
     },
     [strings],
   );
-  return useMemo(() => ({ t }), [t]);
+  const has = useCallback(
+    (key: string): boolean =>
+      Object.prototype.hasOwnProperty.call(strings, key) &&
+      (strings[key] ?? "") !== "",
+    [strings],
+  );
+  return useMemo(() => ({ t, has }), [t, has]);
 }
 
 /** 読み込み済みの定型文で包む（テストや Storybook 的な用途）。 */

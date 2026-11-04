@@ -7,6 +7,10 @@
 - 記録の送り直し（タイムアウトの後など）: 同じ患者・同じ内容（EntryCreate を正規化した
   形が一致）の記録が直近 120 秒以内にあれば、新しく作らずその entry_id と notices を
   返す（`db.add_entry_once`）
+- 取り消し（P2-5）: `POST /{pid}/entries/{entry_id}/undo` は、本人の「つらくて書けない」
+  の記録で、作ってから UNDO_WINDOW 以内・その後に受診の受付が無いものだけを消す
+  （`db.undo_too_sick_entry`）。他人の記録は 404 not_found、条件に合わなければ
+  409 not_undoable。押し間違いを戻すためのもので、他の記録は消せない
 - 登録（Cookie の発行はここだけ）は、クライアント（request.client.host）ごとに失敗
   （unknown_patient）が 10 分で 10 回に達したら、以降の試行を 429 too_many_attempts
   で断る（正しい pid でも断る。成功・422 は数えない）。全クライアントの合計が 10 分で
@@ -20,9 +24,9 @@ import re
 import sqlite3
 from datetime import timedelta
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Path, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from tsutae import db
@@ -50,6 +54,8 @@ _VALUES: dict[AnswerType, frozenset[str]] = {
     "temperature": frozenset({"not_measured", "measured"}),
 }
 RESEND_WINDOW = timedelta(seconds=120)  # 同じ内容の記録を送り直しとみなす長さ
+UNDO_WINDOW = timedelta(minutes=10)  # 「つらくて書けない」を取り消せる長さ
+EntryId = Annotated[int, Path(ge=1, le=2**62)]
 _VERSION_RE = re.compile(r"(?P<name>[a-z0-9][a-z0-9-]*)@(?P<version>[1-9][0-9]{0,8})")
 
 
@@ -133,6 +139,19 @@ def create_entry(
         conn, patient["id"], entry, now(), skill.skill_version, RESEND_WINDOW
     )
     return {"entry_id": saved.id, "notices": notices_for(entry, skill)}
+
+
+@router.post("/{pid}/entries/{entry_id}/undo")
+def undo_entry(
+    pid: str, entry_id: EntryId, request: Request, conn: Conn
+) -> dict[str, bool]:
+    patient = require_patient(pid, request, conn)
+    result = db.undo_too_sick_entry(conn, patient["id"], entry_id, now() - UNDO_WINDOW)
+    if result == "not_found":
+        raise ApiError(404, "not_found")
+    if result == "not_undoable":
+        raise ApiError(409, "not_undoable")
+    return {"ok": True}
 
 
 def _question_texts(

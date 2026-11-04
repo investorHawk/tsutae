@@ -10,7 +10,11 @@
   `purge_expired`。印刷済み・期限切れ（受付番号を消した受診）は一覧に載せず、
   レポートと未処理は 404
 - レポートは `HTMLResponse` に `Cache-Control: no-store` と CSP
-- 未処理（D6）は記録の原文を返す（院内画面だけ。紙には載せない）
+- 未処理（D6）は記録の原文と、疑われた語の原文の中の位置 marks を返す（院内画面だけ。
+  紙には載せない。位置は `doctor_marks`）
+- 患者一覧は最後の記録日・今のコース・次回受診も返す。患者の画面（D2）には、その患者の
+  受診（`GET /patients/{pid}/visits`。印刷済み・期限切れも。前に `purge_expired`）と
+  直近の記録（`GET /patients/{pid}/entries`。自由記載は有無だけ）を返す（`doctor_records`）
 - `POST /courses` は保存前に既存＋新規で `validate_courses`（矛盾は 400 `{"error": code}`）
 - 本文つきの `POST /patients`・`POST /courses` は Content-Type が application/json で
   なければ 415 `{"error": "unsupported_media_type"}`（`require_json_body`。Cookie の検査の
@@ -52,8 +56,15 @@ from tsutae.api.deps import (
     require_same_origin,
     set_doctor_cookie,
 )
+from tsutae.api.doctor_marks import suspect_marks
+from tsutae.api.doctor_records import (
+    RECENT_ENTRIES_MAX,
+    course_summary,
+    entry_summary,
+    patient_visit,
+)
 from tsutae.api.visit import run_generation
-from tsutae.config import Settings, now
+from tsutae.config import Settings, now, today
 from tsutae.course import CourseValidationError, validate_courses
 from tsutae.pipeline.logs import PipelineLogger
 from tsutae.schemas import Course, Regimen
@@ -144,17 +155,22 @@ def _patient_or_404(conn: sqlite3.Connection, pid: str) -> dict[str, Any]:
 
 @_protected.get("/patients")
 def list_patients(conn: Conn, settings: AppSettings) -> dict[str, Any]:
-    return {
-        "patients": [
+    last_dates = db.last_record_dates(conn)
+    day = today()
+    patients = []
+    for p in db.list_patients(conn):
+        last = last_dates.get(p["id"])
+        patients.append(
             {
                 "id": p["id"],
                 "regimen": p["regimen"],
                 "created_at": p["created_at"].isoformat(),
                 "register_url": register_url(settings, p["id"]),
+                "last_record_date": None if last is None else last.isoformat(),
+                **course_summary(db.list_courses(conn, p["id"]), day),
             }
-            for p in db.list_patients(conn)
-        ]
-    }
+        )
+    return {"patients": patients}
 
 
 @_protected.post("/patients", dependencies=[Depends(require_json_body)])
@@ -170,6 +186,31 @@ def list_courses(pid: str, conn: Conn) -> dict[str, Any]:
     patient = _patient_or_404(conn, pid)
     courses = db.list_courses(conn, patient["id"])
     return {"courses": [c.model_dump(mode="json") for c in courses]}
+
+
+@_protected.get("/patients/{pid}/visits")
+def list_patient_visits(pid: str, conn: Conn) -> dict[str, Any]:
+    """D2 の患者の受診（新しい順）。印刷済み・期限切れも載せる（受付番号は null）。"""
+    patient = _patient_or_404(conn, pid)
+    db.purge_expired(conn, now())
+    visits = db.list_visits(conn, patient_id=patient["id"])
+    return {
+        "visits": [
+            patient_visit(v, len(_unprocessed(conn, v["id"]))) for v in reversed(visits)
+        ]
+    }
+
+
+@_protected.get("/patients/{pid}/entries")
+def list_patient_entries(pid: str, conn: Conn) -> dict[str, Any]:
+    """D2 の患者の直近の記録（新しい順）。自由記載は有無だけ（原文は D6 だけ）。"""
+    patient = _patient_or_404(conn, pid)
+    entries = db.list_entries(conn, patient["id"])
+    recent = sorted(entries, key=lambda e: (e.recorded_at, e.id), reverse=True)
+    return {
+        "entries": [entry_summary(e) for e in recent[:RECENT_ENTRIES_MAX]],
+        "total": len(entries),
+    }
 
 
 @_protected.post("/courses", dependencies=[Depends(require_json_body)])
@@ -289,19 +330,22 @@ def regenerate(
 
 @_protected.get("/visits/{vid}/unprocessed")
 def list_unprocessed(vid: VisitId, conn: Conn) -> dict[str, Any]:
-    """D6: 送信から外した記録の原文（伏せ字前）と規則名。"""
+    """D6: 送信から外した記録の原文（伏せ字前）・規則名・疑われた語の位置。"""
     visit = _open_visit(conn, vid)
+    literals = [visit["patient_id"], visit["reception_no"]]
     entries = []
     for item in _unprocessed(conn, vid):
         entry = db.get_entry(conn, item.entry_id)
         if entry is None or entry.patient_id != visit["patient_id"]:
             continue
+        text = entry.free_text or ""
         entries.append(
             {
                 "entry_id": entry.id,
                 "record_date": entry.record_date.isoformat(),
                 "reason": item.reason,
-                "text": entry.free_text or "",
+                "text": text,
+                "marks": suspect_marks(text, literals),
             }
         )
     return {"entries": entries}

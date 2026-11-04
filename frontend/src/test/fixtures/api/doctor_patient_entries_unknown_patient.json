@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/patients/P-ZZZZ9999/entries",
+  "request": null,
+  "status": 404,
+  "body": {
+    "error": "unknown_patient"
+  }
+}

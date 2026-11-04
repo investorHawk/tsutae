@@ -111,7 +111,11 @@ describe("Today (P1): stage 0 too_sick", () => {
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
       { too_sick: true, by_proxy: false },
     ]);
-    expect(screen.queryByRole("button")).toBeNull();
+    // 記録した後は「取り消す」と「追加で記録する」だけ（P2-4・P2-5。押す前の確認は無い）
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      s("today.undo"),
+      s("today.add_more"),
+    ]);
     expect(screen.queryByRole("group")).toBeNull();
   });
 

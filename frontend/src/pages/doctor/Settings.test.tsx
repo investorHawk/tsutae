@@ -11,6 +11,7 @@ import {
   type RouteValue,
 } from "../../components/doctor/testing";
 import { jsonResponse } from "../../test/fetchMock";
+import { skillContentRoutes } from "../../components/doctor/skillTesting";
 import Settings from "./Settings";
 
 afterEach(() => {
@@ -58,6 +59,7 @@ const SKILL_LIST = {
 
 function api(extra: Record<string, RouteValue> = {}) {
   return mockApi({
+    ...skillContentRoutes(["regimen-folfox", "report-format-default"]),
     [SKILLS]: SKILL_LIST,
     [CHANGES]: { skill_changes: [] },
     ...extra,
@@ -69,7 +71,7 @@ function renderSettings() {
 }
 
 async function requestChange(text = REQUEST) {
-  await screen.findByRole("option", { name: /regimen-folfox/ });
+  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
   await userEvent.type(screen.getByLabelText("変えたいこと（一文）"), text);
   await userEvent.click(
     screen.getByRole("button", { name: "書き換えを依頼する" }),
@@ -84,7 +86,9 @@ describe("Settings（D4 設定を変える）", () => {
       screen.getByRole("heading", { level: 1, name: "設定を変える" }),
     ).toBeInTheDocument();
     const select = screen.getByLabelText("Skill");
-    await screen.findByRole("option", { name: "regimen-folfox（version 1）" });
+    await screen.findByRole("option", {
+      name: "FOLFOX の質問集（第1版）",
+    });
     expect(select).toHaveValue("regimen-folfox");
     await userEvent.selectOptions(select, "report-format-default");
     expect(select).toHaveValue("report-format-default");
@@ -93,7 +97,7 @@ describe("Settings（D4 設定を変える）", () => {
   it("一文が空なら依頼できない", async () => {
     api();
     renderSettings();
-    await screen.findByRole("option", { name: /regimen-folfox/ });
+    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
     expect(
       screen.getByRole("button", { name: "書き換えを依頼する" }),
     ).toBeDisabled();

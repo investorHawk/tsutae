@@ -6,6 +6,7 @@ import { errorCode, isUnauthorized } from "../../components/doctor/errors";
 import { formatTime } from "../../components/doctor/format";
 import { isVisitSummary } from "../../components/doctor/guards";
 import { listOf } from "../../components/doctor/input";
+import { PRINT_HINT } from "../../components/doctor/PrintButton";
 import { usePolling } from "../../components/doctor/usePolling";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
 import VisitRow from "../../components/doctor/VisitRow";
@@ -104,8 +105,11 @@ export default function Visits() {
       {visits?.length === 0 ? (
         <p className="d-muted">受付はまだありません</p>
       ) : null}
+      {visits?.some((v) => v.status === "ready") ? (
+        <p className="d-muted d-print-hint">{PRINT_HINT}</p>
+      ) : null}
       {visits && visits.length > 0 ? (
-        <table className="d-table d-visits">
+        <table className="d-table d-table--middle d-visits">
           <thead>
             <tr>
               <th scope="col">受付番号</th>

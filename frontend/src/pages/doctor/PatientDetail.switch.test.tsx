@@ -59,6 +59,10 @@ function GoTo({ pid }: { pid: string }) {
 function renderAt(routes: Record<string, RouteValue>) {
   const fetchMock = mockApi({
     "GET /api/doctor/patients": { patients: [] },
+    [`GET /api/doctor/patients/${A}/visits`]: { visits: [] },
+    [`GET /api/doctor/patients/${A}/entries`]: { entries: [], total: 0 },
+    [`GET /api/doctor/patients/${B}/visits`]: { visits: [] },
+    [`GET /api/doctor/patients/${B}/entries`]: { entries: [], total: 0 },
     ...routes,
   });
   render(
@@ -104,13 +108,13 @@ describe("PatientDetail の患者の切り替え", () => {
     const row = (await screen.findByText("第2コース")).closest("tr");
     await userEvent.click(within(row!).getByRole("button", { name: "修正" }));
     expect(
-      screen.getByRole("heading", { level: 2, name: "第2コースを修正" }),
+      screen.getByRole("heading", { level: 3, name: "第2コースを修正" }),
     ).toBeInTheDocument();
     goToB();
     expect(screen.getByText(B)).toBeInTheDocument();
     expect(screen.queryByText("第2コース")).toBeNull();
     expect(
-      screen.getByRole("heading", { level: 2, name: "コースを追加" }),
+      screen.getByRole("heading", { level: 3, name: "コースを追加" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("コース番号")).toHaveValue(1);
     expect(screen.getByLabelText("実投与日（Day1）")).toHaveValue("");

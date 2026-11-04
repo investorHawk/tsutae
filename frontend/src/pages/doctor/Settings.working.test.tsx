@@ -15,6 +15,7 @@ import {
 } from "../../components/doctor/testing";
 import { SKILL_HISTORY_POLL_MS } from "../../components/doctor/useSkillChangeWatch";
 import { jsonResponse } from "../../test/fetchMock";
+import { skillContentRoutes } from "../../components/doctor/skillTesting";
 import Settings from "./Settings";
 
 const SKILLS = "GET /api/doctor/skills";
@@ -56,6 +57,7 @@ function api(
   extra: Record<string, RouteValue> = {},
 ) {
   return mockApi({
+    ...skillContentRoutes(["regimen-folfox"]),
     [SKILLS]: SKILL_LIST,
     [CHANGES]: () => jsonResponse({ skill_changes: changes() }),
     ...extra,
@@ -162,7 +164,7 @@ describe("Settings: 作業中の変更", () => {
     api(() => [], { [CREATE]: () => pending.promise });
     renderSettings();
     const u = user();
-    await screen.findByRole("option", { name: /regimen-folfox/ });
+    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
     await u.type(screen.getByLabelText("変えたいこと（一文）"), REQUEST);
     await u.click(screen.getByRole("button", { name: "書き換えを依頼する" }));
     const note = screen.getByRole("status");
@@ -190,7 +192,7 @@ describe("Settings: 作業中の変更", () => {
     });
     renderSettings();
     const u = user();
-    await screen.findByRole("option", { name: /regimen-folfox/ });
+    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
     await u.type(screen.getByLabelText("変えたいこと（一文）"), REQUEST);
     await u.click(screen.getByRole("button", { name: "書き換えを依頼する" }));
     expect(await screen.findByText(/経過 30 秒/)).toBeInTheDocument();

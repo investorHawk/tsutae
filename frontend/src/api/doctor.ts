@@ -9,10 +9,13 @@ import {
   isCreatePatientResponse,
   isCreateSkillChangeResponse,
   isOkTrue,
+  isPatientEntriesSummaryResponse,
+  isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
   isSavedCourse,
   isSkillChangesResponse,
+  isSkillContentResponse,
   isSkillsResponse,
   isUnprocessedResponse,
   isVisitsResponse,
@@ -28,11 +31,14 @@ import type {
   CreateSkillChangeResponse,
   LoginRequest,
   OkResponse,
+  PatientEntriesSummaryResponse,
+  PatientVisitsResponse,
   PatientsResponse,
   PipelineEventsResponse,
   Regimen,
   RejectSkillChangeResponse,
   SkillChangesResponse,
+  SkillContentResponse,
   SkillsResponse,
   UnprocessedResponse,
   VisitsResponse,
@@ -119,6 +125,24 @@ export function listCourses(pid: string): Promise<CoursesResponse> {
   );
 }
 
+/** 患者の受診（新しい順。印刷済み・期限切れも。受付番号は消えていれば null）。 */
+export function listPatientVisits(pid: string): Promise<PatientVisitsResponse> {
+  return getChecked<PatientVisitsResponse>(
+    `/api/doctor/patients/${seg(pid)}/visits`,
+    isPatientVisitsResponse,
+  );
+}
+
+/** 患者の直近の記録（新しい順）と総数。自由記載は有無だけ。 */
+export function listPatientEntries(
+  pid: string,
+): Promise<PatientEntriesSummaryResponse> {
+  return getChecked<PatientEntriesSummaryResponse>(
+    `/api/doctor/patients/${seg(pid)}/entries`,
+    isPatientEntriesSummaryResponse,
+  );
+}
+
 /** 実投与日の登録。矛盾は 400 {"error": code}。 */
 export function saveCourse(course: Course): Promise<Course> {
   return postChecked<Course>(
@@ -179,6 +203,14 @@ export function getPipelineEvents(
 
 export function listSkills(): Promise<SkillsResponse> {
   return getChecked<SkillsResponse>("/api/doctor/skills", isSkillsResponse);
+}
+
+/** 1つの Skill の今の中身（読み取り専用）。無い Skill は 404 unknown_skill。 */
+export function getSkill(name: string): Promise<SkillContentResponse> {
+  return getChecked<SkillContentResponse>(
+    `/api/doctor/skills/${seg(name)}`,
+    isSkillContentResponse,
+  );
 }
 
 export function createSkillChange(

@@ -31,12 +31,18 @@ const patients = {
       regimen: "FOLFOX",
       created_at: "2026-09-20T10:00:00+09:00",
       register_url: `http://localhost:5173/register?pid=${A}`,
+      last_record_date: null,
+      current_course_no: null,
+      next_visit: null,
     },
     {
       id: B,
       regimen: "CAPOX",
       created_at: "2026-09-21T10:00:00+09:00",
       register_url: `http://localhost:5173/register?pid=${B}`,
+      last_record_date: null,
+      current_course_no: null,
+      next_visit: null,
     },
   ],
 };

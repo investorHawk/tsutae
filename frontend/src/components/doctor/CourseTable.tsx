@@ -22,7 +22,7 @@ export default function CourseTable({
   onEdit,
 }: CourseTableProps) {
   return (
-    <table className="d-table">
+    <table className="d-table d-table--middle">
       <thead>
         <tr>
           <th scope="col">コース</th>

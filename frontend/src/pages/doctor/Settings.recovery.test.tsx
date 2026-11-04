@@ -10,6 +10,7 @@ import {
   type RouteValue,
 } from "../../components/doctor/testing";
 import { jsonResponse } from "../../test/fetchMock";
+import { skillContentRoutes } from "../../components/doctor/skillTesting";
 import Settings from "./Settings";
 
 afterEach(() => {
@@ -49,6 +50,7 @@ function change(patch: Partial<SkillChange>): SkillChange {
 
 function api(extra: Record<string, RouteValue> = {}) {
   return mockApi({
+    ...skillContentRoutes(["regimen-folfox"]),
     [SKILLS]: SKILL_LIST,
     [CHANGES]: { skill_changes: [] },
     ...extra,
@@ -60,7 +62,7 @@ function renderSettings() {
 }
 
 async function requestChange() {
-  await screen.findByRole("option", { name: /regimen-folfox/ });
+  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
   await userEvent.type(screen.getByLabelText("変えたいこと（一文）"), REQUEST);
   await userEvent.click(
     screen.getByRole("button", { name: "書き換えを依頼する" }),

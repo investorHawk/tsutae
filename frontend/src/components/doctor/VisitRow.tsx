@@ -7,6 +7,7 @@ import PrintButton from "./PrintButton";
 import RegenerateButton from "./RegenerateButton";
 import StatusBadge from "./StatusBadge";
 import TwoStepButton from "./TwoStepButton";
+import UnprocessedLink from "./UnprocessedLink";
 
 interface VisitRowProps {
   visit: VisitSummary;
@@ -69,7 +70,8 @@ function Actions({ visit, onPrinted, onRegenerate }: VisitRowProps) {
 }
 
 /**
- * D3 の1行。受付番号・仮名ID・状態・AI変換なし・未処理・操作。
+ * D3 の1行。受付番号・仮名ID・状態（主の状態のバッジと、副の注記「AI変換なし」）・
+ * 未処理・操作。
  * 一覧に出るのは generating・ready・failed だけ（印刷済み・期限切れは API が出さない）。
  * AI変換なしの ready と failed には「AI でもう一度変換」を出す（Claude の一時的な失敗の後）。
  */
@@ -88,19 +90,14 @@ export default function VisitRow({
         <span className="d-badges">
           <StatusBadge status={visit.status} />
           {visit.fallback ? (
-            <span className="d-badge d-badge--fallback">AI変換なし</span>
+            <span className="d-status-note">AI変換なし</span>
           ) : null}
         </span>
       </td>
       <td>{formatDateTime(visit.created_at)}</td>
       <td>
         {visit.unprocessed_count > 0 ? (
-          <Link
-            className="d-badge d-badge--warn"
-            to={`/doctor/unprocessed/${visit.id}`}
-          >
-            未処理 {visit.unprocessed_count} 件
-          </Link>
+          <UnprocessedLink visitId={visit.id} count={visit.unprocessed_count} />
         ) : (
           <span className="d-muted">—</span>
         )}

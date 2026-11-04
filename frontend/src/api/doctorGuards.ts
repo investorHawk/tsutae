@@ -6,8 +6,13 @@
  * {ok} の応答は ok === true だけを成功とする（{ok:false} を成功と誤認しない）。
  */
 import {
+  FEVER_VALUES,
   REGIMENS,
+  TEMPERATURE_MAX,
+  TEMPERATURE_MIN,
+  THREE_LEVEL_VALUES,
   type Course,
+  type EntryKind,
   type OpenVisitStatus,
   type SkillChangeStatus,
   type VisitStatus,
@@ -78,12 +83,71 @@ export function isVisitSummary(v: Item): boolean {
   );
 }
 
+/** 患者一覧の1件。最後の記録日・今のコース・次回受診は nullable（省略は不正）。 */
 export function isDoctorPatient(v: Item): boolean {
   return (
     isString(v.id) &&
     oneOf(REGIMENS)(v.regimen) &&
     isIsoDateTime(v.created_at) &&
-    isString(v.register_url)
+    isString(v.register_url) &&
+    hasNullable("last_record_date", isIsoDate)(v) &&
+    hasNullable("current_course_no", isPositiveInt)(v) &&
+    hasNullable("next_visit", isIsoDate)(v)
+  );
+}
+
+/** 患者の画面の受診1件。受付番号は印刷済み・期限切れで null。状態は4つとも出る。 */
+export function isPatientVisit(v: Item): boolean {
+  return (
+    isInt(v.id) &&
+    hasNullable("reception_no", isString)(v) &&
+    isIsoDate(v.visit_date) &&
+    isIsoDateTime(v.created_at) &&
+    isVisitStatus(v.status) &&
+    isBool(v.fallback) &&
+    isBool(v.report_available) &&
+    isInt(v.unprocessed_count)
+  );
+}
+
+const ENTRY_KINDS: readonly EntryKind[] = [
+  "too_sick",
+  "answers",
+  "free_text",
+  "mixed",
+];
+const isAnswerValue = oneOf([...THREE_LEVEL_VALUES, ...FEVER_VALUES]);
+
+/** measured なら体温（範囲内の数）、それ以外は null（schemas.py ClosedAnswer）。 */
+function fitsTemperature(v: Item): boolean {
+  if (v.value !== "measured") {
+    return v.temperature === null;
+  }
+  const t = v.temperature;
+  return (
+    typeof t === "number" &&
+    Number.isFinite(t) &&
+    t >= TEMPERATURE_MIN &&
+    t <= TEMPERATURE_MAX
+  );
+}
+
+function isDoctorEntryAnswer(v: Item): boolean {
+  return (
+    isString(v.question_key) && isAnswerValue(v.value) && fitsTemperature(v)
+  );
+}
+
+/** 患者の画面の記録1件。原文は無く has_free_text だけ。 */
+export function isDoctorEntry(v: Item): boolean {
+  return (
+    isInt(v.id) &&
+    isIsoDateTime(v.recorded_at) &&
+    isIsoDate(v.record_date) &&
+    oneOf(ENTRY_KINDS)(v.kind) &&
+    isBool(v.by_proxy) &&
+    everyItem(isDoctorEntryAnswer)(v.answers) &&
+    isBool(v.has_free_text)
   );
 }
 
@@ -156,12 +220,32 @@ export function isPipelineEvent(v: Item): boolean {
   );
 }
 
+/**
+ * 疑われた語の位置の列。各位置は 0 ≤ start < end ≤ 文の長さ（code point）で、
+ * 位置順に重ならずに並ぶ（画面がそのまま切り分けて <mark> にできる）。
+ */
+export function isTextMarks(marks: unknown, text: string): boolean {
+  if (!everyItem((m) => isInt(m.start) && isInt(m.end))(marks)) {
+    return false;
+  }
+  const length = codePointLength(text);
+  let last = 0;
+  for (const m of marks as Array<{ start: number; end: number }>) {
+    if (m.start < last || m.end <= m.start || m.end > length) {
+      return false;
+    }
+    last = m.end;
+  }
+  return true;
+}
+
 export function isUnprocessedItem(v: Item): boolean {
   return (
     isInt(v.entry_id) &&
     isIsoDate(v.record_date) &&
     isString(v.reason) &&
-    isString(v.text)
+    isString(v.text) &&
+    isTextMarks(v.marks, v.text)
   );
 }
 
@@ -189,6 +273,11 @@ export const isPatientsResponse = hasList("patients", isDoctorPatient);
 export const isCoursesResponse = hasList("courses", isCourse);
 export const isVisitsResponse = hasList("visits", isVisitSummary);
 export const isUnprocessedResponse = hasList("entries", isUnprocessedItem);
+export const isPatientVisitsResponse = hasList("visits", isPatientVisit);
+/** 患者の画面の記録 {entries, total}。total は 0 以上の整数。 */
+export function isPatientEntriesSummaryResponse(v: Item): boolean {
+  return everyItem(isDoctorEntry)(v.entries) && isInt(v.total) && v.total >= 0;
+}
 /** GET skills {skills, invalid}。invalid は空でも必ずある（W3 後の決定）。 */
 export function isSkillsResponse(v: Item): boolean {
   return (
@@ -196,6 +285,24 @@ export function isSkillsResponse(v: Item): boolean {
   );
 }
 export const isSkillChangesResponse = hasList("skill_changes", isSkillChange);
+
+const isAnswerType = oneOf(["three_level", "temperature"] as const);
+
+/** Skill の中身の質問 {key, text, answer_type}。 */
+function isSkillQuestion(v: Item): boolean {
+  return isString(v.key) && isString(v.text) && isAnswerType(v.answer_type);
+}
+
+/** GET skills/{name} {name, version, description, questions, text}。 */
+export function isSkillContentResponse(v: Item): boolean {
+  return (
+    isString(v.name) &&
+    isInt(v.version) &&
+    isString(v.description) &&
+    everyItem(isSkillQuestion)(v.questions) &&
+    isString(v.text)
+  );
+}
 
 /** D5 の応答 {status, events}。 */
 export function isPipelineEventsResponse(v: Item): boolean {

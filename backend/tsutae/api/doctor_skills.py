@@ -22,6 +22,11 @@
 - `GET /skills` は壊れた SKILL.md・欠けた必須 Skill を黙って落とさず `invalid` に
   `{name, error_code, required}` で載せる（200 のまま。ログインの確認にも使う経路なので
   500 にして医師画面全体を止めない）。必須は regimen の2本と report-format-default
+- `GET /skills/{name}` は1つの Skill の今の中身（読み取り専用。設定画面で依頼の前に
+  見せる）。名前は書式（400 invalid_name）と、`GET /skills` と同じ置かれた Skill の一覧
+  （許可リスト。無ければ 404 unknown_skill）で検査してから読む。skills_dir の外を指す
+  シンボリックリンクは `skill_path` が invalid_name にする。壊れた SKILL.md は
+  `SkillValidationError` の code（`error_status` の対応）
 """
 
 from __future__ import annotations
@@ -42,6 +47,7 @@ from tsutae.api.deps import (
     require_json_body,
     require_same_origin,
 )
+from tsutae.schemas import RegimenSkill
 from tsutae.skillchange import (
     BAD_REQUEST_CODES,
     NOT_FOUND_CODES,
@@ -58,6 +64,8 @@ from tsutae.skills import (
     SkillValidationError,
     is_valid_skill_name,
     load_skill,
+    read_skill_text,
+    validate_skill_text,
 )
 
 __all__ = ["error_status", "router"]
@@ -143,6 +151,33 @@ def list_skills(settings: AppSettings) -> dict[str, Any]:
         except SkillValidationError as exc:
             invalid.append(_invalid(name, exc.code))
     return {"skills": skills, "invalid": sorted(invalid, key=lambda i: i["name"])}
+
+
+@router.get("/skills/{name}")
+def skill_content(name: str, settings: AppSettings) -> dict[str, Any]:
+    """1つの Skill の今の中身。questions は regimen の質問（report-format は空）。"""
+    base = settings.skills_dir
+    if not is_valid_skill_name(name):
+        raise ApiError(400, "invalid_name")
+    if name not in _skill_dirs(base):
+        raise ApiError(404, "unknown_skill")
+    try:
+        text = read_skill_text(name, base)
+        skill = validate_skill_text(name, text)
+    except SkillValidationError as exc:
+        raise ApiError(error_status(exc.code), exc.code) from exc
+    questions = (
+        [q.model_dump() for q in skill.questions]
+        if isinstance(skill, RegimenSkill)
+        else []
+    )
+    return {
+        "name": skill.name,
+        "version": skill.version,
+        "description": skill.description,
+        "questions": questions,
+        "text": text,
+    }
 
 
 @router.post("/skill-changes", dependencies=[Depends(require_json_body)])

@@ -269,6 +269,8 @@ def test_unprocessed_returns_original_text(client: TestClient) -> None:
                 "record_date": "2026-11-09",
                 "reason": "known_identifier",
                 "text": raw,  # 伏せ字前の原文（○○さん にしていない）
+                # 疑われた語（仮名ID）の原文の中の位置。田中は一次で伏せる辞書の姓
+                "marks": [{"start": 2, "end": 2 + len(pid)}],
             }
         ]
     }

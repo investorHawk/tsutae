@@ -1,0 +1,812 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/patients/P-DEMO0001/entries",
+  "request": null,
+  "status": 200,
+  "body": {
+    "entries": [
+      {
+        "id": 92,
+        "recorded_at": "2026-11-09T10:00:00+09:00",
+        "record_date": "2026-11-09",
+        "kind": "answers",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 38.2
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "present",
+            "temperature": null
+          }
+        ],
+        "has_free_text": false
+      },
+      {
+        "id": 40,
+        "recorded_at": "2026-11-08T20:00:00+09:00",
+        "record_date": "2026-11-08",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 39,
+        "recorded_at": "2026-11-07T20:15:00+09:00",
+        "record_date": "2026-11-07",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 38,
+        "recorded_at": "2026-11-05T21:50:00+09:00",
+        "record_date": "2026-11-05",
+        "kind": "free_text",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": true
+      },
+      {
+        "id": 37,
+        "recorded_at": "2026-11-05T20:40:00+09:00",
+        "record_date": "2026-11-05",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 36.7
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 36,
+        "recorded_at": "2026-11-03T21:30:00+09:00",
+        "record_date": "2026-11-03",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 37.9
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 35,
+        "recorded_at": "2026-11-02T21:00:00+09:00",
+        "record_date": "2026-11-02",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 34,
+        "recorded_at": "2026-11-01T20:30:00+09:00",
+        "record_date": "2026-11-01",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 33,
+        "recorded_at": "2026-10-31T22:15:00+09:00",
+        "record_date": "2026-10-31",
+        "kind": "mixed",
+        "by_proxy": true,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "hard",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 32,
+        "recorded_at": "2026-10-31T18:10:00+09:00",
+        "record_date": "2026-10-31",
+        "kind": "too_sick",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": false
+      },
+      {
+        "id": 31,
+        "recorded_at": "2026-10-30T19:30:00+09:00",
+        "record_date": "2026-10-30",
+        "kind": "too_sick",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": false
+      },
+      {
+        "id": 30,
+        "recorded_at": "2026-10-29T20:00:00+09:00",
+        "record_date": "2026-10-29",
+        "kind": "too_sick",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": false
+      },
+      {
+        "id": 29,
+        "recorded_at": "2026-10-28T21:00:00+09:00",
+        "record_date": "2026-10-28",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 28,
+        "recorded_at": "2026-10-28T08:10:00+09:00",
+        "record_date": "2026-10-28",
+        "kind": "free_text",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": true
+      },
+      {
+        "id": 27,
+        "recorded_at": "2026-10-27T20:50:00+09:00",
+        "record_date": "2026-10-27",
+        "kind": "answers",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": false
+      },
+      {
+        "id": 26,
+        "recorded_at": "2026-10-26T21:00:00+09:00",
+        "record_date": "2026-10-26",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 25,
+        "recorded_at": "2026-10-25T20:00:00+09:00",
+        "record_date": "2026-10-25",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 36.4
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 24,
+        "recorded_at": "2026-10-23T20:20:00+09:00",
+        "record_date": "2026-10-23",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 23,
+        "recorded_at": "2026-10-22T21:00:00+09:00",
+        "record_date": "2026-10-22",
+        "kind": "answers",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": false
+      },
+      {
+        "id": 22,
+        "recorded_at": "2026-10-20T21:00:00+09:00",
+        "record_date": "2026-10-20",
+        "kind": "free_text",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": true
+      },
+      {
+        "id": 21,
+        "recorded_at": "2026-10-20T07:30:00+09:00",
+        "record_date": "2026-10-20",
+        "kind": "answers",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 36.6
+          }
+        ],
+        "has_free_text": false
+      },
+      {
+        "id": 20,
+        "recorded_at": "2026-10-19T21:15:00+09:00",
+        "record_date": "2026-10-19",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 19,
+        "recorded_at": "2026-10-18T19:30:00+09:00",
+        "record_date": "2026-10-18",
+        "kind": "mixed",
+        "by_proxy": true,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "hard",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "hard",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 37.1
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 18,
+        "recorded_at": "2026-10-17T21:00:00+09:00",
+        "record_date": "2026-10-17",
+        "kind": "too_sick",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": false
+      },
+      {
+        "id": 17,
+        "recorded_at": "2026-10-16T19:50:00+09:00",
+        "record_date": "2026-10-16",
+        "kind": "too_sick",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": false
+      },
+      {
+        "id": 16,
+        "recorded_at": "2026-10-15T20:00:00+09:00",
+        "record_date": "2026-10-15",
+        "kind": "too_sick",
+        "by_proxy": false,
+        "answers": [],
+        "has_free_text": false
+      },
+      {
+        "id": 15,
+        "recorded_at": "2026-10-14T20:30:00+09:00",
+        "record_date": "2026-10-14",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 14,
+        "recorded_at": "2026-10-13T21:00:00+09:00",
+        "record_date": "2026-10-13",
+        "kind": "answers",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": false
+      },
+      {
+        "id": 13,
+        "recorded_at": "2026-10-12T21:00:00+09:00",
+        "record_date": "2026-10-12",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "not_measured",
+            "temperature": null
+          }
+        ],
+        "has_free_text": true
+      },
+      {
+        "id": 12,
+        "recorded_at": "2026-10-10T20:00:00+09:00",
+        "record_date": "2026-10-10",
+        "kind": "mixed",
+        "by_proxy": false,
+        "answers": [
+          {
+            "question_key": "numbness",
+            "value": "present",
+            "temperature": null
+          },
+          {
+            "question_key": "diarrhea",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "stomatitis",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "nausea_appetite",
+            "value": "none",
+            "temperature": null
+          },
+          {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 36.5
+          }
+        ],
+        "has_free_text": true
+      }
+    ],
+    "total": 41
+  }
+}

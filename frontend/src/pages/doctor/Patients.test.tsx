@@ -10,6 +10,7 @@ import {
   mockApi,
   renderRoute,
 } from "../../components/doctor/testing";
+import { fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
 import Patients from "./Patients";
 
@@ -27,12 +28,18 @@ const PATIENTS: DoctorPatient[] = [
     regimen: "FOLFOX",
     created_at: "2026-09-20T10:00:00+09:00",
     register_url: `${BASE}P-DEMO0001`,
+    last_record_date: "2026-11-05",
+    current_course_no: 3,
+    next_visit: "2026-11-10",
   },
   {
     id: "P-EVALA001",
     regimen: "CAPOX",
     created_at: "2026-09-21T10:00:00+09:00",
     register_url: `${BASE}P-EVALA001`,
+    last_record_date: null,
+    current_course_no: null,
+    next_visit: null,
   },
 ];
 
@@ -58,6 +65,49 @@ describe("Patients（D1 患者一覧）", () => {
     const link = await screen.findByRole("link", { name: "P-DEMO0001" });
     expect(link).toHaveAttribute("href", "/doctor/patients/P-DEMO0001");
     expect(within(rowOf("P-EVALA001")).getByText("CAPOX")).toBeInTheDocument();
+  });
+
+  it("最後の記録日・今のコース・次回受診の列（無ければ —）", async () => {
+    mockApi({ [LIST]: { patients: PATIENTS } });
+    renderPatients();
+    await screen.findByRole("link", { name: "P-DEMO0001" });
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent);
+    expect(headers).toEqual(
+      expect.arrayContaining(["最後の記録日", "今のコース", "次回受診"]),
+    );
+    const demo = within(rowOf("P-DEMO0001"));
+    expect(demo.getByText("2026-11-05")).toBeInTheDocument();
+    expect(demo.getByText("第3コース")).toBeInTheDocument();
+    expect(demo.getByText("2026-11-10")).toBeInTheDocument();
+    expect(within(rowOf("P-EVALA001")).getAllByText("—")).toHaveLength(3);
+  });
+
+  it("実際の API の応答（fixture）をそのまま並べる", async () => {
+    mockApi({ [LIST]: fixtureBody("doctor_patients") as object });
+    renderPatients();
+    const demo = within(
+      (await screen.findByRole("link", { name: "P-DEMO0001" })).closest(
+        "tr",
+      ) as HTMLElement,
+    );
+    expect(demo.getByText("第3コース")).toBeInTheDocument();
+  });
+
+  it("「患者を追加」は小見出し付きの枠で、一覧と分かれている", async () => {
+    mockApi({ [LIST]: { patients: PATIENTS } });
+    renderPatients();
+    await screen.findByRole("link", { name: "P-DEMO0001" });
+    const box = screen.getByRole("region", { name: "患者を追加" });
+    expect(
+      within(box).getByRole("heading", { level: 2, name: "患者を追加" }),
+    ).toBeInTheDocument();
+    expect(within(box).getByLabelText("レジメン")).toBeInTheDocument();
+    expect(
+      within(box).getByRole("button", { name: "患者を追加" }),
+    ).toBeInTheDocument();
+    expect(within(box).queryByRole("table")).toBeNull();
   });
 
   it("氏名の欄は無い", async () => {
@@ -99,12 +149,15 @@ describe("Patients（D1 患者一覧）", () => {
     expect(screen.queryByRole("img")).toBeNull();
   });
 
-  it("レジメンを選んで新規作成 → 一覧を取り直し、新しい患者の QR を出す", async () => {
+  it("レジメンを選んで患者を追加 → 一覧を取り直し、新しい患者の QR を出す", async () => {
     const created: DoctorPatient = {
       id: "P-NEW00001",
       regimen: "CAPOX",
       created_at: "2026-11-09T10:00:00+09:00",
       register_url: `${BASE}P-NEW00001`,
+      last_record_date: null,
+      current_course_no: null,
+      next_visit: null,
     };
     const lists = [PATIENTS, [...PATIENTS, created]];
     const fetchMock = mockApi({
@@ -114,7 +167,7 @@ describe("Patients（D1 患者一覧）", () => {
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
     await userEvent.selectOptions(screen.getByLabelText("レジメン"), "CAPOX");
-    await userEvent.click(screen.getByRole("button", { name: "新規作成" }));
+    await userEvent.click(screen.getByRole("button", { name: "患者を追加" }));
     expect(bodiesOf(fetchMock, CREATE)).toEqual([{ regimen: "CAPOX" }]);
     expect(
       await screen.findByRole("img", { name: "P-NEW00001 の登録用QR" }),
@@ -133,7 +186,7 @@ describe("Patients（D1 患者一覧）", () => {
     });
     renderPatients();
     await screen.findByRole("link", { name: "P-DEMO0001" });
-    await userEvent.click(screen.getByRole("button", { name: "新規作成" }));
+    await userEvent.click(screen.getByRole("button", { name: "患者を追加" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "invalid_regimen",
     );
@@ -148,7 +201,7 @@ describe("Patients（D1 患者一覧）", () => {
       mockApi({ [LIST]: { patients: PATIENTS }, [CREATE]: body });
       renderPatients();
       await screen.findByRole("link", { name: "P-DEMO0001" });
-      await userEvent.click(screen.getByRole("button", { name: "新規作成" }));
+      await userEvent.click(screen.getByRole("button", { name: "患者を追加" }));
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "invalid_response",
       );

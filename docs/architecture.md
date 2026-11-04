@@ -295,6 +295,16 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 
 - `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
 
+### UI の見直しで足した経路（2026-11-04 午後、修正ボード）
+| 経路 | 応答 |
+|---|---|
+| `POST /api/patient/{pid}/entries/{entry_id}/undo` | `{ok: true}`。本人の「つらくて書けない」の記録で、作ってから10分以内（`UNDO_WINDOW`）・その後に受付が無いものだけ消す（`db.undo_too_sick_entry`）。他人の記録・無い記録は 404 `not_found`、条件に合わなければ 409 `not_undoable`（P2-5） |
+| `GET /api/doctor/patients`（追加項目） | 各患者に `last_record_date`・`current_course_no`（`config.today()` の今コース）・`next_visit`（今コースの次回受診予定日）。無ければ null（D3-2） |
+| `GET /api/doctor/patients/{pid}/visits` | その患者の受診を新しい順（印刷済み・期限切れも）。受付番号は消えていれば null、`report_available` は開ける ready か（D4-1） |
+| `GET /api/doctor/patients/{pid}/entries` | 直近30件と総数。クローズ回答はコードのまま、自由記載は有無（`has_free_text`）だけで原文は返さない（D4-1） |
+| `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | 各記録に `marks: [{start, end}]`（原文の中の疑われた語の位置、code point）。原文の中で見つからない区間には付けない（D7-2） |
+| `GET /api/doctor/skills/{name}` | `{name, version, description, questions, text}`（読み取り専用）。書式違いは 400 `invalid_name`、`GET /skills` と同じ一覧に無ければ 404 `unknown_skill`、`skills_dir` の外へのシンボリックリンクは 400、壊れた SKILL.md はその code（D5-2） |
+
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
 - `SkillEditor` プロトコル: `async edit(work_root: Path, skill_name: str, request_text: str) -> RunStats`。`SdkSkillEditor` は `claude_agent_sdk.query`（`cwd=work_root`、`setting_sources=[]`（分離モード。書き換えに Skill の読み込みは要らず、ファイルの設定も混ぜない）、`allowed_tools=["Read","Edit","Write"]`、`disallowed_tools` に Bash・Web 系・Task/Agent、`permission_mode="acceptEdits"`、hooks は H1（依頼文の二次検出）・H3（`make_work_copy_h3(work_root, skill_name, logger)`。書き込みを作業コピーの SKILL.md ちょうど1つに限る。`workcopy.py`）・H4・PostToolUse の skill_check（`Write|Edit|MultiEdit` の後に写しを `validate_skill_text`・version 不変で検査し、壊れていれば理由を返して同じ会話の中で直させる。2026-11-04 追加）、`max_turns` は 16、`model=settings.model`）。依頼文の H1 に掛かれば編集せず `failed`（`h1_blocked`）
 - `request_change(conn, skill_name, request_text, *, editor, settings, skills_home) -> int`: 名前を `SKILL_NAME_PATTERN` で検査 → `skill_changes` を作る → `skills_home/.claude/skills/<name>/SKILL.md` だけを一時ディレクトリ（`tempfile.mkdtemp`）の `skills/<name>/SKILL.md`（`work_copy_path`。`.claude/` の下には置かない。CLI がそこへの書き込みを acceptEdits でも保護し、サーバーには許可を出す人がいないため。2026-11-04）に写す → editor → 写しを読み `validate_skill_text` → **version は元のまま**であること（エージェントに上げさせない。変わっていれば元に戻してから比べる）→ `diff.unified(old, new)`（空なら `failed`・`no_change`）→ `pending`（diff・new_text を保存）。どこで失敗しても `failed` と短い error_code。一時ディレクトリは必ず消す。本体には触らない

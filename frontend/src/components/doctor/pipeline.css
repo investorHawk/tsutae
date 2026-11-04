@@ -1,4 +1,4 @@
-/* D5 パイプライン可視化。デモ動画で見栄えがするよう、役ごとに色を分ける。 */
+/* D5 変換ログ（パイプラインの様子）。デモ動画で見栄えがするよう、役ごとに色を分ける。 */
 
 .doctor-app .d-pl-lane--main {
   --lane: #1a4f8b;
@@ -83,8 +83,13 @@
   margin-bottom: 8px;
 }
 
+.doctor-app .d-pl-heading {
+  margin: 12px 0 6px;
+  font-size: 1rem;
+}
+
 .doctor-app .d-pl-lane {
-  min-height: 160px;
+  align-self: start;
   padding: 10px;
   background: var(--lane-soft);
   border-top: 6px solid var(--lane);
@@ -114,6 +119,49 @@
   color: var(--d-muted);
 }
 
+/* 内部のコード（event 名・tool_name・役の名前）。日本語の一行に小さく添える */
+.doctor-app .d-pl-code {
+  font-size: 0.72rem;
+  color: var(--d-muted);
+  word-break: break-all;
+}
+
+/* レーンの要約（件数・最後の出来事）。出来事を1件ずつ積まない */
+.doctor-app .d-pl-lane-count {
+  margin: 0;
+  font-weight: 700;
+}
+
+.doctor-app .d-pl-lane-denied {
+  color: var(--d-danger);
+}
+
+.doctor-app .d-pl-lane-last {
+  margin: 4px 0 0;
+  padding: 3px 8px;
+  font-size: 0.85rem;
+  background: #ffffff;
+  border-left: 3px solid var(--lane);
+  border-radius: 4px;
+  animation: d-pl-in 0.35s ease-out;
+}
+
+.doctor-app .d-pl-lane-last.d-pl-tone--deny {
+  color: var(--d-danger);
+  font-weight: 700;
+}
+
+.doctor-app .d-pl-lane-last-label {
+  color: var(--d-muted);
+}
+
+/* まだ動いていない役は低く（説明と一言だけ） */
+.doctor-app .d-pl-lane-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--d-muted);
+}
+
 .doctor-app .d-pl-state {
   flex: none;
   padding: 1px 8px;
@@ -139,30 +187,21 @@
   }
 }
 
-.doctor-app .d-pl-chips {
-  display: grid;
-  gap: 4px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
+/* --- すべての出来事（折りたたみの時系列のカード） ------------------------- */
+
+.doctor-app .d-pl-all {
+  margin-top: 16px;
 }
 
-.doctor-app .d-pl-chip {
-  padding: 3px 8px;
-  font-size: 0.8rem;
-  background: #ffffff;
-  border-left: 3px solid var(--lane);
-  border-radius: 4px;
-  animation: d-pl-in 0.35s ease-out;
+.doctor-app .d-pl-all > summary {
+  padding: 6px 0;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.doctor-app .d-pl-chip-time {
-  margin-right: 6px;
-  font-variant-numeric: tabular-nums;
-  color: var(--d-muted);
+.doctor-app .d-pl-all[open] > summary {
+  margin-bottom: 8px;
 }
-
-/* --- 時系列のカード ----------------------------------------------------- */
 
 .doctor-app .d-pl-timeline {
   position: relative;
@@ -272,12 +311,7 @@
   background: var(--d-danger);
 }
 
-.doctor-app .d-pl-chip.d-pl-tone--deny {
-  color: var(--d-danger);
-  font-weight: 700;
-}
-
-.doctor-app .d-pl-chip.d-pl-tone--warn {
+.doctor-app .d-pl-lane-last.d-pl-tone--warn {
   background: #fff8e5;
 }
 

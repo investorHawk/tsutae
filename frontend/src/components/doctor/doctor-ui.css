@@ -100,15 +100,16 @@
   border-color: var(--d-primary);
 }
 
+/* 色は styles/doctor.css のリンクの基本色（紺・hover で濃く）に任せる */
 .doctor-app .d-sublink {
   margin-left: 8px;
   font-size: 0.9rem;
-  color: var(--d-primary);
 }
 
 .doctor-app .d-badges {
   display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
@@ -121,15 +122,26 @@
   border-radius: 4px;
 }
 
-.doctor-app .d-badge--fallback {
-  color: #ffffff;
-  background: #4a4a4a;
-}
-
 .doctor-app .d-badge--warn {
   color: #6b4e00;
   background: #ffe9a8;
   border: 1px solid #c9a227;
+}
+
+/* 未処理の記載へのリンク（D2-3）。押せると分かるよう下線と矢印、注意の印の点 */
+.doctor-app .d-warnlink {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.doctor-app .d-warnlink::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  content: "";
+  background: #c9a227;
+  border-radius: 50%;
 }
 
 .doctor-app .d-reception {
@@ -171,6 +183,29 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+/* 枠で囲んだ操作の塊（患者を追加。D3-1） */
+.doctor-app .d-box {
+  max-width: 760px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 8px;
+}
+
+.doctor-app .d-box h2 {
+  margin: 0 0 8px;
+}
+
+.doctor-app .d-box .d-inline-form {
+  margin-bottom: 8px;
+}
+
+.doctor-app .d-box > p:last-child {
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 /* 登録用QR（D1） */
@@ -230,8 +265,37 @@
   border-radius: 8px;
 }
 
-.doctor-app .d-course-form h2 {
+.doctor-app .d-course-form .d-form-help {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+/* 患者の画面（D2）の節: コース・記録・受診 */
+.doctor-app .d-section {
+  margin-top: 32px;
+}
+
+.doctor-app .d-section > h2 {
+  padding-bottom: 4px;
   margin-top: 0;
+  border-bottom: 2px solid var(--d-border);
+}
+
+.doctor-app .d-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.doctor-app .d-answer--hard {
+  font-weight: 700;
+}
+
+.doctor-app .d-nowrap {
+  white-space: nowrap;
 }
 
 .doctor-app .d-form-grid {
@@ -383,10 +447,31 @@
   font-size: 0.9rem;
 }
 
-/* ログイン */
+/* ログイン（D1-1）。アプリ名と一文を添えた枠 */
 .doctor-app .d-login {
-  max-width: 360px;
+  max-width: 380px;
+  padding: 24px 28px;
   margin: 48px auto;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+}
+
+.doctor-app .d-login-brand {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--d-primary);
+  letter-spacing: 0.08em;
+}
+
+.doctor-app .d-login h1 {
+  margin-bottom: 4px;
+}
+
+.doctor-app .d-login h1 + p {
+  margin-top: 0;
+  margin-bottom: 16px;
 }
 
 .doctor-app .d-login-form {
@@ -413,8 +498,9 @@
   gap: 4px 8px;
 }
 
+/* 印刷の案内。印刷待ちの表の上に1回だけ（D2-1） */
 .d-print-hint {
-  flex-basis: 100%;
+  margin: 0 0 8px;
   font-size: 0.85em;
 }
 

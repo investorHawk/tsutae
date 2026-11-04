@@ -14,7 +14,10 @@ import {
   createPatient,
   createSkillChange,
   getPipelineEvents,
+  getSkill,
   listCourses,
+  listPatientEntries,
+  listPatientVisits,
   listPatients,
   listSkillChanges,
   listSkills,
@@ -35,6 +38,7 @@ import {
   listEntries,
   registerPatient,
   submitVisit,
+  undoEntry,
 } from "./patient";
 import type { Course, EntryCreate, Regimen } from "./types";
 
@@ -70,9 +74,12 @@ const register: Call = (f) => registerPatient(String(req(f).pid));
 const questions: Call = (f) => getQuestions(pidIn(f));
 const addEntry: Call = (f) => createEntry(pidIn(f), f.request as EntryCreate);
 const entries: Call = (f) => listEntries(pidIn(f));
+const undo: Call = (f) => undoEntry(pidIn(f), idIn(f));
 const visit: Call = (f) => submitVisit(String(req(f).reception_no));
 const doctorLogin: Call = (f) => login(String(req(f).password));
 const courses: Call = (f) => listCourses(pidIn(f));
+const patientVisits: Call = (f) => listPatientVisits(pidIn(f));
+const patientEntries: Call = (f) => listPatientEntries(pidIn(f));
 const course: Call = (f) => saveCourse(f.request as Course);
 const visits: Call = () => listVisits();
 const unprocessed: Call = (f) => listUnprocessed(idIn(f));
@@ -80,6 +87,8 @@ const events: Call = (f) => getPipelineEvents(idIn(f));
 const printed: Call = (f) => markPrinted(idIn(f));
 const regenerate: Call = (f) => regenerateVisit(idIn(f));
 const skills: Call = () => listSkills();
+/** 経路の最後の Skill 名（GET skills/{name}）。 */
+const skill: Call = (f) => getSkill(f.path.replace(/^.*\//, ""));
 const change: Call = (f) =>
   createSkillChange(String(req(f).skill_name), String(req(f).request_text));
 const approve: Call = (f) => approveSkillChange(idIn(f));
@@ -96,6 +105,9 @@ const CALLS: Readonly<Record<string, Call>> = {
   patient_entry_create_invalid: addEntry,
   patient_entries: entries,
   patient_entries_not_logged_in: entries,
+  patient_entry_undo: undo,
+  patient_entry_undo_not_found: undo,
+  patient_entry_undo_not_undoable: undo,
   visit,
   visit_invalid: visit,
   visit_no_course: visit,
@@ -106,6 +118,11 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_patient_create: (f) => createPatient(req(f).regimen as Regimen),
   doctor_courses: courses,
   doctor_courses_unknown_patient: courses,
+  doctor_patient_visits: patientVisits,
+  doctor_patient_visits_open: patientVisits,
+  doctor_patient_visits_unknown_patient: patientVisits,
+  doctor_patient_entries: patientEntries,
+  doctor_patient_entries_unknown_patient: patientEntries,
   doctor_course_save: course,
   doctor_course_save_invalid: course,
   doctor_visits: visits,
@@ -124,6 +141,8 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_regenerate_not_found: regenerate,
   doctor_skills: skills,
   doctor_skills_invalid: skills,
+  doctor_skill: skill,
+  doctor_skill_unknown: skill,
   doctor_skill_change_create: change,
   doctor_skill_change_create_failed: change,
   doctor_skill_change_create_invalid_name: change,

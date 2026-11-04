@@ -11,7 +11,10 @@ interface CourseFormProps {
 
 type TextField = Exclude<keyof CourseFormValues, "id">;
 
-/** D2 の実投与日の登録・修正フォーム。修正中はコース番号を変えられない。 */
+/**
+ * D2 の実投与日の登録・修正フォーム。修正中はコース番号を変えられない。
+ * 「コース」の節（h2）の下に置くので見出しは h3。延期の説明は入力欄の上（D4-2）。
+ */
 export default function CourseForm({
   values,
   busy,
@@ -36,7 +39,11 @@ export default function CourseForm({
 
   return (
     <form className="d-course-form" onSubmit={handleSubmit} noValidate>
-      <h2>{editing ? `第${values.course_no}コースを修正` : "コースを追加"}</h2>
+      <h3>{editing ? `第${values.course_no}コースを修正` : "コースを追加"}</h3>
+      <p className="d-muted d-form-help">
+        延期があれば、実投与日を実際の日に直し、予定日に元の日を入れます。Day
+        は実投与日から数え直します。
+      </p>
       <div className="d-form-grid">
         <label className="d-field">
           <span>コース番号</span>
@@ -76,10 +83,6 @@ export default function CourseForm({
           </button>
         ) : null}
       </div>
-      <p className="d-muted">
-        延期があれば、実投与日を実際の日に直し、予定日に元の日を入れます。Day
-        は実投与日から数え直します。
-      </p>
     </form>
   );
 }

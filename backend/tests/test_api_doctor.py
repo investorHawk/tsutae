@@ -27,6 +27,8 @@ PROTECTED: list[tuple[str, str, dict | None]] = [
     ("get", "/api/doctor/patients", None),
     ("post", "/api/doctor/patients", {"regimen": "FOLFOX"}),
     ("get", "/api/doctor/patients/P-AAAAAAAA/courses", None),
+    ("get", "/api/doctor/patients/P-AAAAAAAA/visits", None),
+    ("get", "/api/doctor/patients/P-AAAAAAAA/entries", None),
     (
         "post",
         "/api/doctor/courses",
@@ -38,6 +40,7 @@ PROTECTED: list[tuple[str, str, dict | None]] = [
     ("get", "/api/doctor/visits/1/unprocessed", None),
     ("get", "/api/doctor/pipeline/1/events", None),
     ("get", "/api/doctor/skills", None),
+    ("get", "/api/doctor/skills/regimen-folfox", None),
     (
         "post",
         "/api/doctor/skill-changes",
@@ -231,7 +234,15 @@ def test_list_patients(tmp_path: Path, fixed_today: str) -> None:
     patients = r.json()["patients"]
     assert [p["id"] for p in patients] == [first, second]
     assert patients[1]["regimen"] == "CAPOX"
-    assert set(patients[0]) == {"id", "regimen", "created_at", "register_url"}
+    assert set(patients[0]) == {
+        "id",
+        "regimen",
+        "created_at",
+        "register_url",
+        "last_record_date",
+        "current_course_no",
+        "next_visit",
+    }
     assert patients[0]["register_url"] == (
         f"https://tsutae.example/register?pid={first}"
     )

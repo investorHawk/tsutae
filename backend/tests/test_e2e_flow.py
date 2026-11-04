@@ -353,6 +353,8 @@ def _check_unprocessed(client: TestClient, visit_id: int) -> None:
                 "record_date": "2026-11-05",
                 "reason": "unknown_before_honorific",
                 "text": UNPROCESSED_TEXT,
+                # 疑われた語「磯鷲さん」の原文の中の位置（D7-2）
+                "marks": [{"start": 0, "end": 4}],
             }
         ]
     }

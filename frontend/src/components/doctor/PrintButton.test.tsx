@@ -6,7 +6,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import PrintButton, { PRINT_LOAD_TIMEOUT_MS } from "./PrintButton";
+import PrintButton, { PRINT_HINT, PRINT_LOAD_TIMEOUT_MS } from "./PrintButton";
 
 const URL_ = "/api/doctor/visits/12/report";
 
@@ -34,18 +34,21 @@ function stubPrint(impl: () => void = () => {}) {
 }
 
 describe("PrintButton", () => {
-  it("押すまで iframe を作らず、別タブで開くリンクと案内の一行は常にある", () => {
+  it("押すまで iframe を作らず、別タブで開くリンクは常にある", () => {
     render(<PrintButton url={URL_} />);
     expect(document.querySelector("iframe")).toBeNull();
     const link = screen.getByRole("link", { name: "レポートを開く" });
     expect(link).toHaveAttribute("href", URL_);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
-    expect(
-      screen.getByText(
-        "印刷ダイアログが開きます。開かなければ『レポートを開く』から ⌘P",
-      ),
-    ).toBeInTheDocument();
+  });
+
+  it("案内の一行はボタンに付けない（印刷待ちの表の上に1回だけ出す。D2-1）", () => {
+    render(<PrintButton url={URL_} />);
+    expect(screen.queryByText(PRINT_HINT)).toBeNull();
+    expect(PRINT_HINT).toBe(
+      "印刷ダイアログが開きます。開かなければ『レポートを開く』から ⌘P",
+    );
   });
 
   it("押すと同じオリジンの非表示 iframe に読み込み、load の後に print を呼ぶ", async () => {

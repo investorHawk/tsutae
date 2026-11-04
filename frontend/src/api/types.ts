@@ -151,11 +151,19 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * 患者一覧の1件。last_record_date・current_course_no・next_visit は無ければ null
+ * （項目は必ずある）。今のコースは今日（サーバーの config.today()）で決め、次回受診は
+ * 今のコースの次回受診予定日。
+ */
 export interface DoctorPatient {
   id: string;
   regimen: Regimen;
   created_at: IsoDateTime;
   register_url: string;
+  last_record_date: IsoDate | null;
+  current_course_no: number | null;
+  next_visit: IsoDate | null;
 }
 
 export interface PatientsResponse {
@@ -174,6 +182,49 @@ export interface CreatePatientResponse {
 
 export interface CoursesResponse {
   courses: Course[];
+}
+
+/**
+ * 患者の画面（D2）の受診1件（新しい順）。印刷済み・期限切れも出る（受付番号は null）。
+ * report_available はレポートを開ける（受付番号が残っている ready）とき true。
+ */
+export interface PatientVisit {
+  id: number;
+  reception_no: string | null;
+  visit_date: IsoDate;
+  created_at: IsoDateTime;
+  status: VisitStatus;
+  fallback: boolean;
+  report_available: boolean;
+  unprocessed_count: number;
+}
+
+export interface PatientVisitsResponse {
+  visits: PatientVisit[];
+}
+
+/** 患者の画面の記録のクローズ回答（コードのまま。表示名は画面で引く）。 */
+export interface DoctorEntryAnswer {
+  question_key: string;
+  value: AnswerValue;
+  temperature: number | null;
+}
+
+/** 患者の画面の記録1件。自由記載は有無だけ（原文は D6 だけに出る）。 */
+export interface DoctorEntry {
+  id: number;
+  recorded_at: IsoDateTime;
+  record_date: IsoDate;
+  kind: EntryKind;
+  by_proxy: boolean;
+  answers: DoctorEntryAnswer[];
+  has_free_text: boolean;
+}
+
+/** 直近の記録（新しい順、上限あり）と、その患者の記録の総数。 */
+export interface PatientEntriesSummaryResponse {
+  entries: DoctorEntry[];
+  total: number;
 }
 
 /**
@@ -202,6 +253,13 @@ export interface UnprocessedItem {
   /** 検出規則名（例 "unknown_before_honorific"） */
   reason: string;
   text: string;
+  /** 疑われた語の text の中の位置（code point の [start, end)。位置順・重なりなし） */
+  marks: TextMark[];
+}
+
+export interface TextMark {
+  start: number;
+  end: number;
 }
 
 export interface UnprocessedResponse {
@@ -244,6 +302,18 @@ export interface InvalidSkill {
 export interface SkillsResponse {
   skills: SkillInfo[];
   invalid: InvalidSkill[];
+}
+
+/**
+ * GET /api/doctor/skills/{name}: 1つの Skill の今の中身（設定画面で依頼の前に見せる。
+ * 読み取り専用）。questions は regimen の質問（report-format は空）、text は SKILL.md の全文。
+ */
+export interface SkillContentResponse {
+  name: string;
+  version: number;
+  description: string;
+  questions: Question[];
+  text: string;
 }
 
 export interface CreateSkillChangeRequest {

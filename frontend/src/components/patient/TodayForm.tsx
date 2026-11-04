@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { isApiError } from "../../api/http";
 import { createEntry, getQuestions } from "../../api/patient";
 import type { EntryCreate, Question } from "../../api/types";
@@ -12,9 +12,10 @@ import {
   type EntryFormState,
   type TemperatureProblem,
 } from "./entryForm";
+import { summarizeEntry, summarySourceOf } from "./entrySummary";
 import FreeTextField from "./FreeTextField";
 import { LoadFailed, Loading } from "./LoadStatus";
-import { DoneMessage, ErrorMessage, Notices } from "./Messages";
+import { DoneMessage, ErrorMessage } from "./Messages";
 import {
   GENERIC_ERROR_KEY,
   NOT_REGISTERED_KEY,
@@ -22,6 +23,7 @@ import {
 } from "./patientApi";
 import ProxyToggle from "./ProxyToggle";
 import QuestionList from "./QuestionList";
+import TodayDone, { type SavedRecord } from "./TodayDone";
 import TooSickButton, { SendingMessage } from "./TooSickButton";
 import { useAsync } from "./useAsync";
 
@@ -31,8 +33,11 @@ type Origin = "too_sick" | "submit";
 type Phase =
   | { name: "editing" }
   | { name: "sending"; from: Origin }
-  | { name: "done"; messageKey: string; notices: readonly string[] }
+  | { name: "done"; saved: SavedRecord }
   | { name: "not_registered" };
+
+/** 「取り消しました」（取り消して記録する前の画面に戻った） */
+const UNDONE_KEY = "today.undone";
 
 /** 自由記載が長すぎる（送る前の検査と、サーバーの 422 free_text_too_long）。 */
 const FREE_TEXT_TOO_LONG_KEY = "today.free_text_too_long";
@@ -44,9 +49,17 @@ const NO_ERRORS: ReadonlyMap<string, TemperatureProblem> = new Map();
  * 今日の記録（P1）の本体。段階0「つらくて書けない」→ 段階1 クローズ質問 → 段階2 自由記載。
  * 送るのは答えたものだけ。空なら送らない。送信後は notices の定型文をそのまま出す。
  * 入力済みで「つらくて書けない」を押したら、入力を捨てることを確かめてから送る。
+ * 記録した後は TodayDone（要約・取り消し・追加で記録する）。記録できたら onSaved を呼ぶ。
  */
-export default function TodayForm({ pid }: { pid: string }) {
+export default function TodayForm({
+  pid,
+  onSaved,
+}: {
+  pid: string;
+  onSaved?: () => void;
+}) {
   const { t } = usePatientStrings();
+  const hintId = useId();
   const loaded = useAsync(() => getQuestions(pid), pid);
   const formRef = useRef<HTMLFormElement>(null);
   const [form, setForm] = useState<EntryFormState>(EMPTY_FORM);
@@ -55,6 +68,7 @@ export default function TodayForm({ pid }: { pid: string }) {
   const [temperatureTried, setTemperatureTried] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [focusRound, setFocusRound] = useState(0);
+  const [infoKey, setInfoKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (focusRound > 0) {
@@ -74,21 +88,47 @@ export default function TodayForm({ pid }: { pid: string }) {
   ) {
     return <ErrorMessage messageKey={NOT_REGISTERED_KEY} />;
   }
+
+  function startOver() {
+    setForm(EMPTY_FORM);
+    setError(null);
+    setTemperatureTried(false);
+    setConfirming(false);
+    setInfoKey(null);
+    setPhase({ name: "editing" });
+  }
+
+  function undone() {
+    setInfoKey(UNDONE_KEY);
+    setPhase({ name: "editing" });
+  }
+
   if (phase.name === "done") {
     return (
-      <>
-        <DoneMessage messageKey={phase.messageKey} />
-        <Notices keys={phase.notices} />
-      </>
+      <TodayDone
+        pid={pid}
+        saved={phase.saved}
+        onUndone={undone}
+        onAddMore={startOver}
+      />
     );
   }
 
   async function send(entry: EntryCreate, doneKey: string, from: Origin) {
     setPhase({ name: "sending", from });
     setError(null);
+    setInfoKey(null);
     try {
       const res = await createEntry(pid, entry);
-      setPhase({ name: "done", messageKey: doneKey, notices: res.notices });
+      const saved: SavedRecord = {
+        entryId: res.entry_id,
+        messageKey: doneKey,
+        notices: res.notices,
+        items: summarizeEntry(summarySourceOf(entry, questions)),
+        undoable: entry.too_sick === true,
+      };
+      setPhase({ name: "done", saved });
+      onSaved?.();
     } catch (err) {
       if (isNotRegistered(err)) {
         setPhase({ name: "not_registered" });
@@ -139,9 +179,11 @@ export default function TodayForm({ pid }: { pid: string }) {
     hasInput(form) &&
     unansweredCount(questions, form) > 0;
   const sendingFrom = phase.name === "sending" ? phase.from : null;
+  const blocked = !hasInput(form);
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} noValidate>
+      {infoKey && <DoneMessage messageKey={infoKey} />}
       <ProxyToggle
         checked={form.byProxy}
         disabled={sending}
@@ -177,10 +219,16 @@ export default function TodayForm({ pid }: { pid: string }) {
       {showIncomplete && <p>{t("today.incomplete")}</p>}
       {error?.at === "submit" && <ErrorMessage messageKey={error.key} />}
       {sendingFrom === "submit" && <SendingMessage />}
+      {blocked && (
+        <p id={hintId} className="p-hint">
+          {t("today.submit_hint")}
+        </p>
+      )}
       <button
         type="submit"
         className="p-button--primary"
-        disabled={sending || !hasInput(form)}
+        disabled={sending || blocked}
+        aria-describedby={blocked ? hintId : undefined}
       >
         {t("today.submit")}
       </button>

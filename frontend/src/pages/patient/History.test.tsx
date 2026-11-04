@@ -15,6 +15,23 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** 「11月2日（月）8:10」の形（定型文 history.date・weekday.* から作る）。 */
+function dateText(month: number, day: number, weekday: number, time: string) {
+  const date = s("history.date")
+    .replace("{month}", String(month))
+    .replace("{day}", String(day))
+    .replace("{weekday}", s(`weekday.${weekday}`));
+  return `${date}${time}`;
+}
+
+function summaryOf(item: HTMLElement): HTMLElement {
+  const summary = item.querySelector("summary");
+  if (!summary) {
+    throw new Error("summary is missing");
+  }
+  return summary;
+}
+
 function renderHistory() {
   return renderPatient(ROUTES, "/history");
 }
@@ -51,9 +68,9 @@ describe("History (P2)", () => {
     renderHistory();
     const rows = await items();
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toHaveTextContent("2026-11-02 08:10");
-    expect(rows[1]).toHaveTextContent("2026-10-31 19:30");
-    expect(rows[2]).toHaveTextContent("2026-10-29 21:05");
+    expect(rows[0]).toHaveTextContent(dateText(11, 2, 1, "8:10"));
+    expect(rows[1]).toHaveTextContent(dateText(10, 31, 6, "19:30"));
+    expect(rows[2]).toHaveTextContent(dateText(10, 29, 4, "21:05"));
     expect(
       callsTo(fetchMock, "GET", `/api/patient/${PID}/entries`),
     ).toHaveLength(1);
@@ -80,6 +97,84 @@ describe("History (P2)", () => {
 
     expect(newest).toHaveTextContent(ENTRIES[2]!.free_text!);
     expect(newest).not.toHaveTextContent(s("history.proxy"));
+  });
+
+  it("each record is one line: the date and a short summary, closed until opened", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [newest, middle, oldest] = await items();
+    for (const item of [newest!, middle!, oldest!]) {
+      expect(item.querySelector("details")).not.toHaveAttribute("open");
+    }
+    const line = summaryOf(middle!);
+    expect(line).toHaveTextContent(dateText(10, 31, 6, "19:30"));
+    expect(line).toHaveTextContent(
+      `${s("symptom.diarrhea")} ${s("answer.present")}`,
+    );
+    expect(line).toHaveTextContent(
+      `${s("symptom.fever")} ${s("history.temperature_value").replace("{value}", "37.9")}`,
+    );
+    expect(line).toHaveTextContent(
+      `${s("history.free_text")} ${s("history.free_text_present")}`,
+    );
+    // 一行には質問文と自由記載の中身を出さない（開くと出る）
+    expect(line).not.toHaveTextContent(questionText("diarrhea"));
+    expect(line).not.toHaveTextContent(ENTRIES[1]!.free_text!);
+    expect(summaryOf(oldest!)).toHaveTextContent(s("history.too_sick"));
+    expect(summaryOf(newest!)).toHaveTextContent(
+      `${s("history.free_text")} ${s("history.free_text_present")}`,
+    );
+  });
+
+  it("the answers in the line and in the details are bold", async () => {
+    mockPatientApi();
+    renderHistory();
+    const [, middle] = await items();
+    expect(
+      within(summaryOf(middle!)).getByText(s("answer.present")).tagName,
+    ).toBe("STRONG");
+    expect(middle!.querySelector("dd")).toHaveTextContent(s("answer.present"));
+  });
+
+  it("the line is a native summary (focusable) and opens the details", async () => {
+    // Tab で届く・Enter や Space で開くのはブラウザの summary の働き（jsdom は Tab の順に
+    // summary を入れず、押下を click にしない）。ここでは focus できることと、押すと開くことを見る
+    mockPatientApi();
+    renderHistory();
+    const [newest] = await items();
+    const details = newest!.querySelector("details")!;
+    summaryOf(newest!).focus();
+    expect(summaryOf(newest!)).toHaveFocus();
+    await userEvent.click(summaryOf(newest!));
+    expect(details).toHaveAttribute("open");
+  });
+
+  it("an unknown question key: the recorded question text is used in the line", async () => {
+    mockPatientApi({
+      entries: () =>
+        jsonResponse({
+          entries: [
+            {
+              ...ENTRIES[1]!,
+              kind: "answers",
+              answers: [
+                {
+                  question_key: "new_question",
+                  value: "hard",
+                  temperature: null,
+                  question_text: "new question text",
+                },
+              ],
+              free_text: null,
+            },
+          ],
+        }),
+    });
+    renderHistory();
+    const [only] = await items();
+    expect(summaryOf(only!)).toHaveTextContent(
+      `new question text ${s("answer.hard")}`,
+    );
   });
 
   it("the free text has the wrapping class (long letters and digits wrap)", async () => {

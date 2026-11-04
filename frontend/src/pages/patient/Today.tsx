@@ -25,7 +25,10 @@ export default function Today() {
   const navigate = useNavigate();
   const [pid] = useState(loadPid);
   // 「登録しました」は登録の直後の1回だけ。履歴の state は消して、再読み込みでは出さない
-  const [justRegistered] = useState(() => cameFromRegister(location.state));
+  // 記録した後は消す（「登録しました」と「記録しました」を縦に並べない）
+  const [justRegistered, setJustRegistered] = useState(() =>
+    cameFromRegister(location.state),
+  );
   useEffect(() => {
     if (cameFromRegister(location.state)) {
       navigate(location.pathname, { replace: true, state: null });
@@ -36,7 +39,11 @@ export default function Today() {
       <h1>{t("today.title")}</h1>
       {justRegistered && <DoneMessage messageKey="register.done" />}
       {pid ? (
-        <TodayForm key={location.key} pid={pid} />
+        <TodayForm
+          key={location.key}
+          pid={pid}
+          onSaved={() => setJustRegistered(false)}
+        />
       ) : (
         <ErrorMessage messageKey={NOT_REGISTERED_KEY} />
       )}

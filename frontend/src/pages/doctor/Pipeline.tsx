@@ -13,6 +13,7 @@ import {
   parseVisitId,
 } from "../../components/doctor/input";
 import PipelineBoard from "../../components/doctor/PipelineBoard";
+import { liveStatus } from "../../components/doctor/pipelineEvents";
 import StatusBadge from "../../components/doctor/StatusBadge";
 import { usePolling } from "../../components/doctor/usePolling";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
@@ -63,8 +64,9 @@ function toSnapshot(body: unknown): Snapshot {
 }
 
 /**
- * D5 パイプライン可視化。2秒ごとに取り直し、ready / failed / printed を見たら
- * もう1回だけ取り直して止める。
+ * D5 変換ログ（パイプラインの様子）。2秒ごとに取り直し、ready / failed / printed を見たら
+ * もう1回だけ取り直して止める。終わった状態を見た時点で「止めました」と出す（最後の
+ * 1回は遅れて記録される出来事のためで、画面の上では終わっている）。
  * 受診ごとに描き直す（別の受診へ移ったら、前の受診の状態・出来事・失敗・停止を引き継がず、
  * 前の受診の遅い応答も捨てる。usePolling の値は描いている間だけのもの）。
  */
@@ -90,16 +92,17 @@ function PipelineView({ visitId }: { visitId: string | undefined }) {
     },
   });
   const snap = polling.data;
+  const live = liveStatus(snap?.status ?? null, polling.stopped);
 
   return (
     <section className="page d-pipeline">
-      <h1>パイプライン</h1>
+      <h1>変換ログ</h1>
       <div className="d-toolbar">
         <span>受診 #{id ?? "?"}</span>
         {snap ? <StatusBadge status={snap.status} /> : null}
         {id !== null ? (
-          <span className={`d-live ${polling.stopped ? "" : "d-live--on"}`}>
-            {polling.stopped ? "更新を止めました" : "2秒ごとに更新中"}
+          <span className={`d-live ${live.on ? "d-live--on" : ""}`}>
+            {live.text}
           </span>
         ) : null}
         <Link className="d-sublink" to="/doctor">

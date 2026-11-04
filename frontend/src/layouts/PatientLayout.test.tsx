@@ -34,6 +34,26 @@ describe("PatientLayout", () => {
     expect(await screen.findByText(NOTICE)).toBeInTheDocument();
   });
 
+  it("the notice sits in the footer with the same side padding as the page (PC-1)", async () => {
+    renderAt("/today");
+    const notice = await screen.findByText(NOTICE);
+    expect(notice.closest(".patient-footer")).not.toBeNull();
+  });
+
+  it("pages with the bottom tabs leave room for them; /register has no tabs", async () => {
+    const { container, unmount } = renderAt("/today");
+    await screen.findByText("today");
+    expect(container.querySelector(".patient-app")).toHaveClass(
+      "patient-app--with-nav",
+    );
+    unmount();
+    const second = renderAt("/register");
+    await screen.findByText("register");
+    expect(second.container.querySelector(".patient-app")).not.toHaveClass(
+      "patient-app--with-nav",
+    );
+  });
+
   it("does not repeat the notice on /register (the page shows it itself)", async () => {
     renderAt("/register");
     expect(await screen.findByText("register")).toBeInTheDocument();

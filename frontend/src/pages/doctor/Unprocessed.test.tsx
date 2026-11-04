@@ -1,6 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { countOf, mockApi, renderRoute } from "../../components/doctor/testing";
+import { fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
 import Unprocessed from "./Unprocessed";
 
@@ -21,6 +22,7 @@ describe("Unprocessed", () => {
             record_date: "2026-11-03",
             reason: "unknown_before_honorific",
             text: RAW,
+            marks: [],
           },
         ],
       },
@@ -31,8 +33,66 @@ describe("Unprocessed", () => {
     ).toBeInTheDocument();
     expect(await screen.findByText(RAW)).toHaveClass("d-raw");
     expect(screen.getByText(/2026-11-03/)).toBeInTheDocument();
-    expect(screen.getByText(/unknown_before_honorific/)).toBeInTheDocument();
-    expect(screen.getByText(/敬称の前/)).toBeInTheDocument();
+    expect(screen.queryByText(/unknown_before_honorific/)).toBeNull();
+    expect(screen.getByText(/敬称の前/)).toHaveAttribute(
+      "title",
+      "unknown_before_honorific",
+    );
+  });
+
+  it("疑われた語に印（<mark>）を付ける（D7-2）", async () => {
+    const text = "磯鷲さんにもらった漢方をのんでみた";
+    mockApi({
+      "GET /api/doctor/visits/12/unprocessed": {
+        entries: [
+          {
+            entry_id: 38,
+            record_date: "2026-11-05",
+            reason: "unknown_before_honorific",
+            text,
+            marks: [{ start: 0, end: 4 }],
+          },
+        ],
+      },
+    });
+    const { container } = renderRoute(
+      "/doctor/unprocessed/12",
+      ROUTE,
+      <Unprocessed />,
+    );
+    const mark = await screen.findByText("磯鷲さん");
+    expect(mark.tagName).toBe("MARK");
+    expect(container.querySelector(".d-raw")).toHaveTextContent(text);
+    expect(container.querySelectorAll("mark")).toHaveLength(1);
+  });
+
+  it("実際の API の応答（fixture）の印をそのまま描く", async () => {
+    mockApi({
+      "GET /api/doctor/visits/12/unprocessed": fixtureBody(
+        "doctor_unprocessed",
+      ) as object,
+    });
+    renderRoute("/doctor/unprocessed/12", ROUTE, <Unprocessed />);
+    expect((await screen.findByText("磯鷲さん")).tagName).toBe("MARK");
+  });
+
+  it("規則を知らなければ一般の説明にする（コードは出さない）", async () => {
+    mockApi({
+      "GET /api/doctor/visits/12/unprocessed": {
+        entries: [
+          {
+            entry_id: 31,
+            record_date: "2026-11-03",
+            reason: "new_rule",
+            text: RAW,
+            marks: [],
+          },
+        ],
+      },
+    });
+    renderRoute("/doctor/unprocessed/12", ROUTE, <Unprocessed />);
+    expect(await screen.findByText(/伏せ字漏れの疑い$/)).toBeInTheDocument();
+    expect(screen.queryByText(/new_rule/)).toBeNull();
   });
 
   it.each([
@@ -43,7 +103,13 @@ describe("Unprocessed", () => {
     mockApi({
       "GET /api/doctor/visits/12/unprocessed": {
         entries: [
-          { entry_id: 31, record_date: "2026-11-03", reason, text: RAW },
+          {
+            entry_id: 31,
+            record_date: "2026-11-03",
+            reason,
+            text: RAW,
+            marks: [],
+          },
         ],
       },
     });

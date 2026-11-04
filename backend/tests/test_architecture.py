@@ -335,6 +335,7 @@ def _patient_responses(client: Any, pid: str, other: str) -> list[Any]:
         client.post(f"/api/patient/{pid}/entries", json={"answers": "x"}),
         client.get(f"/api/patient/{other}/questions"),
         client.get(f"/api/patient/{other}/entries"),
+        client.post(f"/api/patient/{pid}/entries/999999/undo"),
         client.post("/api/visit", json={"reception_no": "A-024"}),
         client.post("/api/visit", json={"reception_no": ""}),
     ]

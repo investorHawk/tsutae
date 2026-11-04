@@ -164,12 +164,13 @@ def list_visits(
     statuses: tuple[str, ...] | None = None,
     *,
     active_only: bool = False,
+    patient_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """受診を id 昇順（受付順）で返す。
 
     statuses で状態を絞れる。active_only=True なら受付番号が残っている受診だけ
     （印刷済み・期限切れを除く。期限切れは status を変えないので、印刷待ちの一覧は
-    これで絞る）。
+    これで絞る）。patient_id があればその患者の受診だけ。
     """
     clauses: list[str] = []
     params: tuple[str, ...] = ()
@@ -182,6 +183,9 @@ def list_visits(
         clauses.append(f"status IN ({placeholders(len(params))})")
     if active_only:
         clauses.append("reception_no IS NOT NULL")
+    if patient_id is not None:
+        clauses.append("patient_id = ?")
+        params = (*params, patient_id)
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = conn.execute(
         f"SELECT {_VISIT_COLUMNS} FROM visits{where} ORDER BY id", params

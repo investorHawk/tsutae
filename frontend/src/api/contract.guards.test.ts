@@ -13,10 +13,13 @@ import {
   isCreatePatientResponse,
   isCreateSkillChangeResponse,
   isOkTrue as isDoctorOk,
+  isPatientEntriesSummaryResponse,
+  isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
   isSavedCourse,
   isSkillChangesResponse,
+  isSkillContentResponse,
   isSkillsResponse,
   isUnprocessedResponse,
   isVisitsResponse,
@@ -42,6 +45,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   patient_questions: isQuestionsResponse,
   patient_entry_create: isCreateEntryResponse,
   patient_entries: isPatientEntriesResponse,
+  patient_entry_undo: isPatientOk,
   patient_strings: (body) => validatePatientStrings(body) !== null,
   visit: isVisitResponse,
   doctor_login: isDoctorOk,
@@ -49,6 +53,9 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_patients: isPatientsResponse,
   doctor_patient_create: isCreatePatientResponse,
   doctor_courses: isCoursesResponse,
+  doctor_patient_visits: isPatientVisitsResponse,
+  doctor_patient_visits_open: isPatientVisitsResponse,
+  doctor_patient_entries: isPatientEntriesSummaryResponse,
   doctor_course_save: savedCourse,
   doctor_visits: isVisitsResponse,
   doctor_visits_after_printed: isVisitsResponse,
@@ -60,6 +67,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_regenerate: isDoctorOk,
   doctor_skills: isSkillsResponse,
   doctor_skills_invalid: isSkillsResponse,
+  doctor_skill: isSkillContentResponse,
   doctor_skill_change_create: isCreateSkillChangeResponse,
   doctor_skill_change_create_failed: isCreateSkillChangeResponse,
   doctor_skill_changes: isSkillChangesResponse,
@@ -114,6 +122,15 @@ const BROKEN: Array<[string, string, Mutate]> = [
     (b) => delete b.visits[0].unprocessed_count,
   ],
   ["doctor_visits", "visits が無い", (b) => delete b.visits],
+  // Skill の中身（GET skills/{name}）
+  ["doctor_skill", "text が無い", (b) => delete b.text],
+  ["doctor_skill", "questions が配列でない", (b) => (b.questions = {})],
+  [
+    "doctor_skill",
+    "質問の answer_type が知らない値",
+    (b) => (b.questions[0].answer_type = "free"),
+  ],
+  ["doctor_skill", "version が文字列", (b) => (b.version = "1")],
   // Skill の一覧（invalid）
   ["doctor_skills", "invalid が無い", (b) => delete b.invalid],
   ["doctor_skills", "invalid が配列でない", (b) => (b.invalid = {})],
@@ -186,7 +203,79 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "entry_id が文字列",
     (b) => (b.entries[0].entry_id = "38"),
   ],
+  ["doctor_unprocessed", "marks が無い", (b) => delete b.entries[0].marks],
+  [
+    "doctor_unprocessed",
+    "印の終わりが文の外",
+    (b) => (b.entries[0].marks = [{ start: 0, end: 999 }]),
+  ],
+  [
+    "doctor_unprocessed",
+    "印が空（start = end）",
+    (b) => (b.entries[0].marks = [{ start: 2, end: 2 }]),
+  ],
+  [
+    "doctor_unprocessed",
+    "印が重なる",
+    (b) =>
+      (b.entries[0].marks = [
+        { start: 0, end: 4 },
+        { start: 3, end: 5 },
+      ]),
+  ],
+  [
+    "doctor_unprocessed",
+    "印の start が負",
+    (b) => (b.entries[0].marks = [{ start: -1, end: 4 }]),
+  ],
+  // 患者の画面の受診・記録（D2）
+  [
+    "doctor_patient_visits",
+    "report_available が無い",
+    (b) => delete b.visits[0].report_available,
+  ],
+  [
+    "doctor_patient_visits",
+    "受付番号が無い（null でなく省略）",
+    (b) => delete b.visits[0].reception_no,
+  ],
+  [
+    "doctor_patient_visits_open",
+    "状態が未知",
+    (b) => (b.visits[0].status = "done"),
+  ],
+  ["doctor_patient_entries", "total が無い", (b) => delete b.total],
+  [
+    "doctor_patient_entries",
+    "has_free_text が無い",
+    (b) => delete b.entries[0].has_free_text,
+  ],
+  [
+    "doctor_patient_entries",
+    "measured なのに体温が null",
+    (b) => (b.entries[0].answers[0].temperature = null),
+  ],
+  [
+    "doctor_patient_entries",
+    "回答の値が未知",
+    (b) => (b.entries[0].answers[1].value = "maybe"),
+  ],
   // 患者・コース
+  [
+    "doctor_patients",
+    "最後の記録日が無い（null でなく省略）",
+    (b) => delete b.patients[0].last_record_date,
+  ],
+  [
+    "doctor_patients",
+    "今のコースが 0",
+    (b) => (b.patients[0].current_course_no = 0),
+  ],
+  [
+    "doctor_patients",
+    "次回受診が無い（null でなく省略）",
+    (b) => delete b.patients[0].next_visit,
+  ],
   [
     "doctor_patients",
     "regimen が未知",

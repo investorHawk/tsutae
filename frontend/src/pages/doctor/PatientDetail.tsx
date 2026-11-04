@@ -11,7 +11,13 @@ import {
   type CourseFormValues,
 } from "../../components/doctor/courseValues";
 import ErrorNote from "../../components/doctor/ErrorNote";
-import { usePatientCourses } from "../../components/doctor/usePatientCourses";
+import PatientEntries from "../../components/doctor/PatientEntries";
+import PatientVisits from "../../components/doctor/PatientVisits";
+import {
+  usePatientCourses,
+  type PatientCourses,
+} from "../../components/doctor/usePatientCourses";
+import { usePatientRecords } from "../../components/doctor/usePatientRecords";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
 import "../../components/doctor/doctor-ui.css";
 
@@ -38,20 +44,46 @@ function NoticeView({ notice }: { notice: Notice | null }) {
 }
 
 /**
- * D2 コース登録。実投与日・予定日・次回受診予定日を登録・修正する。
- * 患者ごとに描き直す（別の患者へ移ったら、フォーム・知らせ・送信中を前の患者から引き継がない）。
+ * D2 患者の画面。「コース」（実投与日・予定日・次回受診予定日の登録・修正）、「記録」
+ * （直近の記録）、「受診」（受診の履歴とレポート）の節（D4-1）。
+ * 患者ごとに描き直す（別の患者へ移ったら、フォーム・知らせ・送信中・記録を前の患者から
+ * 引き継がない）。
  */
 export default function PatientDetail() {
   const { pid = "" } = useParams();
-  return <PatientCourseEditor key={pid} pid={pid} />;
+  return <PatientView key={pid} pid={pid} />;
 }
 
-function PatientCourseEditor({ pid }: { pid: string }) {
+function PatientView({ pid }: { pid: string }) {
   const handleError = useDoctorApiError();
-  const { courses, loadError, regimen, reload } = usePatientCourses(
-    pid,
-    handleError,
+  const { regimen, ...courseState } = usePatientCourses(pid, handleError);
+  const records = usePatientRecords(pid, handleError);
+  return (
+    <section className="page">
+      <h1>
+        患者 <code>{pid}</code>
+      </h1>
+      <p className="d-patient-head">
+        <span className="d-muted">レジメン </span>
+        <span>{regimen ?? "—"}</span>
+        <Link className="d-sublink" to="/doctor/patients">
+          患者一覧へ戻る
+        </Link>
+      </p>
+      <PatientCourseEditor pid={pid} {...courseState} />
+      <PatientEntries entries={records.entries} />
+      <PatientVisits visits={records.visits} />
+    </section>
   );
+}
+
+function PatientCourseEditor({
+  pid,
+  courses,
+  loadError,
+  reload,
+}: { pid: string } & Omit<PatientCourses, "regimen">) {
+  const handleError = useDoctorApiError();
   const [form, setForm] = useState<CourseFormValues>(emptyCourseForm(1));
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -96,16 +128,8 @@ function PatientCourseEditor({ pid }: { pid: string }) {
   }
 
   return (
-    <section className="page">
-      <h1>コース登録</h1>
-      <p className="d-patient-head">
-        仮名ID <code>{pid}</code>
-        <span className="d-muted"> ・ レジメン </span>
-        <span>{regimen ?? "—"}</span>
-        <Link className="d-sublink" to="/doctor/patients">
-          患者一覧へ戻る
-        </Link>
-      </p>
+    <section className="d-section" aria-labelledby="d-sec-courses">
+      <h2 id="d-sec-courses">コース</h2>
       {loadError ? (
         <ErrorNote code={loadError} prefix="コースを取れません" />
       ) : null}

@@ -9,7 +9,13 @@
         "entry_id": 38,
         "record_date": "2026-11-05",
         "reason": "unknown_before_honorific",
-        "text": "磯鷲さんにもらった漢方をのんでみた。おなかがあったかい感じ"
+        "text": "磯鷲さんにもらった漢方をのんでみた。おなかがあったかい感じ",
+        "marks": [
+          {
+            "start": 0,
+            "end": 4
+          }
+        ]
       }
     ]
   }

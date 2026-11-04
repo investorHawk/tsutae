@@ -5,26 +5,15 @@ import type { UnprocessedItem } from "../../api/types";
 import ErrorNote from "../../components/doctor/ErrorNote";
 import { isUnprocessedItem } from "../../components/doctor/guards";
 import { listOf, parseVisitId } from "../../components/doctor/input";
+import MarkedText from "../../components/doctor/MarkedText";
+import { ruleLabel } from "../../components/doctor/ruleLabels";
 import { useDoctorApiError } from "../../components/doctor/useDoctorApiError";
 import "../../components/doctor/doctor-ui.css";
 
-/** 二次検出（H1 の規則）の名前と説明。tsutae.masking.detect_identifiers の規則名。 */
-const RULE_LABELS: Readonly<Record<string, string>> = {
-  unknown_before_honorific: "敬称の前に、辞書にない語がある（人名の疑い）",
-  long_digits: "7桁以上の数字列がある（電話番号・番号の疑い）",
-  at_mark: "@ がある（メールアドレスの疑い）",
-  before_facility: "施設名らしき語がある（病院名の疑い）",
-  address_number: "番地らしき数字の並びがある（住所の疑い）",
-  id_like: "英字とハイフンと番号の並びがある（ID・受付番号の疑い）",
-  known_identifier: "この患者の仮名ID か受付番号が書かれている",
-};
-
-function ruleLabel(reason: string): string {
-  return RULE_LABELS[reason] ?? "伏せ字漏れの疑い";
-}
-
 /**
  * D6 未処理の記載。伏せ字漏れの疑いで Claude に送らなかった記録の原文（院内画面だけ）。
+ * 疑われた語は <mark> で強調する（位置は API の marks）。規則は日本語の説明だけを出し、
+ * 規則名は title に残す。
  * 受診ごとに描き直す（別の受診へ移ったら前の受診の原文・失敗を引き継がない）。
  */
 export default function Unprocessed() {
@@ -82,10 +71,12 @@ function UnprocessedView({ visitId }: { visitId: string | undefined }) {
           {items.map((item) => (
             <li key={item.entry_id} className="d-unprocessed-item">
               <p className="d-unprocessed-meta">
-                記録日 {item.record_date} ・ 記録 #{item.entry_id} ・ 規則{" "}
-                <code>{item.reason}</code>（{ruleLabel(item.reason)}）
+                記録日 {item.record_date} ・ 記録 #{item.entry_id} ・{" "}
+                <span title={item.reason}>{ruleLabel(item.reason)}</span>
               </p>
-              <p className="d-raw">{item.text}</p>
+              <p className="d-raw">
+                <MarkedText text={item.text} marks={item.marks} />
+              </p>
             </li>
           ))}
         </ol>

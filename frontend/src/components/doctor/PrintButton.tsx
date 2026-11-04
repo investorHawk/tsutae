@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 /** iframe の読み込みを待つ上限（ms）。過ぎたら別タブで開く案内に戻す。 */
 export const PRINT_LOAD_TIMEOUT_MS = 15_000;
 
+/** 印刷の案内。行ごとにくり返さず、印刷待ちの表の上に1回だけ出す（D2-1）。 */
 export const PRINT_HINT =
   "印刷ダイアログが開きます。開かなければ『レポートを開く』から ⌘P";
 
@@ -77,7 +78,6 @@ export default function PrintButton({
       >
         レポートを開く
       </a>
-      <span className="d-muted d-print-hint">{PRINT_HINT}</span>
       {status === "failed" ? (
         <span role="alert" className="d-error">
           印刷ダイアログを開けませんでした。『レポートを開く』から ⌘P

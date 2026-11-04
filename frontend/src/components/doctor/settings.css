@@ -1,0 +1,139 @@
+/* D4 設定を変える: 段階の表示・Skill の今の中身・内部名の添え書き。 */
+
+/* --- 依頼を書く → 差分を見る → 承認して反映 ----------------------------- */
+
+.doctor-app .d-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 760px;
+  padding: 0;
+  margin: 12px 0 16px;
+  list-style: none;
+}
+
+.doctor-app .d-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  color: var(--d-muted);
+  background: var(--d-surface);
+  border: 2px solid var(--d-border);
+  border-radius: 10px;
+}
+
+.doctor-app .d-step-no {
+  display: grid;
+  grid-row: span 3;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  background: var(--d-muted);
+  border-radius: 50%;
+}
+
+.doctor-app .d-step-label {
+  font-weight: 700;
+}
+
+.doctor-app .d-step-state,
+.doctor-app .d-step-note {
+  font-size: 0.8rem;
+}
+
+.doctor-app .d-step--current {
+  color: var(--d-text);
+  background: #e8f0fa;
+  border-color: var(--d-primary);
+}
+
+.doctor-app .d-step--current .d-step-no {
+  background: var(--d-primary);
+}
+
+.doctor-app .d-step--done {
+  color: var(--d-text);
+  border-color: var(--d-ok);
+}
+
+.doctor-app .d-step--done .d-step-no {
+  background: var(--d-ok);
+}
+
+.doctor-app .d-step--stopped {
+  color: var(--d-danger);
+  border-color: var(--d-danger);
+}
+
+.doctor-app .d-step--stopped .d-step-no {
+  background: var(--d-danger);
+}
+
+/* --- Skill の今の中身（読み取り専用） ----------------------------------- */
+
+.doctor-app .d-skill-content {
+  padding: 8px 12px;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 8px;
+}
+
+.doctor-app .d-skill-content summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.doctor-app .d-skill-questions {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  padding-left: 1.6em;
+}
+
+.doctor-app .d-skill-q-type {
+  font-size: 0.85rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-skill-fulltext {
+  margin-top: 8px;
+}
+
+.doctor-app .d-skill-fulltext summary {
+  font-weight: 400;
+}
+
+.doctor-app .d-skill-fulltext pre {
+  max-height: 320px;
+  padding: 8px;
+  overflow: auto;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  background: #ffffff;
+  border: 1px solid var(--d-border);
+  border-radius: 4px;
+}
+
+/* --- 内部名（regimen-folfox など）は小さく添える -------------------------- */
+
+.doctor-app .d-skill-name {
+  margin: -6px 0 0;
+  font-size: 0.8rem;
+  color: var(--d-muted);
+}
+
+.doctor-app .d-skill-code {
+  margin-left: 4px;
+  font-size: 0.75rem;
+  color: var(--d-muted);
+}
+
+@media (max-width: 720px) {
+  .doctor-app .d-steps {
+    grid-template-columns: 1fr;
+  }
+}

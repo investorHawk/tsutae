@@ -8,6 +8,8 @@ import { fixtureBody } from "../test/apiFixtures";
 import {
   isCoursesResponse,
   isCreateSkillChangeResponse,
+  isPatientEntriesSummaryResponse,
+  isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
   isSkillChangesResponse,
@@ -22,6 +24,8 @@ type Guard = (body: Item) => boolean;
 const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_visits: isVisitsResponse,
   doctor_patients: isPatientsResponse,
+  doctor_patient_visits: isPatientVisitsResponse,
+  doctor_patient_entries: isPatientEntriesSummaryResponse,
   doctor_courses: isCoursesResponse,
   doctor_unprocessed: isUnprocessedResponse,
   doctor_pipeline_events: isPipelineEventsResponse,
@@ -99,6 +103,24 @@ const BROKEN: Array<[string, string, Mutate]> = [
     b.entries[0].record_date = v;
   }),
   ...dateCases("doctor_unprocessed", "record_date", (b, v) => {
+    b.entries[0].record_date = v;
+  }),
+  ...dateCases("doctor_patients", "last_record_date", (b, v) => {
+    b.patients[0].last_record_date = v;
+  }),
+  ...dateCases("doctor_patients", "next_visit", (b, v) => {
+    b.patients[1].next_visit = v;
+  }),
+  ...dateCases("doctor_patient_visits", "visit_date", (b, v) => {
+    b.visits[0].visit_date = v;
+  }),
+  ...dateTimeCases("doctor_patient_visits", "created_at", (b, v) => {
+    b.visits[0].created_at = v;
+  }),
+  ...dateTimeCases("doctor_patient_entries", "recorded_at", (b, v) => {
+    b.entries[0].recorded_at = v;
+  }),
+  ...dateCases("doctor_patient_entries", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),
   ...dateCases("doctor_courses", "infusion_date", (b, v) => {

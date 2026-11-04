@@ -32,6 +32,18 @@ describe("Register (P0)", () => {
     expect(screen.getByText(s("app.notice_synthetic"))).toBeInTheDocument();
   });
 
+  it("says what the app records and who receives it (register.about)", () => {
+    mockFetch(() => jsonResponse({ ok: true }));
+    renderPatient(ROUTES, `/register?pid=${PID}`);
+    expect(screen.getByText(s("register.about"))).toBeInTheDocument();
+  });
+
+  it("the explanation is shown even when the QR code is missing", () => {
+    mockFetch(() => jsonResponse({ ok: true }));
+    renderPatient(ROUTES, "/register");
+    expect(screen.getByText(s("register.about"))).toBeInTheDocument();
+  });
+
   it("without pid: register.required, no button, no request", () => {
     const fetchMock = mockFetch(() => jsonResponse({ ok: true }));
     renderPatient(ROUTES, "/register");

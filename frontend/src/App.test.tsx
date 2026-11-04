@@ -93,9 +93,9 @@ describe("医師ルート（ログイン済み）", () => {
   it.each([
     ["/doctor", "印刷待ち"],
     ["/doctor/patients", "患者一覧"],
-    ["/doctor/patients/P-DEMO0001", "コース登録"],
+    ["/doctor/patients/P-DEMO0001", "患者 P-DEMO0001"],
     ["/doctor/settings", "設定を変える"],
-    ["/doctor/pipeline/12", "パイプライン"],
+    ["/doctor/pipeline/12", "変換ログ"],
     ["/doctor/unprocessed/12", "未処理の記載"],
   ])("%s は仮ページ", async (path, heading) => {
     const fetchMock = mockApi(200);

@@ -56,6 +56,14 @@ describe("Visit (P3)", () => {
     expect(screen.getByRole("navigation")).toBeInTheDocument();
   });
 
+  it("says what happens when sending (visit.about) and shows an example number", () => {
+    mockPatientApi();
+    renderPatient(ROUTES, "/visit");
+    expect(screen.getByText(s("visit.about"))).toBeInTheDocument();
+    const example = screen.getByText(s("visit.example"));
+    expect(field()).toHaveAttribute("aria-describedby", example.id);
+  });
+
   it("empty or malformed: visit.invalid and no request", async () => {
     const fetchMock = mockPatientApi();
     renderPatient(ROUTES, "/visit");

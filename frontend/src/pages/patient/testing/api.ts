@@ -12,6 +12,8 @@ export interface PatientApiReplies {
   questions?: () => Reply;
   createEntry?: (body: unknown) => Reply;
   entries?: () => Reply;
+  /** POST entries/{id}/undo（取り消し）。引数は経路の id */
+  undo?: (entryId: number) => Reply;
   visit?: (body: unknown) => Reply;
 }
 
@@ -19,6 +21,7 @@ const DEFAULTS: Required<PatientApiReplies> = {
   questions: () => jsonResponse(QUESTIONS_RESPONSE),
   createEntry: () => jsonResponse({ entry_id: 1, notices: [] }),
   entries: () => jsonResponse({ entries: ENTRIES }),
+  undo: () => jsonResponse({ ok: true }),
   visit: () => jsonResponse({ ok: true, message_key: "visit.done" }),
 };
 
@@ -39,6 +42,10 @@ export function mockPatientApi(replies: PatientApiReplies = {}): FetchMock {
     }
     if (method === "GET" && url === `${base}/entries`) {
       return r.entries();
+    }
+    const undo = /^\/entries\/(\d+)\/undo$/.exec(url.slice(base.length));
+    if (method === "POST" && url.startsWith(base) && undo) {
+      return r.undo(Number(undo[1]));
     }
     if (method === "POST" && url === "/api/visit") {
       return r.visit(bodyOf(init));

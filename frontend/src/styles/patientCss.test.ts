@@ -26,6 +26,18 @@ function ruleOf(selector: string): string {
   return match?.[1] ?? "";
 }
 
+/** selector を含む規則（「a, b { }」のように並べたものも）の本文（最初の1つ）。 */
+function groupRuleOf(selector: string): string {
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const match of code.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const selectors = (match[1] ?? "").split(",").map((x) => x.trim());
+    if (selectors.includes(selector)) {
+      return match[2] ?? "";
+    }
+  }
+  return "";
+}
+
 function remOf(body: string, property: string): number {
   const match = new RegExp(`${property}:\\s*([\\d.]+)rem`).exec(body);
   return match ? Number(match[1]) : NaN;
@@ -42,6 +54,69 @@ describe("patient.css", () => {
     expect(
       remOf(ruleOf(".patient-app h2"), "font-size"),
     ).toBeGreaterThanOrEqual(1.4);
+  });
+
+  it("PC-1: 架空の注記の枠は本文と同じ左右の余白を持つ", () => {
+    const body = ruleOf(".patient-footer");
+    expect(body).toMatch(/max-width:\s*560px/);
+    expect(body).toMatch(/margin:\s*0 auto/);
+    expect(body).toMatch(/padding:\s*0 16px/);
+  });
+
+  it("PC-2: 下のタブは画面の下に固定し、safe-area を足す。文字に下線を付けない", () => {
+    const nav = ruleOf(".patient-app .p-nav");
+    expect(nav).toMatch(/position:\s*fixed/);
+    expect(nav).toMatch(/bottom:\s*0/);
+    expect(nav).toMatch(/env\(safe-area-inset-bottom/);
+    expect(ruleOf(".patient-app .p-nav a")).toMatch(/text-decoration:\s*none/);
+    expect(ruleOf('.patient-app .p-nav a[aria-current="page"]')).toMatch(
+      /background:/,
+    );
+  });
+
+  it("PC-2: タブのある画面は、最後がタブに隠れないよう下をあける", () => {
+    const body = ruleOf(".patient-app--with-nav");
+    expect(body).toMatch(/padding-bottom:\s*calc\(var\(--p-nav-h\)/);
+    expect(body).toMatch(/env\(safe-area-inset-bottom/);
+  });
+
+  it("P2-1: 「つらい」を選んだ時は「ある」より濃い色で、色以外（内側の白い輪）でも分かる", () => {
+    const present = groupRuleOf(
+      '.patient-app .p-choice--present[aria-pressed="true"]',
+    );
+    const hard = groupRuleOf(
+      '.patient-app .p-choice--hard[aria-pressed="true"]',
+    );
+    expect(present).toMatch(/background:\s*var\(--p-primary\)/);
+    expect(hard).toMatch(/background:\s*var\(--p-hard\)/);
+    expect(hard).toMatch(/box-shadow:\s*inset/);
+    expect(css).toMatch(/--p-hard:\s*#[0-9a-f]{6}/);
+  });
+
+  it("P2-1: 「なし」も選んだことが分かる（薄い塗りと太枠）", () => {
+    const none = groupRuleOf(
+      '.patient-app .p-choice--none[aria-pressed="true"]',
+    );
+    expect(none).toMatch(/background:\s*var\(--p-choice-light\)/);
+  });
+
+  it("P2-2: 押せないボタンは点線にしない（focus の輪と紛らわしい）", () => {
+    expect(ruleOf(".patient-app button:disabled")).not.toMatch(/dashed/);
+    expect(ruleOf(".patient-app :focus-visible")).toMatch(/outline:/);
+  });
+
+  it("P2-6: 「つらくて書けない」は紺の系統（紫を使わない）", () => {
+    expect(css).not.toMatch(/#4a2373/i);
+    const color = /--p-too-sick:\s*#([0-9a-f]{6})/i.exec(css)?.[1] ?? "";
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(color.slice(i, i + 2), 16));
+    // 紺: 青が一番強く、赤は弱い
+    expect(b!).toBeGreaterThan(r!);
+    expect(b!).toBeGreaterThan(g!);
+    expect(r!).toBeLessThan(0x20);
+  });
+
+  it("P3-2: 記録の答えは太字", () => {
+    expect(ruleOf(".patient-app .p-entry dd")).toMatch(/font-weight:\s*700/);
   });
 
   it("「つらくて書けない」と代理のトグルの間をあける", () => {

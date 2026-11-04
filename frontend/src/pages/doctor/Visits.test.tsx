@@ -95,7 +95,7 @@ describe("Visits（D3 印刷待ち）", () => {
     await screen.findByText("A-023");
     expect(within(rowOf("A-023")).getByText("印刷待ち")).toBeInTheDocument();
     expect(
-      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件" }),
+      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件を見る →" }),
     ).toHaveAttribute("href", "/doctor/unprocessed/1");
     expect(within(rowOf("B-101")).getByText("生成中")).toBeInTheDocument();
     expect(within(rowOf("C-202")).getByText("失敗")).toBeInTheDocument();
@@ -131,11 +131,13 @@ describe("Visits（D3 印刷待ち）", () => {
     ).toBeInTheDocument();
   });
 
-  it("AI変換なし（fallback）の印", async () => {
+  it("AI変換なし（fallback）の印は副の注記（主の状態のバッジと別の見た目）", async () => {
     mockApi({ [LIST]: { visits: VISITS } });
     renderVisits();
     await screen.findByText("A-025");
-    expect(within(rowOf("A-025")).getByText("AI変換なし")).toBeInTheDocument();
+    const note = within(rowOf("A-025")).getByText("AI変換なし");
+    expect(note).toHaveClass("d-status-note");
+    expect(note).not.toHaveClass("d-status");
     expect(within(rowOf("A-023")).queryByText("AI変換なし")).toBeNull();
   });
 
@@ -149,7 +151,7 @@ describe("Visits（D3 印刷待ち）", () => {
     expect(link).toHaveAttribute("href", "/api/doctor/visits/12/report");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link.getAttribute("rel")).toContain("noopener");
-    expect(row.getByText(/印刷ダイアログが開きます/)).toBeInTheDocument();
+    expect(row.queryByText(/印刷ダイアログが開きます/)).toBeNull();
     const generating = within(rowOf("A-024"));
     expect(generating.queryByRole("button", { name: "印刷" })).toBeNull();
     expect(
@@ -157,12 +159,28 @@ describe("Visits（D3 印刷待ち）", () => {
     ).toBeNull();
   });
 
+  it("印刷の案内は表の上に1回だけ出す（行ごとにくり返さない）", async () => {
+    mockApi({ [LIST]: { visits: VISITS } });
+    renderVisits();
+    await screen.findByText("A-023");
+    const hints = screen.getAllByText(/印刷ダイアログが開きます/);
+    expect(hints).toHaveLength(1);
+    expect(hints[0].closest("table")).toBeNull();
+  });
+
+  it("印刷できる行が無ければ印刷の案内を出さない", async () => {
+    mockApi({ [LIST]: { visits: [VISITS[1]] } });
+    renderVisits();
+    await screen.findByText("A-024");
+    expect(screen.queryByText(/印刷ダイアログが開きます/)).toBeNull();
+  });
+
   it("未処理の件数があれば D6 への導線", async () => {
     mockApi({ [LIST]: { visits: VISITS } });
     renderVisits();
     await screen.findByText("A-023");
     expect(
-      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件" }),
+      within(rowOf("A-023")).getByRole("link", { name: "未処理 1 件を見る →" }),
     ).toHaveAttribute("href", "/doctor/unprocessed/12");
     expect(
       within(rowOf("A-025")).queryByRole("link", { name: /未処理/ }),

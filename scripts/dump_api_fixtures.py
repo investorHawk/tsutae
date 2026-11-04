@@ -113,12 +113,15 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/patient/{}/questions"),
         ("POST", "/api/patient/{}/entries"),
         ("GET", "/api/patient/{}/entries"),
+        ("POST", "/api/patient/{}/entries/{}/undo"),
         ("POST", "/api/visit"),
         ("POST", "/api/doctor/login"),
         ("POST", "/api/doctor/logout"),
         ("GET", "/api/doctor/patients"),
         ("POST", "/api/doctor/patients"),
         ("GET", "/api/doctor/patients/{}/courses"),
+        ("GET", "/api/doctor/patients/{}/visits"),
+        ("GET", "/api/doctor/patients/{}/entries"),
         ("POST", "/api/doctor/courses"),
         ("GET", "/api/doctor/visits"),
         ("POST", "/api/doctor/visits/{}/printed"),
@@ -126,6 +129,7 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/doctor/visits/{}/unprocessed"),
         ("GET", "/api/doctor/pipeline/{}/events"),
         ("GET", "/api/doctor/skills"),
+        ("GET", "/api/doctor/skills/{}"),
         ("POST", "/api/doctor/skill-changes"),
         ("GET", "/api/doctor/skill-changes"),
         ("POST", "/api/doctor/skill-changes/{}/approve"),
@@ -135,6 +139,10 @@ JSON_ROUTES = frozenset(
 
 _PID_SEGMENT = re.compile(r"/P-[A-Z0-9]{8}(?=/|$)")
 _INT_SEGMENT = re.compile(r"/[0-9]+(?=/|$)")
+# GET /api/doctor/skills/{name} の Skill 名（SKILL_NAME_PATTERN の形）
+_SKILL_SEGMENT = re.compile(
+    r"(?<=/api/doctor/skills)/(?:regimen|report-format)-[a-z0-9-]+$"
+)
 _PARAM_SEGMENT = re.compile(r"/\{[^/}]+\}(?=/|$)")
 
 
@@ -143,8 +151,9 @@ class DumpError(RuntimeError):
 
 
 def route_template(path: str) -> str:
-    """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id も `{}`）。"""
-    return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", path))
+    """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id・Skill 名も `{}`）。"""
+    named = _SKILL_SEGMENT.sub("/{}", path)
+    return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", named))
 
 
 def app_routes(app: FastAPI) -> set[tuple[str, str]]:
@@ -386,7 +395,9 @@ def _patient_flow(rec: Recorder) -> None:
         ],
         "free_text": None,
     }
-    rec.call("patient_entry_create", "POST", f"/api/patient/{DEMO}/entries", entry)
+    saved = rec.call(
+        "patient_entry_create", "POST", f"/api/patient/{DEMO}/entries", entry
+    )
     bad = {"answers": [{"question_key": "unknown_question", "value": "none"}]}
     rec.call(
         "patient_entry_create_invalid",
@@ -396,6 +407,7 @@ def _patient_flow(rec: Recorder) -> None:
         expect=422,
     )
     rec.call("patient_entries", "GET", f"/api/patient/{DEMO}/entries")
+    _undo_flow(rec, saved["entry_id"])
     with rec.without_cookies():
         rec.call(
             "patient_entries_not_logged_in",
@@ -408,6 +420,30 @@ def _patient_flow(rec: Recorder) -> None:
         "visit_no_course", "POST", "/api/visit", {"reception_no": "B-7"}, expect=409
     )
     set_patient_cookie(rec.client, DEMO)
+
+
+def _undo_flow(rec: Recorder, answers_entry_id: int) -> None:
+    """取り消し（P2-5）。回答の記録は 409、受付の無い評価A の「つらくて書けない」は消せる。
+
+    デモ患者は受付済みなので、取り消しは評価A で試す。消した id は次の記録で使い直される
+    （AUTOINCREMENT なし）ので、後の fixture の id は変わらない。
+    """
+    rec.call(
+        "patient_entry_undo_not_undoable",
+        "POST",
+        f"/api/patient/{DEMO}/entries/{answers_entry_id}/undo",
+        expect=409,
+    )
+    with rec.without_cookies():
+        set_patient_cookie(rec.client, EVAL_A)
+        created = rec.client.post(
+            f"/api/patient/{EVAL_A}/entries", json={"too_sick": True}
+        )
+        if created.status_code != 200:
+            raise DumpError(f"too_sick の記録: status {created.status_code}")
+        path = f"/api/patient/{EVAL_A}/entries/{created.json()['entry_id']}/undo"
+        rec.call("patient_entry_undo", "POST", path)
+        rec.call("patient_entry_undo_not_found", "POST", path, expect=404)
 
 
 def _add_open_visits(app: FastAPI) -> tuple[int, int]:
@@ -504,12 +540,33 @@ def _regenerate_flow(rec: Recorder, generating: int, failed: int) -> None:
     )
 
 
+def _patient_records_flow(rec: Recorder) -> None:
+    """患者の画面（D2）の受診と記録。デモ患者の受診は印刷済み、評価A は生成中。"""
+    base = "/api/doctor/patients"
+    rec.call("doctor_patient_visits", "GET", f"{base}/{DEMO}/visits")
+    rec.call("doctor_patient_visits_open", "GET", f"{base}/{EVAL_A}/visits")
+    rec.call(
+        "doctor_patient_visits_unknown_patient",
+        "GET",
+        f"{base}/{UNKNOWN}/visits",
+        expect=404,
+    )
+    rec.call("doctor_patient_entries", "GET", f"{base}/{DEMO}/entries")
+    rec.call(
+        "doctor_patient_entries_unknown_patient",
+        "GET",
+        f"{base}/{UNKNOWN}/entries",
+        expect=404,
+    )
+
+
 def _patient_admin_flow(rec: Recorder) -> None:
     rec.call("doctor_patients", "GET", "/api/doctor/patients")
     rec.call(
         "doctor_patient_create", "POST", "/api/doctor/patients", {"regimen": "CAPOX"}
     )
     rec.call("doctor_courses", "GET", f"/api/doctor/patients/{DEMO}/courses")
+    _patient_records_flow(rec)
     rec.call(
         "doctor_courses_unknown_patient",
         "GET",
@@ -544,6 +601,13 @@ def _request_change(rec: Recorder, name: str | None, skill: str, text: str) -> i
 def _skill_flow(rec: Recorder, home: Path) -> None:
     base = "/api/doctor/skill-changes"
     rec.call("doctor_skills", "GET", "/api/doctor/skills")
+    rec.call("doctor_skill", "GET", f"/api/doctor/skills/{REGIMEN_SKILL}")
+    rec.call(
+        "doctor_skill_unknown",
+        "GET",
+        "/api/doctor/skills/regimen-nope",
+        expect=404,
+    )
     first = _request_change(
         rec,
         "doctor_skill_change_create",

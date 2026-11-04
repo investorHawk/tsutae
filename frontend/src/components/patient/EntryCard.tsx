@@ -1,6 +1,8 @@
 import type { PatientAnswer, PatientEntry } from "../../api/types";
 import { usePatientStrings } from "../../strings/PatientStrings";
+import { summarizeEntry, summarySourceOf } from "./entrySummary";
 import { formatRecordedAt } from "./history";
+import SummaryLine from "./SummaryLine";
 
 const PREVIOUS_QUESTION_KEY = "history.previous_question";
 
@@ -30,29 +32,44 @@ function AnswerRow({ answer }: { answer: PatientAnswer }) {
   );
 }
 
-/** 自分の記録1件（P2）。編集はできない。AI のまとめは出さない（API にも無い）。 */
+/**
+ * 自分の記録1件（P2）。一行の要約（日時と「しびれ つらい／下痢 ある」）を押すと、
+ * 質問文つきの詳しい内容が開く（details。キーボードでも開ける）。編集はできない。
+ * AI のまとめは出さない（API にも無い）。
+ */
 export default function EntryCard({ entry }: { entry: PatientEntry }) {
   const { t } = usePatientStrings();
+  const items = summarizeEntry(summarySourceOf(entry));
   return (
     <li className="p-entry">
-      <p>
-        <time dateTime={entry.recorded_at}>{formatRecordedAt(entry)}</time>
-      </p>
-      {entry.by_proxy && <p>{t("history.proxy")}</p>}
-      {entry.kind === "too_sick" && <p>{t("history.too_sick")}</p>}
-      {entry.answers.length > 0 && (
-        <dl>
-          {entry.answers.map((answer, i) => (
-            <AnswerRow key={`${i}-${answer.question_key}`} answer={answer} />
-          ))}
-        </dl>
-      )}
-      {entry.free_text && (
-        <>
-          <p>{t("history.free_text")}</p>
-          <p className="p-entry-free-text">{entry.free_text}</p>
-        </>
-      )}
+      <details>
+        <summary className="p-entry-summary">
+          <time className="p-entry-time" dateTime={entry.recorded_at}>
+            {formatRecordedAt(entry, t)}
+          </time>
+          <SummaryLine items={items} />
+        </summary>
+        <div className="p-entry-detail">
+          {entry.by_proxy && <p>{t("history.proxy")}</p>}
+          {entry.kind === "too_sick" && <p>{t("history.too_sick")}</p>}
+          {entry.answers.length > 0 && (
+            <dl>
+              {entry.answers.map((answer, i) => (
+                <AnswerRow
+                  key={`${i}-${answer.question_key}`}
+                  answer={answer}
+                />
+              ))}
+            </dl>
+          )}
+          {entry.free_text && (
+            <>
+              <p>{t("history.free_text")}</p>
+              <p className="p-entry-free-text">{entry.free_text}</p>
+            </>
+          )}
+        </div>
+      </details>
     </li>
   );
 }

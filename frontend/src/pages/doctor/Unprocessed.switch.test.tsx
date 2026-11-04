@@ -33,6 +33,7 @@ describe("Unprocessed の受診の切り替え", () => {
             record_date: "2026-11-03",
             reason: "unknown_before_honorific",
             text: RAW,
+            marks: [],
           },
         ],
       },

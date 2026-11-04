@@ -9,25 +9,37 @@
         "id": "P-DEMO0001",
         "regimen": "FOLFOX",
         "created_at": "2026-11-09T10:00:00+09:00",
-        "register_url": "http://localhost:5173/register?pid=P-DEMO0001"
+        "register_url": "http://localhost:5173/register?pid=P-DEMO0001",
+        "last_record_date": "2026-11-09",
+        "current_course_no": 3,
+        "next_visit": null
       },
       {
         "id": "P-EVAL0001",
         "regimen": "FOLFOX",
         "created_at": "2026-11-09T10:00:00+09:00",
-        "register_url": "http://localhost:5173/register?pid=P-EVAL0001"
+        "register_url": "http://localhost:5173/register?pid=P-EVAL0001",
+        "last_record_date": "2026-09-28",
+        "current_course_no": 2,
+        "next_visit": "2026-09-28"
       },
       {
         "id": "P-EVAL0002",
         "regimen": "FOLFOX",
         "created_at": "2026-11-09T10:00:00+09:00",
-        "register_url": "http://localhost:5173/register?pid=P-EVAL0002"
+        "register_url": "http://localhost:5173/register?pid=P-EVAL0002",
+        "last_record_date": "2026-09-21",
+        "current_course_no": 2,
+        "next_visit": "2026-09-21"
       },
       {
         "id": "P-NOCOURSE",
         "regimen": "FOLFOX",
         "created_at": "2026-11-09T10:00:00+09:00",
-        "register_url": "http://localhost:5173/register?pid=P-NOCOURSE"
+        "register_url": "http://localhost:5173/register?pid=P-NOCOURSE",
+        "last_record_date": null,
+        "current_course_no": null,
+        "next_visit": null
       }
     ]
   }

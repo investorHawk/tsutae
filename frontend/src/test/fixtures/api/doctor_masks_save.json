@@ -1,0 +1,24 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/visits/1/masks",
+  "request": {
+    "entries": [
+      {
+        "entry_id": 38,
+        "send": true,
+        "spans": [
+          {
+            "start": 0,
+            "end": 2
+          }
+        ],
+        "confirmed_clear": false
+      }
+    ]
+  },
+  "status": 200,
+  "body": {
+    "ok": true,
+    "sendable": 1
+  }
+}

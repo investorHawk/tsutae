@@ -15,6 +15,11 @@ from tsutae.db.connection import (
     init_db,
     write_transaction,
 )
+from tsutae.db.repo_doctor_masks import (
+    VisitGeneratingError,
+    list_doctor_masks,
+    save_doctor_masks,
+)
 from tsutae.db.repo_entries import (
     add_entry,
     add_entry_once,
@@ -63,6 +68,7 @@ __all__ = [
     "NotFoundError",
     "PATIENT_ID_PATTERN",
     "VisitClosedError",
+    "VisitGeneratingError",
     "add_entry",
     "add_entry_once",
     "add_pipeline_log",
@@ -82,6 +88,7 @@ __all__ = [
     "init_db",
     "latest_skill_version",
     "list_courses",
+    "list_doctor_masks",
     "last_record_dates",
     "list_entries",
     "list_patients",
@@ -91,6 +98,7 @@ __all__ = [
     "list_visits",
     "mark_printed",
     "purge_expired",
+    "save_doctor_masks",
     "save_report",
     "save_skill_version",
     "save_timeline",

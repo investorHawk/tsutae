@@ -167,6 +167,34 @@ describe("toViewEvents", () => {
     expect(report.title).toBe("レポートの項目を提出");
   });
 
+  it("医師が伏せ字にして・確かめて送ったことを日本語の一行で出す", () => {
+    const [saved, confirmed, applied, sent, h1] = toViewEvents([
+      ev({ event: "doctor_mask_saved", decision: "entry:38" }),
+      ev({ event: "doctor_mask_confirmed", decision: "entry:38" }),
+      ev({ event: "doctor_masks_applied", decision: "sent:1" }),
+      ev({ event: "doctor_confirmed_sent", decision: "sent:1" }),
+      ev({
+        event: "hook_h1_confirmed",
+        hook_name: "H1",
+        decision: "confirmed:1",
+      }),
+    ]);
+    expect(saved.title).toBe("医師が未処理の記載を伏せ字にして保存");
+    expect([saved.decisionLabel, saved.decisionCode]).toEqual(["記録", "38"]);
+    expect(confirmed.title).toBe("医師が「個人を特定する語は無い」と確かめた");
+    expect(applied.title).toBe("医師が伏せ字にした記録を入力に入れた");
+    expect(sent.title).toBe("人が確かめてから送った記録を入力に入れた");
+    expect([sent.decisionLabel, sent.decisionCode]).toEqual([
+      "送った記録",
+      "1",
+    ]);
+    expect(h1.kind).toBe("hook");
+    expect(h1.title).toBe(
+      "H1 送信前の伏せ字漏れ検査：医師が確かめた語だけを通した",
+    );
+    expect([h1.decisionLabel, h1.tone]).toEqual(["人が確認済み", "ok"]);
+  });
+
   it("知らない出来事の名前はそのまま出す（同じコードを二重に添えない）", () => {
     const [view] = toViewEvents([ev({ event: "something_new" })]);
     expect(view.title).toBe("something_new");

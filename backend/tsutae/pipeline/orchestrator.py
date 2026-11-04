@@ -7,7 +7,9 @@ convert の手順:
 2. settings.skills_dir が `<home>/.claude/skills` の形でなければ config_error（SDK は cwd の
    `.claude/skills` しか読まない。黙って既定に替えると、prepare_input・report が読んだ
    Skill と SDK が読む Skill が別物になる）
-3. コードで `detect_identifiers(依頼文)` → 掛かれば h1_blocked（UserPromptSubmit の H1 と二重）
+3. コードで `detect_identifiers(依頼文)` → 掛かれば h1_blocked（UserPromptSubmit の H1 と二重）。
+   医師が確かめて許した語（prepared.allowed_suspects）に完全に含まれる検出だけは
+   H1 と同じく無視する（`masking.manual.detect_in_prompt`。空なら今と同じ）
 4. 実行直前に、ディスク上（`<home>/.claude/skills`）の両 Skill の版が入力の版
    （regimen_skill_version・report_skill_version）と一致するかを確かめる。違えば
    skill_version_mismatch、読めなければ skill_load_error（どちらも Claude を呼ばない）。
@@ -40,7 +42,7 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKError, ResultError
 
 from tsutae.config import Settings
-from tsutae.masking import detect_identifiers
+from tsutae.masking.manual import detect_in_prompt
 from tsutae.pipeline.agents import AGENT_NAMES, build_agents
 from tsutae.pipeline.hooks import build_hooks
 from tsutae.pipeline.logs import EventLogger, reason_code
@@ -166,6 +168,7 @@ def build_options(
             allowed_tools=ALLOWED_TOOLS,
             allowed_subagents=AGENT_NAMES,
             expected_prompt=build_prompt(prepared),
+            allowed_suspects=tuple(prepared.allowed_suspects),
         ),
         max_turns=settings.pipeline_max_turns,
         max_budget_usd=settings.pipeline_max_budget_usd,
@@ -258,7 +261,7 @@ async def _run(
 ) -> ConversionResult:
     started = time.monotonic()
     prompt = build_prompt(prepared)
-    found = detect_identifiers(prompt)
+    found = detect_in_prompt(prompt, tuple(prepared.allowed_suspects))
     if found:
         logger.event(
             "hook_h1_block",

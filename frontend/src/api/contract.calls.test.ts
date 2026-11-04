@@ -11,6 +11,7 @@ import { callOf, jsonResponse, mockFetch } from "../test/fetchMock";
 import { validatePatientStrings } from "../strings/PatientStrings";
 import {
   approveSkillChange,
+  checkMasks,
   createPatient,
   createSkillChange,
   getPipelineEvents,
@@ -29,6 +30,7 @@ import {
   regenerateVisit,
   rejectSkillChange,
   saveCourse,
+  saveMasks,
 } from "./doctor";
 import { ApiError } from "./http";
 import {
@@ -40,7 +42,13 @@ import {
   submitVisit,
   undoEntry,
 } from "./patient";
-import type { Course, EntryCreate, Regimen } from "./types";
+import type {
+  Course,
+  EntryCreate,
+  MaskCheckRequest,
+  MaskSaveRequest,
+  Regimen,
+} from "./types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -86,6 +94,12 @@ const unprocessed: Call = (f) => listUnprocessed(idIn(f));
 const events: Call = (f) => getPipelineEvents(idIn(f));
 const printed: Call = (f) => markPrinted(idIn(f));
 const regenerate: Call = (f) => regenerateVisit(idIn(f));
+const maskCheck: Call = (f) => {
+  const body = f.request as MaskCheckRequest;
+  return checkMasks(idIn(f), body.entry_id, body.spans);
+};
+const maskSave: Call = (f) =>
+  saveMasks(idIn(f), (f.request as MaskSaveRequest).entries);
 const skills: Call = () => listSkills();
 /** 経路の最後の Skill 名（GET skills/{name}）。 */
 const skill: Call = (f) => getSkill(f.path.replace(/^.*\//, ""));
@@ -130,6 +144,13 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_visits_not_logged_in: visits,
   doctor_unprocessed: unprocessed,
   doctor_unprocessed_not_found: unprocessed,
+  doctor_unprocessed_masked: unprocessed,
+  doctor_masks_check: maskCheck,
+  doctor_masks_check_clean: maskCheck,
+  doctor_masks_check_invalid_spans: maskCheck,
+  doctor_masks_check_unknown_entry: maskCheck,
+  doctor_masks_save: maskSave,
+  doctor_masks_save_closed: maskSave,
   doctor_pipeline_events: events,
   doctor_pipeline_events_generating: events,
   doctor_pipeline_events_printed: events,

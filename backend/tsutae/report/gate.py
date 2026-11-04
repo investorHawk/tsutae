@@ -9,6 +9,10 @@ PreparedInput は変換パイプラインが作る。レポートはそれを信
 - 記録: entry_no ごとに、記録日・Day（記録日から数え直す）・代理・too_sick・回答・
   伏せ字後の文が元の記録と一致する。伏せ字後の文は元の自由記載に伏せ字を掛け直して
   比べる（両方を同じ捏造文に差し替えても通らない）。二次検出に掛かる記録は送れない
+- 医師の伏せ字（doctor_masks: entries.id → DoctorMask。D6）は変換の入力と同じ規則で
+  当て直す（`pipeline.inputs.mask_entry_text`）。片方だけだと entry_mismatch。確かめて
+  許した語（prepared.allowed_suspects）も記録から作り直したものと一致しなければ
+  entry_mismatch（H1 に渡す許す一覧を捏造できない）
 - 回答の型: 記録の版の質問集で、3択の質問に none/present/hard、体温の質問に
   measured/not_measured 以外の値があれば answer_mismatch（知らない版・知らない質問は
   ここでは見ない。版が無ければ経過表が unknown_skill_version）
@@ -19,6 +23,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from types import MappingProxyType
 
 from tsutae import course as course_mod
 from tsutae.report.errors import ReportBuildError
@@ -26,6 +31,7 @@ from tsutae.schemas import (
     ClosedAnswer,
     Course,
     CourseSchedule,
+    DoctorMask,
     Entry,
     MaskedEntry,
     PreparedInput,
@@ -34,6 +40,7 @@ from tsutae.schemas import (
     ReportFormatSkill,
 )
 
+_NO_MASKS: Mapping[int, DoctorMask] = MappingProxyType({})
 _VALUES_BY_TYPE: Mapping[str, frozenset[str]] = {
     "three_level": frozenset({"none", "present", "hard"}),
     "temperature": frozenset({"measured", "not_measured"}),
@@ -99,40 +106,58 @@ def _check_skills(
         raise ReportBuildError("skill_mismatch", "質問集が regimen Skill と違う")
 
 
-def mask_free_text(free_text: str | None) -> tuple[str | None, str | None]:
+def mask_free_text(
+    free_text: str | None, doctor_mask: DoctorMask | None = None
+) -> tuple[str | None, str | None]:
     """元の自由記載に、変換の入力と同じ伏せ字を掛ける。(伏せ字後の文, 外す理由)。
 
     正本は `tsutae.pipeline.inputs.mask_free_text`（写しを持つと食い違う。正規化すると
     空になる文を片方だけ '' にしていた）。理由があればその記録は送れない。
+    医師の伏せ字があれば同じく先に当てる。
     """
+    masked, reason, _allowed = _mask_entry(free_text, doctor_mask)
+    return masked, reason
+
+
+def _mask_entry(
+    free_text: str | None, doctor_mask: DoctorMask | None
+) -> tuple[str | None, str | None, tuple[str, ...]]:
     # pipeline/__init__ は orchestrator（SDK）を読み込む。将来 service → report の
     # 循環にならないよう、呼ぶときに読み込む
-    from tsutae.pipeline.inputs import mask_free_text as pipeline_mask_free_text
+    from tsutae.pipeline.inputs import mask_entry_text
 
-    return pipeline_mask_free_text(free_text)
+    outcome = mask_entry_text(free_text, doctor_mask)
+    return outcome.masked, outcome.reason, outcome.allowed
 
 
 def _same_record(
-    me: MaskedEntry, entry: Entry, masked_text: str | None, day: int | None
-) -> bool:
+    me: MaskedEntry,
+    entry: Entry,
+    masked_text: str | None,
+    day: int | None,
+    doctor_mask: DoctorMask | None,
+) -> tuple[str, ...] | None:
+    """同じ記録なら確かめて許した語（無ければ空）を、違えば None を返す。"""
     if (me.masked_free_text or None) != masked_text:
-        return False
-    expected, reason = mask_free_text(entry.free_text)
+        return None
+    expected, reason, allowed = _mask_entry(entry.free_text, doctor_mask)
     if reason is not None or expected != masked_text:
-        return False  # 送れない記録・捏造した文・黙って落とした文
-    return (
+        return None  # 送れない記録・捏造した文・黙って落とした文
+    same = (
         me.record_date == entry.record_date
         and me.day == day
         and me.by_proxy == entry.by_proxy
         and me.too_sick == (entry.kind == "too_sick")
         and list(me.answers) == list(entry.answers)
     )
+    return allowed if same else None
 
 
 def _check_prepared_entries(
     prepared: PreparedInput,
     by_id: Mapping[int, Entry],
     courses: Sequence[Course],
+    doctor_masks: Mapping[int, DoctorMask],
 ) -> None:
     schedule: CourseSchedule = prepared.input.schedule
     numbers = [me.entry_no for me in prepared.input.entries]
@@ -140,18 +165,28 @@ def _check_prepared_entries(
         raise ReportBuildError("entry_mismatch", "entry_no と entry_ids が合わない")
     if not set(prepared.masked_texts) <= set(prepared.entry_ids):
         raise ReportBuildError("entry_mismatch", "masked_texts に未知の entry_no")
+    allowed: set[str] = set()
     for me in prepared.input.entries:
-        entry = by_id.get(prepared.entry_ids[me.entry_no])
+        entry_id = prepared.entry_ids[me.entry_no]
+        entry = by_id.get(entry_id)
         text = prepared.masked_texts.get(me.entry_no)
         day = (
             course_mod.day_of(entry.record_date, schedule, courses=courses)
             if entry is not None
             else None
         )
-        if entry is None or not _same_record(me, entry, text, day):
+        found = (
+            None
+            if entry is None
+            else _same_record(me, entry, text, day, doctor_masks.get(entry_id))
+        )
+        if found is None:
             raise ReportBuildError(
                 "entry_mismatch", f"entry_no {me.entry_no} が entries と合わない"
             )
+        allowed.update(found)
+    if list(prepared.allowed_suspects) != sorted(allowed):
+        raise ReportBuildError("entry_mismatch", "確かめて許した語が記録と合わない")
     if any(u.entry_id not in by_id for u in prepared.unprocessed):
         raise ReportBuildError("entry_mismatch", "未処理の記録が entries に無い")
 
@@ -192,13 +227,17 @@ def check_inputs(
     visit_date: date,
     prepared: PreparedInput,
     questions_by_version: Mapping[str, Sequence[Question]],
+    doctor_masks: Mapping[int, DoctorMask] = _NO_MASKS,
 ) -> CheckedInputs:
-    """入力の対応を確かめる。courses の矛盾は CourseValidationError（course.py）。"""
+    """入力の対応を確かめる。courses の矛盾は CourseValidationError（course.py）。
+
+    doctor_masks は変換の入力（prepare_input）に渡したものと同じ対応表。
+    """
     _check_patient(patient_id, courses, entries)
     ordered = tuple(course_mod.validate_courses(courses))
     by_id = _entries_by_id(entries)
     _check_schedule(prepared, ordered, regimen_skill, visit_date)
     _check_skills(prepared, regimen_skill, report_skill)
-    _check_prepared_entries(prepared, by_id, ordered)
+    _check_prepared_entries(prepared, by_id, ordered, doctor_masks)
     _check_answer_types(entries, regimen_skill, questions_by_version)
     return CheckedInputs(courses=ordered, by_id=by_id)

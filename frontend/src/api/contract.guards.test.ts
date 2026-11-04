@@ -12,6 +12,8 @@ import {
   isCoursesResponse,
   isCreatePatientResponse,
   isCreateSkillChangeResponse,
+  isMaskCheckResponse,
+  isMaskSaveResponse,
   isOkTrue as isDoctorOk,
   isPatientEntriesSummaryResponse,
   isPatientVisitsResponse,
@@ -60,6 +62,10 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_visits: isVisitsResponse,
   doctor_visits_after_printed: isVisitsResponse,
   doctor_unprocessed: isUnprocessedResponse,
+  doctor_unprocessed_masked: isUnprocessedResponse,
+  doctor_masks_check: isMaskCheckResponse,
+  doctor_masks_check_clean: isMaskCheckResponse,
+  doctor_masks_save: isMaskSaveResponse,
   doctor_pipeline_events: isPipelineEventsResponse,
   doctor_pipeline_events_generating: isPipelineEventsResponse,
   doctor_pipeline_events_printed: isPipelineEventsResponse,
@@ -228,6 +234,37 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "印の start が負",
     (b) => (b.entries[0].marks = [{ start: -1, end: 4 }]),
   ],
+  // 医師の伏せ字（D6 で伏せて変換し直す）
+  [
+    "doctor_unprocessed",
+    "doctor_mask が無い",
+    (b) => delete b.entries[0].doctor_mask,
+  ],
+  [
+    "doctor_unprocessed_masked",
+    "doctor_mask の区間が文の外",
+    (b) => (b.entries[0].doctor_mask.spans = [{ start: 0, end: 999 }]),
+  ],
+  [
+    "doctor_unprocessed_masked",
+    "doctor_mask の confirmed_clear が無い",
+    (b) => delete b.entries[0].doctor_mask.confirmed_clear,
+  ],
+  [
+    "doctor_masks_check",
+    "suspects の区間が文の外",
+    (b) => (b.suspects[0].end = 999),
+  ],
+  [
+    "doctor_masks_check",
+    "suspects の rule が無い",
+    (b) => delete b.suspects[0].rule,
+  ],
+  ["doctor_masks_check", "masked_text が無い", (b) => delete b.masked_text],
+  ["doctor_masks_check", "reason が無い", (b) => delete b.reason],
+  ["doctor_masks_check", "confirmable が文字列", (b) => (b.confirmable = "1")],
+  ["doctor_masks_save", "ok が false", (b) => (b.ok = false)],
+  ["doctor_masks_save", "sendable が負", (b) => (b.sendable = -1)],
   // 見出しの受診（医師画面の UX の見直し）
   ["doctor_unprocessed", "visit が無い", (b) => delete b.visit],
   [

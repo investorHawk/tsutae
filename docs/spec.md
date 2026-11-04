@@ -1,6 +1,6 @@
 # つたえ 仕様書
 
-- 版: v1.0（2026-11-03 先生承認。v0.1 ドラフトから締切・未決4件を確定）。2026-11-04 先生の指示で「つらくて書けない」の取り消しを追記（4.1・P2・16）。同日夕方、押した後の確認と3秒の自動記録に改めた（4.1）
+- 版: v1.0（2026-11-03 先生承認。v0.1 ドラフトから締切・未決4件を確定）。2026-11-04 先生の指示で「つらくて書けない」の取り消しを追記（4.1・P2・16）。同日夕方、押した後の確認と3秒の自動記録に改めた（4.1）。2026-11-04 夜、先生の指示で未処理の記載を医師が伏せ字にして変換し直せるようにした（3.2 D6・13.2・13.3・16）
 - 正本の企画: `docs/reference/concept.md`。本書は実装に必要な粒度まで落としたもの。企画と矛盾する箇所は `docs/decisions.md` に理由つきで記録する
 - 大会: Built with Claude (Code): Japan 2026（提出 2026-11-08 20:00 JST、ソロ、公開リポジトリ）
 - **症例は全て合成。本書に登場する患者・記録・数値はすべて架空**
@@ -50,7 +50,7 @@
 | D3 印刷待ち | 受付番号つきレポートの状態（生成中／印刷待ち／印刷済み）。印刷ボタン（ブラウザ印刷 → PDF）。「印刷済み」でレポートを削除 | 必須 |
 | D4 設定を変える | 一文を入力（例:「口内炎は、食事がとれたかも次から聞いて」）→ Agent SDK が SKILL.md を書き換え → **差分を表示 → 医師が承認** → 次の記録から反映（2026-11-04 変更） | 必須（目玉） |
 | D5 パイプライン可視化 | 変換中のサブエージェント3役と Hook の発火ログ | 必須（デモ用） |
-| D6 未処理の記載 | 伏せ字漏れの疑いで Claude に送らなかった記録の**原文**を院内画面で表示（紙には載せない） | 必須 |
+| D6 未処理の記載 | 伏せ字漏れの疑いで Claude に送らなかった記録の**原文**を院内画面で表示（原文は紙には載せない）。医師が伏せる所を選ぶ（疑われた語は初めから伏せる）か、「個人を特定する語は無いことを確かめた」を押せば、その記録を `[伏せ字]` にして Claude で変換し直し、紙の時系列・食い違い・引用に載せられる（医師は文を書かず、伏せる区間だけを選ぶ。2026-11-04 夜） | 必須 |
 
 ### 3.3 院内QR
 - 診察室前の待合に掲示。患者は診察待ちの間に読む
@@ -207,15 +207,16 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 | 段 | 役割 | 規則 |
 |---|---|---|
 | 一次: 置換 | 送る文から識別子を伏せる | 人名（日本語姓辞書＋「さん／先生／くん」後置）→「○○さん」、電話・メール・住所（都道府県＋市区町村＋番地パターン）→「[伏せ字]」、病院名（「病院／医院／クリニック／医療センター」で終わる語）→「[病院]」 |
-| 二次: 検出（H1） | 一次に漏れた候補を見つけて送信を止める | 一次より厳しい規則: 敬称の前の未知語、7桁以上の数字列、`@`、「病院／医院／クリニック」直前の語。該当すればその**記録だけ**送信対象から外し、レポートに「未処理の記載あり」。プロンプト全体に残っていれば `UserPromptSubmit` が全体を止める |
+| 二次: 検出（H1） | 一次に漏れた候補を見つけて送信を止める | 一次より厳しい規則: 敬称の前の未知語、7桁以上の数字列、`@`、「病院／医院／クリニック」直前の語。該当すればその**記録だけ**送信対象から外し、レポートに「未処理の記載あり」。プロンプト全体に残っていれば `UserPromptSubmit` が全体を止める。外した記録は D6 で医師が伏せる区間を選ぶと、生の原文にその区間を当てて `[伏せ字]` にしてから一次・二次を掛け直し、疑いが無ければ変換し直しで送る。伏せた後も疑いが残る（または疑われた語が個人を特定しない）ときは、医師が「個人を特定する語は無いことを確かめた」を押せば、その記録の**その時に疑われていた語だけ**を許して送る（H1 も同じ語だけを無視する。仮名ID・受付番号は確かめても送らない） |
 
 - 残すもの: 日付（正規化に必須）、年齢（送らないがレポートにも載せない）、地域名（「東京へ行った」程度の文脈は残す）
 - 検出漏れはゼロにできないことを README に明記する
 - 送る内容: 伏せ字後の自由記載、クローズ回答、コース日程（実投与日）、記録日。受付番号・仮名IDは送らない（記録には通し番号だけを付ける）
 
 ### 13.3 保持と削除
-- 生の記録: 患者が入力したものはサーバーに残す（P2 で本人が見返す）
+- 生の記録: 患者が入力したものはサーバーに残す（P2 で本人が見返す）。D6 の医師の伏せ字は生の記録を変えない
 - 変換結果とレポート: 印刷済み操作または 24 時間 TTL で削除。受付番号も同時に削除
+- 医師の伏せ字と確かめ（D6。受診ごとの `doctor_masks`。位置と確かめの印だけで文面は持たない）: レポートと同じく印刷済み操作または 24 時間 TTL で、同じトランザクションで削除
 - 変換ログ: Hook の発火・所要時間・トークン数のみ残す。文面は残さない
 - API 側のデータ保持は Anthropic の方針に従う。**本プロジェクトは合成データのみで運用し、実患者データを送らない**
 
@@ -247,6 +248,7 @@ free_texts(entry_id, text TEXT)
 visits(id, patient_id, reception_no TEXT, created_at, status TEXT[generating|ready|printed|failed], expires_at)
 timelines(visit_id, json TEXT)      -- 印刷済み/TTL で削除
 reports(visit_id, html TEXT)        -- 同上
+doctor_masks(visit_id, entry_id, spans_json, confirmed_clear, allowed_json, created_at)  -- D6 の医師の伏せ字（位置だけ。同上で削除）
 pipeline_logs(visit_id, event TEXT, hook_name TEXT NULL, duration_ms, tokens_in, tokens_out)  -- 文面なし
 skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pending|approved|rejected], created_at)
 ```
@@ -266,6 +268,10 @@ skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pendin
 | `POST /api/doctor/courses` | 実投与日の登録 | courses |
 | `POST /api/doctor/skill-changes` | 一文 → Skill 書き換え → 差分 | skill_changes |
 | `POST /api/doctor/skill-changes/{id}/approve` | 承認 | skill_changes |
+| `GET /api/doctor/visits/{id}/unprocessed` | D6 の原文・疑われた語の位置・保存済みの医師の伏せ字 | timelines, entries 系, doctor_masks |
+| `POST /api/doctor/visits/{id}/masks/check` | D6 の伏せる区間を当てた後の、送られる文とまだ疑われる語（保存しない） | entries 系, timelines, doctor_masks |
+| `POST /api/doctor/visits/{id}/masks` | D6 の医師の伏せ字・確かめを保存（送らない記録は消す。閉じた受診は 409） | doctor_masks, pipeline_logs |
+| `POST /api/doctor/visits/{id}/regenerate` | AI でもう一度変換（失敗・AI変換なし・医師の伏せ字あり） | visits, doctor_masks |
 | `GET /api/doctor/pipeline/{visit_id}/events` | D5 用のログ（SSE） | pipeline_logs |
 
 - `/api/patient/*` は `reports`・`timelines` を**インポートしない**（アーキテクチャテストで保証）

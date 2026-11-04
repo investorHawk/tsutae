@@ -373,6 +373,7 @@ def _check_unprocessed(client: TestClient, visit_id: int) -> None:
             "text": UNPROCESSED_TEXT,
             # 疑われた語「磯鷲さん」の原文の中の位置（D7-2）
             "marks": [{"start": 0, "end": 4}],
+            "doctor_mask": None,  # 医師の伏せ字はまだ無い
         }
     ]
     assert "磯鷲" not in report_html(client, visit_id)  # 紙には載せない

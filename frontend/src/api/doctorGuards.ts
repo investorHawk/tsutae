@@ -266,6 +266,15 @@ export function isTextMarks(marks: unknown, text: string): boolean {
   return true;
 }
 
+/** 保存済みの医師の伏せ字 {spans, confirmed_clear}（区間は text の位置の並び）。 */
+function isDoctorMaskView(value: unknown, text: string): boolean {
+  return (
+    isRecord(value) &&
+    isTextMarks(value.spans, text) &&
+    isBool(value.confirmed_clear)
+  );
+}
+
 export function isUnprocessedItem(v: Item): boolean {
   return (
     isInt(v.entry_id) &&
@@ -273,8 +282,47 @@ export function isUnprocessedItem(v: Item): boolean {
     hasCourseDay(v) &&
     isString(v.reason) &&
     isString(v.text) &&
-    isTextMarks(v.marks, v.text)
+    isTextMarks(v.marks, v.text) &&
+    hasNullable("doctor_mask", (m) => isDoctorMaskView(m, v.text as string))(v)
   );
+}
+
+/**
+ * まだ疑われる区間の列。各区間は 0 ≤ start < end ≤ 文の長さで start の順（規則が違えば
+ * 同じ区間・重なる区間がありうる。画面はまとめてから強調する）。
+ */
+function isSuspects(value: unknown, text: string): boolean {
+  if (
+    !everyItem((m) => isInt(m.start) && isInt(m.end) && isString(m.rule))(value)
+  ) {
+    return false;
+  }
+  const length = codePointLength(text);
+  let last = 0;
+  for (const m of value as Array<{ start: number; end: number }>) {
+    if (m.start < last || m.end <= m.start || m.end > length) {
+      return false;
+    }
+    last = m.start;
+  }
+  return true;
+}
+
+/** POST masks/check の応答。 */
+export function isMaskCheckResponse(v: Item): boolean {
+  return (
+    isInt(v.entry_id) &&
+    isString(v.masked_text) &&
+    isSuspects(v.suspects, v.masked_text) &&
+    hasNullable("reason", isString)(v) &&
+    isBool(v.sendable) &&
+    isBool(v.confirmable)
+  );
+}
+
+/** POST masks の応答 {ok: true, sendable}。 */
+export function isMaskSaveResponse(v: Item): boolean {
+  return v.ok === true && isInt(v.sendable) && v.sendable >= 0;
 }
 
 /** POST skill-changes の応答 {id, status, diff}。 */

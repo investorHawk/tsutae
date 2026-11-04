@@ -1,0 +1,22 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/visits/1/masks/check",
+  "request": {
+    "entry_id": 38,
+    "spans": [
+      {
+        "start": 0,
+        "end": 2
+      }
+    ]
+  },
+  "status": 200,
+  "body": {
+    "entry_id": 38,
+    "masked_text": "[伏せ字]さんにもらった漢方をのんでみた。おなかがあったかい感じ",
+    "suspects": [],
+    "reason": null,
+    "sendable": true,
+    "confirmable": false
+  }
+}

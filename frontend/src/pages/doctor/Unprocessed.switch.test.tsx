@@ -38,6 +38,7 @@ describe("Unprocessed の受診の切り替え", () => {
             reason: "unknown_before_honorific",
             text: RAW,
             marks: [],
+            doctor_mask: null,
           },
         ],
       },

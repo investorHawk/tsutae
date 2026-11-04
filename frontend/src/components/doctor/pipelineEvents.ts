@@ -91,6 +91,17 @@ export const RUN_TITLES: Readonly<Record<string, string>> = {
   visit_closed: "印刷済み・期限切れ（何もしない）",
   orphan_recovered: "再起動で止まった受診を回収",
   regenerate_requested: "医師が AI でもう一度変換を依頼",
+  // 未処理の記載（D6）を医師が伏せ字にして変換し直す
+  doctor_mask_saved: "医師が未処理の記載を伏せ字にして保存",
+  doctor_mask_confirmed: "医師が「個人を特定する語は無い」と確かめた",
+  doctor_mask_removed: "医師が伏せ字をやめた（未処理のまま）",
+  doctor_masks_applied: "医師が伏せ字にした記録を入力に入れた",
+  doctor_confirmed_sent: "人が確かめてから送った記録を入力に入れた",
+};
+
+/** Hook の出来事のうち、題名に一言を添えるもの（event 名 → 添える語）。 */
+const HOOK_EVENT_TITLES: Readonly<Record<string, string>> = {
+  hook_h1_confirmed: "医師が確かめた語だけを通した",
 };
 
 const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
@@ -99,6 +110,9 @@ const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
   [/^reject/i, "差し戻し", "deny"],
   [/^(allow|allowed|pass)\b/i, "許可", "ok"],
   [/^(accept|accepted|ok)\b/i, "受理", "ok"],
+  [/^confirmed\b/i, "人が確認済み", "ok"],
+  [/^sent\b/i, "送った記録", "neutral"],
+  [/^entry\b/i, "記録", "neutral"],
 ];
 
 const STOP_PATTERN = /(stop|end|done|finish|complete)/i;
@@ -208,6 +222,10 @@ function titleOf(e: PipelineEvent, kind: EventKind, hookId: HookId | null) {
   switch (kind) {
     case "hook": {
       const base = `${hookId} ${HOOK_LABELS[hookId as HookId]}`;
+      const extra = HOOK_EVENT_TITLES[e.event];
+      if (extra) {
+        return `${base}：${extra}`;
+      }
       return e.tool_name ? `${base}：${toolLabel(e.tool_name)}` : base;
     }
     case "emit":

@@ -296,6 +296,55 @@ export interface UnprocessedItem {
   text: string;
   /** 疑われた語の text の中の位置（code point の [start, end)。位置順・重なりなし） */
   marks: TextMark[];
+  /** 保存済みの医師の伏せ字（無ければ null）。区間は text の位置 */
+  doctor_mask: DoctorMaskView | null;
+}
+
+/** 医師の伏せ字（D6）。spans は原文（text）の伏せる区間、confirmed_clear は確かめた印。 */
+export interface DoctorMaskView {
+  spans: TextMark[];
+  confirmed_clear: boolean;
+}
+
+/** POST /visits/{id}/masks/check の本文（医師は文を書かない。区間だけを送る）。 */
+export interface MaskCheckRequest {
+  entry_id: number;
+  spans: TextMark[];
+}
+
+/** まだ疑われる区間（masked_text の code point の位置）と規則名。 */
+export interface MaskSuspect extends TextMark {
+  rule: string;
+}
+
+/** 区間を当てた後の、送られる文とまだ疑われる区間。保存はしない。 */
+export interface MaskCheckResponse {
+  entry_id: number;
+  masked_text: string;
+  suspects: MaskSuspect[];
+  /** 送れない理由の規則名（無ければ null = そのまま送れる） */
+  reason: string | null;
+  sendable: boolean;
+  /** 「個人を特定する語は無いことを確かめた」で送れる */
+  confirmable: boolean;
+}
+
+export interface MaskSaveEntry {
+  entry_id: number;
+  /** false なら未処理のまま（保存済みの伏せ字も消す） */
+  send: boolean;
+  spans: TextMark[];
+  confirmed_clear: boolean;
+}
+
+export interface MaskSaveRequest {
+  entries: MaskSaveEntry[];
+}
+
+/** 保存の応答。sendable は保存した記録のうち変換で送られる件数。 */
+export interface MaskSaveResponse {
+  ok: true;
+  sendable: number;
 }
 
 export interface TextMark {

@@ -127,6 +127,8 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/doctor/visits/{}/printed"),
         ("POST", "/api/doctor/visits/{}/regenerate"),
         ("GET", "/api/doctor/visits/{}/unprocessed"),
+        ("POST", "/api/doctor/visits/{}/masks/check"),
+        ("POST", "/api/doctor/visits/{}/masks"),
         ("GET", "/api/doctor/pipeline/{}/events"),
         ("GET", "/api/doctor/skills"),
         ("GET", "/api/doctor/skills/{}"),
@@ -504,6 +506,7 @@ def _visit_flow(rec: Recorder) -> None:
         f"/api/doctor/pipeline/{MISSING_ID}/events",
         expect=404,
     )
+    entry_id = _masks_flow(rec, ready)
     rec.call("doctor_printed", "POST", f"/api/doctor/visits/{ready}/printed")
     rec.call(
         "doctor_printed_not_found",
@@ -512,11 +515,71 @@ def _visit_flow(rec: Recorder) -> None:
         expect=404,
     )
     _check_printed_report(rec, ready)
+    rec.call(
+        "doctor_masks_save_closed",
+        "POST",
+        f"/api/doctor/visits/{ready}/masks",
+        _mask_body(entry_id, [(0, 2)]),
+        expect=409,
+    )
     rec.call("doctor_visits_after_printed", "GET", "/api/doctor/visits")
     rec.call(
         "doctor_pipeline_events_printed", "GET", f"/api/doctor/pipeline/{ready}/events"
     )
     _regenerate_flow(rec, generating, failed)
+
+
+def _mask_body(entry_id: int, spans: Sequence[tuple[int, int]]) -> dict[str, Any]:
+    return {
+        "entries": [
+            {
+                "entry_id": entry_id,
+                "send": True,
+                "spans": [{"start": s, "end": e} for s, e in spans],
+                "confirmed_clear": False,
+            }
+        ]
+    }
+
+
+def _masks_flow(rec: Recorder, ready: int) -> int:
+    """D6 の伏せ字: 確かめる（疑いが残る・消えた・区間の誤り）→ 保存 → 一覧に出る。
+
+    変換ログ（doctor_pipeline_events）の fixture を変えないよう、それを取った後に流す。
+    返すのは未処理の記録の id（印刷済みの後の 409 にも使う）。
+    """
+    base = f"/api/doctor/visits/{ready}"
+    entries = rec.fixtures["doctor_unprocessed"]["body"]["entries"]
+    if len(entries) != 1:
+        raise DumpError("デモ患者の未処理の記録が1件でない")
+    entry_id = int(entries[0]["entry_id"])
+    check = f"{base}/masks/check"
+    rec.call("doctor_masks_check", "POST", check, {"entry_id": entry_id, "spans": []})
+    rec.call(
+        "doctor_masks_check_clean",
+        "POST",
+        check,
+        {"entry_id": entry_id, "spans": [{"start": 0, "end": 2}]},
+    )
+    rec.call(
+        "doctor_masks_check_invalid_spans",
+        "POST",
+        check,
+        {"entry_id": entry_id, "spans": [{"start": 0, "end": 999}]},
+        expect=422,
+    )
+    rec.call(
+        "doctor_masks_check_unknown_entry",
+        "POST",
+        check,
+        {"entry_id": MISSING_ID, "spans": []},
+        expect=404,
+    )
+    rec.call(
+        "doctor_masks_save", "POST", f"{base}/masks", _mask_body(entry_id, [(0, 2)])
+    )
+    rec.call("doctor_unprocessed_masked", "GET", f"{base}/unprocessed")
+    return entry_id
 
 
 def _regenerate_flow(rec: Recorder, generating: int, failed: int) -> None:

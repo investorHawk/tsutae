@@ -32,7 +32,8 @@ tuple、counts は読み取り専用の Mapping）。
 
 モジュール: chars.py（文字の種類）、words.py（辞書・許可語の判定）、normalize.py
 （正規化）、replace.py（一次）、detect.py・detect_honorific.py・detect_facility.py・
-detect_address.py・detect_id.py（二次）。
+detect_address.py・detect_id.py（二次）、manual.py（D6 で医師が選んだ区間の伏せ字と、
+確かめた語の許可。2026-11-04 夜）。
 """
 
 from __future__ import annotations

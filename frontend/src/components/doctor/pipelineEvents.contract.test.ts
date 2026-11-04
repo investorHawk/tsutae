@@ -82,6 +82,10 @@ describe("実際のイベント（生成中・印刷済み）", () => {
       "doctor_pipeline_events_printed",
     ) as PipelineEventsResponse;
     expect(body.status).toBe("printed");
-    expect(body.events).toEqual(BODY.events);
+    // 印刷の前に D6 で伏せ字を保存している（dump_api_fixtures.py の流れ）。その分だけ多い
+    expect(body.events.slice(0, BODY.events.length)).toEqual(BODY.events);
+    expect(body.events.slice(BODY.events.length).map((e) => e.event)).toEqual([
+      "doctor_mask_saved",
+    ]);
   });
 });

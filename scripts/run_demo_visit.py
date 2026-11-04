@@ -163,6 +163,7 @@ def _prepared_like_service(
         report_skill=load_report_skill(skills_dir=settings.skills_dir),
         visit_date=visit["visit_date"],
         exclude_literals=(patient["id"], visit["reception_no"]),
+        doctor_masks=db.list_doctor_masks(conn, vid),
     )
 
 

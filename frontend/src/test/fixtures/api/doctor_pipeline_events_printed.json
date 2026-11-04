@@ -285,6 +285,15 @@
         "tool_name": null,
         "decision": "ok",
         "duration_ms": null
+      },
+      {
+        "ts": "2026-11-09T10:00:00+09:00",
+        "event": "doctor_mask_saved",
+        "hook_name": null,
+        "agent_type": null,
+        "tool_name": null,
+        "decision": "entry:38",
+        "duration_ms": null
       }
     ]
   }

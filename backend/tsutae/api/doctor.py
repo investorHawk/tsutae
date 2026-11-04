@@ -10,8 +10,9 @@
   `purge_expired`。印刷済み・期限切れ（受付番号を消した受診）は一覧に載せず、
   レポートと未処理は 404
 - レポートは `HTMLResponse` に `Cache-Control: no-store` と CSP
-- 未処理（D6）は記録の原文と、疑われた語の原文の中の位置 marks を返す（院内画面だけ。
-  紙には載せない。位置は `doctor_marks`）
+- 未処理（D6）は記録の原文と、疑われた語の原文の中の位置 marks と、保存済みの医師の
+  伏せ字 doctor_mask（区間と確かめ。無ければ null）を返す（院内画面だけ。紙には
+  載せない。位置は `doctor_marks`）。伏せ字の確かめ・保存は `unprocessed_masks`
 - 患者一覧は最後の記録日（と今日からの日数・途切れ）・今のコースと Day・次回受診も
   返す。患者の画面（D2）には、その患者の
   受診（`GET /patients/{pid}/visits`。印刷済み・期限切れも。前に `purge_expired`）と
@@ -23,7 +24,8 @@
   後、本文の検証の前）。本文の無い POST（printed）は frontend が Content-Type を付けない
   ので対象外
 - `POST /visits/{id}/regenerate`（本文なし）: 受付番号が残っていて期限内の failed・
-  ready（fallback=True）だけを generating に戻し（`db.begin_regeneration`）、
+  ready（fallback=True、または医師の伏せ字が1件以上ある）だけを generating に戻し
+  （`db.begin_regeneration`）、
   `POST /api/visit` と同じ `visit.run_generation` をバックグラウンドで起動する。
   ログ `regenerate_requested`（文面なし）。それ以外（generating・AI の結果で ready・
   印刷済み・期限切れ）は 409 `{"error": "not_regenerable"}`、無い受診は 404
@@ -44,6 +46,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from tsutae import db
+from tsutae.api import unprocessed_masks
 from tsutae.api.deps import (
     ApiError,
     AppSettings,
@@ -323,7 +326,8 @@ def regenerate(
     conn: Conn,
     settings: AppSettings,
 ) -> dict[str, bool]:
-    """AI でもう一度変換する（failed・AI 変換なしの ready だけ。前のレポートは残す）。"""
+    """AI でもう一度変換する（failed・AI 変換なしの ready・医師の伏せ字のある ready。
+    前のレポートは残す）。"""
     try:
         started = db.begin_regeneration(conn, vid)
     except db.NotFoundError as exc:
@@ -344,6 +348,7 @@ def list_unprocessed(vid: VisitId, conn: Conn) -> dict[str, Any]:
     visit = _open_visit(conn, vid)
     literals = [visit["patient_id"], visit["reception_no"]]
     courses = db.list_courses(conn, visit["patient_id"])
+    masks = db.list_doctor_masks(conn, vid)
     entries = []
     for item in _unprocessed(conn, vid):
         entry = db.get_entry(conn, item.entry_id)
@@ -358,6 +363,7 @@ def list_unprocessed(vid: VisitId, conn: Conn) -> dict[str, Any]:
                 "reason": item.reason,
                 "text": text,
                 "marks": suspect_marks(text, literals),
+                "doctor_mask": unprocessed_masks.doctor_mask_view(masks.get(entry.id)),
             }
         )
     return {"visit": visit_header(visit, now()), "entries": entries}
@@ -382,3 +388,5 @@ def pipeline_events(vid: VisitId, conn: Conn) -> dict[str, Any]:
 
 
 router.include_router(_protected)
+# 未処理の記載（D6）の伏せ字（確かめる・保存）。医師 Cookie・同じオリジン・JSON の検査つき
+router.include_router(unprocessed_masks.router)

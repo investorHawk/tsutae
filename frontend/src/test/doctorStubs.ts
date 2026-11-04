@@ -85,6 +85,7 @@ export function unprocessedItemStub(
     reason: "unknown_before_honorific",
     text: "磯鷲さんにもらった漢方",
     marks: [],
+    doctor_mask: null,
     ...patch,
   };
 }

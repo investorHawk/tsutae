@@ -155,7 +155,7 @@ T03 で確かめる4点:
 | T94 | ✅ Claude の 1 往復（Agent SDK、`set_fields`/`ask`/`propose_questions`、H1・H4） | T92, T93 |
 | T95 | ✅ 2 レジメン固定の解除（型・ローダー・DB 移行・患者登録） | T93 |
 | T96 | ✅ 画面 D4 レジメン（左フォーム・右チャット・確認・登録・小窓） | T93, T94 |
-| T97 | 通し・smoke・記録・README。smoke は 2026-11-05 に1回成功し、実測を decisions と README に記入済み。**残りはブラウザの通し（先生）** | T96 |
+| T97 | 通し・smoke・記録・README。smoke は 2026-11-05 に2回成功し、実測を decisions と README に記入済み。**残りはブラウザの通し（先生）** | T96 |
 
 T97 の残り（先生）:
 1. ブラウザの通し（手順は `docs/plan-d4-regimen.md` §6 の末尾）

@@ -85,7 +85,8 @@ export function toDeviceEntry(
 
 /**
  * 印を付けて端末に保存する。どちらの失敗も例外で返す（呼ぶ側は入力を残し、同じ ID で押し直せる）。
- * 保存だけが失敗すると印が残るが、紙に「届いていない」と出るので事実と違う表示にはならない。
+ * 保存だけが失敗して押し直さなければ印が残るが、紙に「届いていない」と出るので事実と違う
+ * 表示にはならない。押し直したことは呼ぶ側が覚えて、取り消しのときに伝える（undoRecord）。
  */
 export async function recordEntry(
   pid: string,
@@ -102,8 +103,13 @@ export async function recordEntry(
 /**
  * 記録の取り消し。サーバーが通したら端末の記録を消す。その日に端末の記録が他に無ければ
  * 印も消してもらう。端末の記録を消せなければ例外で返す（取り消しは何度送ってもよいので押し直せる）。
+ * retried は同じ記録を押し直して保存したとき。1回目の印の時刻は端末に届いていないことがあるので、
+ * サーバーに押し直しだと伝えて一緒に消してもらう。
  */
-export async function undoRecord(entry: DeviceEntry): Promise<void> {
+export async function undoRecord(
+  entry: DeviceEntry,
+  { retried = false }: { retried?: boolean } = {},
+): Promise<void> {
   const sameDay = await deviceEntriesOn(entry.pid, entry.record_date);
   const others = sameDay.some(
     (e) => e.client_entry_id !== entry.client_entry_id,
@@ -111,6 +117,7 @@ export async function undoRecord(entry: DeviceEntry): Promise<void> {
   await undoRecordMark(entry.pid, {
     recorded_at: entry.recorded_at,
     clear_mark: !others,
+    ...(retried ? { retried: true } : {}),
   });
   await deleteDeviceEntry(entry.pid, entry.client_entry_id);
 }

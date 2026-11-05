@@ -458,7 +458,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | 経路 | 入力 | 出力 |
 |---|---|---|
 | `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計。ミリ秒に揃える） |
-| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}`（`recorded_at` は印の応答の値） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある・その記録を受付で受け取っている（同じ受付番号の送り直しを含む）→ 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（他の時刻の印があれば、先に付いたものも後から付いたものも残す）。何度呼んでもよい |
+| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark, retried?}`（`recorded_at` は印の応答の値。`retried` は端末が同じ記録を押し直して保存したときだけ true） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある・その記録を受付で受け取っている（同じ受付番号の送り直しを含む）→ 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（他の時刻の印があれば、先に付いたものも後から付いたものも残す。`retried` のときだけ、10 分以内の先の印はこの記録の1回目として一緒に消す）。何度呼んでもよい |
 | `GET /api/patient/{pid}/visit-window` | — | `{start, end}`（前コースの Day1〜今日。前コースが無ければ今コースの Day1）。今コースが無ければ 409 `no_course` |
 | `GET /api/patient/{pid}/visit-days` | — | `{visits: [{visit_date, received_at}]}`（新しい順。受付番号・状態は返さない） |
 | `POST /api/patient/{pid}/unregister` | `{endpoint}`（string か null） | `{ok: true}` + Cookie を消す。その登録を消す。`record_marks` は消さない |
@@ -484,7 +484,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `patient/recordEntry.ts` | 記録の順序。`recordEntry`（`POST record-marks` → 応答の時刻で端末に保存）、`undoRecord`（同じ日の記録を読む → `record-marks/undo` → 端末から消す）、`toDeviceEntry`（質問の文の写しを持たせる）、`newClientEntryId` |
 | `patient/fixedRules.ts` | `noticesFor(entry, fixed_rules)`。`api/fixed_rules.py` と同じ判定で、同じ表（`src/test/fixtures/fixed_rule_cases.json`）でテストする |
 | `api/patientDevice.ts` | §12 の経路の呼び出しと応答の検査。`POST /api/visit` の `entries` は `api/patient.ts` の `submitVisit` |
-| `components/patient/TodayForm.tsx` | `client_entry_id` を入力の開始時に作り、押し直しても同じ（「追加で記録する」・取り消しの後で作り直す）。印か保存が失敗したら入力を残して `error.generic`。保存できたら `onSaved`（バッジと表示中の通知を消す） |
+| `components/patient/TodayForm.tsx` | `client_entry_id` を入力の開始時に作り、押し直しても同じ（「追加で記録する」・取り消しの後で作り直す）。印か保存が失敗したら入力を残して `error.generic`。同じ ID で印をもう一度送った記録は、取り消しのときに `retried` を伝える（覚えるのはこの画面の間だけ）。保存できたら `onSaved`（バッジと表示中の通知を消す） |
 | `components/patient/HistoryList.tsx` | P2。端末の記録と `GET visit-days` を読み、`historyRows` で並べる |
 | `patient/visitEntries.ts` | P3（§5.5）。`sendVisit`（`GET visit-window` → 端末の記録を読む → 範囲内だけ `POST /api/visit`）、`toVisitEntry`（`pid` と質問の文の写しを外す）。記録を読めなければ例外で返し、空のまま送らない。受付が断る自由記載は送る前に直し、中身が無くなる記録は送らない（`patient/freeText.ts`） |
 | `patient/freeText.ts` | `cleanFreeText`: 片割れのサロゲートと、前後の空白（Python の `str.strip` の一覧と U+FEFF）を落とす。`entryForm.ts`（入力ありの判定・`buildEntry`）と送る前に使う。同じ表 `test/fixtures/free_text_cases.json` を backend の `test_free_text_cases.py` も読み、画面が保存する形を受付が受け取ることを確かめる |

@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from tsutae.config import to_jst_date
 from tsutae.db.connection import date_from_db, date_to_db, dt_to_db, write_transaction
@@ -24,6 +24,9 @@ __all__ = [
     "undo_record_mark",
     "upsert_mark_row",
 ]
+
+# 押し直しの前の印とみなす長さ。これより前の印は別の端末の記録として残す
+RETRY_WINDOW = timedelta(minutes=10)
 
 
 def upsert_mark_row(conn: sqlite3.Connection, pid: str, at: datetime) -> None:
@@ -46,7 +49,12 @@ def add_record_mark(conn: sqlite3.Connection, pid: str, at: datetime) -> None:
 
 
 def undo_record_mark(
-    conn: sqlite3.Connection, pid: str, recorded_at: datetime, *, clear_mark: bool
+    conn: sqlite3.Connection,
+    pid: str,
+    recorded_at: datetime,
+    *,
+    clear_mark: bool,
+    retried: bool = False,
 ) -> bool:
     """recorded_at の記録の取り消し。受付に届いていれば何も変えずに False。
 
@@ -55,10 +63,14 @@ def undo_record_mark(
     （消せると、端末と印だけが消えて「つらくて書けない」がサーバーに残る）。
     clear_mark なら recorded_at の日の印を消す。ただし recorded_at の他に印が付いていれば
     （別の端末が先か後に書いた）残す。端末は他の端末の記録を知らないので、clear_mark だけでは
-    決められない。調べるのと消すのを1つの write_transaction で行う。時刻の窓は呼び出し側が見る。
+    決められない。retried は端末が同じ記録を押し直したこと（1回目の印の応答が届かない、または
+    保存に失敗した）で、1回目の印は端末から見えない。このときは RETRY_WINDOW の中の先の印も
+    この記録の分として消す。後から付いた印は残す。
+    調べるのと消すのを1つの write_transaction で行う。取り消しの窓は呼び出し側が見る。
     日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する
     """
     at = dt_to_db(recorded_at)
+    since = dt_to_db(recorded_at - RETRY_WINDOW) if retried else at
     with write_transaction(conn):
         visited = conn.execute(
             "SELECT 1 FROM visits WHERE patient_id = ? AND created_at >= ? LIMIT 1",
@@ -76,8 +88,8 @@ def undo_record_mark(
         if clear_mark:
             conn.execute(
                 "DELETE FROM record_marks WHERE patient_id = ? AND record_date = ?"
-                " AND first_marked_at = ? AND last_marked_at = ?",
-                (pid, date_to_db(to_jst_date(recorded_at)), at, at),
+                " AND first_marked_at >= ? AND last_marked_at = ?",
+                (pid, date_to_db(to_jst_date(recorded_at)), since, at),
             )
     return True
 

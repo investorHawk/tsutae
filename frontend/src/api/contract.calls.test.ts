@@ -181,6 +181,7 @@ const CALLS: Readonly<Record<string, Call>> = {
   patient_questions_forbidden: questions,
   patient_record_mark: recordMark,
   patient_record_mark_undo: undoMark,
+  patient_record_mark_undo_retried: undoMark,
   patient_record_mark_undo_not_undoable: undoMark,
   patient_visit_days: visitDays,
   patient_visit_days_not_logged_in: visitDays,

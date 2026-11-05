@@ -173,6 +173,8 @@ export interface UndoRecordMarkRequest {
   recorded_at: IsoDateTime;
   /** その日に端末の記録が他に無いとき true（印も消す） */
   clear_mark: boolean;
+  /** 同じ記録を押し直して保存したとき true（10 分以内の先の印も1回目として消す） */
+  retried?: boolean;
 }
 
 /** GET visit-window: 受診で送る範囲（両端を含む）。 */

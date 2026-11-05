@@ -171,6 +171,67 @@ def test_undo_clears_a_mark_written_again_after_an_undo(
     assert _marks(conn) == []
 
 
+def test_undo_of_a_retried_mark_clears_the_earlier_try(
+    conn: sqlite3.Connection,
+) -> None:
+    """応答が届かず押し直した日は、1回目の印も端末が付けたもの。取り消せば何も残らない。"""
+    db.add_record_mark(conn, PID, AT - timedelta(seconds=30))
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True, retried=True)
+    assert _marks(conn) == []
+    assert db.marked_patients(conn, AT.date()) == set()
+    assert db.last_record_dates(conn) == {}
+    assert db.list_record_marks(conn, PID) == []
+
+
+def test_undo_of_a_retried_mark_reaches_back_ten_minutes(
+    conn: sqlite3.Connection,
+) -> None:
+    db.add_record_mark(conn, PID, AT - timedelta(minutes=10))
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True, retried=True)
+    assert _marks(conn) == []
+
+
+def test_undo_of_a_retried_mark_keeps_a_mark_older_than_the_retry(
+    conn: sqlite3.Connection,
+) -> None:
+    """押し直しでも、10 分より前の印は別の端末の記録として残す。"""
+    db.add_record_mark(conn, PID, AT - timedelta(minutes=10, milliseconds=1))
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True, retried=True)
+    assert db.marked_patients(conn, AT.date()) == {PID}
+
+
+def test_undo_of_a_retried_mark_keeps_a_later_mark(conn: sqlite3.Connection) -> None:
+    """押し直しの後に別の端末が書いた印は残す。"""
+    db.add_record_mark(conn, PID, AT - timedelta(seconds=30))
+    db.add_record_mark(conn, PID, AT)
+    db.add_record_mark(conn, PID, AT + timedelta(seconds=1))
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True, retried=True)
+    assert db.marked_patients(conn, AT.date()) == {PID}
+
+
+def test_undo_of_a_retried_mark_keeps_the_mark_without_clear(
+    conn: sqlite3.Connection,
+) -> None:
+    """端末に同じ日の記録が他にあれば（clear_mark が false）、押し直しでも印を残す。"""
+    db.add_record_mark(conn, PID, AT - timedelta(seconds=30))
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=False, retried=True)
+    assert db.marked_patients(conn, AT.date()) == {PID}
+
+
+def test_undo_of_a_retried_mark_is_refused_once_received(
+    conn: sqlite3.Connection,
+) -> None:
+    db.add_record_mark(conn, PID, AT - timedelta(seconds=30))
+    db.add_record_mark(conn, PID, AT)
+    _receive(conn, PID, AT)
+    assert not db.undo_record_mark(conn, PID, AT, clear_mark=True, retried=True)
+    assert db.marked_patients(conn, AT.date()) == {PID}
+
+
 def test_undo_refused_after_a_visit_leaves_the_mark(conn: sqlite3.Connection) -> None:
     db.add_record_mark(conn, PID, AT)
     expires = now() + timedelta(hours=24)

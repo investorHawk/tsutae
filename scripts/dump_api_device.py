@@ -76,6 +76,20 @@ def _undo_flow(rec: Any, demo: str, other: str, recorded_at: str) -> None:
             f"/api/patient/{other}/record-marks/undo",
             {"recorded_at": marked.json()["recorded_at"], "clear_mark": True},
         )
+        rec.client.post(f"/api/patient/{other}/record-marks")  # 応答が届かなかった1回目
+        retried = rec.client.post(f"/api/patient/{other}/record-marks")
+        if retried.status_code != 200:
+            raise RuntimeError(f"印: status {retried.status_code}")
+        rec.call(
+            "patient_record_mark_undo_retried",
+            "POST",
+            f"/api/patient/{other}/record-marks/undo",
+            {
+                "recorded_at": retried.json()["recorded_at"],
+                "clear_mark": True,
+                "retried": True,
+            },
+        )
         rec.call(
             "patient_unregister",
             "POST",

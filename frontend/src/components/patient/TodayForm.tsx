@@ -53,6 +53,7 @@ const NO_ERRORS: ReadonlyMap<string, TemperatureProblem> = new Map();
  * スマホに置く（plan-device-records §5.2。順序は patient/recordEntry.ts）。
  * 固定規則の案内は画面のコードで判定し、定型文をそのまま出す。
  * client_entry_id は入力の開始時に作り、押し直しても同じ（失敗しても1件にしかならない）。
+ * 印を送った ID は覚えておく。同じ ID でもう一度送れば押し直しで、取り消しのときに伝える。
  * 「つらくて書けない」は必ず確認してから送る。何も入れていなければ3秒で自動で送り、
  * 入れた内容があれば、それを捨てることを確かめてから（「はい」を押した時だけ）送る。
  * 記録した後は TodayDone（要約・取り消し・追加で記録する）。記録できたら onSaved を呼ぶ。
@@ -83,6 +84,7 @@ export default function TodayForm({
   const [focusRound, setFocusRound] = useState(0);
   const [infoKey, setInfoKey] = useState<string | null>(null);
   const [clientEntryId, setClientEntryId] = useState(newClientEntryId);
+  const markedId = useRef<string | null>(null);
 
   const today = loaded.status === "ready" ? loaded.data.today : null;
   useEffect(() => {
@@ -149,6 +151,8 @@ export default function TodayForm({
       // 質問集を読む前に「つらくて書けない」を押したら、ここで読む（記録に版が要る）
       const context =
         loaded.status === "ready" ? loaded.data : await getQuestions(pid);
+      const retried = markedId.current === clientEntryId;
+      markedId.current = clientEntryId;
       const saved = await recordEntry(pid, clientEntryId, entry, context);
       setPhase({
         name: "done",
@@ -156,6 +160,7 @@ export default function TodayForm({
           entry: saved,
           messageKey: doneKey,
           notices: noticesFor(entry, context.fixed_rules),
+          retried,
         },
       });
       onSaved?.();

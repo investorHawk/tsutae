@@ -66,6 +66,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   patient_questions: isQuestionsResponse,
   patient_record_mark: isRecordMarkResponse,
   patient_record_mark_undo: isPatientOk,
+  patient_record_mark_undo_retried: isPatientOk,
   patient_visit_days: isVisitDaysResponse,
   patient_visit_window: isVisitWindowResponse,
   patient_unregister: isPatientOk,

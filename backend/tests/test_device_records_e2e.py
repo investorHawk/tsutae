@@ -547,3 +547,49 @@ def test_undo_is_refused_after_the_same_number_was_sent_again(
         with db_conn(client.app) as conn:
             assert pid in db.marked_patients(conn, date.fromisoformat(TODAY))
             assert [e.kind for e in db.list_entries(conn, pid)] == ["too_sick"]
+
+
+def _undo_after_a_retry(phone: _Phone, day: str) -> None:
+    """1回目の応答が届かず押し直し（印が2回付く）、保存した記録をすぐ取り消す。"""
+    phone.record(day, too_sick=True)
+    entry = phone.record(day, too_sick=True)
+    undo = phone.client.post(
+        f"/api/patient/{phone.pid}/record-marks/undo",
+        json={
+            "recorded_at": entry["recorded_at"],
+            "clear_mark": True,
+            "retried": True,
+        },
+    )
+    assert undo.status_code == 200, undo.text
+    del phone.entries[day]
+
+
+def test_undo_after_a_retry_leaves_no_trace_on_the_paper(
+    tmp_path: Path, fixed_today: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """取り消した日が紙に「届いていない」と出ず、D1 の最後の記録日も戻る。"""
+    with _patient_client(tmp_path) as client:
+        pid = _new_patient(client)
+        phone = _Phone(client, pid, monkeypatch)
+        phone.record("2026-11-02", too_sick=True)
+        _undo_after_a_retry(phone, TODAY)
+        with db_conn(client.app) as conn:
+            assert db.last_record_dates(conn) == {pid: date(2026, 11, 2)}
+        phone.send_visit()
+        visit = _d3_row(client)
+        html = client.get(f"/api/doctor/visits/{visit['id']}/report").text
+    assert "届いていない" not in html
+
+
+def test_undo_after_a_retry_lets_the_push_go_out(
+    tmp_path: Path, fixed_today: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = FakePushSender()
+    with _patient_client(tmp_path, **vapid_overrides()) as client:
+        pid = _new_patient(client)
+        phone = _Phone(client, pid, monkeypatch)
+        _subscribe(client, pid, SECOND_ENDPOINT)
+        _undo_after_a_retry(phone, TODAY)
+        assert _due(client, sender, EVENING) == PushCounts(sent=1)
+        assert _sent_to(sender) == [SECOND_ENDPOINT]

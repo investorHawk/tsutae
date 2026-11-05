@@ -4,11 +4,12 @@
 アーキテクチャテストで検査）。時刻はサーバーの時計（端末の時計は使わない）。
 
 - `POST /{pid}/record-marks`（本文なし）: 今日の印を付け、record_date・recorded_at を返す
-- `POST /{pid}/record-marks/undo`（recorded_at・clear_mark）: 押し間違いの取り消し。サーバーは
+- `POST /{pid}/record-marks/undo`（recorded_at・clear_mark・retried）: 押し間違いの取り消し。サーバーは
   記録の種類を持たないので、種類は端末が見る。recorded_at から UNDO_WINDOW 以内で、その後に
   受付が無く、その記録を受付で受け取っていないときだけ通す（外れれば 409 not_undoable）。
   clear_mark（その日に端末の記録が他に無い）なら印を消す。他の時刻の印があれば（別の端末の分）
-  残す。端末の記録を消すのは、この応答を見た端末
+  残す。retried（端末が同じ記録を押し直した）なら、10 分以内の先の印はこの記録の1回目として
+  消す。端末の記録を消すのは、この応答を見た端末
 - `GET /{pid}/visit-window`: 受診で送る範囲（`visit_entries.visit_window_of`）
 - `GET /{pid}/visit-days`: 受診日と受付の時刻だけ（受付番号・状態は返さない）
 - `POST /{pid}/unregister`（endpoint か null）: この端末の通知の登録と Cookie を消す。
@@ -46,6 +47,7 @@ class UndoMarkIn(BaseModel):
 
     recorded_at: AwareDatetime
     clear_mark: bool
+    retried: bool = False
 
 
 class UnregisterIn(BaseModel):
@@ -76,7 +78,11 @@ def undo_record_mark(
     if not timedelta(0) <= elapsed <= UNDO_WINDOW:
         raise ApiError(409, "not_undoable")
     if not db.undo_record_mark(
-        conn, patient["id"], body.recorded_at, clear_mark=body.clear_mark
+        conn,
+        patient["id"],
+        body.recorded_at,
+        clear_mark=body.clear_mark,
+        retried=body.retried,
     ):
         raise ApiError(409, "not_undoable")
     return {"ok": True}

@@ -1,9 +1,9 @@
 """記録のときの日付の印と取り消し（plan-device-records §5.2・§5.4）。
 
 - `POST /{pid}/record-marks`（本文なし）: サーバーの時計で今日の印を付け、記録日と時刻を返す
-- `POST /{pid}/record-marks/undo`（`{recorded_at, clear_mark}`）: サーバーの時計で 10 分以内で、
-  その後に受付が無ければ通す。外れれば 409 not_undoable。clear_mark なら印を消す（他の時刻の
-  印があれば残す）
+- `POST /{pid}/record-marks/undo`（`{recorded_at, clear_mark, retried?}`）: サーバーの時計で
+  10 分以内で、その後に受付が無ければ通す。外れれば 409 not_undoable。clear_mark なら印を消す
+  （他の時刻の印があれば残す。retried なら 10 分以内の先の印はこの記録の1回目として消す）
 - サーバーは記録の種類を知らない。端末の記録を消すのは端末（この応答を見てから）
 """
 
@@ -246,6 +246,50 @@ def test_undo_keeps_a_mark_written_earlier(client: TestClient, pid: str) -> None
         assert [m.record_date for m in db.list_record_marks(conn, pid)] == [TODAY]
 
 
+def test_undo_of_a_retried_mark_clears_the_day(client: TestClient, pid: str) -> None:
+    """1回目の応答が届かず押し直した。端末は2回目の時刻と、押し直したことだけを知っている。"""
+    _mark(client, pid)  # この応答は端末に届かなかった
+    second = _mark(client, pid)
+    r = client.post(
+        f"/api/patient/{pid}/record-marks/undo",
+        json={
+            "recorded_at": second["recorded_at"],
+            "clear_mark": True,
+            "retried": True,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {"ok": True}
+    assert not _marked(client, pid)
+    with db_conn(client.app) as conn:
+        assert db.last_record_dates(conn) == {}
+        assert db.list_record_marks(conn, pid) == []
+
+
+def test_undo_of_a_retried_mark_keeps_a_mark_from_an_hour_ago(
+    client: TestClient, pid: str
+) -> None:
+    with db_conn(client.app) as conn:
+        db.add_record_mark(conn, pid, now() - timedelta(hours=1))
+    body = _mark(client, pid)
+    r = client.post(
+        f"/api/patient/{pid}/record-marks/undo",
+        json={"recorded_at": body["recorded_at"], "clear_mark": True, "retried": True},
+    )
+    assert r.status_code == 200, r.text
+    assert _marked(client, pid)
+
+
+def test_undo_without_retried_keeps_the_earlier_mark(
+    client: TestClient, pid: str
+) -> None:
+    """押し直したと言わない端末には、今までどおり（別の端末の印として残す）。"""
+    _mark(client, pid)
+    second = _mark(client, pid)
+    assert _undo(client, pid, second["recorded_at"]).status_code == 200
+    assert _marked(client, pid)
+
+
 def test_undo_touches_only_this_patient(client: TestClient, pid: str) -> None:
     other = add_patient(client.app, courses=C1)
     with db_conn(client.app) as conn:
@@ -273,6 +317,11 @@ def test_undo_does_not_touch_entries(client: TestClient, pid: str) -> None:
         {"clear_mark": True},
         {"recorded_at": "2026-11-09T20:00:00+09:00", "clear_mark": "x"},
         {"recorded_at": "2026-11-09T20:00:00+09:00", "clear_mark": True, "x": 1},
+        {
+            "recorded_at": "2026-11-09T20:00:00+09:00",
+            "clear_mark": True,
+            "retried": "x",
+        },
     ],
 )
 def test_undo_bad_body_is_422(client: TestClient, pid: str, body: dict) -> None:

@@ -18,6 +18,8 @@ export interface SavedRecord {
   messageKey: string;
   /** 固定規則の案内（patient_strings のキー） */
   notices: readonly string[];
+  /** 同じ記録の押し直しで保存した（1回目の印がサーバーにあるかもしれない。取り消しで伝える） */
+  retried: boolean;
 }
 
 /** 取り消しが断られた（409 not_undoable）。もう取り消せない。 */
@@ -51,13 +53,13 @@ interface TodayDoneProps {
  * 取り消しの送信（サーバーが通したら端末の記録を消す）。401/403 の後は同じ番号なら押し直せる
  * ように戻し、違う番号は読み直す。
  */
-function useUndo(entry: DeviceEntry, onUndone: () => void) {
+function useUndo(entry: DeviceEntry, retried: boolean, onUndone: () => void) {
   const [undo, setUndo] = useState<UndoState>({ name: "idle" });
 
   async function handleUndo() {
     setUndo({ name: "sending" });
     try {
-      await undoRecord(entry);
+      await undoRecord(entry, { retried });
       onUndone();
     } catch (err) {
       setUndo(
@@ -95,6 +97,7 @@ export default function TodayDone({
   const titleId = useId();
   const { undo, handleUndo, resumeAfterRegister } = useUndo(
     saved.entry,
+    saved.retried,
     onUndone,
   );
 

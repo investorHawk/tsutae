@@ -342,7 +342,7 @@ push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_ti
 | 経路 | 用途 | 読む表 |
 |---|---|---|
 | `POST /api/patient/{pid}/record-marks` | 今日の日付の印を付ける（本文なし。`record_date`・`recorded_at` を返す。端末はこの値で記録を保存する） | record_marks |
-| `POST /api/patient/{pid}/record-marks/undo` | 「つらくて書けない」の取り消し（4.1。`{recorded_at, clear_mark}`。10分を過ぎた・その後に受付がある・その時刻の記録を受付で受け取っている（同じ受付番号の送り直しを含む）なら 409。`clear_mark` ならその日の印を消す。他の時刻の印があれば残す） | visits, entries, record_marks |
+| `POST /api/patient/{pid}/record-marks/undo` | 「つらくて書けない」の取り消し（4.1。`{recorded_at, clear_mark, retried?}`。10分を過ぎた・その後に受付がある・その時刻の記録を受付で受け取っている（同じ受付番号の送り直しを含む）なら 409。`clear_mark` ならその日の印を消す。他の時刻の印があれば残す。`retried`（端末が同じ記録を押し直して保存した）なら、10分以内の先の印はその記録の1回目として消す） | visits, entries, record_marks |
 | `GET /api/patient/{pid}/visit-window` | 受付で送る範囲（前コースの Day1〜今日） | courses |
 | `GET /api/patient/{pid}/visit-days` | 受診日（日付・受付の時刻だけ。P2 の区切り） | visits |
 | `POST /api/patient/{pid}/unregister` | この端末の登録を解除（本文に `endpoint`。通知の登録と Cookie を消す。日付の印は消さない） | push_subscriptions |

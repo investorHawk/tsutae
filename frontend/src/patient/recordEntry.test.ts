@@ -172,6 +172,19 @@ describe("undoRecord", () => {
     await expect(listDeviceEntries(PID)).resolves.toEqual([]);
   });
 
+  it("押し直して付けた記録は retried: true を添える", async () => {
+    const fetchMock = mockMarks();
+    const entry = deviceEntry(ID);
+    await saveDeviceEntry(entry);
+    await undoRecord(entry, { retried: true });
+    expect(undoBody(fetchMock)).toEqual({
+      recorded_at: MARK.recorded_at,
+      clear_mark: true,
+      retried: true,
+    });
+    await expect(listDeviceEntries(PID)).resolves.toEqual([]);
+  });
+
   it("その日に他の記録があれば clear_mark: false", async () => {
     const fetchMock = mockMarks();
     const entry = deviceEntry(ID);

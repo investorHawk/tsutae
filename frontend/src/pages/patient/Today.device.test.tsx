@@ -18,6 +18,7 @@ import {
   LONE_SURROGATE,
   NEXT_LINE,
   PID,
+  QUESTIONS_RESPONSE,
   questionText,
   s,
 } from "./testing/fixtures";
@@ -212,6 +213,135 @@ describe("Today: when recording fails", () => {
     expect(saved).toHaveLength(1);
     expect(saved[0]!.client_entry_id).toBe(attempted());
     expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(2);
+  });
+
+  describe("undo after pressing again (the first mark may be on the server)", () => {
+    const FIRST = "2026-11-09T20:00:00.000000+09:00";
+    const SECOND = "2026-11-09T20:00:30.000000+09:00";
+
+    /** 呼ぶたびに時刻が進む印と、取り消しの本文の控え。 */
+    function mockAdvancingMarks(first: () => Promise<Response> | Response) {
+      const undone: unknown[] = [];
+      let calls = 0;
+      const fetchMock = mockPatientApi({
+        recordMark: () => {
+          calls += 1;
+          return calls === 1
+            ? first()
+            : jsonResponse({ ...MARK, recorded_at: SECOND });
+        },
+        undo: (body) => {
+          undone.push(body);
+          return jsonResponse({ ok: true });
+        },
+      });
+      return { fetchMock, undone };
+    }
+
+    async function pressUndo() {
+      await userEvent.click(button("today.undo"));
+      await screen.findByText(s("today.undone"));
+    }
+
+    it("the save failed: the undo says so, with the time of the second mark", async () => {
+      const { fetchMock, undone } = mockAdvancingMarks(() =>
+        jsonResponse({ ...MARK, recorded_at: FIRST }),
+      );
+      failNextPut();
+      renderToday();
+      await pressTooSick();
+      await screen.findByRole("alert");
+      await recordTooSick();
+      await pressUndo();
+      expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(2);
+      expect(undone).toEqual([
+        { recorded_at: SECOND, clear_mark: true, retried: true },
+      ]);
+      await expect(listDeviceEntries(PID)).resolves.toEqual([]);
+    });
+
+    it("the reply never came: the undo says so too", async () => {
+      const { undone } = mockAdvancingMarks(() =>
+        Promise.reject(new TypeError("Failed to fetch")),
+      );
+      renderToday();
+      await pressTooSick();
+      await screen.findByRole("alert");
+      await recordTooSick();
+      await pressUndo();
+      expect(undone).toEqual([
+        { recorded_at: SECOND, clear_mark: true, retried: true },
+      ]);
+      await expect(listDeviceEntries(PID)).resolves.toEqual([]);
+    });
+
+    it("pressed once: the undo does not say it was retried", async () => {
+      const { undone } = mockAdvancingMarks(() =>
+        jsonResponse({ ...MARK, recorded_at: FIRST }),
+      );
+      renderToday();
+      await recordTooSick();
+      await pressUndo();
+      expect(undone).toEqual([{ recorded_at: FIRST, clear_mark: true }]);
+    });
+
+    it("a new record after the undo is not a retry of the old one", async () => {
+      const { undone } = mockAdvancingMarks(() =>
+        Promise.reject(new TypeError("Failed to fetch")),
+      );
+      renderToday();
+      await pressTooSick();
+      await screen.findByRole("alert");
+      await recordTooSick();
+      await pressUndo();
+      await recordTooSick();
+      await pressUndo();
+      expect(undone).toEqual([
+        { recorded_at: SECOND, clear_mark: true, retried: true },
+        { recorded_at: SECOND, clear_mark: true },
+      ]);
+    });
+
+    it("a new record after add_more is not a retry of the old one", async () => {
+      const { undone } = mockAdvancingMarks(() =>
+        Promise.reject(new TypeError("Failed to fetch")),
+      );
+      renderToday();
+      await pressTooSick();
+      await screen.findByRole("alert");
+      await recordTooSick();
+      await userEvent.click(button("today.add_more"));
+      await recordTooSick();
+      await pressUndo();
+      // 端末に前の記録があるので印は消さない。押し直しでもない
+      expect(undone).toEqual([{ recorded_at: SECOND, clear_mark: false }]);
+    });
+
+    it("questions that could not be read are not a mark on the server", async () => {
+      let questionCalls = 0;
+      const undone: unknown[] = [];
+      mockPatientApi({
+        questions: () => {
+          questionCalls += 1;
+          return questionCalls <= 2
+            ? jsonResponse({ error: "internal_error" }, 500)
+            : jsonResponse(QUESTIONS_RESPONSE);
+        },
+        undo: (body) => {
+          undone.push(body);
+          return jsonResponse({ ok: true });
+        },
+      });
+      renderToday();
+      await pressTooSick();
+      // 質問集の読み込みと送信の両方の失敗が出る
+      await screen.findAllByRole("alert");
+      await recordTooSick();
+      await pressUndo();
+      expect(undone).toEqual([
+        { recorded_at: MARK.recorded_at, clear_mark: true },
+      ]);
+    });
   });
 
   it("too_sick that could not be saved shows the error at its button", async () => {

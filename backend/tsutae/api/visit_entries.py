@@ -19,8 +19,14 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
-from pydantic import field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from tsutae import db
 from tsutae.api.deps import ApiError

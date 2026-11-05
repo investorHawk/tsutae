@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { DoneMessage, ErrorMessage } from "../../components/patient/Messages";
+import { DoneMessage } from "../../components/patient/Messages";
+import NotRegistered from "../../components/patient/NotRegistered";
 import PatientNav from "../../components/patient/PatientNav";
 import { formatDate } from "../../components/patient/history";
-import { NOT_REGISTERED_KEY } from "../../components/patient/patientApi";
 import TodayForm from "../../components/patient/TodayForm";
 import { loadPid } from "../../patient/pid";
 import { usePatientStrings } from "../../strings/PatientStrings";
@@ -38,7 +38,7 @@ function TodayTitle({ today }: { today: string | null }) {
 }
 
 /**
- * P1 今日の記録（/today）。仮名ID が無ければ未登録の案内だけ（API は呼ばない）。
+ * P1 今日の記録（/today）。仮名ID が無ければ未登録の案内と番号の入力欄（記録の API は呼ばない）。
  * 下部ナビの「今日の記録」を押すと（location.key が変わり）新しい記録を始める。
  */
 export default function Today() {
@@ -68,7 +68,7 @@ export default function Today() {
           onToday={setToday}
         />
       ) : (
-        <ErrorMessage messageKey={NOT_REGISTERED_KEY} />
+        <NotRegistered />
       )}
       <PatientNav />
     </section>

@@ -15,6 +15,8 @@ export interface PatientApiReplies {
   /** POST entries/{id}/undo（取り消し）。引数は経路の id */
   undo?: (entryId: number) => Reply;
   visit?: (body: unknown) => Reply;
+  /** POST /api/patient/register（番号の手入力） */
+  register?: (body: unknown) => Reply;
 }
 
 const DEFAULTS: Required<PatientApiReplies> = {
@@ -23,6 +25,7 @@ const DEFAULTS: Required<PatientApiReplies> = {
   entries: () => jsonResponse(entriesBody(ENTRIES)),
   undo: () => jsonResponse({ ok: true }),
   visit: () => jsonResponse({ ok: true, message_key: "visit.done" }),
+  register: () => jsonResponse({ ok: true }),
 };
 
 function bodyOf(init?: RequestInit): unknown {
@@ -49,6 +52,9 @@ export function mockPatientApi(replies: PatientApiReplies = {}): FetchMock {
     }
     if (method === "POST" && url === "/api/visit") {
       return r.visit(bodyOf(init));
+    }
+    if (method === "POST" && url === "/api/patient/register") {
+      return r.register(bodyOf(init));
     }
     return jsonResponse({ error: "not_found" }, 404);
   });

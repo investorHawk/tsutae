@@ -2,10 +2,10 @@ import { useId, useState, type FormEvent } from "react";
 import { isApiError } from "../../api/http";
 import { submitVisit } from "../../api/patient";
 import { DoneMessage, ErrorMessage } from "../../components/patient/Messages";
+import NotRegistered from "../../components/patient/NotRegistered";
 import PatientNav from "../../components/patient/PatientNav";
 import {
   GENERIC_ERROR_KEY,
-  NOT_REGISTERED_KEY,
   isNotRegistered,
 } from "../../components/patient/patientApi";
 import { normalizeReceptionNo } from "../../components/patient/reception";
@@ -16,6 +16,7 @@ type Phase = "editing" | "sending" | "done" | "not_registered";
 const INVALID_KEY = "visit.invalid";
 /** 今コースが無い（409 no_course）。受付で声をかけてもらう。 */
 const NO_COURSE_KEY = "visit.no_course";
+const REGISTERED_KEY = "register.done";
 
 function errorKeyOf(err: unknown): string {
   if (isApiError(err) && (err.status === 400 || err.status === 422)) {
@@ -33,6 +34,8 @@ function errorKeyOf(err: unknown): string {
  * 患者は Cookie で識別される（経路に仮名ID を入れない）。
  * native の maxLength は UTF-16 単位で数え貼り付けを黙って切るので付けない。
  * 長さは送る前に normalizeReceptionNo（code point で 1〜32 字）で検査する。
+ * 送って 401/403 なら番号の入力欄を出す。登録できたら受付番号を残したまま送る前に戻す
+ * （この画面は Cookie だけで送るので、読み直さなくても送り直せる）。
  */
 export default function Visit() {
   const { t } = usePatientStrings();
@@ -41,6 +44,12 @@ export default function Visit() {
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("editing");
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [registered, setRegistered] = useState(false);
+
+  function resumeAfterRegister() {
+    setRegistered(true);
+    setPhase("editing");
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -51,6 +60,7 @@ export default function Visit() {
     }
     setPhase("sending");
     setErrorKey(null);
+    setRegistered(false);
     try {
       await submitVisit(receptionNo);
       setPhase("done");
@@ -78,9 +88,10 @@ export default function Visit() {
     <section className="page">
       <h1>{t("visit.title")}</h1>
       {phase === "not_registered" ? (
-        <ErrorMessage messageKey={NOT_REGISTERED_KEY} />
+        <NotRegistered onRegistered={resumeAfterRegister} />
       ) : (
         <form onSubmit={handleSubmit} noValidate>
+          {registered && <DoneMessage messageKey={REGISTERED_KEY} />}
           <p>{t("visit.about")}</p>
           <label htmlFor={inputId}>{t("visit.reception_label")}</label>
           <p id={exampleId} className="p-hint">

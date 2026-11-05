@@ -1,0 +1,17 @@
+# 新しい worktree に写す、gitignore 対象のファイル（書き方は .gitignore と同じ）
+# 依存（.venv・node_modules）、キャッシュ、確認用の DB は写さない
+
+# 秘密の値と設定
+.env
+.env.*
+.claude/settings.local.json
+
+# 非公開の資料と手元のメモ
+docs/reference/event-rules.md
+notes/
+
+# 動画の素材
+video/public/footage/*.mp4
+video/public/footage/*.mov
+video/public/audio/*.mp3
+video/public/audio/*.wav

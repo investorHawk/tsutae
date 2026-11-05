@@ -103,6 +103,24 @@ def test_prompt_keeps_unlisted_symptoms_out_of_near_terms() -> None:
     assert "歯肉出血" not in terms and "鼻出血" in terms
 
 
+def test_prompt_fixes_the_bleeding_question() -> None:
+    """出血は鼻血と歯ぐきの両方を聞く（先生の判断 2026-11-06）。文と key を固定する。"""
+    prompt = build_turn_prompt(_input(new_draft_form()), TEXT)
+    assert "文を「鼻血や歯ぐきからの出血はありましたか」" in prompt
+    assert "key を bleeding に固定する" in prompt
+    assert "鼻血だけの文に縮めない" in prompt
+
+
+def test_near_terms_rule_is_about_side_effect_rows_not_the_question() -> None:
+    """規則「phrases に混ぜない」は残す。質問の文を縮める理由にはしない。"""
+    prompt = build_turn_prompt(_input(new_draft_form()), TEXT)
+    assert (
+        "これは side_effects の行の話で、患者への質問の文を鼻血だけに縮める理由にはならない"
+        in prompt
+    )
+    assert "歯ぐきの言い方は side_effects の phrases に入れない" in prompt
+
+
 def test_prompt_lists_doctor_edit_and_missing_fields_by_ref() -> None:
     form = load_builtin_form("regimen-folfox")
     sources = FieldSources(

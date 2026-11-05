@@ -67,13 +67,22 @@ export default function RegimenSettings() {
             ask,
             locked: busy,
             fieldErrors: editor.fieldErrors,
+            drugNames: screen.drugNames,
             commit: (fieldId, value) =>
               patch({ changes: [{ field_id: fieldId, value }] }, [fieldId]),
             patch,
             setFieldError: editor.setFieldError,
           }
         : null,
-    [draft, ask, busy, editor.fieldErrors, patch, editor.setFieldError],
+    [
+      draft,
+      ask,
+      busy,
+      editor.fieldErrors,
+      screen.drugNames,
+      patch,
+      editor.setFieldError,
+    ],
   );
 
   return (
@@ -158,6 +167,7 @@ export default function RegimenSettings() {
             busy={busy}
             blocked={editor.blocked}
             notice={editor.notice}
+            drugNames={screen.drugNames}
             onSend={screen.sendTurn}
             onJump={screen.jump}
           />

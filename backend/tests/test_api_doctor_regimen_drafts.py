@@ -111,6 +111,7 @@ def _set_standard(client: TestClient, draft_id: int, field_id: str) -> None:
         ("post", f"{BASE}/1/discard"),
         ("get", f"{BASE}/1/preview"),
         ("post", f"{BASE}/1/adopt"),
+        ("get", "/api/doctor/regimen-drug-names"),
     ],
 )
 def test_requires_doctor_cookie(tmp_path: Path, method: str, path: str) -> None:

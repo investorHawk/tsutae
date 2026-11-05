@@ -8,6 +8,7 @@ import { ApiError } from "./http";
 import {
   TURN_TIMEOUT_MS,
   fieldIssuesOf,
+  listRegimenDrugNames,
   patchRegimenFields,
   postRegimenTurn,
 } from "./regimenDrafts";
@@ -100,4 +101,23 @@ describe("postRegimenTurn", () => {
       },
     ]);
   });
+});
+
+describe("listRegimenDrugNames", () => {
+  it("GET で名前の一覧を読む", async () => {
+    const fixture = apiFixture("doctor_regimen_drug_names");
+    const mock = mockFetch(() => jsonResponse(fixture.body));
+    await expect(listRegimenDrugNames()).resolves.toEqual(fixture.body);
+    expect(callOf(mock).method).toBe("GET");
+    expect(callOf(mock).url).toBe("/api/doctor/regimen-drug-names");
+  });
+
+  it.each([[{}], [{ names: "パクリタキセル" }], [{ names: [1] }]])(
+    "形が違えば invalid_response（%j）",
+    async (body) => {
+      mockFetch(() => jsonResponse(body));
+      const err = await listRegimenDrugNames().catch((e: unknown) => e);
+      expect((err as ApiError).code).toBe("invalid_response");
+    },
+  );
 });

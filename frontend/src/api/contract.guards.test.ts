@@ -12,6 +12,7 @@ import {
   isCreateRegimenDraftResponse,
   isRegimenDraftResponse,
   isRegimenDraftsResponse,
+  isRegimenDrugNamesResponse,
   isRegimenPreviewResponse,
   isRegimenTurnResponse,
 } from "./regimenGuards";
@@ -95,6 +96,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_question_library_add: isAddLibraryQuestionResponse,
   doctor_question_library_hide: isDoctorOk,
   doctor_regimen_drafts: isRegimenDraftsResponse,
+  doctor_regimen_drug_names: isRegimenDrugNamesResponse,
   doctor_regimen_draft: isRegimenDraftResponse,
   doctor_regimen_draft_create: isCreateRegimenDraftResponse,
   doctor_regimen_draft_create_existing: isCreateRegimenDraftResponse,

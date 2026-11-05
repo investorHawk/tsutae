@@ -238,17 +238,21 @@ describe("D4 レジメン: 一覧の削除", () => {
 });
 
 describe("D4 レジメン: 凡例", () => {
-  it("先生の文からの欄には「頼まない限り書き換えない」を当てない", async () => {
+  it("青枠は「先生の値」1行で、出どころによる保護の違いを文で分ける", async () => {
     api(demoDraft());
     renderRoute("/doctor/settings", "/doctor/settings", <RegimenSettings />);
     await userEvent.click(
       await screen.findByRole("tab", { name: /FOLFIRI＋BV 下書き/ }),
     );
     const legend = await screen.findByLabelText("欄の状態");
-    const edit = within(legend).getByText("先生が入れた").parentElement;
-    const text = within(legend).getByText("先生の文から").parentElement;
-    expect(edit).toHaveTextContent("頼まない限り Claude は書き換えない");
-    expect(text).not.toHaveTextContent("頼まない限り");
-    expect(text).toHaveTextContent("次の文で Claude が直すことがある");
+    const doc = within(legend).getByText("先生の値").parentElement;
+    expect(doc).toHaveTextContent(
+      "先生の文から入った欄は次の文で Claude が直すことがある",
+    );
+    expect(doc).toHaveTextContent("直接入れた欄は頼まない限り書き換えない");
+    expect(within(legend).queryByText("先生が入れた")).toBeNull();
+    expect(within(legend).queryByText("先生の文から")).toBeNull();
+    expect(legend.querySelectorAll(".rf-legend-tag--doc")).toHaveLength(1);
+    expect(within(legend).getByText("AI が入れた")).toBeInTheDocument();
   });
 });

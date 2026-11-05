@@ -18,6 +18,7 @@ export const REGIMENS = `GET ${API}/regimens`;
 export const DRAFTS = `GET ${API}/regimen-drafts`;
 export const CREATE = `POST ${API}/regimen-drafts`;
 export const LIBRARY = `GET ${API}/question-library`;
+export const DRUG_NAMES = `GET ${API}/regimen-drug-names`;
 
 export const draftPath = (id: number) => `${API}/regimen-drafts/${id}`;
 export const turnKey = (id: number) => `POST ${draftPath(id)}/turns`;

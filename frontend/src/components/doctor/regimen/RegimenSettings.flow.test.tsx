@@ -197,9 +197,9 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     ).toBeInTheDocument();
     const name = screen.getByLabelText("レジメン名");
     expect(fieldOf(name)).toHaveAttribute("data-state", "missing");
-    expect(
-      within(fieldOf(name)).getByText("未入力（必須）"),
-    ).toBeInTheDocument();
+    expect(within(fieldOf(name)).getByText("未入力（必須）")).toHaveClass(
+      "rf-tag",
+    );
     expect(screen.getByRole("button", { name: "確認へ進む" })).toBeDisabled();
 
     // チャットで送る（⌘+Enter）→ 欄が埋まる
@@ -220,20 +220,24 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     expect(cycle).toHaveValue("14");
     // 先生の文からの欄は青枠、標準の値の欄は AI が入れた
     expect(fieldOf(cycle)).toHaveAttribute("data-state", "doc");
-    expect(
-      within(fieldOf(cycle)).getByText("先生の文から"),
-    ).toBeInTheDocument();
+    // 札は読み上げにだけ残す（色で見せる）。aria-describedby は同じ札を指す
+    const cycleTag = within(fieldOf(cycle)).getByText("先生の文から");
+    expect(cycleTag).toHaveClass("rf-sr-only");
+    expect(cycle).toHaveAttribute("aria-describedby", cycleTag.id);
     const target = fieldOf(screen.getByLabelText("対象（任意）"));
     expect(target).toHaveAttribute("data-state", "ai");
-    expect(
-      within(target).getByText("AI が入れた（標準の値）"),
-    ).toBeInTheDocument();
-    // ask の欄は赤枠と札
+    const targetTag = within(target).getByText("AI が入れた（標準の値）");
+    expect(targetTag).toHaveClass("rf-sr-only");
+    expect(screen.getByLabelText("対象（任意）")).toHaveAttribute(
+      "aria-describedby",
+      targetTag.id,
+    );
+    // ask の欄は赤枠と札（見せる）
     const days = screen.getByLabelText("Day（ベバシズマブ）");
     expect(fieldOf(days)).toHaveAttribute("data-state", "asked");
-    expect(
-      within(fieldOf(days)).getByText("Claude が聞いています"),
-    ).toBeInTheDocument();
+    const askedTag = within(fieldOf(days)).getByText("Claude が聞いています");
+    expect(askedTag).toHaveClass("rf-tag");
+    expect(askedTag).not.toHaveClass("rf-sr-only");
 
     // 変えた欄の札を押すと、その欄へ focus
     const changed = within(chat).getByRole("group", { name: "変えた欄" });
@@ -310,6 +314,13 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     expect(within(phone).queryByText(/点滴の日を Day1/)).toBeNull();
     const adopt = screen.getByRole("button", { name: "採用して登録" });
     expect(adopt).toBeDisabled();
+    // 印の前でも、戻る・捨てるは押せる
+    expect(
+      screen.getByRole("button", { name: "フォームに戻る" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "下書きを捨てる" }),
+    ).toBeEnabled();
 
     // 印を付けてから1行削除 → 欄を空にする PATCH → 確認を取り直す（印は外れる）
     await user.click(screen.getByLabelText("上の値を全て確かめました"));

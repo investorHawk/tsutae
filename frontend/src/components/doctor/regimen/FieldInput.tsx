@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { Parsed } from "./fieldValues";
 import { domIdOf } from "./fieldLabels";
-import { fieldStateOf, stateTagOf } from "./fieldState";
+import { fieldStateOf, showsStateTag, stateTagOf } from "./fieldState";
 import { useRegimenForm } from "./formContext";
 
 interface FieldShellProps {
@@ -24,7 +24,7 @@ interface FieldShellProps {
   className?: string;
 }
 
-/** 欄の枠: 名前・状態の札（色だけに頼らない）・欄の下の理由。 */
+/** 欄の枠: 名前・状態の札（ai と doc は読み上げだけ。showsStateTag）・欄の下の理由。 */
 export function FieldShell({
   fieldId,
   label,
@@ -54,7 +54,10 @@ export function FieldShell({
       </label>
       {children({ id, describedBy, invalid: errors.length > 0 })}
       {tag ? (
-        <span id={tagId} className="rf-tag">
+        <span
+          id={tagId}
+          className={showsStateTag(state) ? "rf-tag" : "rf-sr-only"}
+        >
           {tag}
         </span>
       ) : null}
@@ -79,6 +82,8 @@ interface FieldInputProps {
   disabled?: boolean;
   hideLabel?: boolean;
   maxLength?: number;
+  /** 入力の候補の datalist の id（1行の欄だけ。候補に無い値も書ける） */
+  list?: string;
 }
 
 /**
@@ -98,6 +103,7 @@ export function FieldInput({
   disabled = false,
   hideLabel = false,
   maxLength,
+  list,
 }: FieldInputProps) {
   const { locked, commit, setFieldError } = useRegimenForm();
   const [text, setText] = useState(value);
@@ -189,6 +195,7 @@ export function FieldInput({
             id={id}
             type="text"
             inputMode={inputMode}
+            list={list}
             value={text}
             placeholder={placeholder}
             disabled={disabled || locked}

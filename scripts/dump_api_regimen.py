@@ -95,6 +95,8 @@ def _adopt(rec: Any, draft_id: int) -> None:
     )
     body = {"confirm_token": token, "ai_values_confirmed": True}
     rec.call("doctor_regimen_draft_adopt", "POST", f"{path}/adopt", body)
+    # 採用した版の薬が候補に増えた形
+    rec.call("doctor_regimen_drug_names", "GET", "/api/doctor/regimen-drug-names")
 
 
 def _turn_chat() -> ScriptChat:

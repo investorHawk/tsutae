@@ -187,6 +187,11 @@ export function isRegimenDraftsResponse(v: Item): boolean {
   return everyItem(isRegimenDraftSummary)(v.drafts);
 }
 
+/** GET regimen-drug-names {names}。 */
+export function isRegimenDrugNamesResponse(v: Item): boolean {
+  return isStringList(v.names);
+}
+
 /** GET regimen-drafts/{id}・PATCH .../fields {draft}。 */
 export function isRegimenDraftResponse(v: Item): boolean {
   return isRegimenDraft(v.draft);

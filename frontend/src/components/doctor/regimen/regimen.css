@@ -1,5 +1,6 @@
 /* D4 レジメン（フォーム＋チャット）。色・文言・状態は docs/reference/d4-regimen-mock.dc.html が正。
-   欄の4つの状態は色と文字の札の両方で出す（色だけに頼らない）。 */
+   欄の4つの状態は色と枠の線で出す。文字の札を見せるのは未入力と Claude が聞いている欄だけで、
+   AI の値と先生の値の札は読み上げだけ（意味は凡例と節の見出しの件数。docs/decisions.md）。 */
 
 .doctor-app .rf-kind-tabs,
 .doctor-app .rf-tabs {
@@ -263,14 +264,6 @@
 
 .doctor-app .rf-field--asked .rf-tag {
   color: #a30000;
-}
-
-.doctor-app .rf-field--ai .rf-tag {
-  color: #8a4300;
-}
-
-.doctor-app .rf-field--doc .rf-tag {
-  color: var(--d-primary-strong);
 }
 
 .doctor-app .rf-field-error {

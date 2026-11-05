@@ -13,6 +13,8 @@ export interface RegimenFormContextValue {
   /** Claude の応答中（全ての欄・行の操作を止める） */
   locked: boolean;
   fieldErrors: FieldErrors;
+  /** 薬の名前の候補（読めなければ空） */
+  drugNames: readonly string[];
   commit: (fieldId: string, value: unknown) => Promise<boolean>;
   patch: (
     body: PatchRegimenFieldsRequest,

@@ -13,6 +13,7 @@ import {
 import { useRegimenCatalog } from "./useRegimenCatalog";
 import { useRegimenConfirm } from "./useRegimenConfirm";
 import { useRegimenDraft } from "./useRegimenDraft";
+import { useRegimenDrugNames } from "./useRegimenDrugNames";
 
 export type RegimenView = "form" | "confirm" | "done";
 
@@ -51,6 +52,7 @@ export function useRegimenScreen(handleError: (err: unknown) => string) {
   const catalog = useRegimenCatalog(handleError);
   const editor = useRegimenDraft(handleError);
   const confirm = useRegimenConfirm(editor.draft?.id ?? null, handleError);
+  const { names: drugNames, reload: reloadDrugNames } = useRegimenDrugNames();
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<RegimenView>("form");
   const [adopted, setAdopted] = useState<AdoptedRegimen | null>(null);
@@ -186,9 +188,10 @@ export function useRegimenScreen(handleError: (err: unknown) => string) {
     setSelected(skillTabKey(result.skill_name));
     editor.close();
     confirm.clear();
+    void reloadDrugNames();
     await catalog.reload();
     focusFirst("rf-done-h");
-  }, [catalog, confirm, editor]);
+  }, [catalog, confirm, editor, reloadDrugNames]);
 
   const backToList = useCallback(() => {
     setAdopted(null);
@@ -200,6 +203,7 @@ export function useRegimenScreen(handleError: (err: unknown) => string) {
     catalog,
     editor,
     confirm,
+    drugNames,
     selected,
     view,
     adopted,

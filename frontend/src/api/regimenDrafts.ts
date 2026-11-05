@@ -10,6 +10,7 @@ import {
   isFieldIssue,
   isRegimenDraftResponse,
   isRegimenDraftsResponse,
+  isRegimenDrugNamesResponse,
   isRegimenPreviewResponse,
   isRegimenTurnResponse,
 } from "./regimenGuards";
@@ -22,6 +23,7 @@ import type {
   PatchRegimenFieldsRequest,
   RegimenDraftResponse,
   RegimenDraftsResponse,
+  RegimenDrugNamesResponse,
   RegimenPreview,
   RegimenTurnResponse,
 } from "./regimenTypes";
@@ -36,6 +38,7 @@ const TIMEOUT_MS = 30_000;
  */
 export const TURN_TIMEOUT_MS = 100_000;
 const BASE = "/api/doctor/regimen-drafts";
+const DRUG_NAMES_PATH = "/api/doctor/regimen-drug-names";
 
 const draftPath = (id: number): string => `${BASE}/${seg(id)}`;
 
@@ -53,6 +56,14 @@ export async function listRegimenDrafts(): Promise<RegimenDraftsResponse> {
   return checked<RegimenDraftsResponse>(
     await getJson<unknown>(BASE, { timeoutMs: TIMEOUT_MS }),
     isRegimenDraftsResponse,
+  );
+}
+
+/** 薬の名前の候補（採用済みのレジメンの薬 → 固定の5つの順）。 */
+export async function listRegimenDrugNames(): Promise<RegimenDrugNamesResponse> {
+  return checked<RegimenDrugNamesResponse>(
+    await getJson<unknown>(DRUG_NAMES_PATH, { timeoutMs: TIMEOUT_MS }),
+    isRegimenDrugNamesResponse,
   );
 }
 

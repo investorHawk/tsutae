@@ -1,4 +1,4 @@
-/** 欄の状態の凡例（色と文字の札の対応）。 */
+/** 欄の状態の凡例（色の意味。ai と doc は欄の下に札を見せないので、ここが説明になる）。 */
 export default function RegimenLegend() {
   return (
     <p className="rf-legend" aria-label="欄の状態">
@@ -16,12 +16,9 @@ export default function RegimenLegend() {
         採用の前に確かめる
       </span>
       <span>
-        <span className="rf-legend-tag rf-legend-tag--doc">先生が入れた</span>{" "}
-        頼まない限り Claude は書き換えない
-      </span>
-      <span>
-        <span className="rf-legend-tag rf-legend-tag--doc">先生の文から</span>{" "}
-        先生の文から Claude が入れた。次の文で Claude が直すことがある
+        <span className="rf-legend-tag rf-legend-tag--doc">先生の値</span>{" "}
+        先生の文から入った欄は次の文で Claude
+        が直すことがある。直接入れた欄は頼まない限り書き換えない
       </span>
     </p>
   );

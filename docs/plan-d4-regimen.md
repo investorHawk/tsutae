@@ -41,8 +41,10 @@
 確認: AI が入れた値の一覧（行ごとに削除・チェック 1 回）→ SKILL.md（新規は全文、既存は版 N との差分）→ 患者のスマホの見本 → 採用
 ```
 
-欄の状態の色（色だけに頼らず文字も添える）: 未入力 = ピンク（必須）／Claude が聞いています = 赤枠／
-AI が入れた = 橙の点線（採用の前に確かめる）／先生が入れた = 青枠。
+欄の状態の色: 未入力 = ピンク（必須）／Claude が聞いています = 赤枠／
+AI が入れた = 橙の点線（採用の前に確かめる）／先生の値 = 青枠。欄の下に文字の札を見せるのは未入力と
+Claude が聞いていますだけで、AI の値と先生の値は色と枠の線で見せ、札は読み上げにだけ残す（2026-11-06。
+意味は上の凡例と節の見出しの「AI が入れた N 欄」で分かる。`docs/decisions.md`）。
 
 ## 2. 壊してはいけないこと（既存の決まりとの整合）
 
@@ -118,8 +120,11 @@ CAPOX の切り替え。どの場合も **T91 のバイト一致テスト・H1�
 画面の確認（別のターミナルで。採用すると Skill のフォルダに書くので、本体の写しと新しい DB を使う）:
 
 ```
-TSUTAE_DB=data/d4-check.db make seed
-cp -R backend/skills_home/.claude/skills /tmp/d4-skills
-TSUTAE_DB=data/d4-check.db TSUTAE_SKILLS_DIR=/tmp/d4-skills TSUTAE_TODAY=2026-11-09 make dev-api
+export TSUTAE_DB=data/d4-check2.db
+export TSUTAE_SKILLS_DIR=/tmp/d4-home/.claude/skills
+export TSUTAE_TODAY=2026-11-09
+make seed
+cp -R backend/skills_home /tmp/d4-home  # .claude/skills だけを写すと、採用の書き込み先がずれる
+make dev-api
 make dev-web
 ```

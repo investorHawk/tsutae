@@ -342,7 +342,7 @@ describe("D4 レジメン: 確認の画面と Claude の往復", () => {
 
     await userEvent.type(
       screen.getByLabelText("Claude に伝える"),
-      "1コースは21日{Enter}",
+      "1コースは21日{Meta>}{Enter}{/Meta}",
     );
     expect(await screen.findByText(/考えています…/)).toBeInTheDocument();
     expect(check).toBeDisabled();
@@ -416,7 +416,7 @@ describe("D4 レジメン: 確認の画面で Claude が聞き返した", () => 
     expect(screen.getByRole("button", { name: "採用して登録" })).toBeEnabled();
     await userEvent.type(
       screen.getByLabelText("Claude に伝える"),
-      "補足も入れて{Enter}",
+      "補足も入れて{Meta>}{Enter}{/Meta}",
     );
     expect(
       await screen.findByText(/Claude の質問に答えてください（チャットか/),

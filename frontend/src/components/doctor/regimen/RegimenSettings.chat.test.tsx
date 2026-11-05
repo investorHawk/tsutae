@@ -1,5 +1,5 @@
 /**
- * D4 レジメン: チャットの決まり（IME 変換中の Enter・Shift+Enter・送信中の止め方・
+ * D4 レジメン: チャットの決まり（⌘/Ctrl+Enter で送る・Enter は改行・IME 変換中・送信中の止め方・
  * H1 の決まった文・往復の失敗）。
  */
 import {
@@ -75,40 +75,79 @@ async function openDraft() {
 
 describe("D4 レジメン: チャットの入力", () => {
   it.each([
+    ["⌘+Enter", { metaKey: true }],
+    ["Ctrl+Enter", { ctrlKey: true }],
+  ])("%s で送る", async (_name, init) => {
+    const fetchMock = api({
+      [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn") as object,
+    });
+    const input = await openDraft();
+    await userEvent.type(input, "点滴は");
+    fireEvent.keyDown(input, { key: "Enter", ...init });
+    await waitFor(() => expect(countOf(fetchMock, turnKey(3))).toBe(1));
+    expect(bodiesOf(fetchMock, turnKey(3))).toEqual([{ text: "点滴は" }]);
+  });
+
+  it("送るボタンで送る", async () => {
+    const fetchMock = api({
+      [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn") as object,
+    });
+    const input = await openDraft();
+    await userEvent.type(input, "点滴は");
+    await userEvent.click(screen.getByRole("button", { name: "送る" }));
+    await waitFor(() => expect(countOf(fetchMock, turnKey(3))).toBe(1));
+  });
+
+  it.each([
+    ["Enter", "{Enter}"],
+    ["Shift+Enter", "{Shift>}{Enter}{/Shift}"],
+  ])("%s は送らず改行する", async (_name, keys) => {
+    const fetchMock = api({
+      [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn") as object,
+    });
+    const input = await openDraft();
+    await userEvent.type(input, `点滴は${keys}Day1`);
+    await flush();
+    expect(input).toHaveValue("点滴は\nDay1");
+    expect(countOf(fetchMock, turnKey(3))).toBe(0);
+    expect(screen.queryByText(/考えています…/)).toBeNull();
+  });
+
+  it("Option+Enter では送らない（改行はブラウザに任せ、止めない）", async () => {
+    const fetchMock = api({
+      [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn") as object,
+    });
+    const input = await openDraft();
+    await userEvent.type(input, "点滴は");
+    // fireEvent は既定の動きを止められたとき false を返す
+    expect(fireEvent.keyDown(input, { key: "Enter", altKey: true })).toBe(true);
+    await flush();
+    expect(countOf(fetchMock, turnKey(3))).toBe(0);
+  });
+
+  it.each([
     ["isComposing", { isComposing: true }],
     ["keyCode 229", { keyCode: 229 }],
   ])(
-    "IME 変換中の Enter（%s）では送らない（送るまで待ってから確かめる）",
+    "IME 変換中の ⌘+Enter（%s）では送らない（送るまで待ってから確かめる）",
     async (_name, init) => {
       const fetchMock = api({
         [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn") as object,
       });
       const input = await openDraft();
       await userEvent.type(input, "点滴は");
-      fireEvent.keyDown(input, { key: "Enter", ...init });
+      fireEvent.keyDown(input, { key: "Enter", metaKey: true, ...init });
       await flush();
       expect(countOf(fetchMock, turnKey(3))).toBe(0);
       expect(screen.queryByText(/考えています…/)).toBeNull();
       expect(input).toHaveValue("点滴は");
       expect(screen.getByLabelText("レジメン名")).toBeEnabled();
-      // 確定の後の Enter は送る
-      fireEvent.keyDown(input, { key: "Enter" });
+      // 確定の後の ⌘+Enter は送る
+      fireEvent.keyDown(input, { key: "Enter", metaKey: true });
       await waitFor(() => expect(countOf(fetchMock, turnKey(3))).toBe(1));
       expect(bodiesOf(fetchMock, turnKey(3))).toEqual([{ text: "点滴は" }]);
     },
   );
-
-  it("Shift+Enter では送らない", async () => {
-    const fetchMock = api({
-      [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn") as object,
-    });
-    const input = await openDraft();
-    await userEvent.type(input, "点滴は");
-    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
-    await flush();
-    expect(countOf(fetchMock, turnKey(3))).toBe(0);
-    expect(screen.queryByText(/考えています…/)).toBeNull();
-  });
 
   it.each([
     ["isComposing", { isComposing: true }],
@@ -156,7 +195,7 @@ describe("D4 レジメン: チャットの入力", () => {
     const fetchMock = api();
     const input = await openDraft();
     expect(screen.getByRole("button", { name: "送る" })).toBeDisabled();
-    await userEvent.type(input, "   {Enter}");
+    await userEvent.type(input, "   {Meta>}{Enter}{/Meta}");
     expect(countOf(fetchMock, turnKey(3))).toBe(0);
   });
 
@@ -164,7 +203,7 @@ describe("D4 レジメン: チャットの入力", () => {
     const pending = deferred<Response>();
     api({ [turnKey(3)]: () => pending.promise });
     const input = await openDraft();
-    await userEvent.type(input, "点滴の日は Day1{Enter}");
+    await userEvent.type(input, "点滴の日は Day1{Meta>}{Enter}{/Meta}");
     expect(await screen.findByText(/考えています…/)).toBeInTheDocument();
     expect(screen.getByLabelText("レジメン名")).toBeDisabled();
     expect(screen.getByLabelText("Day（ベバシズマブ）")).toBeDisabled();
@@ -191,7 +230,7 @@ describe("D4 レジメン: チャットの入力", () => {
       [turnKey(3)]: fixtureBody("doctor_regimen_draft_turn_failed") as object,
     });
     const input = await openDraft();
-    await userEvent.type(input, "点滴の日は Day1{Enter}");
+    await userEvent.type(input, "点滴の日は Day1{Meta>}{Enter}{/Meta}");
     const chat = screen.getByRole("complementary", {
       name: "Claude とのチャット",
     });
@@ -235,7 +274,7 @@ describe("D4 レジメン: チャットの入力", () => {
       },
     });
     const input = await openDraft();
-    await userEvent.type(input, "点滴の日は Day1{Enter}");
+    await userEvent.type(input, "点滴の日は Day1{Meta>}{Enter}{/Meta}");
     expect(
       await screen.findByText(/この往復の結果は反映しませんでした/),
     ).toBeInTheDocument();
@@ -248,7 +287,7 @@ describe("D4 レジメン: チャットの入力", () => {
       [turnKey(3)]: () => jsonResponse({ error: "working" }, 409),
     });
     const input = await openDraft();
-    await userEvent.type(input, "点滴の日は Day1{Enter}");
+    await userEvent.type(input, "点滴の日は Day1{Meta>}{Enter}{/Meta}");
     expect(await screen.findByText(/Claude の応答中です/)).toBeInTheDocument();
     expect(countOf(fetchMock, getKey(3))).toBe(2);
   });

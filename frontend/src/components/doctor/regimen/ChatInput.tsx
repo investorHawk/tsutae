@@ -22,7 +22,8 @@ function isComposing(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
 }
 
 /**
- * チャットの入力欄。Enter で送る・Shift+Enter で改行・変換中の Enter は送らない。
+ * チャットの入力欄。⌘+Enter（Ctrl+Enter）か「送る」で送る。Enter・Shift+Enter・Option+Enter は
+ * ブラウザのまま改行する（途中で送ってしまわないため）。変換中は送らない。
  * H1 に掛かったときは入力の文を返さず決まった文で知らせ、入力欄の文は残す。
  */
 export default function ChatInput({
@@ -38,7 +39,8 @@ export default function ChatInput({
   const existing = draft.base_version !== null;
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey || isComposing(event)) {
+    const sendKey = event.metaKey || event.ctrlKey;
+    if (event.key !== "Enter" || !sendKey || isComposing(event)) {
       return;
     }
     event.preventDefault();
@@ -88,7 +90,7 @@ export default function ChatInput({
       />
       <div className="rf-chat-actions">
         <span className="rf-chat-hint">
-          Enter で送る · Shift+Enter で改行（変換中の Enter は送らない）
+          ⌘+Enter（Ctrl+Enter）で送る · Enter で改行
         </span>
         <button
           type="button"

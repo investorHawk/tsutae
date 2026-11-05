@@ -202,8 +202,11 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "確認へ進む" })).toBeDisabled();
 
-    // チャットで送る（Enter）→ 欄が埋まる
-    await user.type(screen.getByLabelText("Claude に伝える"), `${MSG1}{Enter}`);
+    // チャットで送る（⌘+Enter）→ 欄が埋まる
+    await user.type(
+      screen.getByLabelText("Claude に伝える"),
+      `${MSG1}{Meta>}{Enter}{/Meta}`,
+    );
     expect(bodiesOf(fetchMock, turnKey(3))).toEqual([{ text: MSG1 }]);
     await waitFor(() =>
       expect(screen.getByLabelText("レジメン名")).toHaveValue("FOLFIRI＋BV"),
@@ -272,7 +275,10 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     expect(document.querySelectorAll('[data-state="asked"]')).toHaveLength(0);
 
     // 2回目の往復: チャットで質問の文を直す → 欄が変わり、変えた欄の札が付く
-    await user.type(screen.getByLabelText("Claude に伝える"), `${MSG2}{Enter}`);
+    await user.type(
+      screen.getByLabelText("Claude に伝える"),
+      `${MSG2}{Meta>}{Enter}{/Meta}`,
+    );
     const diarrhea = await screen.findByDisplayValue(DIARRHEA_TEXT);
     expect(fieldOf(diarrhea)).toHaveAttribute("data-state", "doc");
     expect(

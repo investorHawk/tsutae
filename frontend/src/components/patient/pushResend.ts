@@ -17,6 +17,21 @@ import { loadPushState, statusOfState, type PushState } from "./pushState";
 
 let latest: Promise<void> = Promise.resolve();
 
+type DroppedListener = (endpoint: string) => void;
+
+const droppedListeners = new Set<DroppedListener>();
+
+/**
+ * 送り直しで「送信先に消された」と分かり、端末でも解除したときに呼ぶ（開いている設定の画面が
+ * オフの表示に変わるように）。解除の関数を返す。
+ */
+export function onSubscriptionDropped(listener: DroppedListener): () => void {
+  droppedListeners.add(listener);
+  return () => {
+    droppedListeners.delete(listener);
+  };
+}
+
 async function resendOnce(): Promise<void> {
   const pid = loadPid();
   if (!pid || !isPushSupported()) {
@@ -37,6 +52,7 @@ async function resendOnce(): Promise<void> {
   } catch (err) {
     if (isSubscriptionGone(err)) {
       await dropGoneSubscription(subscription);
+      droppedListeners.forEach((listener) => listener(subscription.endpoint));
     }
   }
 }

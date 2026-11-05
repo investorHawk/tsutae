@@ -12,6 +12,7 @@ import {
   turnOn,
 } from "./pushActions";
 import { GENERIC_ERROR_KEY, isNotRegistered } from "./patientApi";
+import { onSubscriptionDropped } from "./pushResend";
 import { statusOfState, type PushState } from "./pushState";
 import type { PushStatus } from "./pushStatus";
 
@@ -111,6 +112,18 @@ export function usePushSettings(pid: string, initial: PushState): PushSettings {
     }
     // 開いたときの1回だけ
   }, []);
+
+  // 開いている間に外枠の送り直しが解除したら、オフの表示にする（戻ってきたときなど）
+  useEffect(
+    () =>
+      onSubscriptionDropped((endpoint) => {
+        setSubscription((current) =>
+          current?.endpoint === endpoint ? null : current,
+        );
+        task.setFeedback({ kind: "error", key: SUBSCRIPTION_GONE_KEY });
+      }),
+    [],
+  );
 
   function enable() {
     // iPhone は押した直後でないと許可を求められないので、await より前に呼ぶ

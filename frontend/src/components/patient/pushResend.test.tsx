@@ -13,7 +13,7 @@ import { reloadPage } from "../../patient/reload";
 import Register from "../../pages/patient/Register";
 import Today from "../../pages/patient/Today";
 import { callsTo, mockPatientApi } from "../../pages/patient/testing/api";
-import { PID, s } from "../../pages/patient/testing/fixtures";
+import { PID, questionText, s } from "../../pages/patient/testing/fixtures";
 import {
   ENDPOINT,
   KEYS,
@@ -22,17 +22,23 @@ import {
   type FakePushOptions,
 } from "../../pages/patient/testing/pushBrowser";
 import { renderPatient } from "../../pages/patient/testing/render";
+import Settings from "../../pages/patient/Settings";
 import { apiFixture } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
 import NotRegistered from "./NotRegistered";
+import { onSubscriptionDropped, resendSubscription } from "./pushResend";
 
 vi.mock("../../patient/reload", () => ({ reloadPage: vi.fn() }));
 
 const SUBSCRIPTION_URL = `/api/patient/${PID}/push-subscription`;
 const CONFIG_URL = "/api/patient/push-config";
 const ON = { permission: "granted", subscribed: true } as const;
+const OTHER_PID = "P-DEMO0002";
+const OTHER_SUBSCRIPTION_URL = `/api/patient/${OTHER_PID}/push-subscription`;
 
 let fake: FakePush | null = null;
+// 止めた応答を開けたままテストを終えない（送り直しの順番はテストをまたいで続く）
+let releaseHeld: () => void = () => undefined;
 
 function givenPush(options: FakePushOptions = {}): FakePush {
   fake = installFakePush(options);
@@ -70,6 +76,32 @@ const replyGone = () => {
   return jsonResponse(fixture.body, fixture.status);
 };
 
+const replySaved = () => jsonResponse({ ok: true, notify_time: "20:00" });
+
+/** PUT の応答を止める。open を呼ぶと reply の応答が返る。 */
+function holdPut(reply: () => Response) {
+  let open: () => void = () => undefined;
+  const promise = new Promise<Response>((resolve) => {
+    open = () => resolve(reply());
+  });
+  releaseHeld = open;
+  return { reply: () => promise, open };
+}
+
+/** 外枠の下に1つの画面を置く。 */
+function renderInLayout(path: string, initial: string, element: JSX.Element) {
+  return render(
+    <MemoryRouter initialEntries={[initial]}>
+      <Routes>
+        <Route element={<PatientLayout />}>
+          <Route path={path} element={element} />
+          <Route path="/today" element={<p>today page</p>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   clearPid();
   savePid(PID);
@@ -77,7 +109,10 @@ beforeEach(() => {
   vi.mocked(reloadPage).mockClear();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  releaseHeld();
+  releaseHeld = () => undefined;
+  await settle();
   fake?.uninstall();
   fake = null;
   delete (document as unknown as Record<string, unknown>).visibilityState;
@@ -206,7 +241,107 @@ describe("the banner on Today", () => {
   });
 });
 
+describe("the banner waits for the resend", () => {
+  it("while the PUT is slow it does not read the state, then shows", async () => {
+    givenPush(ON);
+    const held = holdPut(replyGone);
+    const fetchMock = mockPatientApi({ pushSubscribe: held.reply });
+    renderInLayout("/today", "/today", <Today />);
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PUT", SUBSCRIPTION_URL)).toHaveLength(1),
+    );
+    await screen.findByRole("group", { name: questionText("fever") });
+    await settle();
+    // 送り直し自身の1回だけ（帯は PUT の結果を待つ）
+    expect(callsTo(fetchMock, "GET", CONFIG_URL)).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: s("notify.banner") })).toBeNull();
+    held.open();
+    expect(
+      await screen.findByRole("link", { name: s("notify.banner") }),
+    ).toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET", CONFIG_URL)).toHaveLength(2);
+  });
+});
+
+describe("the settings screen stays open while the layout resends", () => {
+  it("410 on coming back: the screen says off and what to do", async () => {
+    const push = givenPush(ON);
+    let isGone = false;
+    mockPatientApi({
+      pushSubscribe: () => (isGone ? replyGone() : replySaved()),
+    });
+    renderInLayout("/settings", "/settings", <Settings />);
+    await screen.findByRole("button", { name: s("notify.turn_off") });
+    await settle();
+    isGone = true;
+    setVisibility("hidden");
+    setVisibility("visible");
+    await waitFor(() => expect(push.isSubscribed()).toBe(false));
+    expect(await screen.findByText(s("notify.expired"))).toBeInTheDocument();
+    expect(screen.getByText(s("notify.status_off"))).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: s("notify.turn_on") }),
+    ).toBeEnabled();
+    expect(screen.queryByText(s("notify.status_on"))).toBeNull();
+  });
+
+  it("a fine resend leaves the screen on", async () => {
+    givenPush(ON);
+    mockPatientApi({ pushSubscribe: replySaved });
+    renderInLayout("/settings", "/settings", <Settings />);
+    await screen.findByRole("button", { name: s("notify.turn_off") });
+    setVisibility("visible");
+    await settle();
+    expect(screen.getByText(s("notify.status_on"))).toBeInTheDocument();
+    expect(screen.queryByText(s("notify.expired"))).toBeNull();
+  });
+
+  it("a screen that stopped listening is not told", async () => {
+    const push = givenPush(ON);
+    mockPatientApi({ pushSubscribe: replyGone });
+    const told = vi.fn();
+    const stop = onSubscriptionDropped(told);
+    stop();
+    await resendSubscription();
+    expect(push.isSubscribed()).toBe(false);
+    expect(told).not.toHaveBeenCalled();
+  });
+
+  it("a listening screen is told which subscription went", async () => {
+    givenPush(ON);
+    mockPatientApi({ pushSubscribe: replyGone });
+    const told = vi.fn();
+    const stop = onSubscriptionDropped(told);
+    await resendSubscription();
+    stop();
+    expect(told).toHaveBeenCalledWith(ENDPOINT);
+  });
+});
+
 describe("after registering a number", () => {
+  it("the new number's PUT waits for the previous number's PUT", async () => {
+    givenPush(ON);
+    const held = holdPut(replySaved);
+    const fetchMock = mockPatientApi({ pushSubscribe: held.reply });
+    renderInLayout("/register", `/register?pid=${OTHER_PID}`, <Register />);
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PUT", SUBSCRIPTION_URL)).toHaveLength(1),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: s("register.button") }),
+    );
+    await screen.findByText("today page");
+    await settle();
+    expect(loadPid()).toBe(OTHER_PID);
+    // 前の番号の応答を待つ間は、新しい番号の分を出さない（前の分が後から届かないように）
+    expect(callsTo(fetchMock, "PUT", OTHER_SUBSCRIPTION_URL)).toEqual([]);
+    held.open();
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PUT", OTHER_SUBSCRIPTION_URL)).toHaveLength(1),
+    );
+    expect(callsTo(fetchMock, "PUT", SUBSCRIPTION_URL)).toHaveLength(1);
+  });
+
   it("Register: the subscription moves to the new patient", async () => {
     clearPid();
     givenPush(ON);

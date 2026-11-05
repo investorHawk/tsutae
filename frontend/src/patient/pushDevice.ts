@@ -60,6 +60,13 @@ export async function findSubscription(
   return subscription && usesKey(subscription, publicKey) ? subscription : null;
 }
 
+/** この端末にまだこの endpoint の登録があるか（鍵は見ない）。 */
+export async function isStillSubscribed(endpoint: string): Promise<boolean> {
+  const registration = await navigator.serviceWorker.getRegistration();
+  const current = await registration?.pushManager.getSubscription();
+  return current?.endpoint === endpoint;
+}
+
 /**
  * Service Worker を登録し、通知の登録を返す。許可は呼ぶ前に取っておく。
  * 別の鍵の登録が残っていると subscribe が例外になるので、先に解除する。

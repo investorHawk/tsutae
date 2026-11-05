@@ -430,7 +430,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `patient/pushDevice.ts` | 端末の API の包み。Service Worker の登録は `subscribeDevice`（設定でオンにしたとき）だけ |
 | `components/patient/pushStatus.ts` | 純関数 `pushStatusOf`（`unsupported`・`no_key`・`denied`・`on`・`off`）と選べる時刻 |
 | `components/patient/pushState.ts`・`pushActions.ts`・`usePushSettings.ts` | 状態を読む／端末とサーバーの登録を揃える／画面の状態。許可を求めるのはボタンの onClick の最初だけ |
-| `components/patient/pushResend.ts` | オンの端末の登録を送り直す。アプリを開いたとき・戻ってきたとき（`PatientLayout`）と番号を登録したとき（P0・番号の入力欄）。410 なら端末でも解除する。設定と案内の帯は、送り直しが終わってから状態を読む |
+| `components/patient/pushResend.ts` | オンの端末の登録を送り直す。アプリを開いたとき・戻ってきたとき（`PatientLayout`）と番号を登録したとき（P0・番号の入力欄）。410 なら端末でも解除し、開いている設定の画面へ知らせる（`onSubscriptionDropped`）。設定と案内の帯は、送り直しが終わってから状態を読む |
 | `components/patient/NotifySettings.tsx`・`pages/patient/Settings.tsx` | P5（`/settings`）。文言は全て `patient_strings.json` |
 | `components/patient/NotifyBanner.tsx` | オフでオンにできるときだけ、今日の記録の欄の下に出す案内の帯 |
 | `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー |

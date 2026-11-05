@@ -70,22 +70,26 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
     }),
   };
   let current: unknown = null;
-  const makeSubscription = () => ({
-    endpoint: ENDPOINT,
-    options: { applicationServerKey: base64UrlToBytes(PUBLIC_KEY).buffer },
-    toJSON: () => ({ endpoint: ENDPOINT, keys: KEYS }),
-    unsubscribe: vi.fn(async () => {
-      calls.push("unsubscribe");
-      if (options.unsubscribeError) {
-        throw options.unsubscribeError;
-      }
-      if (options.unsubscribeReturnsFalse) {
-        return false;
-      }
-      current = null;
-      return true;
-    }),
-  });
+  const makeSubscription = () => {
+    const subscription = {
+      endpoint: ENDPOINT,
+      options: { applicationServerKey: base64UrlToBytes(PUBLIC_KEY).buffer },
+      toJSON: () => ({ endpoint: ENDPOINT, keys: KEYS }),
+      unsubscribe: vi.fn(async () => {
+        calls.push("unsubscribe");
+        if (options.unsubscribeError) {
+          throw options.unsubscribeError;
+        }
+        // 本物と同じく、すでに解除された登録の解除は false（例外にならない）
+        if (options.unsubscribeReturnsFalse || current !== subscription) {
+          return false;
+        }
+        current = null;
+        return true;
+      }),
+    };
+    return subscription;
+  };
   // 本物と同じく、register の直後は有効でなく、ready が解決してから subscribe できる
   let active = options.subscribed === true;
   const subscribe = vi.fn(async () => {

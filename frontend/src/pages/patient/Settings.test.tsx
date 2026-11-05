@@ -424,6 +424,24 @@ describe("Settings: on", () => {
     expect(push.isSubscribed()).toBe(true);
   });
 
+  it("already let go on the device: turning off still ends off, without an error", async () => {
+    const push = givenPush({ permission: "granted", subscribed: true });
+    const fetchMock = mockPatientApi();
+    renderSettings();
+    const off = await findOnScreen();
+    const registration = await navigator.serviceWorker.getRegistration();
+    const current = await registration?.pushManager.getSubscription();
+    await current?.unsubscribe();
+    await userEvent.click(off);
+    await findOffScreen();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
+    expect(screen.getByText(s("notify.status_off"))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "DELETE", SUBSCRIPTION_URL)).toEqual([
+      { endpoint: ENDPOINT },
+    ]);
+    expect(push.isSubscribed()).toBe(false);
+  });
+
   it("changing the time sends PUT and is kept on the device", async () => {
     givenPush({ permission: "granted", subscribed: true });
     const fetchMock = mockPatientApi();

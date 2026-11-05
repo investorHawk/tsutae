@@ -7,6 +7,7 @@ import {
 } from "../../api/patientPush";
 import { saveNotifyTime } from "../../patient/notifyTime";
 import {
+  isStillSubscribed,
   subscribeDevice,
   toSubscriptionRequest,
 } from "../../patient/pushDevice";
@@ -71,7 +72,8 @@ export async function turnOff(
 ): Promise<void> {
   const { endpoint } = subscription;
   const removed = await subscription.unsubscribe();
-  if (!removed) {
+  // false は「解除できなかった」か「もう解除されていた」。端末に残っているときだけ失敗にする
+  if (!removed && (await isStillSubscribed(endpoint))) {
     throw new Error("unsubscribe failed");
   }
   await deletePushSubscription(pid, endpoint).catch(() => undefined);

@@ -42,6 +42,8 @@ export interface FakePush {
   subscribe: ReturnType<typeof vi.fn>;
   clearAppBadge: ReturnType<typeof vi.fn>;
   shown: { close: ReturnType<typeof vi.fn> }[];
+  /** 知らせの受け取りを始めた（navigator.serviceWorker.startMessages） */
+  startMessages: ReturnType<typeof vi.fn>;
   /** Service Worker から画面へ知らせを送る（通知を押した、など） */
   postFromWorker: (data: unknown) => void;
   /** 今の許可の状態を変える（端末の設定で直した、など） */
@@ -119,8 +121,10 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
     registered = true;
   }
   const messageListeners = new Set<(event: { data: unknown }) => void>();
+  const startMessages = vi.fn();
   defineOnNavigator("serviceWorker", {
     register,
+    startMessages,
     addEventListener: (
       _type: string,
       listener: (event: { data: unknown }) => void,
@@ -151,6 +155,7 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
     subscribe,
     clearAppBadge,
     shown,
+    startMessages,
     postFromWorker: (data) => {
       messageListeners.forEach((listener) => listener({ data }));
     },

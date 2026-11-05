@@ -114,6 +114,8 @@ export function onOpenTodayMessage(listener: () => void): () => void {
     }
   };
   worker.addEventListener("message", onMessage);
+  // addEventListener だけでは受け取りが始まらないことがある
+  worker.startMessages();
   return () => worker.removeEventListener("message", onMessage);
 }
 

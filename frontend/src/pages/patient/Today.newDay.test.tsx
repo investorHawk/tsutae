@@ -182,6 +182,14 @@ describe("Today (P1): tapping the notification on a visible screen", () => {
     expect(screen.queryByText(s("today.too_sick_done"))).toBeNull();
   });
 
+  it("starts receiving the worker's messages", async () => {
+    push = installFakePush();
+    givenServer();
+    renderPatient(ROUTES, "/today");
+    await findTitle(DAY1_TITLE());
+    expect(push.startMessages).toHaveBeenCalled();
+  });
+
   it("other messages are ignored", async () => {
     push = installFakePush();
     const { questionCalls } = givenServer();

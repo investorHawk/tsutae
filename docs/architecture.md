@@ -347,7 +347,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - 確かめて送る（confirmed_clear）: 保存の時にサーバーが「伏せた後にまだ疑われている区間」を `allowed`（伏せた後の文の位置）として記録する（`pipeline.manual_review.confirmed_mask`）。変換では、その記録のその区間に完全に含まれる検出だけを許し、許した部分文字列を `PreparedInput.allowed_suspects` に入れる。H1（`make_h1(..., allowed=...)`）と convert のコードの段（`masking.manual.detect_in_prompt`）は依頼文全体でその語（JSON の形に直したもの）の出現に完全に含まれる検出だけを無視する（ログ `hook_h1_confirmed`、decision `confirmed:<数>`）。**許す一覧が空なら H1 は今と同じ**。gate は allowed_suspects も記録から作り直して照合する
 - `[伏せ字]さん`・`[伏せ字]先生` などの伏せた後の文は二次に掛からない（`tests/test_masking_manual.py`。検出側は変えていない）
 - 変換の入力のログ: 医師の伏せ字を使って送った記録があれば `doctor_masks_applied`（`sent:N`）、確かめて許した記録があれば `doctor_confirmed_sent`（`sent:M`）。無ければ何も足さない
-- 保持: `doctor_masks` は印刷済み・期限切れでレポートと同じトランザクションで消す（`_erase_results`。purge は doctor_masks だけが残った受診も消す）。生の記録（entries・free_texts）は変えない（spec 13.3）
+- 保持: `doctor_masks` は印刷済み・期限切れでレポートと同じトランザクションで消す（`_erase_results`。purge は doctor_masks だけが残った受診も消す）。D6 の伏せ字は生の記録（entries・free_texts）を書き換えない。受付で受け取った行は §12 のとおり消す
 - 画面（D6）: 記録ごとに「送らない（未処理のまま）」（初め）／「送る（伏せて）」。送る記録は疑われた区間（marks）を初めから伏せ、黒い「伏せ字」の印（button）を押すと戻す。ほかの所は選んで「伏せ字にする」（伏せた区間と重なる・隣り合う選択は1つにまとめる）。「伏せ字を確かめる」で送られる文とまだ疑われる語を出し、確かめて送れるならチェックを出す。下の「伏せ字を保存して AI で変換し直す」で保存 → regenerate → 変換ログへ（送れる記録が0件なら変換しない）。「確かめたらこの画面から印刷」の欄は残す
 
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）

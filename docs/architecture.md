@@ -488,9 +488,9 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `components/patient/HistoryList.tsx` | P2。端末の記録と `GET visit-days` を読み、`historyRows` で並べる |
 | `patient/visitEntries.ts` | P3（§5.5）。`sendVisit`（`GET visit-window` → 端末の記録を読む → 範囲内だけ `POST /api/visit`）、`toVisitEntry`（`pid` と質問の文の写しを外す）。記録を読めなければ例外で返し、空のまま送らない |
 | `patient/standalone.ts` | §5.8 の判定の純関数。`needsHomeScreenGuide`（iPhone・iPad で、`navigator.standalone` でも `display-mode: standalone` でもない）、`suggestsHomeScreen`（Android のブラウザ）、`readDisplayEnv` |
-| `layouts/PatientLayout.tsx`・`components/patient/AddToHomeGuide.tsx` | 判定が真なら、どの患者の経路でも案内だけを出す。ページも通知の処理も動かさず、API は定型文の GET だけ。URL の `pid` は形が正しいときだけ大きく見せ、保存も登録もしない。医師の経路はこの外枠を通らない |
+| `layouts/PatientLayout.tsx`・`components/patient/AddToHomeGuide.tsx` | 判定が真なら、どの患者の経路でも案内だけを出す。ページも通知の処理も動かさず、API は定型文の GET だけ。URL の `pid` は形が正しいときだけ大きく見せ、保存も登録もしない。アプリ内ブラウザでは Safari で開き直す文を手順の前に出す（いつも出す）。医師の経路はこの外枠を通らない |
 | `components/patient/PatientNav.tsx` | 下の4つのタブ。幅は文字の長さで分ける（`patient.css`。幅 360px 以上で全て1行） |
-| `components/patient/DeviceReset.tsx`・`resetDevice.ts` | §5.9。画面の中の2段階の確認の後、送り直しの PUT を待ち、`POST unregister` → 通知の登録の解除 → 端末の記録 → 仮名ID の順に消す。1つが失敗しても次へ進み、残れば知らせて押し直せる |
+| `components/patient/DeviceReset.tsx`・`resetDevice.ts` | §5.9。画面の中の2段階の確認の後、送り直しの PUT を待ち、`POST unregister` → 通知の登録の解除 → 端末の記録 → 仮名ID の順に消す。1つが失敗しても次へ進み、残れば知らせて押し直せる。押し直しは前の回の endpoint を送る（解除の後は読めないので）。`unregister` の 401・403・404 `unknown_patient` は成功と同じ。消す記録は今の番号の分だけで、文もそう書く |
 | `components/patient/DemoEntries.tsx` | §5.10。`GET demo-config` が真のときだけ出す。`GET demo-entries` を端末に保存する（同じ ID なので増えない） |
 
 テストは dev 依存の `fake-indexeddb` を `src/test/setup.ts` で入れ、テストごとに空の DB から始める。

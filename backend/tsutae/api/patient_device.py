@@ -56,7 +56,9 @@ class UnregisterIn(BaseModel):
 @router.post("/{pid}/record-marks")
 def add_record_mark(pid: str, request: Request, conn: Conn) -> dict[str, str]:
     patient = require_patient(pid, request, conn)
-    at = now()
+    current = now()
+    # ミリ秒に揃える: ブラウザの Date を通っても同じ時刻に戻り、取り消しの比較がずれない
+    at = current.replace(microsecond=current.microsecond // 1000 * 1000)
     db.add_record_mark(conn, patient["id"], at)
     return {
         "record_date": to_jst_date(at).isoformat(),

@@ -455,8 +455,8 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 
 | 経路 | 入力 | 出力 |
 |---|---|---|
-| `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計） |
-| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}` | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある → 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（後から付いた印は残す）。何度呼んでもよい |
+| `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計。ミリ秒に揃える） |
+| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}`（`recorded_at` は印の応答の値） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある → 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（後から付いた印は残す）。何度呼んでもよい |
 | `GET /api/patient/{pid}/visit-window` | — | `{start, end}`（前コースの Day1〜今日。前コースが無ければ今コースの Day1）。今コースが無ければ 409 `no_course` |
 | `GET /api/patient/{pid}/visit-days` | — | `{visits: [{visit_date, received_at}]}`（新しい順。受付番号・状態は返さない） |
 | `POST /api/patient/{pid}/unregister` | `{endpoint}`（string か null） | `{ok: true}` + Cookie を消す。その登録を消す。`record_marks` は消さない |

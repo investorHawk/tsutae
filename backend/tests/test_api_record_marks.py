@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -134,6 +134,17 @@ def test_undo_clears_the_mark(client: TestClient, pid: str) -> None:
     r = _undo(client, pid, body["recorded_at"])
     assert r.status_code == 200
     assert r.json() == {"ok": True}
+    assert not _marked(client, pid)
+
+
+def test_undo_with_the_time_read_by_the_browser_clears_the_mark(
+    client: TestClient, pid: str
+) -> None:
+    """端末が時刻を Date に通して送り直しても（UTC・ミリ秒）同じ時刻として通る。"""
+    body = _mark(client, pid)
+    at = datetime.fromisoformat(body["recorded_at"])
+    browser = at.astimezone(UTC).isoformat(timespec="milliseconds")
+    assert _undo(client, pid, browser).status_code == 200
     assert not _marked(client, pid)
 
 

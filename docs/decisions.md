@@ -575,3 +575,4 @@
 | B1 ボタンを出してよいかは `GET /{pid}/demo-config`（Cookie の患者ごとの真偽）で返す。環境変数が無いときの `demo-entries` は Cookie を見る前に 404 | §5.10 は「デモ患者の設定に」出す。患者ごとに聞けば画面の判定が要らない。環境変数が無いときに 401 と 404 で経路の有る無しを探れないように | 技術判断 |
 | B1 `demo-entries` は今日より先の記録を返さない | 実際の日付で開くと、端末に未来の記録が残り P2 に出る。`TSUTAE_TODAY=2026-11-09` なら全ての記録が返る | 技術判断 |
 | B1 使わなくなった `db.add_entry_once`・`db.undo_too_sick_entry`・`clear_mark_if_no_entries` を消す。`add_entry` と `notices_for` は残す | 記録の経路を外すと呼ぶ所が無くなる。`add_entry` は seed・評価・テストが使い、`notices_for` は §5.3 の Python の側の判定。§5.3 の同じ表は `frontend/src/test/fixtures/fixed_rule_cases.json` に置く | 技術判断 |
+| B1 印の時刻はミリ秒に揃えて保存し、返す | 取り消しは `last_marked_at` との文字列の比較で決める。マイクロ秒のままだと、端末が時刻を `Date` に通して送り直したときに 200 を返すのに印が残る | 技術判断 |

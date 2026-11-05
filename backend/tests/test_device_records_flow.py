@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -25,6 +26,9 @@ from pipeline_fakes import FakeRunner
 
 DEMO = "P-DEMO0001"
 RECEPTION = "A-023"
+# C3 の Day6（10/27 が Day1）。見本に記録があり、送らなければ「届いていない」になる
+MISSING_DATE = "2026-11-01"
+MISSING_DAY = "Day6"
 
 
 @contextmanager
@@ -190,6 +194,86 @@ def test_conversion_input_is_the_same_as_server_records(
     device = _prompt(tmp_path / "device", device_records=True)
     server = _prompt(tmp_path / "server", device_records=False)
     assert device == server
+
+
+def _report_html(client: TestClient) -> str:
+    r = client.get(f"/api/doctor/visits/{_visit_row(client)['id']}/report")
+    assert r.status_code == 200, r.text
+    return r.text
+
+
+def _without_one_day(entries: list[dict[str, Any]], day: str) -> list[dict[str, Any]]:
+    kept = [e for e in entries if e["record_date"] != day]
+    assert len(kept) < len(entries)
+    return kept
+
+
+def test_all_marked_days_received_means_no_not_received_line(
+    tmp_path: Path, fixed_today: str
+) -> None:
+    """撮影の流れ: 見本を全て送れば、紙に「届いていない」は出ない。"""
+    with _client(tmp_path, device_records=True) as client:
+        login_doctor(client)
+        _send(client, _to_send(client))
+        assert "届いていない" not in _report_html(client)
+
+
+def test_paper_shows_not_received_days(tmp_path: Path, fixed_today: str) -> None:
+    """印があって届かなかった日は紙に出る（AI 変換なしでも）。経過表は空白のまま（§5.6）。"""
+    runner = FakeRunner()  # 台本なしなので AI 変換なしの結果になる
+    with _client(tmp_path, device_records=True, runner=runner) as client:
+        login_doctor(client)
+        _send(client, _without_one_day(_to_send(client), MISSING_DATE))
+        assert _visit_row(client)["fallback"] is True
+        html = _report_html(client)
+    assert f"記録が届いていない日: {MISSING_DAY}" in html
+    assert "・届いていない1" in html
+    assert "入力なし3" in html  # もとの3日のまま。届いていない日は数えない
+    match = re.search(
+        rf'<td class="([^"]*)" data-row="c3-diarrhea" data-day="{MISSING_DAY[3:]}">',
+        html,
+    )
+    assert match and "st-no_input" in match.group(1)
+    (prompt,) = runner.prompts
+    assert "届いていない" not in prompt
+
+
+def _prompt_without_a_day(tmp_path: Path, *, keep_mark: bool) -> str:
+    runner = FakeRunner()
+    with _client(tmp_path, device_records=True, runner=runner) as client:
+        if not keep_mark:
+            with db_conn(client.app) as conn:
+                conn.execute(
+                    "DELETE FROM record_marks WHERE patient_id = ? AND record_date = ?",
+                    (DEMO, MISSING_DATE),
+                )
+                conn.commit()
+        _send(client, _without_one_day(_to_send(client), MISSING_DATE))
+    (prompt,) = runner.prompts
+    return prompt
+
+
+def test_marks_do_not_change_the_conversion_input(
+    tmp_path: Path, fixed_today: str
+) -> None:
+    """印があってもなくても Claude への入力は同じ（届いていない日を送らない。§5.6）。"""
+    marked = _prompt_without_a_day(tmp_path / "marked", keep_mark=True)
+    unmarked = _prompt_without_a_day(tmp_path / "unmarked", keep_mark=False)
+    assert marked == unmarked
+
+
+def test_report_with_ai_shows_not_received_days(
+    tmp_path: Path, fixed_today: str
+) -> None:
+    with _client(tmp_path, device_records=True) as client:
+        login_doctor(client)
+        _send(client, _without_one_day(_to_send(client), MISSING_DATE))
+        set_runner(client, demo_runner(client, reception_no=RECEPTION))
+        visit = _visit_row(client)
+        r = client.post(f"/api/doctor/visits/{visit['id']}/regenerate")
+        assert r.status_code == 200, r.text
+        assert _visit_row(client)["fallback"] is False
+        assert f"記録が届いていない日: {MISSING_DAY}" in _report_html(client)
 
 
 def test_received_entries_are_not_shown_to_the_patient(

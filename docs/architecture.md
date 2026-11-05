@@ -203,18 +203,19 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 
 | ファイル | 中身 |
 |---|---|
-| `build.py` | `build_report_data(*, reception_no, patient_id, regimen_skill, report_skill, courses, entries, visit_date, prepared, result: ConversionResult, questions_by_version: dict[str, list[Question]]) -> ReportData`。**決定的**（同じ入力なら同じ出力）。下の規則 |
+| `build.py` | `build_report_data(*, reception_no, patient_id, regimen_skill, report_skill, courses, entries, visit_date, prepared, result: ConversionResult, questions_by_version: dict[str, list[Question]], record_marks: Sequence[RecordMark] = ()) -> ReportData`。**決定的**（同じ入力なら同じ出力）。下の規則 |
 | `render.py` + `templates/report.html.j2` + `templates/report.css` | `render_report_html(data: ReportData, *, questions: list[Question]) -> str`。Jinja2（autoescape）。下の描画規則 |
 
 組み立ての規則:
-- header: 記録日数＝記録（too_sick を含む）のある日数、入力なし＝記録の無い日数、つらくて書けない＝too_sick の日数（今コースの Day1〜min(最終日, visit_date)）。延期注記は `course.delay_note`。`fallback` は `result.fallback`
-- attention（この順）: 食い違い（timeline.contradictions）／`fever_attention_celsius` 以上の体温（今コース）／つらくて書けない（今コース。前コースの同じ Day も too_sick なら `previous_course_same_day=True`）／未処理の記録（count のみ）
+- header: 記録日数＝記録（too_sick を含む）のある日数、届いていない＝日付の印（`record_marks`）があって記録の無い日数、入力なし＝記録も印も無い日数、つらくて書けない＝too_sick の日数（今コースの Day1〜min(最終日, visit_date)）。延期注記は `course.delay_note`。`fallback` は `result.fallback`
+- attention（この順）: 食い違い（timeline.contradictions）／`fever_attention_celsius` 以上の体温（今コース）／つらくて書けない（今コース。前コースの同じ Day も too_sick なら `previous_course_same_day=True`）／届いていない日（今コース。紙は `記録が届いていない日: Day5, Day6` の1行）／未処理の記録（count のみ）
+- 届いていない日（plan-device-records §5.6）: 同じ日に記録が1件でもあれば届いた扱い（日付の単位）。経過表のセルは no_input（空白）のまま。`record_marks` は `prepare_input` に渡さないので Claude には送らない（テストで固定）。AI 変換なしでも出る
 - grid: 今コースの行（質問ごと）＋体温行（`show_temperature_row`）＋ `show_previous_course` なら前コースの行（**クローズ回答のみ**、AI の結果を使わない）。セル state: その日の記録の回答＝none/present/hard、記録が無い＝no_input、その日の記録の skill_version の質問集にその質問が無い＝not_asked、too_sick だけの日＝too_sick。同じ日に複数の回答があれば重い方（hard > present > none）。free_text_mark は今コースの events（status が present か improving、question_key 一致、event の date のその Day）、recalled_mark はその event が recalled。列: by_proxy の記録がある日は「代」、too_sick の日は斜線
 - per_symptom: `result.picks.per_symptom`（無ければ空）
 - quotes: 伏せ字後の自由記載（`prepared.masked_texts`）を Day 順に、`quotes_max_items` まで。未処理の記録は載せない
 - フォールバック（`result.timeline is None`）: free_text_mark なし・食い違いなし・per_symptom 空。経過表と引用は同じ
 
-描画の規則: A4 一枚・モノクロ（`@page { size: A4; margin: 10mm }`、`@media print`）。セル: なし=薄い「−」、ある=網掛け、つらい=濃い網掛け、入力なし=空白、未設問=「−−」、つらくて書けない=列全体の斜線、○・「回」・列頭「代」、凡例を欄外に固定。冒頭に「症例は全て合成」、fallback なら「AI変換なし」。用語の欄外に「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」。low_confidence_threshold 未満の per_symptom は「？」。**Grade・軽症・中等症・重症・重篤などの語を出さない**（テストで検査）。引用が多く溢れる場合は引用欄を2枚目に回す（`page-break-before`）
+描画の規則: A4 一枚・モノクロ（`@page { size: A4; margin: 10mm }`、`@media print`）。セル: なし=薄い「−」、ある=網掛け、つらい=濃い網掛け、入力なし=空白、未設問=「−−」、つらくて書けない=列全体の斜線、○・「回」・列頭「代」、凡例を欄外に固定。冒頭に「症例は全て合成」、fallback なら「AI変換なし」。用語の欄外に「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」。low_confidence_threshold 未満の per_symptom は「？」。**Grade・軽症・中等症・重症・重篤などの語を出さない**（テストで検査）。引用が多く溢れる場合は引用欄を2枚目に回す（`page-break-before`）。届いていない日の行が折り返す分も見積もりに入れる
 
 ## 7c. 評価（W2-eval、`tsutae.eval`）
 

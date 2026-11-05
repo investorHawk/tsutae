@@ -13,11 +13,13 @@ from datetime import date, datetime
 
 from tsutae.config import to_jst_date
 from tsutae.db.connection import date_from_db, date_to_db, dt_to_db, write_transaction
+from tsutae.schemas import RecordMark
 
 __all__ = [
     "add_record_mark",
     "backfill_record_marks",
     "last_record_dates",
+    "list_record_marks",
     "marked_patients",
     "undo_record_mark",
     "upsert_mark_row",
@@ -74,6 +76,18 @@ def last_record_dates(conn: sqlite3.Connection) -> dict[str, date]:
         " GROUP BY patient_id"
     ).fetchall()
     return {r["patient_id"]: date_from_db(r["last"]) for r in rows}
+
+
+def list_record_marks(conn: sqlite3.Connection, pid: str) -> list[RecordMark]:
+    """その患者の印を日付順に。レポートの「届いていない日」に使う（§5.6）。"""
+    rows = conn.execute(
+        "SELECT record_date FROM record_marks WHERE patient_id = ? ORDER BY record_date",
+        (pid,),
+    ).fetchall()
+    return [
+        RecordMark(patient_id=pid, record_date=date_from_db(r["record_date"]))
+        for r in rows
+    ]
 
 
 def marked_patients(conn: sqlite3.Connection, day: date) -> set[str]:

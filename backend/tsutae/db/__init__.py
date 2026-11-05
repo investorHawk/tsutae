@@ -63,6 +63,7 @@ from tsutae.db.repo_record_marks import (
     add_record_mark,
     backfill_record_marks,
     last_record_dates,
+    list_record_marks,
     marked_patients,
     undo_record_mark,
 )
@@ -143,6 +144,7 @@ __all__ = [
     "list_pipeline_logs",
     "is_push_endpoint_gone",
     "list_push_subscriptions",
+    "list_record_marks",
     "mark_push_endpoint_gone",
     "list_skill_changes",
     "list_visit_days",

@@ -6,7 +6,7 @@ from __future__ import annotations
 class ReportBuildError(ValueError):
     """入力が食い違っていてレポートを組み立てられない。`code` は短い英字。
 
-    - patient_mismatch: 引数の patient_id と courses・entries の患者が合わない
+    - patient_mismatch: 引数の patient_id と courses・entries・record_marks の患者が合わない
     - schedule_mismatch: PreparedInput の日程・レジメンが courses・受診日と合わない
     - entry_mismatch: PreparedInput の記録が entries と対応しない（id の重複も含む）
     - skill_mismatch: PreparedInput の Skill の版・質問集が渡された Skill と違う

@@ -86,6 +86,20 @@ def test_marked_patients_is_for_one_day(conn: sqlite3.Connection) -> None:
     assert db.marked_patients(conn, date(2026, 11, 7)) == set()
 
 
+def test_list_record_marks_is_for_one_patient_by_date(
+    conn: sqlite3.Connection,
+) -> None:
+    db.add_record_mark(conn, PID, AT)
+    db.add_record_mark(conn, PID, AT - timedelta(days=2))
+    db.add_record_mark(conn, OTHER, AT - timedelta(days=1))
+    marks = db.list_record_marks(conn, PID)
+    assert [(m.patient_id, m.record_date) for m in marks] == [
+        (PID, date(2026, 11, 7)),
+        (PID, date(2026, 11, 9)),
+    ]
+    assert db.list_record_marks(conn, "P-NONE0000") == []
+
+
 def test_add_record_mark_writes_only_a_mark(conn: sqlite3.Connection) -> None:
     db.add_record_mark(conn, PID, AT)
     assert _marks(conn) == [(PID, "2026-11-09", AT.isoformat(timespec="microseconds"))]

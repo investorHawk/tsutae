@@ -327,8 +327,15 @@ class Grid(Frozen):
     rows: list[GridRow]
 
 
+class RecordMark(Frozen):
+    """日付の印。「その日に記録があった」ことだけ（db の record_marks）。Claude には送らない。"""
+
+    patient_id: str
+    record_date: date
+
+
 class AttentionItem(Frozen):
-    kind: Literal["contradiction", "fever", "too_sick", "unprocessed"]
+    kind: Literal["contradiction", "fever", "too_sick", "not_received", "unprocessed"]
     day: int | None = None
     question_key: str | None = None
     closed_answer: str | None = None
@@ -351,6 +358,8 @@ class ReportHeader(Frozen):
     total_days: int
     no_input_days: int
     too_sick_days: int
+    # 印があって受け取った記録が無い日。入力なしには数えない（plan-device-records §5.6）
+    not_received_days: int = 0
     delay_note: str | None = None
     fallback: bool = False
 

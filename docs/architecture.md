@@ -418,7 +418,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は今日の分を戻してから登録を消し、endpoint を `push_gone_endpoints` に覚える。応答の前にタイムアウトしたときだけ二重に届く余地がある
 - **鍵**: `TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（`mailto:` か `https://`）。全て無ければ警告なしで使えない。欠け（`missing`）・subject の誤り（`bad_subject`）・読めない鍵（例外の型名）・組でない（`key_mismatch`）は警告に理由のコードだけを出して使えない。どれも起動は止めない
 - **入力の検査**: endpoint は既知の送信サービスの https だけ（`fcm.googleapis.com`・`*.push.apple.com`・`*.push.services.mozilla.com`・`*.notify.windows.com`。ポートは 443、ユーザー情報は不可）。`\` を受けず、ホストは英数字・`.`・`-` だけで、送信に使う urllib3 の読み方でも同じホストになること。本物の送信はリダイレクトを追わない。p256dh は 65 バイトの P-256 の点、auth は 16 バイト
-- **ログ**: 件数と例外の型名だけ。仮名ID・endpoint・例外の文面を出さない
+- **ログ**: 件数と例外の型名、送信先が返した状態コードだけ。仮名ID・endpoint・例外の文面を出さない。件数（`push.done`）と試送の結果（`push.test_done`）も WARNING で出す（uvicorn の既定で INFO は残らない）
 - **守ること**: 通知のモジュールは `reports`・`timelines`・`regimen_drafts` を読まない。本文は全ての患者で同じ（`tests/test_architecture.py`）
 
 **フロント**
@@ -430,10 +430,10 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `patient/pushDevice.ts` | 端末の API の包み。Service Worker の登録は `subscribeDevice`（設定でオンにしたとき）だけ |
 | `components/patient/pushStatus.ts` | 純関数 `pushStatusOf`（`unsupported`・`no_key`・`denied`・`on`・`off`）と選べる時刻 |
 | `components/patient/pushState.ts`・`pushActions.ts`・`usePushSettings.ts` | 状態を読む／端末とサーバーの登録を揃える／画面の状態。許可を求めるのはボタンの onClick の最初だけ |
-| `components/patient/pushResend.ts` | オンの端末の登録を送り直す。アプリを開いたとき・戻ってきたとき（`PatientLayout`）と番号を登録したとき（P0・番号の入力欄）。410 なら端末でも解除し、開いている設定の画面へ知らせる（`onSubscriptionDropped`）。設定と案内の帯は、送り直しが終わってから状態を読む |
+| `components/patient/pushResend.ts` | オンの端末の登録を送り直す。アプリを開いたとき・戻ってきたとき（`PatientLayout`）と番号を登録したとき（P0・番号の入力欄）。送る時刻は順番が来たときの端末の時刻。410 なら端末でも解除し、設定の画面へ知らせる（`onSubscriptionDropped`。画面がまだ無ければ次に開いたときに1回だけ）。設定と案内の帯は、送り直しと時刻の保存が終わってから状態を読む |
 | `components/patient/NotifySettings.tsx`・`pages/patient/Settings.tsx` | P5（`/settings`）。文言は全て `patient_strings.json` |
 | `components/patient/NotifyBanner.tsx` | オフでオンにできるときだけ、今日の記録の欄の下に出す案内の帯 |
-| `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー |
+| `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー。写しは PUT が受け入れられた時刻で書く（`pushActions.saveSubscription` が PUT を1本ずつ順に送る） |
 | `components/patient/useNewDayCheck.ts` | 開いたまま日付が変わった今日の記録に気づく。戻ったとき（`visibilitychange`）と通知を押したとき（`sw.js` の知らせ）に `GET /questions` を読み、画面の今日とサーバーの今日が違うときだけ `pages/patient/Today.tsx` が読み直す。同じ日は完了の画面も書きかけも残す |
 | `patient/useClearNotifications.ts` | アプリを開いたとき・戻ってきたときに、バッジと表示中の通知を消す（`PatientLayout`） |
 

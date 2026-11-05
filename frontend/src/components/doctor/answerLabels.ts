@@ -3,7 +3,8 @@
  * 短い症状名は患者画面の `symptom.<question_key>`（backend/tsutae/patient_strings.json）と
  * 同じ語にする（テストで照合）。紙の経過表（backend/tsutae/report/labels.py）は
  * hand_foot を「手足の皮膚」と書くので、そこだけ紙と画面で語が違う。
- * 並びは経過表の列の順。知らない質問（D4 で足した質問など）は key をそのまま出す。
+ * 並びは経過表の列の順。知らない質問（D4 で足した質問など）は記録の版の form の短い名前
+ * （API の question_label。v1.1）、それも無ければ key をそのまま出す。
  */
 import type { AnswerValue } from "../../api/types";
 
@@ -27,8 +28,8 @@ const VALUE_LABELS: Readonly<Record<AnswerValue, string>> = {
   measured: "測った",
 };
 
-export function questionLabel(key: string): string {
-  return QUESTION_LABELS[key] ?? key;
+export function questionLabel(key: string, label?: string | null): string {
+  return QUESTION_LABELS[key] ?? (label || key);
 }
 
 export function valueLabel(value: AnswerValue): string {

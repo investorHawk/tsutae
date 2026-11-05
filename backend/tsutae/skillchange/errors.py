@@ -1,7 +1,8 @@
 """Skill の書き換え（D4）の例外。API は `code` を `{"error": code}` にする。
 
 code と HTTP の対応（`status_for(code)`。API の router はこれを使う）:
-- 400: invalid_name・invalid_request
+- 400: invalid_name・invalid_request・use_regimen_editor（v1.1。regimen-* は旧 D4 で
+  書き換えない。D4 レジメンの画面で直す）
 - 404: unknown_skill・not_found
 - 409: not_pending・not_ready・stale・busy（別の承認が進行中。依頼では同じ Skill の
   書き換えが作業中）・version_conflict・
@@ -13,13 +14,15 @@ from __future__ import annotations
 
 __all__ = [
     "BAD_REQUEST_CODES",
+    "USE_REGIMEN_EDITOR",
     "NOT_FOUND_CODES",
     "SERVER_ERROR_CODES",
     "SkillChangeError",
     "status_for",
 ]
 
-BAD_REQUEST_CODES = frozenset({"invalid_name", "invalid_request"})
+USE_REGIMEN_EDITOR = "use_regimen_editor"
+BAD_REQUEST_CODES = frozenset({"invalid_name", "invalid_request", USE_REGIMEN_EDITOR})
 NOT_FOUND_CODES = frozenset({"unknown_skill", "not_found"})
 SERVER_ERROR_CODES = frozenset({"base_invalid"})
 

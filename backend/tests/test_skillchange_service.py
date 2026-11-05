@@ -2,6 +2,9 @@
 
 skills_home は tmp_path に backend/skills_home を写して使う（本物を書き換えない）。
 editor は偽物（work_root の写しを書き換える）。API は呼ばない。
+v1.1 から旧 D4（一文の書き換え）は report-format だけなので、report-format-default の
+frontmatter（引用の最大件数）を書き換える。regimen-* は use_regimen_editor
+（test_skillchange_regimen_blocked.py）。
 """
 
 from __future__ import annotations
@@ -28,10 +31,10 @@ from tsutae.skillchange import (
 from tsutae.skillchange.workcopy import work_copy_path
 from tsutae.skills import load_skill
 
-NAME = "regimen-folfox"
-OLD_Q = "text: 下痢はありましたか"
-NEW_Q = "text: 下痢やお腹のゆるさはありましたか"
-REQUEST = "下痢の質問をお腹のゆるさも含む文にして"
+NAME = "report-format-default"
+OLD_Q = "quotes_max_items: 30"
+NEW_Q = "quotes_max_items: 20"
+REQUEST = "引用は20件までにして"
 
 
 def _change_question(text: str) -> str:
@@ -133,8 +136,8 @@ async def test_request_makes_pending_with_unified_diff(
     assert change["new_text"] == _change_question(old)
     diff = change["diff"]
     assert diff.startswith(f"--- a/{NAME}/SKILL.md\n+++ b/{NAME}/SKILL.md\n@@")
-    assert f"\n-  - {{key: diarrhea, {OLD_Q}" in diff
-    assert f"\n+  - {{key: diarrhea, {NEW_Q}" in diff
+    assert f"\n-{OLD_Q}\n" in diff
+    assert f"\n+{NEW_Q}\n" in diff
     assert editor.calls[0][1:] == (NAME, REQUEST)
     # 写しは1つの SKILL.md だけ
     assert editor.files == [f"skills/{NAME}/SKILL.md"]
@@ -162,9 +165,12 @@ async def test_request_only_version_bump_is_no_change(conn, home, settings):
     "transform, code",
     [
         (lambda t: t.replace("---", "", 2), "format"),  # frontmatter が壊れた
-        (lambda t: t.replace("cycle_days: 14", "cycle_days: [14"), "format"),
-        (lambda t: t.replace("cycle_days: 14", "cycle_days: two"), "schema"),
-        (lambda t: t.replace(f"name: {NAME}", "name: regimen-x"), "name_mismatch"),
+        (lambda t: t.replace(OLD_Q, "quotes_max_items: [30"), "format"),
+        (lambda t: t.replace(OLD_Q, "quotes_max_items: two"), "schema"),
+        (
+            lambda t: t.replace(f"name: {NAME}", "name: report-format-x"),
+            "name_mismatch",
+        ),
         (lambda t: t.replace("version: 1\n", ""), "schema"),
     ],
 )
@@ -292,7 +298,7 @@ async def test_request_rejects_bad_names(conn, home, settings, name):
 
 async def test_request_unknown_skill(conn, home, settings):
     with pytest.raises(SkillChangeError) as info:
-        await _request(conn, home, settings, name="regimen-nothing")
+        await _request(conn, home, settings, name="report-format-nothing")
     assert info.value.code == "unknown_skill"
 
 
@@ -311,7 +317,7 @@ async def test_request_logs_without_text(conn, home, settings):
     assert names[0] == "skill_change_request"
     assert "editor_done" in names
     assert names[-1] == "skill_change_pending"
-    assert "下痢" not in repr(logs)
+    assert "引用" not in repr(logs)
 
 
 async def test_work_copy_is_outside_dot_claude_through_approve(
@@ -365,8 +371,8 @@ async def test_approve_bumps_version_and_writes(conn, home, settings, skill_file
     assert sorted(p.name for p in skill_file.parent.iterdir()) == ["SKILL.md"]
     saved = db.get_skill_version(conn, NAME, 2)
     assert saved["content"] == text
-    texts = {q.key: q.text for q in saved["questions"]}
-    assert texts["diarrhea"] == "下痢やお腹のゆるさはありましたか"
+    assert saved["questions"] is None  # report-format は質問集を持たない
+    assert load_skill(NAME, home / ".claude" / "skills").quotes_max_items == 20
     change = db.get_skill_change(conn, cid)
     assert change["status"] == "approved"
     assert change["new_version"] == 2
@@ -391,7 +397,11 @@ async def test_approve_stale_when_other_change_approved(
         conn,
         home,
         settings,
-        FakeEditor(lambda t: t.replace("手足のしびれ", "手足のしびれ感")),
+        FakeEditor(
+            lambda t: t.replace(
+                "show_temperature_row: true", "show_temperature_row: false"
+            )
+        ),
     )
     approve_change(conn, first, skills_home=home)
     after_first = skill_file.read_bytes()

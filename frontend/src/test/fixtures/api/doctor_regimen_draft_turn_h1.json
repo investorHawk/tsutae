@@ -1,0 +1,18 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/regimen-drafts/3/turns",
+  "request": {
+    "text": "受付 A-023 の方と同じにして"
+  },
+  "status": 422,
+  "body": {
+    "error": "h1_blocked",
+    "issues": [
+      {
+        "field_id": "text",
+        "code": "identifier",
+        "message": "個人を特定しうる表現の疑い（id_like）"
+      }
+    ]
+  }
+}

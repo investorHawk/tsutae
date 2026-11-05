@@ -247,8 +247,18 @@ def test_patient_entries_newest_first_without_raw_text(client: TestClient) -> No
     assert entries[0]["by_proxy"] is True
     assert entries[0]["has_free_text"] is True
     assert entries[0]["answers"] == [
-        {"question_key": "fever", "value": "measured", "temperature": 38.2},
-        {"question_key": "diarrhea", "value": "present", "temperature": None},
+        {
+            "question_key": "fever",
+            "value": "measured",
+            "temperature": 38.2,
+            "question_label": "体温",  # 記録の版（FOLFOX@1）の form の短い名前
+        },
+        {
+            "question_key": "diarrhea",
+            "value": "present",
+            "temperature": None,
+            "question_label": "下痢",
+        },
     ]
     assert entries[1]["kind"] == "too_sick"
     assert entries[1]["has_free_text"] is False

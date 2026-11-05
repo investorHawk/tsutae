@@ -4,6 +4,8 @@
 内側で行い、ロックを取ってから変更の行と本体の SKILL.md を読み直す。取れなければ busy。
 
 承認の手順（ロックの内側）:
+0. regimen-* は use_regimen_editor で failed にする（v1.1。T95 より前に作られた pending の
+   行。旧 D4 で上げた版には form JSON が無く D4 レジメンの画面で開けない。却下はできる）
 1. 変更が pending で diff・new_text があること。final = new_text の version を base+1 に
 2. 本体を読む。「既に final になっている」なら途中で落ちた承認の続き（resume）とみなす
    （他の承認済みの変更が同じ版を作っていれば stale）。そうでなければ、今の版が
@@ -20,10 +22,7 @@ approved まで進む（save_skill_version は同じ内容なら何もしない�
 
 from __future__ import annotations
 
-import os
 import sqlite3
-import stat
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -31,11 +30,13 @@ from tsutae import db
 from tsutae.config import now
 from tsutae.pipeline.logs import EventLogger, PipelineLogger
 from tsutae.schemas import RegimenSkill, ReportFormatSkill
+from tsutae.skillchange.atomic import write_atomic as _write_atomic
 from tsutae.skillchange.diff import set_version, unified
-from tsutae.skillchange.errors import SkillChangeError
+from tsutae.skillchange.errors import USE_REGIMEN_EDITOR, SkillChangeError
 from tsutae.skillchange.lock import skill_lock
 from tsutae.skillchange.state import RUN_KIND, fail_pending, transition
 from tsutae.skills import (
+    REGIMEN_PREFIX,
     SKILL_FILE_NAME,
     SkillValidationError,
     is_valid_skill_name,
@@ -71,22 +72,6 @@ def _ready(conn: sqlite3.Connection, change_id: object) -> dict[str, Any]:
     if change["new_text"] is None or change["diff"] is None:
         raise SkillChangeError("not_ready")
     return change
-
-
-def _write_atomic(path: Path, data: bytes) -> None:
-    """同じディレクトリの一時ファイルに書いてから os.replace で置き換える。"""
-    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
-    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-        os.chmod(tmp, mode)
-        os.replace(tmp, path)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
 
 
 def _read_current(path: Path, name: str) -> tuple[bytes, str, int]:
@@ -205,6 +190,8 @@ def _approve_locked(
 ) -> int:
     change = _ready(conn, change_id)  # ロックを取ってから読み直す
     try:
+        if str(change["skill_name"]).startswith(REGIMEN_PREFIX):
+            raise SkillChangeError(USE_REGIMEN_EDITOR)
         version = _write_and_record(conn, change, path, logger)
     except SkillChangeError as exc:
         fail_pending(conn, logger, change_id, exc.code)

@@ -1,0 +1,20 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/regimen-drafts",
+  "request": null,
+  "status": 200,
+  "body": {
+    "drafts": [
+      {
+        "id": 1,
+        "regimen": "FOLFIRI-BV",
+        "skill_name": "regimen-folfiri-bv",
+        "display_name": "FOLFIRI＋BV",
+        "base_version": null,
+        "version": 1,
+        "status": "open",
+        "updated_at": "2026-11-09T10:00:00+09:00"
+      }
+    ]
+  }
+}

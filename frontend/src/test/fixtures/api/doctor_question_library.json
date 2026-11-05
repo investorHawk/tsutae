@@ -1,0 +1,52 @@
+{
+  "method": "GET",
+  "path": "/api/doctor/question-library",
+  "request": null,
+  "status": 200,
+  "body": {
+    "questions": [
+      {
+        "key": "numbness",
+        "label": "しびれ",
+        "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+        "answer_type": "three_level",
+        "origin": "seed"
+      },
+      {
+        "key": "diarrhea",
+        "label": "下痢",
+        "text": "下痢はありましたか",
+        "answer_type": "three_level",
+        "origin": "seed"
+      },
+      {
+        "key": "stomatitis",
+        "label": "口内炎",
+        "text": "口の中の痛みや口内炎はありましたか",
+        "answer_type": "three_level",
+        "origin": "seed"
+      },
+      {
+        "key": "nausea_appetite",
+        "label": "吐き気・食欲",
+        "text": "吐き気や食欲の落ち込みはありましたか",
+        "answer_type": "three_level",
+        "origin": "seed"
+      },
+      {
+        "key": "hand_foot",
+        "label": "手のひら・足の裏",
+        "text": "手のひらや足の裏の赤み・痛み・ひび割れはありましたか",
+        "answer_type": "three_level",
+        "origin": "seed"
+      },
+      {
+        "key": "fever",
+        "label": "体温",
+        "text": "熱を測りましたか",
+        "answer_type": "temperature",
+        "origin": "seed"
+      }
+    ]
+  }
+}

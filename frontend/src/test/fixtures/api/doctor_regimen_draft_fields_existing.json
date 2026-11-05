@@ -1,0 +1,198 @@
+{
+  "method": "PATCH",
+  "path": "/api/doctor/regimen-drafts/2/fields",
+  "request": {
+    "changes": [
+      {
+        "field_id": "notes",
+        "value": "施設の決まりを書く欄"
+      }
+    ]
+  },
+  "status": 200,
+  "body": {
+    "draft": {
+      "id": 2,
+      "regimen": "CAPOX",
+      "skill_name": "regimen-capox",
+      "display_name": "CAPOX",
+      "base_version": 1,
+      "version": 2,
+      "status": "open",
+      "updated_at": "2026-11-09T10:00:00+09:00",
+      "generation": 0,
+      "form": {
+        "basic": {
+          "display_name": "CAPOX",
+          "code": "CAPOX",
+          "target": "大腸がん",
+          "cycle_days": 21
+        },
+        "drugs": [
+          {
+            "row_id": "d-oxaliplatin",
+            "name": "オキサリプラチン",
+            "route": "infusion",
+            "days": [
+              {
+                "start": 1,
+                "end": 1
+              }
+            ],
+            "times_per_day": null,
+            "start_note": null
+          },
+          {
+            "row_id": "d-capecitabine",
+            "name": "カペシタビン",
+            "route": "oral",
+            "days": [
+              {
+                "start": 1,
+                "end": 14
+              }
+            ],
+            "times_per_day": 2,
+            "start_note": "Day1 の夕方から"
+          }
+        ],
+        "side_effects": [
+          {
+            "row_id": "se-numbness",
+            "phrases": [
+              "手足のしびれ",
+              "冷たいものにさわるとピリピリする"
+            ],
+            "ctcae_terms": [
+              "末梢性感覚ニューロパチー",
+              "錯感覚",
+              "異常感覚"
+            ],
+            "question_key": "numbness"
+          },
+          {
+            "row_id": "se-diarrhea",
+            "phrases": [
+              "下痢",
+              "お腹がゆるい"
+            ],
+            "ctcae_terms": [
+              "下痢"
+            ],
+            "question_key": "diarrhea"
+          },
+          {
+            "row_id": "se-stomatitis",
+            "phrases": [
+              "口内炎",
+              "口の中が痛い"
+            ],
+            "ctcae_terms": [
+              "口腔粘膜炎",
+              "口腔内痛"
+            ],
+            "question_key": "stomatitis"
+          },
+          {
+            "row_id": "se-nausea-appetite",
+            "phrases": [
+              "吐き気",
+              "吐いた",
+              "食欲がない"
+            ],
+            "ctcae_terms": [
+              "悪心",
+              "嘔吐",
+              "食欲不振"
+            ],
+            "question_key": "nausea_appetite"
+          },
+          {
+            "row_id": "se-hand-foot",
+            "phrases": [
+              "手のひらや足の裏が赤い・痛い・ひび割れた"
+            ],
+            "ctcae_terms": [
+              "手掌・足底発赤知覚不全症候群"
+            ],
+            "question_key": "hand_foot"
+          },
+          {
+            "row_id": "se-fever",
+            "phrases": [
+              "熱が出た"
+            ],
+            "ctcae_terms": [
+              "発熱"
+            ],
+            "question_key": "fever"
+          },
+          {
+            "row_id": "se-fatigue",
+            "phrases": [
+              "だるい",
+              "疲れやすい"
+            ],
+            "ctcae_terms": [
+              "疲労",
+              "倦怠感"
+            ],
+            "question_key": null
+          }
+        ],
+        "questions": [
+          {
+            "row_id": "q-numbness",
+            "key": "numbness",
+            "label": "しびれ",
+            "text": "手足のしびれや冷たいものがさわりにくい感じはありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-diarrhea",
+            "key": "diarrhea",
+            "label": "下痢",
+            "text": "下痢はありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-stomatitis",
+            "key": "stomatitis",
+            "label": "口内炎",
+            "text": "口の中の痛みや口内炎はありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-nausea-appetite",
+            "key": "nausea_appetite",
+            "label": "吐き気・食欲",
+            "text": "吐き気や食欲の落ち込みはありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-hand-foot",
+            "key": "hand_foot",
+            "label": "手のひら・足の裏",
+            "text": "手のひらや足の裏の赤み・痛み・ひび割れはありましたか",
+            "answer_type": "three_level"
+          },
+          {
+            "row_id": "q-fever",
+            "key": "fever",
+            "label": "体温",
+            "text": "熱を測りましたか",
+            "answer_type": "temperature"
+          }
+        ],
+        "notes": "施設の決まりを書く欄"
+      },
+      "sources": {
+        "notes": "doctor_edit"
+      },
+      "chat": [],
+      "missing": [],
+      "schedule_locked": true,
+      "created_at": "2026-11-09T10:00:00+09:00"
+    }
+  }
+}

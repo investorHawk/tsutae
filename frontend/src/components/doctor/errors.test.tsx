@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../api/http";
 import ErrorNote from "./ErrorNote";
-import { describeError, errorCode } from "./errors";
+import { describeError, describeRegimenError, errorCode } from "./errors";
 
 describe("errorCode", () => {
   it("ApiError はその code", () => {
@@ -48,5 +48,25 @@ describe("ErrorNote", () => {
   it("前置きを付けられる", () => {
     render(<ErrorNote code="network_error" prefix="保存できませんでした" />);
     expect(screen.getByRole("alert")).toHaveTextContent("保存できませんでした");
+  });
+});
+
+describe("describeRegimenError（D4 レジメンの画面）", () => {
+  it.each([
+    ["token_mismatch", "確認の画面を出した後に値が変わりました"],
+    ["ai_values_unconfirmed", "上の値を全て確かめました"],
+    ["schedule_locked", "患者がいるため"],
+    ["code_taken", "識別名はもう使われています"],
+    ["stale", "版が変わりました"],
+    ["conflict", "読み直した"],
+  ])("%s は採用・保存の場面に合う説明", (code, part) => {
+    expect(describeRegimenError(code)).toContain(part);
+  });
+
+  it("旧 D4 と同じ code でも、共通の表の説明は変えない", () => {
+    expect(describeError("stale")).toContain("依頼");
+    expect(describeRegimenError("course_order")).toBe(
+      describeError("course_order"),
+    );
   });
 });

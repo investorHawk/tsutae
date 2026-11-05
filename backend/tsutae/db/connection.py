@@ -66,6 +66,13 @@ def connect(path: Path) -> sqlite3.Connection:
 
 
 @contextmanager
+def write_lock() -> Iterator[None]:
+    """書き込みのプロセス内ロックだけを握る（トランザクションは呼び出し側が開く）。"""
+    with _WRITE_LOCK:
+        yield
+
+
+@contextmanager
 def write_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
     """書き込み用のトランザクション。ロックの内側で `with conn:` を開く。
 
@@ -76,7 +83,14 @@ def write_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
-    """schema.sql を流す。CREATE ... IF NOT EXISTS のみなので何度呼んでもよい。"""
+    """古い形の表を作り直してから（`migrate.migrate_db`）schema.sql を流す。
+
+    schema.sql は CREATE ... IF NOT EXISTS のみ、移行も新しい形なら何もしないので、
+    何度呼んでもよい。
+    """
+    from tsutae.db.migrate import migrate_db  # migrate は SCHEMA_PATH をここから引く
+
+    migrate_db(conn)
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 

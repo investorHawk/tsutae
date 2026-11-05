@@ -11,11 +11,11 @@
       },
       {
         "name": "regimen-folfox",
-        "version": 2
+        "version": 1
       },
       {
         "name": "report-format-default",
-        "version": 1
+        "version": 2
       }
     ],
     "invalid": [

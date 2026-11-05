@@ -2,8 +2,10 @@
 
 入口の検査（入力どうしの対応）は gate.py。ここは AI の出力を記録と突き合わせる。
 
-- 出来事（usable_events）: その entry_no の記録日より後の日付、ctcae_terms.json の
-  用語と question_key の対応に合わないもの、引用が伏せ字後の文に無いものを落とす。
+- 出来事（usable_events）: その entry_no の記録日より後の日付、用語と question_key の
+  対応（ctcae_terms.json ＋ その記録の版の term_keys。その版の質問に無い key は null。
+  checks.OutputContext と同じ。v1.1。spec 9.1）に合わないもの、引用が伏せ字後の文に
+  無いものを落とす。
   「回」（recalled）は AI の値ではなく「出来事の日付が記録日より前」で決め直す
 - 食い違い（verified_contradictions）: entry_no の記録の実際のクローズ回答と照合する。
   記録日・質問・回答・引用のどれかが合わないものは載せない。表示する回答は記録の値、
@@ -37,6 +39,7 @@ from tsutae.schemas import (
     Timeline,
     TimelineEvent,
 )
+from tsutae.skills.term_keys import entry_term_keys
 from tsutae.synthetic import load_terms
 
 _MARKED_STATUSES = frozenset({"present", "improving"})
@@ -80,12 +83,31 @@ def _source_entry(
     return by_id.get(entry_id) if entry_id is not None else None
 
 
-def _event_fits(ev: TimelineEvent, entry: Entry, prepared: PreparedInput) -> bool:
-    keys = ctcae_term_keys()
+def prepared_term_keys(
+    prepared: PreparedInput, entry_no: int
+) -> Mapping[str, str | None]:
+    """紙に載せてよい用語名 → その記録の版の質問 key（v1.1。checks と同じ対応）。
+
+    全体の対応（ctcae_terms.json）＋ その記録の版の term_keys。その版の質問に無い key は
+    null。重さの判定語を含む語は除く（ctcae_term_keys と同じ）。
+    """
+    return {
+        term: key
+        for term, key in entry_term_keys(prepared, entry_no).items()
+        if term in ctcae_term_keys()
+    }
+
+
+def _event_fits(
+    ev: TimelineEvent,
+    entry: Entry,
+    prepared: PreparedInput,
+    keys: Mapping[str, str | None],
+) -> bool:
     return (
         ev.date <= entry.record_date  # 記録した日より後の出来事は書けない
         and ev.term in keys
-        and keys[ev.term] == ev.question_key  # 用語と行（質問）の対応は一覧のとおり
+        and keys[ev.term] == ev.question_key  # 用語と行（質問）の対応は版の対応のとおり
         and quote_matches(prepared, ev.entry_no, ev.source_quote)
     )
 
@@ -96,12 +118,18 @@ def usable_events(
     """記録と照合できた出来事だけ。「回」（recalled）は記録日と出来事の日付から決め直す。
 
     落とすもの: 未知の entry_no、記録日より後の日付、一覧に無い用語、用語と
-    question_key の組み合わせが一覧と違うもの、引用が伏せ字後の文に無いもの。
+    question_key の組み合わせがその記録の版の対応（prepared_term_keys）と違うもの、
+    引用が伏せ字後の文に無いもの。
     """
+    keys: dict[int, Mapping[str, str | None]] = {}
     usable = []
     for ev in timeline.events:
         entry = _source_entry(ev.entry_no, prepared, by_id)
-        if entry is None or not _event_fits(ev, entry, prepared):
+        if entry is None:
+            continue
+        if ev.entry_no not in keys:
+            keys[ev.entry_no] = prepared_term_keys(prepared, ev.entry_no)
+        if not _event_fits(ev, entry, prepared, keys[ev.entry_no]):
             continue
         usable.append(ev.model_copy(update={"recalled": ev.date < entry.record_date}))
     return usable

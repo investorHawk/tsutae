@@ -185,3 +185,19 @@ def test_gate_masking_uses_the_doctor_mask_like_the_pipeline() -> None:
     text = "磯鷲さんに会った"
     assert mask_free_text(text, mask) == pipeline_inputs.mask_free_text(text, mask)
     assert mask_free_text(text, mask)[1] is None
+
+
+@pytest.mark.parametrize("drop", ["one", "all"])
+def test_gate_rejects_entries_without_version(demo: SampleInputs, drop: str) -> None:
+    from tsutae.report.errors import ReportBuildError
+
+    versions = dict(demo.prepared.entry_versions)
+    if drop == "all":
+        versions = {}
+    else:
+        versions.pop(min(versions))
+    prepared = demo.prepared.model_copy(update={"entry_versions": versions})
+    kwargs = {**demo.build_kwargs(), "prepared": prepared}
+    with pytest.raises(ReportBuildError) as exc:
+        build_report_data(**kwargs)
+    assert exc.value.code == "entry_mismatch"

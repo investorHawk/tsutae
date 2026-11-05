@@ -17,12 +17,14 @@
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 38.2
+            "temperature": 38.2,
+            "question_label": "体温"
           },
           {
             "question_key": "diarrhea",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           }
         ],
         "has_free_text": false
@@ -39,27 +41,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -76,27 +83,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -124,27 +136,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 36.7
+            "temperature": 36.7,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -161,27 +178,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 37.9
+            "temperature": 37.9,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -198,27 +220,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -235,27 +262,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -272,27 +304,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "hard",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -342,27 +379,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -390,27 +432,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": false
@@ -427,27 +474,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -464,27 +516,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 36.4
+            "temperature": 36.4,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -501,27 +558,32 @@
           {
             "question_key": "numbness",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -538,27 +600,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": false
@@ -586,27 +653,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 36.6
+            "temperature": 36.6,
+            "question_label": "体温"
           }
         ],
         "has_free_text": false
@@ -623,27 +695,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -660,27 +737,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "hard",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "hard",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 37.1
+            "temperature": 37.1,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -730,27 +812,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -767,27 +854,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": false
@@ -804,27 +896,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "not_measured",
-            "temperature": null
+            "temperature": null,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true
@@ -841,27 +938,32 @@
           {
             "question_key": "numbness",
             "value": "present",
-            "temperature": null
+            "temperature": null,
+            "question_label": "しびれ"
           },
           {
             "question_key": "diarrhea",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "下痢"
           },
           {
             "question_key": "stomatitis",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "口内炎"
           },
           {
             "question_key": "nausea_appetite",
             "value": "none",
-            "temperature": null
+            "temperature": null,
+            "question_label": "吐き気・食欲"
           },
           {
             "question_key": "fever",
             "value": "measured",
-            "temperature": 36.5
+            "temperature": 36.5,
+            "question_label": "体温"
           }
         ],
         "has_free_text": true

@@ -1,9 +1,10 @@
 /**
- * D4 設定を変える: 医師向けの呼び名（D5-1）・依頼の前に今の中身を見せる（D5-2）・
+ * D4 レポートの形式（旧 D4 の一文の書き換え。v1.1 で report-format-* だけ）: 医師向けの呼び名（D5-1）・依頼の前に今の中身を見せる（D5-2）・
  * 「依頼 → 差分を見る → 承認」の段階の表示（D5-3）。
- * 今の中身は実際の API の応答（fixture doctor_skill）を使う。
+ * 質問の一覧の出し方は SkillContentPanel を実際の API の応答（fixture doctor_skill）で直接描いて確かめる
+ * （レポートの形式には質問が無い）。
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SkillContentResponse } from "../../api/types";
@@ -16,7 +17,8 @@ import {
 } from "../../components/doctor/testing";
 import { fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
-import Settings from "./Settings";
+import SkillContentPanel from "../../components/doctor/SkillContentPanel";
+import ReportFormatSettings from "./ReportFormatSettings";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -26,24 +28,37 @@ const SKILLS = "GET /api/doctor/skills";
 const CHANGES = "GET /api/doctor/skill-changes";
 const CREATE = "POST /api/doctor/skill-changes";
 const APPROVE = "POST /api/doctor/skill-changes/5/approve";
-const FOLFOX = "GET /api/doctor/skills/regimen-folfox";
 const REPORT = "GET /api/doctor/skills/report-format-default";
+const SHORT = "GET /api/doctor/skills/report-format-short";
 const FOLFOX_BODY = fixtureBody("doctor_skill") as SkillContentResponse;
-const REPORT_BODY: SkillContentResponse = {
-  name: "report-format-default",
-  version: 3,
-  description: "医師が決めたレポートの形式（合成）",
+
+function reportBody(version: number): SkillContentResponse {
+  return {
+    name: "report-format-default",
+    version,
+    description: "医師が決めたレポートの形式（合成）",
+    questions: [],
+    text: `---\nname: report-format-default\nversion: ${version}\n---\n\n# レポートの形式（既定）\n`,
+  };
+}
+const REPORT_BODY = reportBody(3);
+const SHORT_BODY: SkillContentResponse = {
+  name: "report-format-short",
+  version: 1,
+  description: "短いレポートの形式（合成）",
   questions: [],
-  text: "---\nname: report-format-default\nversion: 3\n---\n\n# レポートの形式（既定）\n",
+  text: "---\nname: report-format-short\nversion: 1\n---\n\n# 短い形式\n",
 };
 const DIFF =
   "--- a/SKILL.md\n+++ b/SKILL.md\n@@ -1 +1 @@\n-version: 1\n+version: 2\n";
 
-function list(folfoxVersion = 1) {
+function list(reportVersion = 3) {
   return {
     skills: [
-      { name: "regimen-folfox", version: folfoxVersion },
-      { name: "report-format-default", version: 3 },
+      // レジメンは一覧に来ても旧 D4 の選択肢に出さない
+      { name: "regimen-folfox", version: 1 },
+      { name: "report-format-default", version: reportVersion },
+      { name: "report-format-short", version: 1 },
     ],
     invalid: [],
   };
@@ -53,14 +68,18 @@ function api(extra: Record<string, RouteValue> = {}) {
   return mockApi({
     [SKILLS]: list(),
     [CHANGES]: { skill_changes: [] },
-    [FOLFOX]: FOLFOX_BODY,
     [REPORT]: REPORT_BODY,
+    [SHORT]: SHORT_BODY,
     ...extra,
   });
 }
 
 function renderSettings() {
-  return renderRoute("/doctor/settings", "/doctor/settings", <Settings />);
+  return renderRoute(
+    "/doctor/settings",
+    "/doctor/settings",
+    <ReportFormatSettings />,
+  );
 }
 
 function contentPanel() {
@@ -78,7 +97,7 @@ function currentStep() {
 }
 
 async function requestChange() {
-  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+  await screen.findByRole("option", { name: /レポートの形式（第/ });
   await userEvent.type(
     screen.getByLabelText("変えたいこと（一文）"),
     "（合成）口内炎の質問を足して",
@@ -93,65 +112,84 @@ describe("Settings: 医師向けの呼び名（D5-1）", () => {
     api();
     renderSettings();
     const option = await screen.findByRole("option", {
-      name: "FOLFOX の質問集（第1版）",
+      name: "レポートの形式（第3版）",
     });
-    expect(option).toHaveValue("regimen-folfox");
+    expect(option).toHaveValue("report-format-default");
     expect(
-      screen.getByRole("option", { name: "レポートの形式（第3版）" }),
-    ).toHaveValue("report-format-default");
+      screen.getByRole("option", { name: "レポートの形式（short）（第1版）" }),
+    ).toHaveValue("report-format-short");
     expect(screen.queryByRole("option", { name: /version/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /FOLFOX/ })).toBeNull();
     expect(
-      screen.getByText("regimen-folfox", { selector: "code" }),
+      screen.getByText("report-format-default", { selector: "code" }),
     ).toHaveClass("d-skill-code");
   });
 });
 
 describe("Settings: 依頼の前に今の中身を見せる（D5-2）", () => {
-  it("選んだ Skill の今の質問の一覧と SKILL.md の全文", async () => {
+  it("選んだ Skill の SKILL.md の全文（形式に質問は無いので一覧は出さない）", async () => {
     const fetchMock = api();
     renderSettings();
     const panel = await contentPanel();
     expect(
-      within(panel).getByText("今の中身（FOLFOX の質問集・第1版）"),
+      within(panel).getByText("今の中身（レポートの形式・第3版）"),
     ).toBeInTheDocument();
-    const questions = await within(panel).findByRole("list", {
-      name: "今の質問",
-    });
-    const items = within(questions).getAllByRole("listitem");
-    expect(items).toHaveLength(FOLFOX_BODY.questions.length);
-    expect(items[1]).toHaveTextContent("下痢はありましたか");
-    expect(items[1]).toHaveTextContent("3段階で答える");
-    expect(items[4]).toHaveTextContent("体温を入れる");
-    expect(within(panel).getByText("SKILL.md の全文")).toBeInTheDocument();
-    expect(panel.querySelector("pre")).toHaveTextContent(
-      "name: regimen-folfox",
-    );
-    expect(countOf(fetchMock, FOLFOX)).toBe(1);
-  });
-
-  it("選び直すと、その Skill の中身を取り直す（質問の無い Skill は全文だけ）", async () => {
-    const fetchMock = api();
-    renderSettings();
-    await within(await contentPanel()).findByRole("list", { name: "今の質問" });
-    await userEvent.selectOptions(
-      screen.getByLabelText("Skill"),
-      "report-format-default",
-    );
-    const panel = await contentPanel();
+    // 枠は先に出て、中身は GET が返ってから（読み込み中を待つ）
     expect(
-      await within(panel).findByText("今の中身（レポートの形式・第3版）"),
+      await within(panel).findByText("SKILL.md の全文"),
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(panel.querySelector("pre")).toHaveTextContent(
-        "# レポートの形式（既定）",
+        "name: report-format-default",
       ),
     );
     expect(within(panel).queryByRole("list", { name: "今の質問" })).toBeNull();
     expect(countOf(fetchMock, REPORT)).toBe(1);
   });
 
+  it("選び直すと、その Skill の中身を取り直す", async () => {
+    const fetchMock = api();
+    renderSettings();
+    await within(await contentPanel()).findByText(
+      "今の中身（レポートの形式・第3版）",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("Skill"),
+      "report-format-short",
+    );
+    const panel = await contentPanel();
+    expect(
+      await within(panel).findByText(
+        "今の中身（レポートの形式（short）・第1版）",
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(panel.querySelector("pre")).toHaveTextContent("# 短い形式"),
+    );
+    expect(countOf(fetchMock, SHORT)).toBe(1);
+  });
+
+  it("質問のある Skill なら今の質問の一覧を出す（部品の表示。fixture doctor_skill）", () => {
+    render(
+      <SkillContentPanel
+        skillName="regimen-folfox"
+        version={1}
+        state={{ content: FOLFOX_BODY, error: null }}
+      />,
+    );
+    const panel = screen.getByRole("region", {
+      name: "選んだ Skill の今の中身",
+    });
+    const questions = within(panel).getByRole("list", { name: "今の質問" });
+    const items = within(questions).getAllByRole("listitem");
+    expect(items).toHaveLength(FOLFOX_BODY.questions.length);
+    expect(items[1]).toHaveTextContent("下痢はありましたか");
+    expect(items[1]).toHaveTextContent("3段階で答える");
+    expect(items[4]).toHaveTextContent("体温を入れる");
+  });
+
   it("中身を読めなければ code を出す（依頼の入力は止めない）", async () => {
-    api({ [FOLFOX]: () => jsonResponse({ error: "format" }, 409) });
+    api({ [REPORT]: () => jsonResponse({ error: "format" }, 409) });
     renderSettings();
     const panel = await contentPanel();
     const alert = await within(panel).findByRole("alert");
@@ -161,7 +199,7 @@ describe("Settings: 依頼の前に今の中身を見せる（D5-2）", () => {
   });
 
   it("契約と違う中身は invalid_response（空の中身と言わない）", async () => {
-    api({ [FOLFOX]: { name: "regimen-folfox", version: 1 } });
+    api({ [REPORT]: { name: "report-format-default", version: 3 } });
     renderSettings();
     const panel = await contentPanel();
     expect(await within(panel).findByRole("alert")).toHaveTextContent(
@@ -171,25 +209,22 @@ describe("Settings: 依頼の前に今の中身を見せる（D5-2）", () => {
   });
 
   it("承認で版が上がったら、今の中身を取り直す", async () => {
-    const lists = [list(1), list(2)];
+    const lists = [list(3), list(4)];
     const fetchMock = api({
       [SKILLS]: () => jsonResponse(lists.length > 1 ? lists.shift() : lists[0]),
       [CREATE]: { id: 5, status: "pending", diff: DIFF },
-      [APPROVE]: { ok: true, new_version: 2 },
-      [FOLFOX]: () =>
-        jsonResponse({
-          ...FOLFOX_BODY,
-          version: countOf(fetchMock, FOLFOX) > 1 ? 2 : 1,
-        }),
+      [APPROVE]: { ok: true, new_version: 4 },
+      [REPORT]: () =>
+        jsonResponse(reportBody(countOf(fetchMock, REPORT) > 1 ? 4 : 3)),
     });
     renderSettings();
     await requestChange();
     await userEvent.click(
       await screen.findByRole("button", { name: "承認する" }),
     );
-    await waitFor(() => expect(countOf(fetchMock, FOLFOX)).toBe(2));
+    await waitFor(() => expect(countOf(fetchMock, REPORT)).toBe(2));
     expect(
-      await screen.findByText("今の中身（FOLFOX の質問集・第2版）"),
+      await screen.findByText("今の中身（レポートの形式・第4版）"),
     ).toBeInTheDocument();
   });
 });
@@ -198,7 +233,7 @@ describe("Settings: 依頼 → 差分を見る → 承認 の段階（D5-3）", 
   it("入力中は「依頼を書く」が今", async () => {
     api();
     renderSettings();
-    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+    await screen.findByRole("option", { name: /レポートの形式（第/ });
     expect(steps().map((li) => li.textContent)).toEqual([
       expect.stringContaining("依頼を書く"),
       expect.stringContaining("差分を見る"),

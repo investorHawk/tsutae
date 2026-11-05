@@ -1,7 +1,9 @@
 """デモの筋書きを通す結合テスト（test_e2e_flow.py）の部品。API は呼ばない。
 
-- `demo_client`: backend/skills_home を tmp_path に写し（D4 の承認で本物の SKILL.md を
+- `demo_client`: backend/skills_home を tmp_path に写し（D4 の採用・承認で本物の SKILL.md を
   書き換えない）、合成3人を投入した TestClient を開く
+- `adopt_new_question`: D4 レジメンの画面と同じ API（下書き → 直接編集 → 確認 → 採用）で
+  既存の版に質問を1つ足す（v1.1。旧 D4 の一文の書き換えは report-format だけ）
 - `demo_runner`: いまの DB の記録から、サービスと同じ引数で `prepare_input` を作り、
   正解ラベル（labels_demo_patient.json）から AI の結果（emit_timeline・emit_report）を
   作った台本どおりの FakeRunner。患者画面から足した記録（ラベルなし）は出来事にしない
@@ -27,7 +29,6 @@ from typing import Any
 
 from api_helpers import (
     TEST_PASSWORD,
-    FakeEditor,
     RunnerFactory,
     api_client,
     db_conn,
@@ -52,11 +53,7 @@ DEMO_RECEPTION = "A-023"
 UNPROCESSED_SEQ = 38  # 二次検出に掛かる記載（辞書にない架空の姓＋さん。D6 デモ用）
 NEW_QUESTION_KEY = "meal_intake"
 NEW_QUESTION_TEXT = "口内炎で食事がとりにくいことはありましたか"
-NEW_QUESTION_LINE = (
-    f"  - {{key: {NEW_QUESTION_KEY}, text: {NEW_QUESTION_TEXT}, "
-    "answer_type: three_level}\n"
-)
-_ANCHOR = "  - {key: fever,"
+NEW_QUESTION_LABEL = "食事"  # D4 レジメンの form の短い名前（紙の行名。v1.1）
 _ROW_CELL = re.compile(
     r'<td class="(?P<cls>[^"]*)" data-row="(?P<row>[^"]+)" data-day="(?P<day>\d+)">'
     r"(?P<body>.*?)</td>"
@@ -219,19 +216,41 @@ def section(html: str, name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# D4（質問を1つ足す偽の editor）
+# D4 レジメン（既存の版に質問を1つ足して採用する。v1.1。旧 D4 は report-format だけ）
 # ---------------------------------------------------------------------------
 
-
-def add_question(text: str) -> str:
-    """questions の fever の前に質問を1行足す（version は変えない）。"""
-    assert _ANCHOR in text and NEW_QUESTION_KEY not in text
-    return text.replace(_ANCHOR, NEW_QUESTION_LINE + _ANCHOR, 1)
+REGIMEN_DRAFTS = "/api/doctor/regimen-drafts"
 
 
-def question_adding_editor() -> FakeEditor:
-    transform: Callable[[str], str] = add_question
-    return FakeEditor(transform=transform)
+def adopt_new_question(client: TestClient, skill_name: str = "regimen-folfox") -> dict:
+    """版 N+1 の下書きに NEW_QUESTION_KEY の質問を足し、確認して採用する。preview を返す。"""
+    r = client.post(REGIMEN_DRAFTS, json={"skill": skill_name})
+    assert r.status_code == 200, r.text
+    draft_id = r.json()["draft"]["id"]
+    row = "q-meal"
+    fields = {
+        "key": NEW_QUESTION_KEY,
+        "label": NEW_QUESTION_LABEL,
+        "text": NEW_QUESTION_TEXT,
+        "answer_type": "three_level",
+    }
+    body = {
+        "adds": [{"section": "questions", "row_id": row}],
+        "changes": [
+            {"field_id": f"questions.{row}.{name}", "value": value}
+            for name, value in fields.items()
+        ],
+    }
+    r = client.patch(f"{REGIMEN_DRAFTS}/{draft_id}/fields", json=body)
+    assert r.status_code == 200, r.text
+    preview = client.get(f"{REGIMEN_DRAFTS}/{draft_id}/preview").json()
+    assert preview["issues"] == [], preview["issues"]
+    r = client.post(
+        f"{REGIMEN_DRAFTS}/{draft_id}/adopt",
+        json={"confirm_token": preview["confirm_token"], "ai_values_confirmed": True},
+    )
+    assert r.status_code == 200, r.text
+    return {**preview, "adopted": r.json()}
 
 
 # ---------------------------------------------------------------------------

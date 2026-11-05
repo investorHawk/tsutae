@@ -1,7 +1,9 @@
 """Skill の書き換えの依頼・承認・却下（D4）。docs/architecture.md §9b。
 
 request_change の手順（本体の SKILL.md には触らない）:
-1. 名前（SKILL_NAME_PATTERN）と依頼文を検査。今の SKILL.md を読んで版を得る。
+1. 名前（SKILL_NAME_PATTERN）と依頼文を検査。regimen-* は use_regimen_editor で断る
+   （v1.1。旧 D4 は report-format だけ。レジメンは D4 レジメンの画面）。今の SKILL.md を
+   読んで版を得る。
    同じ Skill に作業中（pending・diff なし）の行があれば busy（created_at から
    settings.pipeline_timeout_s を過ぎた作業中の行は先に failed・stale_request にする）
    （ここまでの失敗は行を作らず SkillChangeError）
@@ -52,7 +54,7 @@ from tsutae.skillchange.approve import approve_change, reject_change
 from tsutae.skillchange.check import baseline_of, identifier_like_question
 from tsutae.skillchange.diff import set_version, unified
 from tsutae.skillchange.editor import SkillEditor, build_prompt, logging_to
-from tsutae.skillchange.errors import SkillChangeError
+from tsutae.skillchange.errors import USE_REGIMEN_EDITOR, SkillChangeError
 from tsutae.skillchange.state import (
     RUN_KIND,
     fail_pending,
@@ -62,6 +64,7 @@ from tsutae.skillchange.state import (
 )
 from tsutae.skillchange.workcopy import work_copy_path
 from tsutae.skills import (
+    REGIMEN_PREFIX,
     SKILL_FILE_NAME,
     SkillNotFoundError,
     SkillValidationError,
@@ -104,6 +107,10 @@ def _diff_path(name: str) -> str:
 def _check_name(skill_name: object) -> str:
     if not is_valid_skill_name(skill_name):
         raise SkillChangeError("invalid_name")
+    if str(skill_name).startswith(REGIMEN_PREFIX):
+        # v1.1: レジメンは D4 レジメンの画面（フォーム＋チャット）で直す。一文の書き換えで
+        # 上げた版には form JSON が無く、その画面で開けない（spec 9.2）
+        raise SkillChangeError(USE_REGIMEN_EDITOR)
     return str(skill_name)
 
 

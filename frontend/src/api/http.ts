@@ -13,12 +13,18 @@ export const INVALID_RESPONSE = "invalid_response";
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /**
+   * 失敗の本文（JSON として読めたときだけ。無ければ null）。D4 レジメンの 422 の
+   * issues（欄の id と理由）のように、code の他に画面が使う値を持つ。
+   */
+  readonly body: unknown;
 
-  constructor(status: number, code: string) {
+  constructor(status: number, code: string, body: unknown = null) {
     super(`API error ${status}: ${code}`);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 
   get isUnauthorized(): boolean {
@@ -30,7 +36,7 @@ export function isApiError(value: unknown): value is ApiError {
   return value instanceof ApiError;
 }
 
-type Method = "GET" | "POST";
+type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
 export interface RequestOptions {
   /**
@@ -57,19 +63,25 @@ function buildInit(
   };
 }
 
-async function readErrorCode(res: Response): Promise<string> {
+interface ErrorBody {
+  code: string;
+  body: unknown;
+}
+
+async function readError(res: Response): Promise<ErrorBody> {
   try {
     const data: unknown = await res.json();
     if (data !== null && typeof data === "object" && "error" in data) {
       const code = (data as { error: unknown }).error;
       if (typeof code === "string" && code.length > 0) {
-        return code;
+        return { code, body: data };
       }
     }
+    return { code: UNKNOWN_ERROR, body: data };
   } catch {
     // 本文が JSON でない（プロキシのエラーページ等）
   }
-  return UNKNOWN_ERROR;
+  return { code: UNKNOWN_ERROR, body: null };
 }
 
 async function readBody<T>(
@@ -77,10 +89,10 @@ async function readBody<T>(
   signal: AbortSignal | undefined,
 ): Promise<T> {
   if (!res.ok) {
-    const code = await readErrorCode(res);
+    const { code, body } = await readError(res);
     throw signal?.aborted
       ? new ApiError(0, NETWORK_ERROR)
-      : new ApiError(res.status, code);
+      : new ApiError(res.status, code, body);
   }
   if (res.status === 204) {
     return undefined as T;
@@ -134,6 +146,23 @@ export function postJson<T>(
   options?: RequestOptions,
 ): Promise<T> {
   return request<T>("POST", path, body, options);
+}
+
+/** 本文つきの PATCH（D4 レジメンの下書きの欄の直接編集）。 */
+export function patchJson<T>(
+  path: string,
+  body: unknown,
+  options?: RequestOptions,
+): Promise<T> {
+  return request<T>("PATCH", path, body, options);
+}
+
+/** 本文の無い DELETE（質問の部品集から外すなど）。 */
+export function deleteJson<T>(
+  path: string,
+  options?: RequestOptions,
+): Promise<T> {
+  return request<T>("DELETE", path, undefined, options);
 }
 
 /** 経路の一部に入れる値を URL エンコードする。 */

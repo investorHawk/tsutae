@@ -38,8 +38,10 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTS_DIR = REPO_ROOT / "backend" / "tests"
-if str(TESTS_DIR) not in sys.path:
-    sys.path.insert(0, str(TESTS_DIR))
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+for _path in (TESTS_DIR, SCRIPTS_DIR):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 import httpx  # noqa: E402
 from api_helpers import (  # noqa: E402
@@ -49,6 +51,7 @@ from api_helpers import (  # noqa: E402
     seed_synthetic,
     set_patient_cookie,
 )
+from dump_api_regimen import regimen_drafts_flow  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from pipeline_fakes import (  # noqa: E402
@@ -119,6 +122,7 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/doctor/logout"),
         ("GET", "/api/doctor/patients"),
         ("POST", "/api/doctor/patients"),
+        ("GET", "/api/doctor/regimens"),
         ("GET", "/api/doctor/patients/{}/courses"),
         ("GET", "/api/doctor/patients/{}/visits"),
         ("GET", "/api/doctor/patients/{}/entries"),
@@ -136,6 +140,17 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/doctor/skill-changes"),
         ("POST", "/api/doctor/skill-changes/{}/approve"),
         ("POST", "/api/doctor/skill-changes/{}/reject"),
+        ("GET", "/api/doctor/question-library"),
+        ("POST", "/api/doctor/question-library"),
+        ("DELETE", "/api/doctor/question-library/{}"),
+        ("POST", "/api/doctor/regimen-drafts"),
+        ("GET", "/api/doctor/regimen-drafts"),
+        ("GET", "/api/doctor/regimen-drafts/{}"),
+        ("PATCH", "/api/doctor/regimen-drafts/{}/fields"),
+        ("POST", "/api/doctor/regimen-drafts/{}/discard"),
+        ("GET", "/api/doctor/regimen-drafts/{}/preview"),
+        ("POST", "/api/doctor/regimen-drafts/{}/adopt"),
+        ("POST", "/api/doctor/regimen-drafts/{}/turns"),
     }
 )
 
@@ -145,6 +160,8 @@ _INT_SEGMENT = re.compile(r"/[0-9]+(?=/|$)")
 _SKILL_SEGMENT = re.compile(
     r"(?<=/api/doctor/skills)/(?:regimen|report-format)-[a-z0-9-]+$"
 )
+# DELETE /api/doctor/question-library/{key} の質問 key（QUESTION_KEY_PATTERN の形）
+_LIBRARY_SEGMENT = re.compile(r"(?<=/api/doctor/question-library)/[a-z][a-z0-9_]+$")
 _PARAM_SEGMENT = re.compile(r"/\{[^/}]+\}(?=/|$)")
 
 
@@ -154,7 +171,7 @@ class DumpError(RuntimeError):
 
 def route_template(path: str) -> str:
     """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id・Skill 名も `{}`）。"""
-    named = _SKILL_SEGMENT.sub("/{}", path)
+    named = _LIBRARY_SEGMENT.sub("/{}", _SKILL_SEGMENT.sub("/{}", path))
     return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", named))
 
 
@@ -625,8 +642,16 @@ def _patient_records_flow(rec: Recorder) -> None:
 
 def _patient_admin_flow(rec: Recorder) -> None:
     rec.call("doctor_patients", "GET", "/api/doctor/patients")
+    rec.call("doctor_regimens", "GET", "/api/doctor/regimens")
     rec.call(
         "doctor_patient_create", "POST", "/api/doctor/patients", {"regimen": "CAPOX"}
+    )
+    rec.call(
+        "doctor_patient_create_unknown_regimen",
+        "POST",
+        "/api/doctor/patients",
+        {"regimen": "XELOX"},
+        expect=422,
     )
     rec.call("doctor_courses", "GET", f"/api/doctor/patients/{DEMO}/courses")
     _patient_records_flow(rec)
@@ -671,14 +696,12 @@ def _skill_flow(rec: Recorder, home: Path) -> None:
         "/api/doctor/skills/regimen-nope",
         expect=404,
     )
+    # v1.1: 旧 D4（一文の書き換え）は report-format だけ。regimen-* は 400 use_regimen_editor
     first = _request_change(
-        rec,
-        "doctor_skill_change_create",
-        REGIMEN_SKILL,
-        "口内炎の質問で食事がとれたかも聞いて",
+        rec, "doctor_skill_change_create", REPORT_SKILL, "見出しの順を変えて"
     )
     _request_change(
-        rec, "doctor_skill_change_create_failed", REGIMEN_SKILL, NO_CHANGE_REQUEST
+        rec, "doctor_skill_change_create_failed", REPORT_SKILL, NO_CHANGE_REQUEST
     )
     rec.call(
         "doctor_skill_change_create_invalid_name",
@@ -687,8 +710,15 @@ def _skill_flow(rec: Recorder, home: Path) -> None:
         {"skill_name": "../etc", "request_text": "x"},
         expect=400,
     )
+    rec.call(
+        "doctor_skill_change_create_regimen",
+        "POST",
+        base,
+        {"skill_name": REGIMEN_SKILL, "request_text": "口内炎の質問を直して"},
+        expect=400,
+    )
     second = _request_change(rec, None, REPORT_SKILL, "引用は短くして")
-    with skill_lock(_skill_dir(home, REGIMEN_SKILL)):
+    with skill_lock(_skill_dir(home, REPORT_SKILL)):
         rec.call(
             "doctor_skill_change_approve_busy",
             "POST",
@@ -712,6 +742,27 @@ def _skill_flow(rec: Recorder, home: Path) -> None:
     rec.call("doctor_skill_change_reject", "POST", f"{base}/{second}/reject")
     rec.call("doctor_skill_changes", "GET", base)
     _skills_with_invalid(rec, home)
+
+
+def _question_library_flow(rec: Recorder) -> None:
+    """質問の部品集（初期の6問・追加・重複・外す・初期の問は外せない）。"""
+    base = "/api/doctor/question-library"
+    rec.call("doctor_question_library", "GET", base)
+    body = {
+        "key": "fatigue",
+        "label": "だるさ",
+        "text": "だるさや疲れやすさはありましたか",
+        "answer_type": "three_level",
+    }
+    rec.call("doctor_question_library_add", "POST", base, body)
+    rec.call("doctor_question_library_add_taken", "POST", base, body, expect=409)
+    rec.call("doctor_question_library_hide", "DELETE", f"{base}/fatigue")
+    rec.call(
+        "doctor_question_library_hide_seed",
+        "DELETE",
+        f"{base}/diarrhea",
+        expect=409,
+    )
 
 
 def _skills_with_invalid(rec: Recorder, home: Path) -> None:
@@ -745,6 +796,8 @@ def _run(app: FastAPI, home: Path) -> Dump:
         _visit_flow(rec)
         _patient_admin_flow(rec)
         _skill_flow(rec, home)
+        _question_library_flow(rec)
+        regimen_drafts_flow(rec)
         rec.call("doctor_logout", "POST", "/api/doctor/logout")
         return Dump(
             fixtures=dict(sorted(rec.fixtures.items())),

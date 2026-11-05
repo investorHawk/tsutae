@@ -12,7 +12,7 @@ import {
 } from "../../components/doctor/testing";
 import { jsonResponse } from "../../test/fetchMock";
 import { skillContentRoutes } from "../../components/doctor/skillTesting";
-import Settings from "./Settings";
+import ReportFormatSettings from "./ReportFormatSettings";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -22,21 +22,22 @@ const SKILLS = "GET /api/doctor/skills";
 const CHANGES = "GET /api/doctor/skill-changes";
 const CREATE = "POST /api/doctor/skill-changes";
 const REQUEST = "口内炎は、食事がとれたかも次から聞いて";
+const SKILL = "report-format-default";
 
 const DIFF = [
-  "--- a/regimen-folfox/SKILL.md",
-  "+++ b/regimen-folfox/SKILL.md",
+  "--- a/report-format-default/SKILL.md",
+  "+++ b/report-format-default/SKILL.md",
   "@@ -1,3 +1,4 @@",
   "-version: 1",
   "+version: 2",
-  "+  - {key: stomatitis_meal, text: 食事はとれましたか, answer_type: three_level}",
-  " regimen: FOLFOX",
+  "+low_confidence_threshold: 0.6",
+  " name: report-format-default",
 ].join("\n");
 
 function change(patch: Partial<SkillChange>): SkillChange {
   return {
     id: 5,
-    skill_name: "regimen-folfox",
+    skill_name: SKILL,
     requested_text: REQUEST,
     diff: DIFF,
     status: "pending",
@@ -51,15 +52,17 @@ function change(patch: Partial<SkillChange>): SkillChange {
 
 const SKILL_LIST = {
   skills: [
+    // レジメンは一覧に来ても選べない（D4 レジメンの画面で直す）
     { name: "regimen-folfox", version: 1 },
-    { name: "report-format-default", version: 3 },
+    { name: "report-format-default", version: 1 },
+    { name: "report-format-short", version: 3 },
   ],
   invalid: [],
 };
 
 function api(extra: Record<string, RouteValue> = {}) {
   return mockApi({
-    ...skillContentRoutes(["regimen-folfox", "report-format-default"]),
+    ...skillContentRoutes(["report-format-default", "report-format-short"]),
     [SKILLS]: SKILL_LIST,
     [CHANGES]: { skill_changes: [] },
     ...extra,
@@ -67,37 +70,40 @@ function api(extra: Record<string, RouteValue> = {}) {
 }
 
 function renderSettings() {
-  return renderRoute("/doctor/settings", "/doctor/settings", <Settings />);
+  return renderRoute(
+    "/doctor/settings",
+    "/doctor/settings",
+    <ReportFormatSettings />,
+  );
 }
 
 async function requestChange(text = REQUEST) {
-  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+  await screen.findByRole("option", { name: /レポートの形式（第/ });
   await userEvent.type(screen.getByLabelText("変えたいこと（一文）"), text);
   await userEvent.click(
     screen.getByRole("button", { name: "書き換えを依頼する" }),
   );
 }
 
-describe("Settings（D4 設定を変える）", () => {
-  it("Skill の一覧から選べる（版つき）", async () => {
+describe("ReportFormatSettings（D4 レポートの形式）", () => {
+  it("report-format の一覧から選べる（版つき。初めは report-format-default。レジメンは出さない）", async () => {
     api();
     renderSettings();
-    expect(
-      screen.getByRole("heading", { level: 1, name: "設定を変える" }),
-    ).toBeInTheDocument();
     const select = screen.getByLabelText("Skill");
     await screen.findByRole("option", {
-      name: "FOLFOX の質問集（第1版）",
+      name: "レポートの形式（第1版）",
     });
-    expect(select).toHaveValue("regimen-folfox");
-    await userEvent.selectOptions(select, "report-format-default");
     expect(select).toHaveValue("report-format-default");
+    expect(within(select).getAllByRole("option")).toHaveLength(2);
+    expect(screen.queryByRole("option", { name: /FOLFOX/ })).toBeNull();
+    await userEvent.selectOptions(select, "report-format-short");
+    expect(select).toHaveValue("report-format-short");
   });
 
   it("一文が空なら依頼できない", async () => {
     api();
     renderSettings();
-    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+    await screen.findByRole("option", { name: /レポートの形式（第/ });
     expect(
       screen.getByRole("button", { name: "書き換えを依頼する" }),
     ).toBeDisabled();
@@ -120,7 +126,7 @@ describe("Settings（D4 設定を変える）", () => {
     renderSettings();
     await requestChange();
     expect(bodiesOf(fetchMock, CREATE)).toEqual([
-      { skill_name: "regimen-folfox", request_text: REQUEST },
+      { skill_name: SKILL, request_text: REQUEST },
     ]);
     expect(screen.getByRole("status")).toHaveTextContent("生成中");
     expect(
@@ -149,7 +155,7 @@ describe("Settings（D4 設定を変える）", () => {
     );
     const status = await screen.findByText(/version 2/);
     expect(status).toHaveTextContent("次の記録から反映されます");
-    expect(status).toHaveTextContent("regimen-folfox");
+    expect(status).toHaveTextContent(SKILL);
     await waitFor(() => expect(countOf(fetchMock, SKILLS)).toBe(2));
     expect(countOf(fetchMock, CHANGES)).toBe(historyBefore + 1);
     expect(screen.queryByRole("region", { name: "差分" })).toBeNull();
@@ -285,6 +291,28 @@ describe("Settings（D4 設定を変える）", () => {
     expect(screen.getByRole("button", { name: "承認する" })).toBeEnabled();
   });
 
+  it("履歴: T95 より前のレジメンの承認待ちは「確認する」を出さず、レジメンの画面へ案内する", async () => {
+    api({
+      [CHANGES]: {
+        skill_changes: [
+          change({
+            id: 7,
+            status: "pending",
+            skill_name: "regimen-folfox",
+            requested_text: "（合成）レジメンの例",
+          }),
+        ],
+      },
+    });
+    renderSettings();
+    const table = await screen.findByRole("table", { name: "変更の履歴" });
+    const row = within(table).getAllByRole("row")[1];
+    expect(within(row).queryByRole("button", { name: "確認する" })).toBeNull();
+    expect(
+      within(row).getByText(/レジメンは「レジメン」のタブで直します/),
+    ).toBeInTheDocument();
+  });
+
   it("履歴が空ならその旨", async () => {
     api();
     renderSettings();
@@ -309,7 +337,7 @@ describe("Settings（D4 設定を変える）", () => {
   );
 
   it("Skill 一覧の応答が契約と違えば invalid_response", async () => {
-    api({ [SKILLS]: { skills: [{ name: "regimen-folfox" }], invalid: [] } });
+    api({ [SKILLS]: { skills: [{ name: SKILL }], invalid: [] } });
     renderSettings();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "invalid_response",

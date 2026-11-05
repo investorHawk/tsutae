@@ -19,7 +19,7 @@ from tsutae.db.repo_patients import (
     upsert_course_row,
     validate_new_patient,
 )
-from tsutae.schemas import Course, Entry, EntryCreate
+from tsutae.schemas import BUILTIN_REGIMENS, Course, Entry, EntryCreate
 
 
 def _to_create(entry: Entry) -> EntryCreate:
@@ -42,6 +42,8 @@ def _validate(
     entries: Sequence[Entry],
 ) -> list[EntryCreate]:
     """書く前に全て検査し、記録ごとの EntryCreate を返す。"""
+    if regimen not in BUILTIN_REGIMENS:  # 合成データは評価済みの2つだけ
+        raise ValueError(f"unknown regimen: {regimen!r}")
     validate_new_patient(regimen, patient_id)
     for course in courses:
         if not isinstance(course, Course) or course.patient_id != patient_id:

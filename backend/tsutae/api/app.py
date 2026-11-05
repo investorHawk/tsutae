@@ -1,11 +1,14 @@
 """FastAPI アプリ（docs/architecture.md §8b）。`uvicorn tsutae.api.app:app` で起動する。
 
-- `create_app(settings=None, *, runner_factory=None, skill_editor=None)`。`app.state` に
-  settings・runner_factory（既定 `SdkRunner`）・skill_editor（既定 `SdkSkillEditor`。
-  `tsutae.skillchange` が無ければ None）・skills_home を置く
+- `create_app(settings=None, *, runner_factory=None, skill_editor=None,
+  regimen_chat=None)`。`app.state` に settings・runner_factory（既定 `SdkRunner`）・
+  skill_editor（既定 `SdkSkillEditor`。`tsutae.skillchange` が無ければ None）・
+  regimen_chat（D4 レジメンの1往復。既定 `SdkRegimenChat`）・skills_home を置く
 - create_app は設定を検査する（`settings_check`。公開の構成で既定の鍵・パスワードなら
   `InsecureSettingsError` で起動しない。手元では警告だけ）
-- 起動時（lifespan）に `init_db`・`ensure_skill_versions`・`purge_expired`。起動中は
+- 起動時（lifespan）に `init_db`・`ensure_skill_versions`・`seed_question_library`
+  （質問の部品集の初期6問）・`recover_abandoned_turns`（working の取り残しを open に）・
+  `recover_interrupted_adoptions`（採用の途中の回復）・`purge_expired`。起動中は
   `PURGE_INTERVAL_S` ごとに `purge_once` を回す周期タスク（`app.state.purge_task`）を
   置き、終了時に止める（医師 API が呼ばれなくても期限切れの中身を消す）
 - 起動時（purge の後・リクエストを受ける前）に1回だけ `orphans.recover_orphans`:
@@ -15,7 +18,8 @@
   （最後のログから pipeline_timeout_s + 120 秒以上）だけを同じやり方で救う
   （稼働中に生成が DB を開けずに抜けた受診を、再起動を待たずに回収する）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
-- 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`）は、モジュールがあれば
+- 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`・
+  `tsutae.api.doctor_question_library`・`tsutae.api.doctor_regimen_drafts`）は、モジュールがあれば
   `router` を載せる（無ければ飛ばす。中の import の失敗は隠さない）
 - モジュールの `app` は初めて参照されたときに作る（`.env` もそのとき読む）
 """
@@ -43,6 +47,11 @@ from tsutae.api.settings_check import check_settings
 from tsutae.config import Settings, get_settings, load_env_file, now
 from tsutae.pipeline.runner import SdkRunner
 from tsutae.pipeline.service import ensure_skill_versions
+from tsutae.regimen.chat_sdk import SdkRegimenChat
+from tsutae.regimen.recover import (
+    recover_abandoned_turns,
+    recover_interrupted_adoptions,
+)
 
 __all__ = [
     "OPTIONAL_ROUTERS",
@@ -52,7 +61,12 @@ __all__ = [
     "startup",
 ]
 
-OPTIONAL_ROUTERS = ("tsutae.api.doctor", "tsutae.api.doctor_skills")
+OPTIONAL_ROUTERS = (
+    "tsutae.api.doctor",
+    "tsutae.api.doctor_skills",
+    "tsutae.api.doctor_question_library",
+    "tsutae.api.doctor_regimen_drafts",
+)
 SKILLCHANGE_MODULE = "tsutae.skillchange"
 PURGE_INTERVAL_S = 600.0
 _log = logging.getLogger(__name__)
@@ -65,6 +79,14 @@ def startup(settings: Settings) -> int:
     try:
         db.init_db(conn)
         ensure_skill_versions(conn, settings.skills_dir)
+        db.seed_question_library(conn)
+        # working の取り残し（前のプロセスの往復）を先に open に戻す（回復は open だけを見る）
+        abandoned = recover_abandoned_turns(conn)
+        if abandoned:
+            _log.info("往復の途中で止まった下書き %d 件を open に戻した", abandoned)
+        recovered = recover_interrupted_adoptions(conn, settings.skills_dir)
+        if recovered:
+            _log.info("採用の途中で止まった下書き %d 件を補った", recovered)
         return db.purge_expired(conn, now())
     finally:
         conn.close()
@@ -174,6 +196,7 @@ def create_app(
     *,
     runner_factory: Callable[[], Any] | None = None,
     skill_editor: Any = None,
+    regimen_chat: Any = None,
 ) -> FastAPI:
     resolved = settings if settings is not None else get_settings()
     check_settings(resolved)
@@ -188,6 +211,9 @@ def create_app(
     app.state.runner_factory = runner_factory or SdkRunner
     app.state.skill_editor = (
         skill_editor if skill_editor is not None else _default_skill_editor(resolved)
+    )
+    app.state.regimen_chat = (
+        regimen_chat if regimen_chat is not None else SdkRegimenChat(resolved)
     )
     app.state.skills_home = skills_home_of(resolved)
     install_error_handlers(app)

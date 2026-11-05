@@ -10,7 +10,11 @@ export type IsoDateTime = string;
 // 基本の列挙（schemas.py）
 // ---------------------------------------------------------------------------
 
-export type Regimen = "FOLFOX" | "CAPOX";
+/**
+ * レジメンの識別名（v1.1。FOLFOX/CAPOX に固定しない。英大文字・数字・`-`、30字まで）。
+ * 選べる一覧は GET /api/doctor/regimens（D4 で採用したレジメンも入る）。
+ */
+export type Regimen = string;
 export type ThreeLevel = "none" | "present" | "hard";
 export type FeverValue = "not_measured" | "measured";
 export type AnswerValue = ThreeLevel | FeverValue;
@@ -21,7 +25,9 @@ export type VisitStatus = "generating" | "ready" | "printed" | "failed";
 export type OpenVisitStatus = Exclude<VisitStatus, "printed">;
 export type SkillChangeStatus = "pending" | "approved" | "rejected" | "failed";
 
-export const REGIMENS: readonly Regimen[] = ["FOLFOX", "CAPOX"];
+/** 識別名の書式（schemas.py の REGIMEN_CODE_PATTERN・REGIMEN_CODE_MAX と同じ）。 */
+export const REGIMEN_CODE_PATTERN = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/;
+export const REGIMEN_CODE_MAX = 30;
 export const THREE_LEVEL_VALUES: readonly ThreeLevel[] = [
   "none",
   "present",
@@ -192,6 +198,22 @@ export interface CreatePatientRequest {
   regimen: Regimen;
 }
 
+/**
+ * GET regimens の1件（置かれていて検査に通るレジメン。T95）。
+ * skill_name は `regimen-` + 識別名の小文字、display_name は紙のヘッダ・画面の名前
+ * （SKILL.md の display_name、無ければ識別名）。並びは FOLFOX・CAPOX が先。
+ */
+export interface RegimenChoice {
+  code: Regimen;
+  skill_name: string;
+  version: number;
+  display_name: string;
+}
+
+export interface RegimensResponse {
+  regimens: RegimenChoice[];
+}
+
 export interface CreatePatientResponse {
   id: string;
   /** {public_base_url}/register?pid=<id>。QR はフロントで描く */
@@ -221,11 +243,16 @@ export interface PatientVisitsResponse {
   visits: PatientVisit[];
 }
 
-/** 患者の画面の記録のクローズ回答（コードのまま。表示名は画面で引く）。 */
+/**
+ * 患者の画面の記録のクローズ回答（コードのまま。表示名は画面で引く）。
+ * question_label はその記録の版の form の短い名前（D4 で足した質問の名前に使う。既知の
+ * 6問は画面の表が先。form の無い版は null。v1.1）。
+ */
 export interface DoctorEntryAnswer {
   question_key: string;
   value: AnswerValue;
   temperature: number | null;
+  question_label: string | null;
 }
 
 /**
@@ -447,4 +474,37 @@ export interface ApproveSkillChangeResponse {
 /** POST reject の応答（{ok: true} だけ）。 */
 export interface RejectSkillChangeResponse {
   ok: true;
+}
+
+/** 質問の部品集の出どころ（初期の6問・医師が足した・採用したレジメンから）。 */
+export type QuestionOrigin = "seed" | "doctor" | "adopted";
+
+/** 質問の部品集の1問（D4 レジメンの小窓の候補。v1.1）。 */
+export interface LibraryQuestion {
+  key: string;
+  /** 医師画面の短い名前（例: しびれ） */
+  label: string;
+  text: string;
+  answer_type: AnswerType;
+  origin: QuestionOrigin;
+}
+
+/** GET /api/doctor/question-library（外した問は含まない。初期の6問が先）。 */
+export interface QuestionLibraryResponse {
+  questions: LibraryQuestion[];
+}
+
+/**
+ * POST /api/doctor/question-library。回答の型は3択だけ（体温は初期の fever だけ）。
+ * 形・H1 に掛かれば 422 {error, field}、key の重複（外した key も）は 409 key_taken。
+ */
+export interface AddLibraryQuestionRequest {
+  key: string;
+  label: string;
+  text: string;
+  answer_type?: "three_level";
+}
+
+export interface AddLibraryQuestionResponse {
+  question: LibraryQuestion;
 }

@@ -13,6 +13,11 @@
 - 未処理（D6）は記録の原文と、疑われた語の原文の中の位置 marks と、保存済みの医師の
   伏せ字 doctor_mask（区間と確かめ。無ければ null）を返す（院内画面だけ。紙には
   載せない。位置は `doctor_marks`）。伏せ字の確かめ・保存は `unprocessed_masks`
+- `GET /regimens` は患者の登録で選べるレジメン（`skills.list_regimens` のうち skill_versions
+  に版のあるもの。識別名・Skill 名・版・表示名）。`POST /patients` はその識別名だけを受ける
+  （無ければ 422 invalid_input）。DB の版も見るのは、新規の採用（ファイルが先・DB が後）の
+  途中で登録して、DB が落ちてフォルダが消えたときに置かれていないレジメンの患者を残さない
+  ため（起動時の ensure_skill_versions が置かれた Skill を登録する）
 - 患者一覧は最後の記録日（と今日からの日数・途切れ）・今のコースと Day・次回受診も
   返す。患者の画面（D2）には、その患者の
   受診（`GET /patients/{pid}/visits`。印刷済み・期限切れも。前に `purge_expired`）と
@@ -75,7 +80,9 @@ from tsutae.api.visit import run_generation
 from tsutae.config import Settings, now, today
 from tsutae.course import CourseValidationError, validate_courses
 from tsutae.pipeline.logs import PipelineLogger
+from tsutae.regimen.labels import labels_by_version
 from tsutae.schemas import Course, Regimen
+from tsutae.skills import RegimenInfo, list_regimens
 
 __all__ = ["REPORT_HEADERS", "register_url", "router"]
 
@@ -182,10 +189,38 @@ def list_patients(conn: Conn, settings: AppSettings) -> dict[str, Any]:
     return {"patients": patients}
 
 
+def _choices(conn: sqlite3.Connection, settings: Settings) -> list[RegimenInfo]:
+    """置かれていて検査に通り、skill_versions に版のあるレジメン（T95）。"""
+    return [
+        r
+        for r in list_regimens(settings.skills_dir)
+        if db.latest_skill_version(conn, r.skill_name) is not None
+    ]
+
+
+@_protected.get("/regimens")
+def list_regimen_choices(conn: Conn, settings: AppSettings) -> dict[str, Any]:
+    """患者の登録で選べるレジメン（T95）。"""
+    return {
+        "regimens": [
+            {
+                "code": r.code,
+                "skill_name": r.skill_name,
+                "version": r.version,
+                "display_name": r.display_name,
+            }
+            for r in _choices(conn, settings)
+        ]
+    }
+
+
 @_protected.post("/patients", dependencies=[Depends(require_json_body)])
 def create_patient(
     body: PatientIn, conn: Conn, settings: AppSettings
 ) -> dict[str, str]:
+    # 選べないレジメンは書式の誤りと同じ 422（一覧は GET /regimens）
+    if body.regimen not in {r.code for r in _choices(conn, settings)}:
+        raise ApiError(422, "invalid_input")
     pid = db.create_patient(conn, body.regimen)
     return {"id": pid, "register_url": register_url(settings, pid)}
 
@@ -217,8 +252,10 @@ def list_patient_entries(pid: str, conn: Conn) -> dict[str, Any]:
     entries = db.list_entries(conn, patient["id"])
     courses = db.list_courses(conn, patient["id"])
     recent = sorted(entries, key=lambda e: (e.recorded_at, e.id), reverse=True)
+    shown = recent[:RECENT_ENTRIES_MAX]
+    labels = labels_by_version(conn, (e.skill_version for e in shown))
     return {
-        "entries": [entry_summary(e, courses) for e in recent[:RECENT_ENTRIES_MAX]],
+        "entries": [entry_summary(e, courses, labels[e.skill_version]) for e in shown],
         "total": len(entries),
     }
 

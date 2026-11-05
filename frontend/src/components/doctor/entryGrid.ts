@@ -1,7 +1,8 @@
 /**
  * 患者の画面（D2）の記録の経過表の、列と行を決める純関数（引数は書き換えない）。
  * - 列: 記録に出てくる question_key ごとに1列。既知の質問は経過表の順、知らない質問は
- *   最初に出てきた順で後ろ。質問集の版で質問が違っても、同じ key は同じ列に入る
+ *   最初に出てきた順で後ろ。質問集の版で質問が違っても、同じ key は同じ列に入る。
+ *   知らない質問の名前は記録の版の短い名前（最初に出てきたもの。v1.1）
  * - 行: 記録を新しい順に並べ、受診日（その日の最初の受付）の行を受付の時刻の位置に入れる。
  *   受付より後の記録は上、前の記録は下。受付と同じ時刻の記録は受付の前（下）とみなす
  *   （患者画面の受診日の区切りと同じ規則）
@@ -47,10 +48,14 @@ function rank(key: string, seen: readonly string[]): number {
 export function gridColumns(entries: readonly DoctorEntry[]): GridColumn[] {
   const seen: string[] = [];
   const temperature = new Set<string>();
+  const labels = new Map<string, string>();
   for (const entry of entries) {
     for (const answer of entry.answers) {
       if (!seen.includes(answer.question_key)) {
         seen.push(answer.question_key);
+      }
+      if (answer.question_label && !labels.has(answer.question_key)) {
+        labels.set(answer.question_key, answer.question_label);
       }
       if (TEMPERATURE_VALUES.includes(answer.value)) {
         temperature.add(answer.question_key);
@@ -60,7 +65,7 @@ export function gridColumns(entries: readonly DoctorEntry[]): GridColumn[] {
   const ordered = [...seen].sort((a, b) => rank(a, seen) - rank(b, seen));
   const column = (key: string): GridColumn => ({
     key,
-    label: questionLabel(key),
+    label: questionLabel(key, labels.get(key)),
     kind: temperature.has(key) ? "temperature" : "level",
   });
   const levels = ordered.filter((k) => !temperature.has(k)).map(column);

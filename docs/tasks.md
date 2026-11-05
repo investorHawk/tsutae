@@ -138,3 +138,25 @@ T03 で確かめる4点:
   3. `! .venv/bin/python scripts/run_demo_skill_change.py`（本物の Claude で D4 の書き換え。本体の SKILL.md は変えない）
   4. `! make eval`（T41。5指標の実測）→ 失敗例を見て改善（T42）
   5. T14（正解ラベルの臨床レビュー）、T80〜T84（動画・実機印刷・README の先生が書く節・ライセンス・提出）
+
+## 9. D4 レジメンの作り直し（11/5〜11/7。2026-11-04 夜に決定）
+
+- 方針・タスクの詳細: `docs/plan-d4-regimen.md`（T90〜T97）。モック: `docs/reference/d4-regimen-mock.dc.html`
+- 縦の一本 **T90 → T91 → T93 → T94 → T96**（新しいレジメンをチャットで作って採用）を先に通し、T92・T95・T97 を重ねる
+- 先生の判断: **落とさず全部作る**（補足の指示欄も含む）。間に合わないと分かったら勝手に削らず先生に確認する（候補の順は `plan-d4-regimen.md` §4）
+- 担当は全て opus。sol は読み取り専用のレビューだけ
+
+| ID | タスク | 依存 |
+|---|---|---|
+| T90 | ✅ spec.md v1.1・architecture.md §2・§4・§9c・plan の更新（4観点のレビューを反映。先生が差分を見る） | — |
+| T91 | ✅ `RegimenForm` と Jinja2 で SKILL.md を描く。FOLFOX/CAPOX とバイト一致 | — |
+| T92 | ✅ 部品集（表・seed 6 問・API） | T10 |
+| T93 | ✅ 下書き（表・API・preview・adopt。既存は版 N+1） | T91 |
+| T94 | ✅ Claude の 1 往復（Agent SDK、`set_fields`/`ask`/`propose_questions`、H1・H4） | T92, T93 |
+| T95 | ✅ 2 レジメン固定の解除（型・ローダー・DB 移行・患者登録） | T93 |
+| T96 | ✅ 画面 D4 レジメン（左フォーム・右チャット・確認・登録・小窓） | T93, T94 |
+| T97 | 通し・smoke・記録・README。smoke は 2026-11-05 に2回成功し、実測を decisions と README に記入済み。**残りはブラウザの通し（先生）** | T96 |
+
+T97 の残り（先生）:
+1. ブラウザの通し（手順は `docs/plan-d4-regimen.md` §6 の末尾）
+2. `docs/plan-d4-regimen.md` §6 の「先生に確かめてもらうこと」

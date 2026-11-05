@@ -157,7 +157,7 @@ def build_options(
         setting_sources=["project"],
         skills=[regimen_skill, report_skill],
         model=settings.model,
-        agents=build_agents(settings, regimen_skill),
+        agents=build_agents(settings, regimen_skill, term_keys=prepared.term_keys),
         mcp_servers={SERVER_NAME: build_server(collector)},
         allowed_tools=list(ALLOWED_TOOLS),
         disallowed_tools=list(DISALLOWED_TOOLS),

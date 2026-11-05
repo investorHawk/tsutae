@@ -59,6 +59,7 @@ const level = (question_key: string, value: "none" | "present" | "hard") => ({
   question_key,
   value,
   temperature: null,
+  question_label: null,
 });
 
 describe("PatientDetail の見出しと節", () => {
@@ -197,7 +198,12 @@ describe("PatientDetail の記録の経過表", () => {
             kind: "mixed",
             by_proxy: true,
             answers: [
-              { question_key: "fever", value: "measured", temperature: 38.2 },
+              {
+                question_key: "fever",
+                value: "measured",
+                temperature: 38.2,
+                question_label: null,
+              },
               level("diarrhea", "hard"),
               level("numbness", "none"),
               level("stomatitis", "present"),

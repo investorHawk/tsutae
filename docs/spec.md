@@ -1,6 +1,6 @@
 # つたえ 仕様書
 
-- 版: v1.0（2026-11-03 先生承認。v0.1 ドラフトから締切・未決4件を確定）。2026-11-04 先生の指示で「つらくて書けない」の取り消しを追記（4.1・P2・16）。同日夕方、押した後の確認と3秒の自動記録に改めた（4.1）。2026-11-04 夜、先生の指示で未処理の記載を医師が伏せ字にして変換し直せるようにした（3.2 D6・13.2・13.3・16）。同日夜、13.3 に実運用の前に決めることを追記
+- 版: v1.0（2026-11-03 先生承認。v0.1 ドラフトから締切・未決4件を確定）。2026-11-04 先生の指示で「つらくて書けない」の取り消しを追記（4.1・P2・16）。同日夕方、押した後の確認と3秒の自動記録に改めた（4.1）。2026-11-04 夜、先生の指示で未処理の記載を医師が伏せ字にして変換し直せるようにした（3.2 D6・13.2・13.3・16）。同日夜、13.3 に実運用の前に決めることを追記。**v1.1（2026-11-04 夜、先生の提案。2026-11-04 先生承認）: D4 をレジメンとレポートの形式に分け、レジメンは「左に Skill のフォーム・右に Claude とのチャット」で作る・直す画面にした。レジメンの数を FOLFOX/CAPOX の2つに固定しない（1・2・3・4・5・8・9・10・11・12・13.3・14・15・16・17・19・20。方針とタスクは `docs/plan-d4-regimen.md`）**
 - 正本の企画: `docs/reference/concept.md`。本書は実装に必要な粒度まで落としたもの。企画と矛盾する箇所は `docs/decisions.md` に理由つきで記録する
 - 大会: Built with Claude (Code): Japan 2026（提出 2026-11-08 20:00 JST、ソロ、公開リポジトリ）
 - **症例は全て合成。本書に登場する患者・記録・数値はすべて架空**
@@ -9,14 +9,14 @@
 
 ## 1. 一言で
 
-外来化学療法（FOLFOX/CAPOX）中の消化器がん患者が、毎日スマホで「つらくて書けない」ワンタップ／クローズ5問／自由記載のいずれかで記録する。受診時に患者が院内QRを読むと、Claude が記録を「暦日・コース日数・標準用語・原文引用」つきの時系列に直し、**医師が決めた形式の A4 一枚**を診察室のプリンタ（MVPでは PDF）に出す。患者のスマホには AI の文は一切出ない。
+外来化学療法（FOLFOX/CAPOX など。v1.1 から医師がレジメンを足せる）中の消化器がん患者が、毎日スマホで「つらくて書けない」ワンタップ／クローズ質問（レジメンの Skill の質問。FOLFOX は5問）／自由記載のいずれかで記録する。受診時に患者が院内QRを読むと、Claude が記録を「暦日・コース日数・標準用語・原文引用」つきの時系列に直し、**医師が決めた形式の A4 一枚**を診察室のプリンタ（MVPでは PDF）に出す。患者のスマホには AI の文は一切出ない。
 
 | 項目 | 内容 |
 |---|---|
 | 困っている人 | 外科医本人。外来で患者の話がまとまらず、聞き取りに約3分かかる |
 | 変わること | 聞き取り 約3分 → 約30秒、問診の抜けが減る（**実感値、未測定**と明記） |
 | 対象 | 外来化学療法中の消化器がん患者。末期・緩和ケアは対象外 |
-| 完走するレジメン | FOLFOX（合成データ・評価まで）。CAPOX は Skill のみ用意 |
+| 完走するレジメン | FOLFOX（合成データ・評価まで）。CAPOX と D4 で足したレジメンは Skill のみ（合成データ・評価なし） |
 
 ## 2. 用語
 
@@ -28,6 +28,10 @@
 | 変換 | 記録を時系列（timeline）とレポートに直す Agent SDK のパイプライン |
 | 要確認 | レポート冒頭に並べる、医師が最初に見るべき項目（食い違い・発熱・つらくて書けない） |
 | Skill | `.claude/skills/` 配下の SKILL.md。レジメン別の質問集・固定規則、医師別のレポート形式 |
+| 識別名 | レジメンの英大文字の名前（例 `FOLFOX`、`RAM-WPTX`）。`patients.regimen` に入り、Skill 名は `regimen-<小文字>`（v1.1） |
+| 下書き | D4 レジメンで採用前のフォーム（`regimen_drafts`）。新規、または既存の版 N から版 N+1 を作る（v1.1） |
+| 部品集 | 患者への質問の部品（key・短い名前・文・回答の型）の DB（`question_library`）（v1.1） |
+| 出どころ・標準の値 | 欄ごとの値の出どころ: 先生の文から／標準の値（Claude の知識から入れた値。採用の前に医師が確かめる）／先生が直接入れた（v1.1） |
 
 ## 3. 登場人物と画面
 
@@ -35,12 +39,12 @@
 | 画面 | 内容 | 区分 |
 |---|---|---|
 | P0 登録 | 院内で渡された登録用QR（仮名ID入りURL）を開くとスマホに仮名IDを保存。パスワードなし | 必須 |
-| P1 今日の記録 | 段階0「今日はつらくて書けない」ボタン → 段階1 クローズ5問 → 段階2 自由記載。「本人／家族が代わりに」トグル | 必須 |
+| P1 今日の記録 | 段階0「今日はつらくて書けない」ボタン → 段階1 クローズ質問（レジメンの Skill の質問。FOLFOX は5問） → 段階2 自由記載。「本人／家族が代わりに」トグル | 必須 |
 | P2 自分の記録一覧 | 入力したものを日付順に表示。編集不可（4.1 の「つらくて書けない」の取り消しだけは例外）。AIのまとめは一切出さない | 必須 |
 | P3 受診時 | 院内QRを読んで開く。当日の受付番号を入力 → 「先生に届けました」の定型文のみ | 必須 |
 | P4 固定規則の表示 | 38.0℃以上を入力した時に、施設が既に患者に渡している案内文をそのまま表示 | 必須（デモでは触れるだけ） |
 
-患者画面の文言は全て `patient_strings.json` の定型文から出す。モデル生成文字列が患者画面に届く経路は存在しない（8節 H4）。
+患者画面の文言は `patient_strings.json` の定型文と、医師が承認・採用した Skill の質問文だけ（採用した質問文は医師の文として扱う。`docs/decisions.md`）。下書き・チャットの文・変換の結果が患者画面に届く経路は無い（8節 H4）。
 
 ### 3.2 医師 Web（React、院内PCのブラウザ）
 | 画面 | 内容 | 区分 |
@@ -48,7 +52,8 @@
 | D1 患者一覧 | 仮名IDの一覧と登録用QRの発行。氏名は扱わない | 必須 |
 | D2 コース登録 | レジメン、各コースの**実投与日**、次回受診予定日。延期があればここで直す | 必須 |
 | D3 印刷待ち | 受付番号つきレポートの状態（生成中／印刷待ち／印刷済み）。印刷ボタン（ブラウザ印刷 → PDF）。「印刷済み」でレポートを削除 | 必須 |
-| D4 設定を変える | 一文を入力（例:「口内炎は、食事がとれたかも次から聞いて」）→ Agent SDK が SKILL.md を書き換え → **差分を表示 → 医師が承認** → 次の記録から反映（2026-11-04 変更） | 必須（目玉） |
+| D4 設定を変える — レジメン | 左にレジメンの Skill をフォームで見せ（基本・投与スケジュール・副作用・患者への質問・補足の指示）、右の Claude とのチャットで作る・直す。新しいレジメンも既存の版の書き換えもここ。Claude は欄の値だけを入れ、迷ったら欄を指して選択肢つきで聞く。**確認の画面で AI が入れた値の一覧・SKILL.md（新規は全文、既存は差分）・患者のスマホの見本を見て医師が採用** → 次の記録から反映（9節。v1.1） | 必須（目玉） |
+| D4 設定を変える — レポートの形式 | 一文を入力 → Agent SDK が report-format の SKILL.md を書き換え → **差分を表示 → 医師が承認**（v1.0 の D4 のまま。レジメンには使わない） | 必須 |
 | D5 パイプライン可視化 | 変換中のサブエージェント3役と Hook の発火ログ | 必須（デモ用） |
 | D6 未処理の記載 | 伏せ字漏れの疑いで Claude に送らなかった記録の**原文**を院内画面で表示（原文は紙には載せない）。医師が伏せる所を選ぶ（疑われた語は初めから伏せる）か、「個人を特定する語は無いことを確かめた」を押せば、その記録を `[伏せ字]` にして Claude で変換し直し、紙の時系列・食い違い・引用に載せられる（医師は文を書かず、伏せる区間だけを選ぶ。2026-11-04 夜） | 必須 |
 
@@ -62,7 +67,7 @@
 | 段階 | 内容 | 保存される事実 |
 |---|---|---|
 | 0 | 「今日はつらくて書けない」1ボタン | `entry.kind = "too_sick"`。これだけで終了できる |
-| 1 | クローズ5問（大きなボタン、3択） | 各質問に `none / present / hard` |
+| 1 | クローズ質問（大きなボタン、3択。FOLFOX は5問、体温は数値） | 各質問に `none / present / hard` |
 | 2 | 自由記載（テキスト。音声は MVP 外） | 原文をそのまま保存 |
 
 - 「今日はつらくて書けない」を押すと確認を出す。ほかに何も入れていなければ、確認の「はい」が3秒で満ちていき、3秒たつと自動で記録する（「やめる」で止められる）。入れた内容があれば、それは送らないことを確認し、「はい」を押した時だけ記録する。記録した後に「取り消す」を出す。取り消せるのは本人の「つらくて書けない」の記録で、作ってから10分以内・その後に受付が無いものだけ（押し間違いを戻すためのもの。他の記録は消せず、P2 の「編集不可」と 13.3 の保持はそれ以外の記録にそのまま当てはまる）
@@ -80,7 +85,7 @@
 | fever | 熱を測りましたか | 測っていない／測った（→体温を数値入力） |
 
 - 「つらい」は患者の主観として引用扱い。Grade ではない
-- 質問集は `.claude/skills/regimen-folfox/SKILL.md` が正本。アプリは Skill を読んで画面を組む
+- 質問集は患者のレジメンの Skill（FOLFOX は `.claude/skills/regimen-folfox/SKILL.md`）が正本。アプリは Skill を読んで画面を組む
 - CAPOX Skill には手足症候群を追加した質問集を置く（合成データ・評価は作らない）
 
 ### 4.3 記録と Skill のバージョン
@@ -89,9 +94,12 @@
 
 ## 5. コースと Day
 
-- 投与日を Day1、次の投与前日まで（FOLFOX は Day1〜14 が標準）
+- コースの Day1 の実投与日を Day1 とし、次コースの実投与日の前日まで（FOLFOX は Day1〜14 が標準）
 - 延期・スキップは医師が D2 で実投与日を登録し、Day はそこから数え直す。レポートに「延期（予定より○日）」と注記。AI は延期の理由を推測しない
-- 相対時間表現の変換は、記録日・コースの実投与日・ポンプ抜去日（Day3）を手がかりに暦日に直す
+- 相対時間表現の変換は、記録日・コースの実投与日・レジメンの投与スケジュール（点滴の日・内服の期間・ポンプ抜去日。FOLFOX は Day3）を手がかりに暦日に直す
+- 1コースの日数・点滴の日・内服の期間・ポンプの有無はレジメンの Skill が持つ（9節）。コース内で点滴が複数回ある（例: Day1・8・15）、内服が途中で休む（例: Day1〜5・8〜12）レジメンも扱う（v1.1）
+- **D2 で登録するのは各コースの Day1 の実投与日だけ**。Day8・15 などコース内の2回目以降の点滴は Skill の予定の Day として扱い、実際に点滴したか・延期したかは記録しない（範囲外、20節）
+- 回が決まらない言い方（「点滴の日」など）は記録日以前で最も近い予定の Day に直し、confidence をレポート形式の「？」の境目（今は 0.6）より下げる。紙で「？」が付くので、医師がスキップの有無を確かめる
 
 ## 6. 受診時の流れ
 
@@ -138,8 +146,8 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 |---|---|---|---|---|
 | H1 | `UserPromptSubmit` | 厳格検出器（13.2）で識別子らしき文字列を見つけたらプロンプト全体を止める | 伏せ字漏れが Claude に届かない最後の砦 | 検出器の網羅性。辞書にない姓は規則で拾えないことがある |
 | H2 | `PreToolUse` matcher `^mcp__tsutae__emit_(timeline\|report)$`（カスタムツールは MCP 経由なので `mcp__<server>__<tool>` 名になる） | 引用のない症状記載、原文に一致しない引用を `deny` | 引用なし・捏造引用がレポートに載らない | 引用の切り取り方の妥当性 |
-| H3 | `PreToolUse` matcher `Write\|Edit` | D4 の Skill 書き換えで、書き込み先を `.claude/skills/<regimen|report-format>/` 配下に限定 | エージェントがサーバーの他のファイルを書けない | — |
-| H4 | `PreToolUse`（パイプライン全体） | 患者向け API・`patient_strings.json`・患者テーブルへ書くツールを `deny` | エージェントが患者向け経路に書かない | 患者画面に AI 文が出ないことの**本体はアーキテクチャ**（患者 API は `reports`・`timelines` を読まない）。Hook は補助 |
+| H3 | `PreToolUse` matcher `Write\|Edit` | D4 レポートの形式の書き換えで、書き込み先を作業コピーの SKILL.md ちょうど1つに限定。**D4 レジメンのチャットはファイルを書かないので使わない**（v1.1） | エージェントがサーバーの他のファイルを書けない | — |
+| H4 | `PreToolUse`（パイプライン全体） | 許可したツール以外を `deny`。変換は Task・Agent・Skill と emit 系、D4 レポートの形式は Read・Edit・Write、**D4 レジメンのチャットは `mcp__tsutae_regimen__{set_fields,ask,propose_questions}` の3つだけ（サブエージェント無し）**（v1.1）。患者向け API・`patient_strings.json`・患者テーブルへ書くツールは無い | エージェントが患者向け経路・ファイルに書かない | 患者画面に AI 文が出ないことの**本体はアーキテクチャ**（患者 API は `reports`・`timelines` を読まない。患者に届く質問文は医師が採用した版だけ）。Hook は補助 |
 
 - 伏せ字の**置換規則**（13.2 の一次処理）と H1 の**検出規則**は別物にする。同じ規則だと H1 は永遠に発火せず、検証もできない
 - Hook の発火は D5 とテストで確認できるようログを残す（文面は残さない）
@@ -150,23 +158,74 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 |---|---|---|
 | regimen-folfox | `.claude/skills/regimen-folfox/SKILL.md` | 投与スケジュール、クローズ質問集（4.2）、固定規則（11節）、`version` |
 | regimen-capox | `.claude/skills/regimen-capox/SKILL.md` | 同上（3週、手足症候群あり）。合成データは作らない |
+| regimen-<名前>（v1.1） | `.claude/skills/regimen-<名前>/SKILL.md` | D4 レジメンで医師が足したもの。数に上限を置かない。合成データ・評価は作らない |
 | report-format-default | `.claude/skills/report-format-default/SKILL.md` | 10節のレポート形式を自然言語で記述。医師別形式は MVP では1名分 |
 
-**書き換えループ（D4）**
+- SKILL.md は YAML frontmatter（アプリが読む設定）と本文（エージェントが読む指示）を持つ。アプリは frontmatter だけを読む（例外: D4 レジメンの一覧と編集は 9.1 の form JSON を読む）。書き換え・採用のたびにバリデータ（frontmatter の構造検査）を通す。壊れた Skill は差分を出さず失敗にする
+
+### 9.1 D4 レジメン — フォームとチャット（v1.1）
+
+**フォームが正本。SKILL.md はフォームの値からコードが決まった形（Jinja2）で描く。Claude に SKILL.md を書かせない。**
+`regimen-folfox@1`・`regimen-capox@1` を同じ描き方で描くと今の SKILL.md と**1バイトも違わない**ことをテストで保証し、評価済みの版は上げない。
+
+フォームの欄（`RegimenForm`）:
+
+| 節 | 欄 | 必須 |
+|---|---|---|
+| 基本 | 表示名（例: FOLFIRI＋BV）・識別名（英大文字・数字・`-`。新規の下書きでだけ入れられ、既存の版では変えられない。既存の Skill・開いている別の下書きと同じなら欄のエラー）・対象（任意。例: 大腸がん。画面と一覧だけに使い SKILL.md には描かない）・1コースの日数（7〜42） | 対象以外 |
+| 投与スケジュール | 薬ごとに 名前・経路（点滴／内服／持続ポンプ）・Day の範囲（複数可。例: `Day1・8・15`、`Day1〜5・8〜12`）・内服の回数・飲み始め（内服のとき必須。例: CAPOX は「Day1 の夕方から」）。**薬の量は持たない**（数値＋量の単位 mg・mg/m²・mg/kg・g・mL・AUC・単位 を含む値は拒否） | 1剤以上 |
+| 副作用（注意する症状） | 患者の言い方の例・CTCAE v5.0 JCOG版の用語（アプリの一覧 `ctcae_terms.json` から選ぶ。一覧に無い語は拒否。一覧に語を足すのは先生の確認が要る）・対応する質問（このレジメンの質問から選ぶ。無ければ「なし」） | 1つ以上 |
+| 患者への質問 | 部品集（下）から選ぶか新しく作る。短い名前・患者に出る文・回答の型（3択／体温）。新しい下書きは体温の質問（38.0℃の固定規則の対象。11節）を初めから持ち、外せない | 1問以上 |
+| 補足の指示 | 型に入らない施設の決まりを自由記載（例: 内服の期間は人ごとに違う）。空でなければ本文の最後に「補足の指示」の節として描く | 任意 |
+
+**投与スケジュールの検査**: Day1 に点滴を1剤以上置く（Day1 = 実投与日を守るため）。持続ポンプは1剤まで・範囲は1つで Day1 から（その最後の Day がポンプ抜去日）。内服は1剤まで。範囲は重ならず、1コースの日数の中に収める。内服だけのレジメンは範囲外（20節）
+
+**SKILL.md に何を置くか**:
+- frontmatter の鍵は v1.0 と同じ（name・description・version・regimen・cycle_days・pump_removal_day・questions{key,text,answer_type}・fixed_rules）に、任意の2つだけを足す: `display_name`（識別名と違うときだけ書く）と `term_keys`（用語→質問 key の対応のうち、全体の対応 `ctcae_terms.json` と違うものだけ）。FOLFOX/CAPOX@1 はどちらも書かない
+- 表示名以外の欄（対象・薬・Day の範囲・副作用・質問の短い名前・補足の指示）は **form JSON**（`regimen_forms` 表。FOLFOX/CAPOX@1 はリポジトリの `regimen_forms/*.json`）に持ち、本文に描く。アプリが本文を読み戻して解析することはしない
+- 描くのはフォームの値と版だけで決まる（部品集も DB も見ない純関数）。質問の短い名前は frontmatter に書かない。form JSON には採用した時の短い名前・文を写して持つ
+- FOLFOX/CAPOX の本文にあってフォームの欄に無い文（CAPOX の冒頭の注記、「（3週）」、点滴の日の括弧の中、46時間の持続ポンプの文、improving・食い違いの例文 など）は、画面に出さない**描画用の文**（`prose`）として form JSON に持つ。Claude も医師も書けない。新しいレジメンでは既定の文（例文は副作用の1つ目から作る）を使い、既存の版 N+1 では版 N の `prose` を引き継ぐ
+- 日付の言い方の表（「飲み薬が終わった日」→ 内服の最後の Day、「ポンプを外した日」→ 抜去日、「飲み薬が休みの日」→ 内服の範囲の間 など）は投与スケジュールから**コードが**決まった規則で作る（architecture 9c）
+- **値の形の検査**: frontmatter と本文の表に入る値は1行で、そのまま読み戻せるものに限る（YAML に入れて読み戻して同じ値か・表のセルに改行と `|` が無いかをコードで確かめる）。通らなければ欄の id と理由をつけて拒否する
+
+**用語と質問の対応（v1.1）**: 変換の検査（出来事の question_key）と紙の検査は、その記録の Skill の版の対応（全体の対応 ＋ その版の `term_keys`）を使う。これで、D4 で足した質問（例: だるさ）に自由記載の出来事をつなげられる
+
+**質問の部品集**: 質問の key・短い名前・患者に出る文・回答の型を DB に持つ。初期値は今の6問。短い名前は医師画面の名前（しびれ・下痢・口内炎・吐き気・食欲・手のひら・足の裏・体温）を正本にする。紙の経過表は既知の6問は今の短い名前（10節）、それ以外は版の form JSON の短い名前。患者画面は今のまま `patient_strings.json` の症状名、無ければ採用した質問文。採用したレジメンの新しい質問は部品集にも入る。部品集の削除は選択肢から外すだけ（行は残す。初期の6問と、どれかの版が使っている key は消せない。消した key は作り直せない）
+
+**出どころ**: 欄ごとに 先生の文から／標準の値（Claude の知識）／先生が直接入れた を持つ。行（薬・副作用・質問）は変わらない id を持ち、出どころはその id で引く（行を消すと出どころも消える）。標準の値は画面で橙の点線にし、採用の前に確かめる
+
+**チャットの1往復**
+1. 医師がチャットに書いて送る（⌘+Enter か Ctrl+Enter、または送るボタン。Enter・Shift+Enter・Option+Enter は改行。日本語変換中は送らない）。または左の欄を直接直す
+2. **下書きに入る文は全て、入る前に H1 の検出（13.2 の二次検出）に通す**: チャットの文・欄の直接入力・Claude のツールの値。掛かれば保存も送信もせず、掛かった欄の id と規則の種類（文面は返さない）を返す。さらに `query()` の前に、アプリが作った依頼文の全体にもコードで同じ検査を掛け、掛かれば Claude を呼ばずにその往復を失敗にする（変換と同じ二重の検査）。依頼文では Day を `{start, end}` の組で渡し、もとの版を `regimen-folfox@1` の形で書かない（検出の誤検知を避ける）
+3. Agent SDK `query()` を1回だけ回す（応答まで待つ。上限は専用の短い時間）。渡すもの: 今のフォームと出どころ・直近の会話・部品集・CTCAE の一覧。エージェントが使えるのは同一プロセスの MCP ツール3つだけ（H4）:
+   - `set_fields`: 欄に値を入れる（出どころ必須。先生が直接入れた欄は、先生の文が書き換えを頼んでいるときだけ）
+   - `ask`: 欄を1つ指して、選択肢つきで1問聞く（画面ではその欄が赤枠になる。医師は選択肢・チャット・欄への直接入力のどれでも答えられる）
+   - `propose_questions`: 基本・投与スケジュール・副作用がそろってから、副作用をもとに患者への質問を提案する（部品集を優先。新しい質問は部品集に無いものだけ。PRO-CTCAE の文言を写さない・患者への助言を書かない）
+4. 値はコードが pydantic と規則（上の検査・H1・薬の量・値の形）で検査し、通らなければ理由を返して同じ会話の中で直させる。通った値だけを下書きに入れ、Claude の返答（院内の画面だけに出る）と一緒に保存する。Claude の返答が検出に掛かったときは画面に出さず、次の依頼文の会話にも入れない
+5. 応答の間は左の欄の編集・確認・採用・破棄ができない（409）。往復が失敗（時間切れ・SDK の失敗・予算超過・検出）したら下書きを元に戻し、会話に失敗の行を残す。遅れて届いた古い往復の結果は反映しない（往復ごとの世代番号）。止めて待つ方式（`AskUserQuestion`）は使わない
+
+**採用**
+- 必須の欄が全てそろうと「確認へ進む」が押せる。確認の画面に (1) AI が入れた値の一覧（標準の値だけ。先生の文から入れた値は出さない。フォームの行ごとに1行にまとめ、行ごとに削除できる。削除はその行か欄を消す直接編集で、必須が欠ければ確認へ戻る。チェック1回で確かめる）、(2) SKILL.md（新規は全文、既存は今の版との unified diff）、(3) 患者のスマホの見本、(4) 検査の結果 を出す
+- **確かめは確認の画面に出した版に結びつける**: 確認の画面は下書きの値と出どころから作った印（ハッシュ）を持ち、採用はその印と「確かめた」を送る。サーバーは採用の時に、必須の検査・描画とバリデータ・印の照合・版の古さ（stale）をやり直し、どれかが違えば 409。確かめた後にチャットや直接編集で値が変わった下書きは、確認の画面を出し直さないと採用できない
+- 採用で、新規は Skill のフォルダ（既にあれば 409）・`skill_versions` の版1・form JSON を作る。既存は版 N+1。**採用するまで患者の画面は変わらない**。変わるのは次の記録から。それまでの記録は当時の版の質問集で表示・集計する（4.3）
+- 1コースの日数と投与スケジュールは、過去のコースも今の版で計算する（レポートの Day・列）。そのため、**患者が登録されているレジメンの版 N+1 では、1コースの日数・薬の Day・ポンプ抜去日を変えられない**（確認の検査で止める。変えるときは新しいレジメンとして作る）
+- 下書きはいつでも捨てられる。既存の版から作った下書きは1レジメンに1つまで。新規の下書きは識別名が決まるまでレジメンを持たない
+- アプリは git commit をしない。版の履歴は `skill_versions` に全文で残す
+
+### 9.2 D4 レポートの形式 — 書き換えループ（v1.0 のまま）
 1. 医師が一文入力 → Agent SDK `query()`（`allowed_tools=["Read","Edit","Write"]`, H3 付き）が該当 SKILL.md を編集
 2. サーバーが差分（unified diff）を D4 に表示 → 医師が承認／却下
-3. 承認で `version` を上げ、次の記録から新しい質問集が出る（2026-11-04 変更。記録ごとに版を持つので、それまでの記録は当時の質問集で表示する）。レポートの列も変わる
-4. 却下なら一時コピーを捨てるだけ（本体は触っていない）。承認時に本体へ書き込み、コミットする（Skill は git 管理）
-
-- 書き換えはエージェントに**一時コピー**を編集させ、サーバーがバリデータ（frontmatter の `version`・`questions` の構造検査）を通してから差分を作る。壊れた Skill は差分を出さず失敗にする
-- SKILL.md は YAML frontmatter に `version` と `questions`（key・文言・回答型）を持ち、本文に自然言語の説明を置く。アプリは frontmatter だけを読む
+3. 承認で `version` を上げ、次の受診のレポートから新しい形式で描く
+4. 却下なら一時コピーを捨てるだけ（本体は触っていない）。承認時に本体へ書き込む（git commit はしない。版の履歴は `skill_versions`。2026-11-04 変更）
+- 書き換えはエージェントに**一時コピー**を編集させ、サーバーがバリデータを通してから差分を作る
+- v1.1 から、このループは report-format にだけ使う。`POST /api/doctor/skill-changes` に regimen の Skill を渡すと 400（`use_regimen_editor`）。レジメンは 9.1
 
 ## 10. レポート仕様（A4 一枚、モノクロ印刷前提）
 
 上から:
 1. **ヘッダ**: 受付番号、仮名ID、レジメン、コース番号と期間、記録日数（例: 11日/14日、内訳: 入力なし2・つらくて書けない1）、延期注記、`fallback` なら「AI変換なし」
 2. **要確認**: ▲ 食い違い（Day、クローズ回答、自由記載の引用）／▲ 発熱（Day、体温）／● つらくて書けない（Day、前コースの同じ Day にもあれば併記）／未処理の記載あり（件数のみ）
-3. **経過表**: 行=質問5項目＋体温、列=Day1〜14。今コースの下に前コースの行を並べる
+3. **経過表**: 行=レジメンの質問（体温を含む。FOLFOX は質問5項目＋体温）、列=Day1〜そのコースの最後の日（1段は21列まで。超えたら段を分けて折り返す。28日なら21＋7）。今コースの下に前コースの行を並べる。A4 一枚に収まることを確かめたのは14日のコース（21日を超えるコースは2枚にまたがることがある）
    - セル: なし=薄い「−」、ある=網掛け、つらい=濃い網掛け、入力なし=空白、未設問=「−−」
    - 「つらくて書けない」の日は列全体を斜線
    - 自由記載にその症状の記述があれば ○ を重ねる（クローズ「なし」の上の ○ は食い違いとして目で分かる）
@@ -181,7 +240,7 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 
 ## 11. 緊急時の固定規則
 
-- `regimen-folfox` Skill に施設が書いた規則を置く。MVP は1本: **体温 38.0℃以上の入力 → 施設が既に患者に渡している案内文をそのまま表示**
+- 各レジメンの Skill の `fixed_rules` に置く。どのレジメンにもコードが必ず描き、フォームで外せない（v1.1）。MVP は1本: **体温 38.0℃以上の入力 → 施設が既に患者に渡している案内文をそのまま表示**
 - 判定はコードの閾値比較。モデルは関与しない。文面は施設の案内文をそのまま使い、アプリは一文字も足さない
 - デモの文面（架空。`patient_strings.json` に置く）: 「【デモ用・架空の施設の案内です】体温が38.0℃以上のときは、お渡ししている「連絡先カード」の番号にお電話ください。」。施設名・電話番号は入れない
 - 受診と受診の間に医療機関へ通知する機能は対象外（責任を伴う見守りサービスになるため）。README に施設が決めることとして書く
@@ -197,6 +256,7 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 6. 延期の理由、症状の原因、治療の効果を推測しない
 7. 患者に助言しない。患者向け文言は定型文のみ
 8. 受診と受診の間に医療機関へ通知しない
+9. レジメンの設定（D4）で、Claude が知識から入れた値（標準の値）は医師が確かめるまで採用できない。薬の量は扱わない。患者に届くのは医師が採用した質問文だけ（v1.1）
 
 ## 13. 患者情報の扱い（必須節）
 
@@ -218,6 +278,7 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 - 変換結果とレポート: 印刷済み操作または 24 時間 TTL で削除。受付番号も同時に削除
 - 医師の伏せ字と確かめ（D6。受診ごとの `doctor_masks`。位置と確かめの印だけで文面は持たない）: レポートと同じく印刷済み操作または 24 時間 TTL で、同じトランザクションで削除
 - 変換ログ: Hook の発火・所要時間・トークン数のみ残す。文面は残さない
+- D4 レジメンの会話（`regimen_drafts` の会話。院内の画面だけに出す。v1.1）: 採用または破棄で文面を消し、往復の回数・費用・秒だけを残す。フォームの値と出どころは採用した版の form JSON に残る。会話のログ（`pipeline_logs` の `regimen_chat`）は文面なし
 - API 側のデータ保持は Anthropic の方針に従う。**本プロジェクトは合成データのみで運用し、実患者データを送らない**
 - **実運用の前に決めること（MVP では作っていない）**。デモは合成データだけなので問題にならないが、実患者で使う前に必要:
   1. 生の記録の保持期限（例: 治療の終了から一定期間で削除）。今は期限なしで残る
@@ -238,13 +299,13 @@ report: { header, attention[], grid, per_symptom[], quotes[], fallback: bool }
 | 自由記載 | AI が要約 | 事後に人が当てはめる、または扱わない | **引用つき**で標準用語に当てはめ、クローズ回答との**食い違いを解決せずに示す** |
 | 欠けた日 | 扱わない | 未回答 | **情報として表示**（入力なし／つらくて書けない／症状なし／未設問を区別） |
 | 出力 | 患者が持ってくる要約 | ダッシュボード、アラート | **医師が決めた形式の紙**。QR → 診察室に印刷。電子カルテ連携不要 |
-| 設定 | なし | ベンダーが設定 | **医師が自然言語で Skill を書き換える** |
+| 設定 | なし | ベンダーが設定 | **医師がフォームと Claude とのチャットでレジメンの Skill を作り・直す（レポートの形式は一文で）** |
 | 患者への AI 文 | 会話・助言する | アラート | **出さない** |
 
 ## 15. データモデル（SQLite）
 
 ```
-patients(id TEXT PK=仮名ID, regimen TEXT, created_at)
+patients(id TEXT PK=仮名ID, regimen TEXT, created_at)   -- v1.1: regimen は FOLFOX/CAPOX に限らない（読み込んだ regimen Skill の識別名と照合）。既存 DB の CHECK は表を作り直して外し、行は移す
 courses(id, patient_id, course_no, infusion_date DATE, planned_date DATE, next_visit DATE, note)
 entries(id, patient_id, recorded_at DATETIME, target_date DATE NULL, kind TEXT[too_sick|answers|free_text],
         by_proxy BOOL, skill_version TEXT)
@@ -255,8 +316,13 @@ visits(id, patient_id, reception_no TEXT, created_at, status TEXT[generating|rea
 timelines(visit_id, json TEXT)      -- 印刷済み/TTL で削除
 reports(visit_id, html TEXT)        -- 同上
 doctor_masks(visit_id, entry_id, spans_json, confirmed_clear, allowed_json, created_at)  -- D6 の医師の伏せ字（位置だけ。同上で削除）
-pipeline_logs(visit_id, event TEXT, hook_name TEXT NULL, duration_ms, tokens_in, tokens_out)  -- 文面なし
-skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pending|approved|rejected], created_at)
+pipeline_logs(run_kind TEXT[visit|skill_change|regimen_chat], run_id, event TEXT, hook_name TEXT NULL, duration_ms, tokens_in, tokens_out)  -- 文面なし。regimen_chat は v1.1（既存 DB は表を作り直して CHECK を広げる）
+skill_changes(id, skill_name, requested_text, diff, new_text, base_version, new_version, status TEXT[pending|approved|rejected|failed], error_code, created_at, decided_at)  -- v1.1 から report-format だけ
+skill_versions(skill_name, version, content, questions_json, approved_at)  -- 採用・承認した版の全文
+regimen_forms(skill_name, version, form_json, sources_json, created_at, PK(skill_name, version))  -- v1.1。D4 で採用した版のフォーム（FOLFOX/CAPOX@1 はリポジトリの JSON）
+regimen_drafts(id, regimen TEXT NULL, base_skill TEXT NULL, base_version INT NULL, form_json, sources_json, chat_json,
+               generation INT, status TEXT[open|working|adopted|discarded], turns, cost_usd, created_at, updated_at)  -- v1.1。regimen は新規で識別名が決まるまで NULL
+question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|adopted], hidden BOOL, created_at)  -- v1.1
 ```
 
 ## 16. API（FastAPI、要点）
@@ -272,15 +338,24 @@ skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pendin
 | `GET /api/doctor/visits/{id}/report` | レポート HTML | reports |
 | `POST /api/doctor/visits/{id}/printed` | 印刷済み → 削除 | visits, reports, timelines |
 | `POST /api/doctor/courses` | 実投与日の登録 | courses |
-| `POST /api/doctor/skill-changes` | 一文 → Skill 書き換え → 差分 | skill_changes |
+| `POST /api/doctor/skill-changes` | 一文 → Skill 書き換え → 差分（v1.1 から report-format だけ。regimen は 400 `use_regimen_editor`） | skill_changes |
 | `POST /api/doctor/skill-changes/{id}/approve` | 承認 | skill_changes |
+| `GET /api/doctor/regimens` | レジメンの一覧（識別名・表示名・版。患者登録の選択肢にも使う）（v1.1） | — |
+| `POST /api/doctor/regimen-drafts` | 下書きを作る（新規、または既存の版から。開いた下書きがあればそれを返す。採用済みの版のフォームもこの応答で読む）（v1.1） | regimen_drafts |
+| `GET /api/doctor/regimen-drafts/{id}` | 下書き（フォーム・出どころ・会話・状態） | regimen_drafts |
+| `PATCH /api/doctor/regimen-drafts/{id}/fields` | 欄の直接編集・行の削除（`null`）。H1 などの検査に掛かれば 422 で欄の id。応答中は 409 | regimen_drafts |
+| `POST /api/doctor/regimen-drafts/{id}/turns` | チャットの1往復（H1 → Agent SDK → 検査 → 反映） | regimen_drafts, question_library, pipeline_logs |
+| `GET /api/doctor/regimen-drafts/{id}/preview` | AI が入れた値の一覧・SKILL.md（全文 or 差分）・患者の見本・検査結果・確認の印 | regimen_drafts, skill_versions |
+| `POST /api/doctor/regimen-drafts/{id}/adopt` | 採用（`{confirm_token, ai_values_confirmed}`。印が今の下書きと違う・確かめが無い・検査に通らなければ 409） | regimen_drafts, skill_versions, regimen_forms, question_library |
+| `POST /api/doctor/regimen-drafts/{id}/discard` | 下書きを捨てる | regimen_drafts |
+| `GET/POST/DELETE /api/doctor/question-library` | 質問の部品集（v1.1。DELETE は選択肢から外すだけ。初期の6問・使われている key は 409） | question_library |
 | `GET /api/doctor/visits/{id}/unprocessed` | D6 の原文・疑われた語の位置・保存済みの医師の伏せ字 | timelines, entries 系, doctor_masks |
 | `POST /api/doctor/visits/{id}/masks/check` | D6 の伏せる区間を当てた後の、送られる文とまだ疑われる語（保存しない） | entries 系, timelines, doctor_masks |
 | `POST /api/doctor/visits/{id}/masks` | D6 の医師の伏せ字・確かめを保存（送らない記録は消す。閉じた受診は 409） | doctor_masks, pipeline_logs |
 | `POST /api/doctor/visits/{id}/regenerate` | AI でもう一度変換（失敗・AI変換なし・医師の伏せ字あり） | visits, doctor_masks |
 | `GET /api/doctor/pipeline/{visit_id}/events` | D5 用のログ（SSE） | pipeline_logs |
 
-- `/api/patient/*` は `reports`・`timelines` を**インポートしない**（アーキテクチャテストで保証）
+- `/api/patient/*` は `reports`・`timelines`・`regimen_drafts` を**読まない**（アーキテクチャテストで保証。v1.1 で `regimen_drafts` を足す）
 - 医師 API は環境変数の単一パスワード（デモ用）
 
 ## 17. 合成データと精度評価
@@ -293,6 +368,7 @@ skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pendin
 
 - 合計約42日分、自由記載約60件。各記載に正解ラベル（暦日・Day・用語・食い違い・否定の有無・引用）を JSON で付ける
 - 必須で埋め込む難ケース: (a) クローズ「なし」と自由記載の矛盾、(b) 軽い・改善中の症状（「しびれはだいぶ楽」）、(c) 相対時間表現（「点滴の次の日から」「先週木曜まで」「ポンプを外した日」）、(d) 否定表現（「吐き気はなかった」）
+- **D4 レジメンのデモ・テストで足す例（v1.1、先生の指定）**: 胃がんの RAM＋wPTX（ラムシルマブ＋毎週パクリタキセル）、大腸がんの FOLFIRI＋BV（ベバシズマブ）、大腸がんのロンサーフ＋BV。投与スケジュールの値はテストとデモのための例で、先生が確かめる。この3つの合成記録・評価は作らない
 
 ### 17.2 指標（合格ラインは置かず実測値と失敗例を出す）
 1. 日付正規化の一致率（暦日と Day）
@@ -317,13 +393,13 @@ skill_changes(id, skill_name, requested_text TEXT, diff TEXT, status TEXT[pendin
 | バックエンド | Python 3.12（uv で導入。システムの 3.9 は使わない）、FastAPI、SQLite、`claude-agent-sdk` |
 | フロント | React + Vite + TypeScript、印刷 CSS。患者用と医師用は同一アプリの別ルート |
 | 認証 | 患者: 仮名ID の Cookie／医師: 環境変数パスワード |
-| 変換 | Agent SDK（主エージェント＋サブエージェント3役＋カスタムツール＋Hook 4本＋Skill 3本）。モデルは `claude-opus-5-5` を既定とし、サブエージェントは `claude-sonnet-5-5` で試す |
+| 変換 | Agent SDK（主エージェント＋サブエージェント3役＋カスタムツール＋Hook 4本＋Skill はレジメンの数＋レポートの形式）。モデルは `claude-opus-5-5` を既定とし、サブエージェントは `claude-sonnet-5-5` で試す |
 | 印刷 | HTML → ブラウザ印刷 → PDF。実機印刷は別 Mac で行い動画に収める |
 | 開発 | Claude Code。公開コミットとテスト件数で示す |
 
 ## 20. 範囲外と余力
 
-**範囲外（README に明記）**: 音声入力、PWA、電子カルテ連携、受診間の通知、患者への助言、CAPOX の合成データ・評価、医師2名以上の形式
+**範囲外（README に明記）**: 音声入力、PWA、電子カルテ連携、受診間の通知、患者への助言、CAPOX と D4 で足したレジメンの合成データ・評価、医師2名以上の形式、薬の量の管理、レジメンの削除（採用した版は残す）、コース内の2回目以降の点滴（Day8・15 など）の延期・中止の記録、内服だけのレジメン、数値の回答（血圧など。回答の型は3択と体温だけ）
 
 **余力（優先順）**: ① 診察室プリンタへの自動印刷（`lp` を叩く常駐スクリプト）、② 前コースの AI 変換結果の表示（現状はクローズのみ）、③ Playwright E2E、④ 印刷用端末の MCP サーバー化
 

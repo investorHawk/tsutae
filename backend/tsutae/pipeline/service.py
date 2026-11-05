@@ -3,8 +3,10 @@
 `generate_visit_report` の手順:
 1. 受診を読む。無い・受付番号が消えている（印刷済み・期限切れ）・expires_at を
    過ぎている（purge 前）なら何もしない（Claude を呼ばない）
-2. 患者・コース・記録・Skill（今の SKILL.md）・版ごとの質問集（skill_versions）・
-   その受診の医師の伏せ字（doctor_masks。D6）を集め、
+2. 患者・コース・記録・Skill（今の SKILL.md）・版ごとの質問集と記録の版の Skill
+   （用語 → 質問 key の対応を記録ごとに引く。skill_versions。`pipeline.versions`）・
+   その受診の医師の伏せ字（doctor_masks。D6）・今の版の form の質問の短い名前（紙の行名。
+   D4 で採用した版と FOLFOX/CAPOX@1。旧 D4 の版は無いので質問文。v1.1）を集め、
    `prepare_input(exclude_literals=(仮名ID, 受付番号), doctor_masks=...)`。受付番号・
    仮名IDは Claude に送らない（自由記載に含む記録は known_identifier で外れる。§7 W2b）。
    医師の伏せ字は手順4の `build_report_data` にも同じものを渡す（片方だけだと
@@ -35,9 +37,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import sqlite3
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -51,6 +52,12 @@ from tsutae.pipeline.inputs import prepare_input
 from tsutae.pipeline.logs import EventLogger, PipelineLogger, reason_code
 from tsutae.pipeline.orchestrator import convert
 from tsutae.pipeline.runner import AgentRunner
+from tsutae.pipeline.versions import (
+    MAX_SCANNED_VERSIONS,
+    questions_by_version,
+    regimen_skills_by_version,
+)
+from tsutae.regimen.labels import version_labels
 from tsutae.report import build_report_data, render_report_html
 from tsutae.schemas import (
     ConversionResult,
@@ -66,7 +73,6 @@ from tsutae.schemas import (
     Timeline,
 )
 from tsutae.skills import (
-    REGIMEN_SKILL_NAMES,
     SKILL_FILE_NAME,
     SkillValidationError,
     is_valid_skill_name,
@@ -89,9 +95,6 @@ PREPARE_ERROR = "prepare_error"
 REPORT_ERROR = "report_error"
 SAVE_ERROR = "save_error"
 CANCELLED = "cancelled"
-# questions_by_version(conn) が1つの Skill について順に引く版の上限（最新の版は別に必ず引く）
-MAX_SCANNED_VERSIONS = 200
-_VERSION_RE = re.compile(r"^(?P<name>[a-z0-9-]+)@(?P<version>[1-9][0-9]{0,8})$")
 # 読み直し・保存で起こりうる db の例外（NotFoundError は LookupError）
 _DB_ERRORS = (sqlite3.Error, ValueError, LookupError)
 _log = logging.getLogger(__name__)
@@ -107,7 +110,9 @@ class _VisitInputs:
     courses: tuple[Course, ...]
     entries: tuple[Entry, ...]
     questions_by_version: Mapping[str, Sequence[Question]]
+    version_skills: Mapping[str, RegimenSkill]  # 記録の版 → その版（用語の対応。v1.1）
     doctor_masks: Mapping[int, DoctorMask]
+    question_labels: Mapping[str, str]  # 今の版の form の短い名前（紙の行名。v1.1）
 
 
 # ---------------------------------------------------------------------------
@@ -147,61 +152,6 @@ def _register_skill(conn: sqlite3.Connection, root: Path, name: str) -> None:
     db.save_skill_version(conn, skill.name, skill.version, text, questions)
 
 
-def _parse_version(value: object) -> tuple[str, int] | None:
-    """`"regimen-folfox@1"` → (名前, 版)。regimen Skill でない・形が違えば None。"""
-    if not isinstance(value, str):
-        return None
-    match = _VERSION_RE.fullmatch(value)
-    if match is None or match["name"] not in REGIMEN_SKILL_NAMES.values():
-        return None
-    return match["name"], int(match["version"])
-
-
-def _fetch_questions(
-    conn: sqlite3.Connection, pairs: Iterable[tuple[str, int]]
-) -> dict[str, list[Question]]:
-    found: dict[str, list[Question]] = {}
-    for name, version in sorted(set(pairs)):
-        row = db.get_skill_version(conn, name, version)
-        if row is not None and row["questions"] is not None:
-            found[f"{name}@{version}"] = list(row["questions"])
-    return found
-
-
-def _scan_pairs(conn: sqlite3.Connection) -> list[tuple[str, int]]:
-    """regimen Skill ごとに 1〜min(最新, 上限) の版と最新の版。"""
-    pairs: list[tuple[str, int]] = []
-    for name in sorted(REGIMEN_SKILL_NAMES.values()):
-        latest = db.latest_skill_version(conn, name)
-        if latest is None:
-            continue
-        top = int(latest["version"])
-        if top > MAX_SCANNED_VERSIONS:
-            _log.warning(
-                "skill %s: 版 %d は MAX_SCANNED_VERSIONS を超える（途中は引かない）",
-                name,
-                top,
-            )
-        pairs.extend((name, v) for v in range(1, min(top, MAX_SCANNED_VERSIONS) + 1))
-        pairs.append((name, top))
-    return pairs
-
-
-def questions_by_version(
-    conn: sqlite3.Connection, versions: Iterable[str] | None = None
-) -> dict[str, list[Question]]:
-    """`"regimen-folfox@1"` → その版の質問集（regimen Skill の登録済みの版）。
-
-    versions を渡せば、その版だけを引く（形の違う値・regimen でない Skill は無視）。
-    渡さなければ regimen Skill ごとに 1〜min(最新, MAX_SCANNED_VERSIONS) と最新の版を引く
-    （db に版の一覧を返す公開関数が無いための上限）。
-    """
-    if versions is None:
-        return _fetch_questions(conn, _scan_pairs(conn))
-    parsed = (_parse_version(v) for v in versions)
-    return _fetch_questions(conn, (p for p in parsed if p is not None))
-
-
 # ---------------------------------------------------------------------------
 # 入力を集める
 # ---------------------------------------------------------------------------
@@ -238,7 +188,9 @@ def _gather(
         courses=tuple(db.list_courses(conn, patient_id)),
         entries=entries,
         questions_by_version=questions_by_version(conn, versions=sorted(used)),
+        version_skills=regimen_skills_by_version(conn, sorted(used)),
         doctor_masks=db.list_doctor_masks(conn, int(visit["id"])),
+        question_labels=version_labels(conn, regimen_skill.skill_version),
     )
 
 
@@ -252,6 +204,7 @@ def _prepare(inputs: _VisitInputs, logger: EventLogger) -> PreparedInput:
         exclude_literals=(inputs.patient_id, inputs.reception_no),
         doctor_masks=inputs.doctor_masks,
         logger=logger,
+        version_skills=inputs.version_skills,
     )
 
 
@@ -285,6 +238,7 @@ def _render(
         result=result,
         questions_by_version=inputs.questions_by_version,
         doctor_masks=inputs.doctor_masks,
+        question_labels=inputs.question_labels,
     )
     skill = inputs.report_skill
     html = render_report_html(
@@ -293,6 +247,7 @@ def _render(
         low_confidence_threshold=skill.low_confidence_threshold,
         sections=list(skill.sections),
         quotes_max_items=skill.quotes_max_items,
+        question_labels=inputs.question_labels,
     )
     return data, html
 

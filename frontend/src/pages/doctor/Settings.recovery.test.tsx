@@ -11,7 +11,7 @@ import {
 } from "../../components/doctor/testing";
 import { jsonResponse } from "../../test/fetchMock";
 import { skillContentRoutes } from "../../components/doctor/skillTesting";
-import Settings from "./Settings";
+import ReportFormatSettings from "./ReportFormatSettings";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -28,14 +28,14 @@ const DIFF =
   "--- a/SKILL.md\n+++ b/SKILL.md\n@@ -1 +1 @@\n-version: 1\n+version: 2\n";
 
 const SKILL_LIST = {
-  skills: [{ name: "regimen-folfox", version: 1 }],
+  skills: [{ name: "report-format-default", version: 1 }],
   invalid: [],
 };
 
 function change(patch: Partial<SkillChange>): SkillChange {
   return {
     id: 5,
-    skill_name: "regimen-folfox",
+    skill_name: "report-format-default",
     requested_text: REQUEST,
     diff: "",
     status: "pending",
@@ -50,7 +50,7 @@ function change(patch: Partial<SkillChange>): SkillChange {
 
 function api(extra: Record<string, RouteValue> = {}) {
   return mockApi({
-    ...skillContentRoutes(["regimen-folfox"]),
+    ...skillContentRoutes(["report-format-default"]),
     [SKILLS]: SKILL_LIST,
     [CHANGES]: { skill_changes: [] },
     ...extra,
@@ -58,11 +58,15 @@ function api(extra: Record<string, RouteValue> = {}) {
 }
 
 function renderSettings() {
-  return renderRoute("/doctor/settings", "/doctor/settings", <Settings />);
+  return renderRoute(
+    "/doctor/settings",
+    "/doctor/settings",
+    <ReportFormatSettings />,
+  );
 }
 
 async function requestChange() {
-  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+  await screen.findByRole("option", { name: /レポートの形式（第/ });
   await userEvent.type(screen.getByLabelText("変えたいこと（一文）"), REQUEST);
   await userEvent.click(
     screen.getByRole("button", { name: "書き換えを依頼する" }),

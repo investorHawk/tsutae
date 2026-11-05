@@ -2,7 +2,7 @@
   "method": "POST",
   "path": "/api/doctor/skill-changes",
   "request": {
-    "skill_name": "regimen-folfox",
+    "skill_name": "report-format-default",
     "request_text": "今のままでよい"
   },
   "status": 200,

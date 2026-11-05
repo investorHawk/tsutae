@@ -1,0 +1,143 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/regimen-drafts/3/turns",
+  "request": {
+    "text": "点滴の日は Day1"
+  },
+  "status": 200,
+  "body": {
+    "draft": {
+      "id": 3,
+      "regimen": null,
+      "skill_name": null,
+      "display_name": "FOLFIRI＋BV",
+      "base_version": null,
+      "version": 1,
+      "status": "open",
+      "updated_at": "2026-11-09T10:00:00+09:00",
+      "generation": 2,
+      "form": {
+        "basic": {
+          "display_name": "FOLFIRI＋BV",
+          "code": null,
+          "target": "大腸がん",
+          "cycle_days": 14
+        },
+        "drugs": [
+          {
+            "row_id": "drug1",
+            "name": "ベバシズマブ",
+            "route": "infusion",
+            "days": [],
+            "times_per_day": null,
+            "start_note": null
+          }
+        ],
+        "side_effects": [],
+        "questions": [
+          {
+            "row_id": "q-fever",
+            "key": "fever",
+            "label": "体温",
+            "text": "熱を測りましたか",
+            "answer_type": "temperature"
+          },
+          {
+            "row_id": "question1",
+            "key": "diarrhea",
+            "label": "下痢",
+            "text": "下痢はありましたか",
+            "answer_type": "three_level"
+          }
+        ],
+        "notes": ""
+      },
+      "sources": {
+        "basic.cycle_days": "doctor_text",
+        "basic.display_name": "doctor_text",
+        "basic.target": "standard",
+        "drugs.drug1.name": "doctor_text",
+        "drugs.drug1.route": "standard",
+        "questions.question1.answer_type": "doctor_text",
+        "questions.question1.key": "doctor_text",
+        "questions.question1.label": "doctor_text",
+        "questions.question1.text": "doctor_text"
+      },
+      "chat": [
+        {
+          "role": "doctor",
+          "text": "FOLFIRI＋BV を作りたい。14日ごと、ベバシズマブも使う。下痢の質問も入れて",
+          "generation": 1,
+          "at": "2026-11-09T10:00:00.000000+09:00"
+        },
+        {
+          "role": "assistant",
+          "text": "名前・1コースの日数・ベバシズマブを入れ、下痢の質問を足しました。点滴の日を選んでください",
+          "changed": [
+            "basic.display_name",
+            "basic.cycle_days",
+            "basic.target",
+            "drugs.drug1.name",
+            "drugs.drug1.route",
+            "questions.question1.key",
+            "questions.question1.label",
+            "questions.question1.text",
+            "questions.question1.answer_type"
+          ],
+          "ask": {
+            "field_id": "drugs.drug1.days",
+            "question": "ベバシズマブは何日目に点滴しますか",
+            "options": [
+              "Day1",
+              "Day1・15"
+            ]
+          },
+          "proposed": [
+            "diarrhea"
+          ],
+          "reply_hidden": false,
+          "generation": 1,
+          "at": "2026-11-09T10:00:00.000000+09:00"
+        },
+        {
+          "role": "doctor",
+          "text": "点滴の日は Day1",
+          "generation": 2,
+          "at": "2026-11-09T10:00:00.000000+09:00"
+        },
+        {
+          "role": "system",
+          "kind": "turn_failed",
+          "reason": "internal_error",
+          "generation": 2,
+          "at": "2026-11-09T10:00:00.000000+09:00"
+        }
+      ],
+      "missing": [
+        {
+          "field_id": "basic.code",
+          "code": "required",
+          "message": "入力が要る"
+        },
+        {
+          "field_id": "drugs.drug1.days",
+          "code": "required",
+          "message": "入力が要る"
+        },
+        {
+          "field_id": "drugs",
+          "code": "day1_infusion",
+          "message": "Day1 に点滴を1剤以上置く（Day1 = 実投与日）"
+        },
+        {
+          "field_id": "side_effects",
+          "code": "required",
+          "message": "注意する症状を1つ以上入れる"
+        }
+      ],
+      "schedule_locked": false,
+      "created_at": "2026-11-09T10:00:00+09:00"
+    },
+    "turn_error": "internal_error"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "method": "DELETE",
+  "path": "/api/doctor/question-library/diarrhea",
+  "request": null,
+  "status": 409,
+  "body": {
+    "error": "seed_question"
+  }
+}

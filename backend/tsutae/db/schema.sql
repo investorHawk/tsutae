@@ -2,9 +2,11 @@
 -- 日時は JST の ISO 8601（+09:00、マイクロ秒まで固定幅）、日付は YYYY-MM-DD。
 -- init_db が何度流しても安全なように IF NOT EXISTS のみを使う。
 
+-- regimen はレジメンの識別名（v1.1。FOLFOX/CAPOX に固定しない。一覧との照合は API の入口、
+-- 書式は repo_patients。既存の DB の CHECK は migrate_db が外す）
 CREATE TABLE IF NOT EXISTS patients (
     id TEXT PRIMARY KEY,
-    regimen TEXT NOT NULL CHECK (regimen IN ('FOLFOX', 'CAPOX')),
+    regimen TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
@@ -92,7 +94,8 @@ CREATE TABLE IF NOT EXISTS doctor_masks (
 -- 文面（プロンプト・記録・引用・出力）は入れない。識別子と数値だけ
 CREATE TABLE IF NOT EXISTS pipeline_logs (
     id INTEGER PRIMARY KEY,
-    run_kind TEXT NOT NULL CHECK (run_kind IN ('visit', 'skill_change')),
+    run_kind TEXT NOT NULL
+        CHECK (run_kind IN ('visit', 'skill_change', 'regimen_chat')),
     run_id INTEGER NOT NULL,
     ts TEXT NOT NULL,
     event TEXT NOT NULL,
@@ -132,4 +135,56 @@ CREATE TABLE IF NOT EXISTS skill_versions (
     questions_json TEXT,
     approved_at TEXT NOT NULL,
     PRIMARY KEY (skill_name, version)
+);
+
+-- 質問の部品集（v1.1。spec 9.1）。D4 レジメンの画面の小窓で選ぶ候補。SKILL.md には影響しない。
+-- 削除は hidden=1（行は残す。消した key は作り直せない）。初期の6問は origin='seed'
+CREATE TABLE IF NOT EXISTS question_library (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    text TEXT NOT NULL,
+    answer_type TEXT NOT NULL CHECK (answer_type IN ('three_level', 'temperature')),
+    origin TEXT NOT NULL CHECK (origin IN ('seed', 'doctor', 'adopted')),
+    hidden INTEGER NOT NULL DEFAULT 0 CHECK (hidden IN (0, 1)),
+    created_at TEXT NOT NULL
+);
+
+-- D4 レジメンの下書き（v1.1。spec 9.1・architecture 9c）。院内だけ。
+-- regimen は識別名（例: FOLFIRI-BV）。新規の下書きは識別名が決まるまで NULL。
+-- base_version は既存の版から作った下書きの元の版（新規は NULL。採用で版1）。
+-- 状態 open → working（Claude の1往復の間）→ open。adopted・discarded で閉じる。
+-- generation は往復ごとに上がる（結果は世代が同じときだけ反映する。T94）。
+-- chat_json は会話の文面（院内の画面だけに出す。採用・破棄で '[]' にする）
+CREATE TABLE IF NOT EXISTS regimen_drafts (
+    id INTEGER PRIMARY KEY,
+    regimen TEXT,
+    base_version INTEGER CHECK (base_version IS NULL OR base_version >= 1),
+    status TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'working', 'adopted', 'discarded')),
+    generation INTEGER NOT NULL DEFAULT 0 CHECK (generation >= 0),
+    form_json TEXT NOT NULL,
+    sources_json TEXT NOT NULL DEFAULT '{}',
+    chat_json TEXT NOT NULL DEFAULT '[]',
+    adopted_version INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    working_since TEXT,
+    closed_at TEXT,
+    CHECK ((status = 'working') = (working_since IS NOT NULL))
+);
+
+-- 1つのレジメンに開いている（open・working）下書きは1つまで
+CREATE UNIQUE INDEX IF NOT EXISTS idx_regimen_drafts_active
+    ON regimen_drafts (regimen)
+    WHERE regimen IS NOT NULL AND status IN ('open', 'working');
+
+-- D4 で採用した版の form JSON（skill_versions と同じ版に結びつく）。FOLFOX/CAPOX@1 は
+-- リポジトリの regimen_forms/*.json に持つのでここには無い
+CREATE TABLE IF NOT EXISTS regimen_forms (
+    skill_name TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    form_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (skill_name, version),
+    FOREIGN KEY (skill_name, version) REFERENCES skill_versions (skill_name, version)
 );

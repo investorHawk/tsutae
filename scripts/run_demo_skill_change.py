@@ -12,10 +12,12 @@
   発火数（H1・H3・H4・skill_check の allow / retry / deny）・差分の追加と削除の行数を出し、
   差分と新しい SKILL.md の全文を `<out-dir>/demo-skill-change-<YYYYMMDD-HHMM>.diff|.md`
   に書く（既定の out-dir は docs/eval。差分が無ければ書かない）
-- `--approve`: pending なら写しの上で approve_change まで流し、新しい版の質問集
-  （key と text）を出す
-- `--dry-run`: SdkSkillEditor の代わりに、stomatitis の質問の後に質問を1つ足す偽の
-  editor で同じ流れを通す（API を呼ばない。書き込みの後の skill_check は偽物が呼ぶ）
+- 既定の Skill は report-format-default（v1.1。旧 D4 は report-format だけ。regimen-* は
+  `use_regimen_editor` で断られる。レジメンは D4 レジメンの画面と run_demo_regimen.py）
+- `--approve`: pending なら写しの上で approve_change まで流し、新しい版の設定（レジメンなら
+  質問集の key と text、レポート形式なら frontmatter の項目）を出す
+- `--dry-run`: SdkSkillEditor の代わりに、引用の最大件数（quotes_max_items）を 30 → 20 に
+  する偽の editor で同じ流れを通す（API を呼ばない。書き込みの後の skill_check は偽物が呼ぶ）
 - ANTHROPIC_API_KEY が無く --dry-run でもなければ終了コード 2。pending（--approve なら
   承認まで成功）なら 0、それ以外は 1
 """
@@ -59,14 +61,14 @@ from tsutae.skillchange.check import make_skill_check, read_baseline
 from tsutae.skillchange.editor import current_logger
 from tsutae.skillchange.state import RUN_KIND
 from tsutae.skillchange.workcopy import work_copy_path
+from tsutae.skills import DEFAULT_REPORT_SKILL, validate_skill_text
 
-DEFAULT_SKILL = "regimen-folfox"
-DEFAULT_REQUEST = "口内炎は、食事がとれたかも次から聞いて"
+DEFAULT_SKILL = DEFAULT_REPORT_SKILL  # report-format-default
+DEFAULT_REQUEST = "引用は20件までにして"
 DEFAULT_OUT_DIR = REPO_ROOT / "docs" / "eval"
 HOOK_NAMES = ("H1", "H3", "H4", "skill_check")
-DRY_RUN_KEY = "stomatitis_meal"
-DRY_RUN_TEXT = "口内炎があるとき、食事はとれましたか"
-_ANCHOR = "{key: stomatitis,"
+DRY_RUN_OLD = "quotes_max_items: 30"
+DRY_RUN_NEW = "quotes_max_items: 20"
 NO_KEY_MESSAGE = (
     "ANTHROPIC_API_KEY がありません。.env に書くか環境変数で渡してください。"
     "API を呼ばずに流れだけ確かめるなら --dry-run を付けてください。"
@@ -78,29 +80,24 @@ NO_KEY_MESSAGE = (
 # ---------------------------------------------------------------------------
 
 
-def add_question_after_stomatitis(text: str) -> str:
-    """stomatitis の質問の行の後に DRY_RUN_KEY の質問を足す（無ければそのまま）。"""
+def shorten_quotes(text: str) -> str:
+    """frontmatter の引用の最大件数を 30 → 20 にする（その行が無ければそのまま）。"""
     lines = text.splitlines(keepends=True)
     for i, line in enumerate(lines):
-        if _ANCHOR in line:
-            prefix = line[: line.index(_ANCHOR)]  # "  - "
-            added = (
-                f"{prefix}{{key: {DRY_RUN_KEY}, text: {DRY_RUN_TEXT},"
-                " answer_type: three_level}\n"
-            )
-            return "".join([*lines[: i + 1], added, *lines[i + 1 :]])
+        if line.rstrip("\n") == DRY_RUN_OLD:
+            return "".join([*lines[:i], DRY_RUN_NEW + "\n", *lines[i + 1 :]])
     return text
 
 
 class DryRunSkillEditor:
-    """写しの SKILL.md に質問を1つ足し、Edit の後と同じく skill_check を呼ぶ。"""
+    """写しの SKILL.md の引用の最大件数を変え、Edit の後と同じく skill_check を呼ぶ。"""
 
     async def edit(
         self, work_root: Path, skill_name: str, request_text: str
     ) -> RunStats:
         path = work_copy_path(work_root, skill_name)
         old = path.read_text(encoding="utf-8")
-        new = add_question_after_stomatitis(old)
+        new = shorten_quotes(old)
         if new == old:
             return RunStats(num_turns=1)
         base = read_baseline(work_root, skill_name).version
@@ -220,7 +217,7 @@ def print_summary(summary: Mapping[str, Any], paths: Sequence[Path]) -> None:
 def approve_on_copy(
     conn: sqlite3.Connection, change_id: int, skill_name: str, skills_home: Path
 ) -> bool:
-    """写しの上で承認し、新しい版の質問集を出す。失敗は error_code を出して False。"""
+    """写しの上で承認し、新しい版の設定を出す。失敗は error_code を出して False。"""
     try:
         version = approve_change(conn, change_id, skills_home=skills_home)
     except SkillChangeError as exc:
@@ -229,11 +226,14 @@ def approve_on_copy(
     print(f"承認: {skill_name} の版 {version}")
     saved = db.get_skill_version(conn, skill_name, version) or {}
     questions = saved.get("questions")
-    if not questions:
-        print("  （質問集なし）")
+    if questions:
+        for q in questions:
+            print(f"  {q.key}: {q.text}")
         return True
-    for q in questions:
-        print(f"  {q.key}: {q.text}")
+    skill = validate_skill_text(skill_name, str(saved.get("content") or ""))
+    shown = skill.model_dump(mode="json", exclude={"name", "description", "version"})
+    for key, value in shown.items():
+        print(f"  {key}: {_show(value)}")
     return True
 
 
@@ -350,7 +350,7 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
         help="API を呼ばず偽の editor で同じ流れを通す",
     )
     parser.add_argument(
-        "--approve", action="store_true", help="写しの上で承認まで流し質問集を出す"
+        "--approve", action="store_true", help="写しの上で承認まで流し新しい版を出す"
     )
     parser.add_argument(
         "--skill", default=DEFAULT_SKILL, help="書き換える Skill の名前"

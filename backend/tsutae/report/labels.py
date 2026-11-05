@@ -23,7 +23,8 @@ SEVERITY_WORDS: tuple[str, ...] = (
 )
 
 # 経過表の行・要確認で使う短い名前。Skill の質問文は長いので、既知の key だけ短くする。
-# 未知の key（D4 で医師が足した質問など）は質問文をそのまま使う
+# 未知の key（D4 で医師が足した質問など）は版の form の短い名前（`regimen.labels`）、
+# それも無ければ質問文をそのまま使う
 SHORT_LABELS: Mapping[str, str] = MappingProxyType(
     {
         "numbness": "しびれ",
@@ -47,10 +48,20 @@ ANSWER_LABELS: Mapping[str, str] = MappingProxyType(
 )
 
 
-def question_label(key: str, questions: Sequence[Question]) -> str:
-    """質問 key の表示名。既知の key は短い名前、未知は質問文、それも無ければ key。"""
+def question_label(
+    key: str,
+    questions: Sequence[Question],
+    labels: Mapping[str, str] | None = None,
+) -> str:
+    """質問 key の表示名。
+
+    既知の key は短い名前（SHORT_LABELS）、それ以外は版の form の短い名前（labels。
+    v1.1）、それも無ければ質問文（旧 D4 で足した版など）、最後に key。
+    """
     if key in SHORT_LABELS:
         return SHORT_LABELS[key]
+    if labels and labels.get(key):
+        return labels[key]
     for q in questions:
         if q.key == key:
             return q.text

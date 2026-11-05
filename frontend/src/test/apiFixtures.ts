@@ -5,7 +5,7 @@
  */
 
 export interface ApiFixture {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
   /** 送った本文（無ければ null） */
   request: unknown;

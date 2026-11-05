@@ -2,6 +2,8 @@
 
 - 入口で patient_id・courses・entries・prepared・Skill の対応を確かめる
   （gate.check_inputs）。合わなければ ReportBuildError
+- ヘッダのレジメンは識別名（regimen）と表示名（regimen_label。Skill の display_name、
+  無ければ None で紙は識別名。v1.1）
 - ヘッダ・経過表・要確認の発熱／つらくて書けない／未処理は、記録（entries）と
   コース日程からコードで決める。AI の結果（result.timeline / picks）を使うのは
   経過表の ○・「回」、要確認の食い違い、症状別の時系列だけ。どれも記録・出来事と
@@ -158,6 +160,7 @@ def _header(
         reception_no=reception_no,
         patient_id=patient_id,
         regimen=regimen_skill.regimen,
+        regimen_label=regimen_skill.display_name,
         course_no=schedule.course_no,
         course_start=schedule.day1_date,
         course_end=max([schedule.last_day_date, *dates]),
@@ -292,8 +295,9 @@ def _grid(
     regimen_skill: RegimenSkill,
     report_skill: ReportFormatSkill,
     questions_by_version: Mapping[str, Sequence[Question]],
+    labels: Mapping[str, str] | None,
 ) -> Grid:
-    rows = row_specs(regimen_skill, report_skill)
+    rows = row_specs(regimen_skill, report_skill, labels)
     marks = (
         event_marks(ctx.events, ctx.current.schedule, ctx.courses, rows)
         if ctx.timeline is not None
@@ -322,12 +326,14 @@ def build_report_data(
     result: ConversionResult,
     questions_by_version: Mapping[str, Sequence[Question]],
     doctor_masks: Mapping[int, DoctorMask] | None = None,
+    question_labels: Mapping[str, str] | None = None,
 ) -> ReportData:
     """レポートの中身を組み立てる。
 
     入力が食い違えば ReportBuildError、courses の矛盾は CourseValidationError
     （どちらも ValueError）。doctor_masks は prepare_input に渡した医師の伏せ字
-    （entries.id → DoctorMask。無ければ空）。
+    （entries.id → DoctorMask。無ければ空）。question_labels は今の版の form の
+    質問の短い名前（経過表の行名。既知の6問は SHORT_LABELS が先。v1.1）。
     """
     ctx = _context(
         patient_id=patient_id,
@@ -341,7 +347,9 @@ def build_report_data(
         questions_by_version=questions_by_version,
         doctor_masks=dict(doctor_masks or {}),
     )
-    grid = _grid(ctx, regimen_skill, report_skill, questions_by_version)
+    grid = _grid(
+        ctx, regimen_skill, report_skill, questions_by_version, question_labels
+    )
     unprocessed = _unprocessed_ids(ctx)
     header = _header(
         ctx,

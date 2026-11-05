@@ -18,6 +18,15 @@
   3. 伏せ字後の文を JSON にした形（依頼文での見え方）で二次に掛かった → 最初の規則名
 - 「つらくて書けない」の記録も入れる（too_sick=True、回答・自由記載なし）
 - 仮名ID・受付番号は構造の項目に入れない。引数は書き換えない
+- 版の用語 → 質問 key の対応（`regimen_skill.term_keys`。v1.1）を `term_keys` に、
+  送る記録の版（entry_no → Entry.skill_version）を `entry_versions` に、入力の版と違う版の
+  対応の材料（`version_skills`: 版 → その版の RegimenSkill。service が skill_versions から
+  引く）を `other_versions` に写す（PipelineInput の外。Claude に送る JSON は変わらない。
+  checks・紙の照合は記録の版の対応を使う。spec 9.1）
+- 材料を引けなかった版（version_skills に無い。skill_versions の全文が今の検査に通らない
+  古い版など）は安全側に倒し、空の材料（`VersionTermKeys()`）を置く。その版の記録は
+  どの用語も質問 key につながらない（null。紙に ○ を付けない。出来事は残る）。
+  警告には版の文字列（名前と番号）だけを出す
 - 医師の伏せ字（`doctor_masks`: entries.id → DoctorMask。D6 で医師が選んだ区間）が
   ある記録は、**生の原文に区間を当てて `[伏せ字]` にしてから**上の 1〜3 を同じく掛ける
   （区間は原文の位置なので一次の前）。生の記録は変えない（spec 13.3）。区間が原文に
@@ -33,6 +42,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -47,6 +57,7 @@ from tsutae.masking.manual import (
     without_allowed,
 )
 from tsutae.pipeline.logs import EventLogger
+from tsutae.pipeline.versions import parse_version
 from tsutae.schemas import (
     Course,
     CourseSchedule,
@@ -58,7 +69,9 @@ from tsutae.schemas import (
     RegimenSkill,
     ReportFormatSkill,
     UnprocessedEntry,
+    VersionTermKeys,
 )
+from tsutae.skills.term_keys import record_versions
 
 __all__ = [
     "REASON_DOCTOR_MASK_INVALID",
@@ -71,6 +84,7 @@ __all__ = [
     "mask_entry_text",
     "mask_free_text",
     "prepare_input",
+    "version_materials",
 ]
 
 REASON_KNOWN_IDENTIFIER = "known_identifier"
@@ -80,6 +94,7 @@ DOCTOR_MASKS_EVENT = "doctor_masks_applied"
 DOCTOR_CONFIRMED_EVENT = "doctor_confirmed_sent"
 # 区切りに使われる長音符（Lm なので文字として残ってしまう）。半角 ｰ は NFKC で ー
 _PROLONGED_MARKS = frozenset("ー")
+_log = logging.getLogger(__name__)
 
 
 class PrepareInputError(ValueError):
@@ -333,6 +348,29 @@ def _schedule_for(
     )
 
 
+def version_materials(
+    entry_versions: Mapping[int, str],
+    regimen_skill: RegimenSkill,
+    version_skills: Mapping[str, RegimenSkill] | None,
+) -> dict[str, VersionTermKeys]:
+    """送る記録の版のうち入力の版と違うもの全ての、用語の対応の材料。
+
+    材料（その版の RegimenSkill）を引けなかった版は空の材料（どの用語も null）にする。
+    今の版の対応を当てると、その版で聞いていない質問の行に ○ が付きうる。
+    """
+    found = record_versions(entry_versions, regimen_skill, version_skills)
+    for version in sorted(set(entry_versions.values())):
+        if version == regimen_skill.skill_version or version in found:
+            continue
+        parsed = parse_version(version)
+        _log.warning(
+            "記録の版 %s の材料を引けない（その版の記録の出来事は質問につなげない）",
+            f"{parsed[0]}@{parsed[1]}" if parsed else "（形の違う版）",
+        )
+        found[version] = VersionTermKeys()
+    return found
+
+
 def prepare_input(
     *,
     courses: Sequence[Course],
@@ -343,8 +381,13 @@ def prepare_input(
     exclude_literals: Sequence[str] = (),
     doctor_masks: Mapping[int, DoctorMask] | None = None,
     logger: EventLogger | None = None,
+    version_skills: Mapping[str, RegimenSkill] | None = None,
 ) -> PreparedInput:
-    """受診日の今コースの記録から、Claude に送る入力を作る。"""
+    """受診日の今コースの記録から、Claude に送る入力を作る。
+
+    version_skills（版 → その版の RegimenSkill）に無い版の記録は、どの用語も質問 key に
+    つなげない（version_materials。安全側）。
+    """
     folded_literals = _fold_literals(exclude_literals)
     masks = check_doctor_masks(doctor_masks)
     _check_same_patient(courses, entries)
@@ -358,6 +401,8 @@ def prepare_input(
             INPUT_PREPARED_EVENT, decision=f"out_of_range_count:{out_of_range}"
         )
         _log_doctor_masks(logger, selected)
+    versions = {e.id: e.skill_version for e in entries}
+    entry_versions = {no: versions[eid] for no, eid in selected.entry_ids.items()}
     return PreparedInput(
         input=PipelineInput(
             regimen=regimen_skill.regimen,
@@ -371,4 +416,7 @@ def prepare_input(
         masked_texts=selected.masked_texts,
         unprocessed=selected.unprocessed,
         allowed_suspects=sorted(selected.allowed),
+        term_keys=dict(regimen_skill.term_keys or {}),
+        entry_versions=entry_versions,
+        other_versions=version_materials(entry_versions, regimen_skill, version_skills),
     )

@@ -1,5 +1,5 @@
 /**
- * D4 設定を変える: 実際の API の応答（src/test/fixtures/api）で、W3 後の決定を確かめる。
+ * D4 レポートの形式（旧 D4）: 実際の API の応答（src/test/fixtures/api）で、W3 後の決定を確かめる。
  * - GET skills の invalid（読めない Skill）を表示する
  * - 承認・却下の 409 busy は確認画面のまま説明を出し、もう一度押せる
  * - approve の new_version（必須）をそのまま出す
@@ -16,7 +16,7 @@ import {
 import { apiFixture, fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
 import { skillContentRoutes } from "../../components/doctor/skillTesting";
-import Settings from "./Settings";
+import ReportFormatSettings from "./ReportFormatSettings";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -59,16 +59,23 @@ function api(extra: Record<string, RouteValue> = {}) {
 }
 
 function renderSettings() {
-  return renderRoute("/doctor/settings", "/doctor/settings", <Settings />);
+  return renderRoute(
+    "/doctor/settings",
+    "/doctor/settings",
+    <ReportFormatSettings />,
+  );
 }
 
 async function openReview() {
-  await screen.findByRole("option", { name: /FOLFOX の質問集/ });
-  // fixture の一覧は名前順（regimen-capox が先）。依頼の fixture と同じ Skill を選ぶ
-  await userEvent.selectOptions(screen.getByRole("combobox"), "regimen-folfox");
+  await screen.findByRole("option", { name: /レポートの形式（第/ });
+  // 依頼の fixture と同じ Skill を選ぶ（v1.1: 旧 D4 の一文の書き換えは report-format だけ）
+  await userEvent.selectOptions(
+    screen.getByRole("combobox"),
+    "report-format-default",
+  );
   await userEvent.type(
     screen.getByLabelText("変えたいこと（一文）"),
-    "口内炎の質問で食事がとれたかも聞いて",
+    "見出しの順を変えて",
   );
   await userEvent.click(
     screen.getByRole("button", { name: "書き換えを依頼する" }),
@@ -80,7 +87,7 @@ describe("Settings: 読めない Skill（GET skills の invalid）", () => {
   it("invalid が空なら何も出さない", async () => {
     api();
     renderSettings();
-    await screen.findByRole("option", { name: /FOLFOX の質問集/ });
+    await screen.findByRole("option", { name: /レポートの形式（第/ });
     expect(screen.queryByRole("alert", { name: "読めない Skill" })).toBeNull();
   });
 
@@ -93,10 +100,11 @@ describe("Settings: 読めない Skill（GET skills の invalid）", () => {
     expect(note).toHaveTextContent("frontmatter の項目が合いません");
     expect(note).toHaveTextContent("schema");
     expect(within(note).queryByText("必須")).toBeNull();
-    // 読める Skill は今までどおり選べる（読めない Skill は選択肢に出さない）
+    // 読める report-format は今までどおり選べる（読めない Skill・レジメンは選択肢に出さない）
     expect(
-      screen.getByRole("option", { name: /FOLFOX の質問集/ }),
+      screen.getByRole("option", { name: /レポートの形式（第/ }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /FOLFOX/ })).toBeNull();
     expect(screen.queryByRole("option", { name: /EXTRA の質問集/ })).toBeNull();
   });
 
@@ -163,7 +171,7 @@ describe("Settings: 承認・却下の 409 busy", () => {
     expect(again).toBeEnabled();
     await userEvent.click(again);
     const done = await screen.findByText(/第2版（version 2）になりました/);
-    expect(done).toHaveTextContent("regimen-folfox");
+    expect(done).toHaveTextContent("report-format-default");
     expect(screen.queryByRole("region", { name: "差分の確認" })).toBeNull();
   });
 

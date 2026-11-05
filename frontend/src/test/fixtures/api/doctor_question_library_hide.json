@@ -1,0 +1,9 @@
+{
+  "method": "DELETE",
+  "path": "/api/doctor/question-library/fatigue",
+  "request": null,
+  "status": 200,
+  "body": {
+    "ok": true
+  }
+}

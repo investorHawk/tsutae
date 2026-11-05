@@ -8,6 +8,15 @@ import { describe, expect, it } from "vitest";
 import { apiFixture, fixtureBody, fixtureNames } from "../test/apiFixtures";
 import { validatePatientStrings } from "../strings/PatientStrings";
 import {
+  isAdoptRegimenResponse,
+  isCreateRegimenDraftResponse,
+  isRegimenDraftResponse,
+  isRegimenDraftsResponse,
+  isRegimenPreviewResponse,
+  isRegimenTurnResponse,
+} from "./regimenGuards";
+import {
+  isAddLibraryQuestionResponse,
   isApproveResponse,
   isCoursesResponse,
   isCreatePatientResponse,
@@ -19,6 +28,8 @@ import {
   isPatientVisitsResponse,
   isPatientsResponse,
   isPipelineEventsResponse,
+  isQuestionLibraryResponse,
+  isRegimensResponse,
   isSavedCourse,
   isSkillChangesResponse,
   isSkillContentResponse,
@@ -54,6 +65,7 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_logout: isDoctorOk,
   doctor_patients: isPatientsResponse,
   doctor_patient_create: isCreatePatientResponse,
+  doctor_regimens: isRegimensResponse,
   doctor_courses: isCoursesResponse,
   doctor_patient_visits: isPatientVisitsResponse,
   doctor_patient_visits_open: isPatientVisitsResponse,
@@ -79,6 +91,21 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_skill_changes: isSkillChangesResponse,
   doctor_skill_change_approve: isApproveResponse,
   doctor_skill_change_reject: isDoctorOk,
+  doctor_question_library: isQuestionLibraryResponse,
+  doctor_question_library_add: isAddLibraryQuestionResponse,
+  doctor_question_library_hide: isDoctorOk,
+  doctor_regimen_drafts: isRegimenDraftsResponse,
+  doctor_regimen_draft: isRegimenDraftResponse,
+  doctor_regimen_draft_create: isCreateRegimenDraftResponse,
+  doctor_regimen_draft_create_existing: isCreateRegimenDraftResponse,
+  doctor_regimen_draft_fields: isRegimenDraftResponse,
+  doctor_regimen_draft_fields_existing: isRegimenDraftResponse,
+  doctor_regimen_draft_preview: isRegimenPreviewResponse,
+  doctor_regimen_draft_preview_diff: isRegimenPreviewResponse,
+  doctor_regimen_draft_adopt: isAdoptRegimenResponse,
+  doctor_regimen_draft_discard: isDoctorOk,
+  doctor_regimen_draft_turn: isRegimenTurnResponse,
+  doctor_regimen_draft_turn_failed: isRegimenTurnResponse,
 };
 
 function guardOf(name: string): Guard {
@@ -112,6 +139,178 @@ type Mutate = (body: any) => void;
 
 /** [fixture, 壊し方の説明, 壊す操作]。壊した本文は guard に拒まれる。 */
 const BROKEN: Array<[string, string, Mutate]> = [
+  // レジメンの一覧（T95）
+  ["doctor_regimens", "regimens が無い", (b) => delete b.regimens],
+  ["doctor_regimens", "識別名が小文字", (b) => (b.regimens[0].code = "folfox")],
+  [
+    "doctor_regimens",
+    "Skill 名が識別名と合わない",
+    (b) => (b.regimens[1].skill_name = "regimen-folfox"),
+  ],
+  ["doctor_regimens", "版が 0", (b) => (b.regimens[0].version = 0)],
+  ["doctor_regimens", "表示名が無い", (b) => delete b.regimens[0].display_name],
+  [
+    "doctor_regimens",
+    "識別名が重なる",
+    (b) => b.regimens.push({ ...b.regimens[0] }),
+  ],
+  [
+    "doctor_patients",
+    "レジメンの識別名の書式が違う",
+    (b) => (b.patients[0].regimen = "folfox"),
+  ],
+  [
+    "doctor_patient_entries",
+    "回答の短い名前が省略",
+    (b) => delete b.entries[0].answers[0].question_label,
+  ],
+  [
+    "doctor_patient_entries",
+    "回答の短い名前が数",
+    (b) => (b.entries[0].answers[0].question_label = 1),
+  ],
+  // D4 レジメンの下書き（v1.1）
+  ["doctor_regimen_drafts", "未知の状態", (b) => (b.drafts[0].status = "x")],
+  ["doctor_regimen_drafts", "version が 0", (b) => (b.drafts[0].version = 0)],
+  [
+    "doctor_regimen_drafts",
+    "updated_at に時差が無い",
+    (b) => (b.drafts[0].updated_at = "2026-11-09T10:00:00"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "regimen が無い（null でなく省略）",
+    (b) => delete b.draft.regimen,
+  ],
+  [
+    "doctor_regimen_draft",
+    "未知の出どころ",
+    (b) => (b.draft.sources["basic.code"] = "ai"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "未知の経路",
+    (b) => (b.draft.form.drugs[0].route = "iv"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "Day の範囲が数でない",
+    (b) => (b.draft.form.drugs[0].days[0].start = "1"),
+  ],
+  [
+    "doctor_regimen_draft",
+    "描画用の文 prose が出ている",
+    (b) => (b.draft.form.prose = {}),
+  ],
+  [
+    "doctor_regimen_draft",
+    "schedule_locked が無い",
+    (b) => delete b.draft.schedule_locked,
+  ],
+  ["doctor_regimen_draft_create", "created が無い", (b) => delete b.created],
+  [
+    "doctor_regimen_draft_preview",
+    "AI の値の出どころが doctor_edit",
+    (b) => (b.ai_values[0].source = "doctor_edit"),
+  ],
+  [
+    "doctor_regimen_draft_preview",
+    "AI の値の出どころが doctor_text（一覧は標準の値だけ）",
+    (b) => (b.ai_values[0].source = "doctor_text"),
+  ],
+  [
+    "doctor_regimen_draft_preview",
+    "検査の結果があるのに SKILL.md がある",
+    (b) => (b.issues = [{ field_id: "notes", code: "x", message: "x" }]),
+  ],
+  [
+    "doctor_regimen_draft_preview",
+    "confirm_token の形が違う",
+    (b) => (b.confirm_token = "abc"),
+  ],
+  [
+    "doctor_regimen_draft_preview_diff",
+    "SKILL.md の種類が未知",
+    (b) => (b.skill_md.kind = "patch"),
+  ],
+  ["doctor_regimen_draft_adopt", "ok が false", (b) => (b.ok = false)],
+  ["doctor_regimen_draft_adopt", "version が無い", (b) => delete b.version],
+  // D4 レジメンの1往復（T94）
+  [
+    "doctor_regimen_draft_turn",
+    "turn_error が無い（null でなく省略）",
+    (b) => delete b.turn_error,
+  ],
+  ["doctor_regimen_draft_turn", "turn_error が数", (b) => (b.turn_error = 1)],
+  [
+    "doctor_regimen_draft_turn",
+    "未知の role",
+    (b) => (b.draft.chat[0].role = "patient"),
+  ],
+  [
+    "doctor_regimen_draft_turn",
+    "先生の文が無い",
+    (b) => delete b.draft.chat[0].text,
+  ],
+  [
+    "doctor_regimen_draft_turn",
+    "会話の行の at に時差が無い",
+    (b) => (b.draft.chat[0].at = "2026-11-09T10:00:00"),
+  ],
+  [
+    "doctor_regimen_draft_turn",
+    "変えた欄が配列でない",
+    (b) => (b.draft.chat[1].changed = "basic.cycle_days"),
+  ],
+  [
+    "doctor_regimen_draft_turn",
+    "ask が無い（null でなく省略）",
+    (b) => delete b.draft.chat[1].ask,
+  ],
+  [
+    "doctor_regimen_draft_turn",
+    "ask の選択肢が1つ",
+    (b) => (b.draft.chat[1].ask.options = ["Day1"]),
+  ],
+  [
+    "doctor_regimen_draft_turn",
+    "reply_hidden が無い",
+    (b) => delete b.draft.chat[1].reply_hidden,
+  ],
+  [
+    "doctor_regimen_draft_turn_failed",
+    "失敗の行に reason が無い",
+    (b) => delete b.draft.chat[3].reason,
+  ],
+  [
+    "doctor_regimen_draft_turn_failed",
+    "generation が負",
+    (b) => (b.draft.chat[3].generation = -1),
+  ],
+  // 質問の部品集（v1.1）
+  [
+    "doctor_question_library",
+    "label が無い",
+    (b) => delete b.questions[0].label,
+  ],
+  [
+    "doctor_question_library",
+    "未知の出どころ",
+    (b) => (b.questions[0].origin = "ai"),
+  ],
+  [
+    "doctor_question_library",
+    "未知の回答の型",
+    (b) => (b.questions[0].answer_type = "yes_no"),
+  ],
+  ["doctor_question_library", "questions が無い", (b) => delete b.questions],
+  [
+    "doctor_question_library_add",
+    "question が null",
+    (b) => (b.question = null),
+  ],
+  ["doctor_question_library_add", "text が数", (b) => (b.question.text = 1)],
+  ["doctor_question_library_hide", "ok が false", (b) => (b.ok = false)],
   // 印刷待ち一覧（W3 後の決定）
   ["doctor_visits", "状態が printed", (b) => (b.visits[0].status = "printed")],
   ["doctor_visits", "未知の状態", (b) => (b.visits[0].status = "done")],
@@ -354,10 +553,11 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "次回受診が無い（null でなく省略）",
     (b) => delete b.patients[0].next_visit,
   ],
+  // v1.1: regimen は識別名の書式だけを見る（置かれているかは GET regimens）
   [
     "doctor_patients",
-    "regimen が未知",
-    (b) => (b.patients[0].regimen = "XELOX"),
+    "regimen が識別名の書式でない",
+    (b) => (b.patients[0].regimen = "XELOX "),
   ],
   [
     "doctor_patients",

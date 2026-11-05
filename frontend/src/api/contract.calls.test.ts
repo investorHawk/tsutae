@@ -10,16 +10,20 @@ import { apiFixture, fixtureNames, type ApiFixture } from "../test/apiFixtures";
 import { callOf, jsonResponse, mockFetch } from "../test/fetchMock";
 import { validatePatientStrings } from "../strings/PatientStrings";
 import {
+  addLibraryQuestion,
   approveSkillChange,
   checkMasks,
   createPatient,
   createSkillChange,
   getPipelineEvents,
   getSkill,
+  hideLibraryQuestion,
   listCourses,
   listPatientEntries,
   listPatientVisits,
   listPatients,
+  listQuestionLibrary,
+  listRegimens,
   listSkillChanges,
   listSkills,
   listUnprocessed,
@@ -43,12 +47,28 @@ import {
   undoEntry,
 } from "./patient";
 import type {
+  AddLibraryQuestionRequest,
   Course,
   EntryCreate,
   MaskCheckRequest,
   MaskSaveRequest,
   Regimen,
 } from "./types";
+import {
+  adoptRegimenDraft,
+  createRegimenDraft,
+  discardRegimenDraft,
+  getRegimenDraft,
+  listRegimenDrafts,
+  patchRegimenFields,
+  postRegimenTurn,
+  previewRegimenDraft,
+} from "./regimenDrafts";
+import type {
+  AdoptRegimenRequest,
+  CreateRegimenDraftRequest,
+  PatchRegimenFieldsRequest,
+} from "./regimenTypes";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -107,6 +127,21 @@ const change: Call = (f) =>
   createSkillChange(String(req(f).skill_name), String(req(f).request_text));
 const approve: Call = (f) => approveSkillChange(idIn(f));
 const reject: Call = (f) => rejectSkillChange(idIn(f));
+const addQuestion: Call = (f) =>
+  addLibraryQuestion(f.request as AddLibraryQuestionRequest);
+const draftCreate: Call = (f) =>
+  createRegimenDraft(f.request as CreateRegimenDraftRequest);
+const draftGet: Call = (f) => getRegimenDraft(idIn(f));
+const draftFields: Call = (f) =>
+  patchRegimenFields(idIn(f), f.request as PatchRegimenFieldsRequest);
+const draftPreview: Call = (f) => previewRegimenDraft(idIn(f));
+const draftAdopt: Call = (f) =>
+  adoptRegimenDraft(idIn(f), f.request as AdoptRegimenRequest);
+const draftDiscard: Call = (f) => discardRegimenDraft(idIn(f));
+const draftTurn: Call = (f) => postRegimenTurn(idIn(f), String(req(f).text));
+/** 経路の最後の質問 key（DELETE question-library/{key}）。 */
+const hideQuestion: Call = (f) =>
+  hideLibraryQuestion(f.path.replace(/^.*\//, ""));
 
 /** fixture の名前 → それを受け取る API の関数。全ての fixture に要る。 */
 const CALLS: Readonly<Record<string, Call>> = {
@@ -130,6 +165,9 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_logout: () => logout(),
   doctor_patients: () => listPatients(),
   doctor_patient_create: (f) => createPatient(req(f).regimen as Regimen),
+  doctor_patient_create_unknown_regimen: (f) =>
+    createPatient(req(f).regimen as Regimen),
+  doctor_regimens: () => listRegimens(),
   doctor_courses: courses,
   doctor_courses_unknown_patient: courses,
   doctor_patient_visits: patientVisits,
@@ -167,12 +205,36 @@ const CALLS: Readonly<Record<string, Call>> = {
   doctor_skill_change_create: change,
   doctor_skill_change_create_failed: change,
   doctor_skill_change_create_invalid_name: change,
+  doctor_skill_change_create_regimen: change,
   doctor_skill_changes: () => listSkillChanges(),
   doctor_skill_change_approve: approve,
   doctor_skill_change_approve_busy: approve,
   doctor_skill_change_approve_not_pending: approve,
   doctor_skill_change_reject: reject,
   doctor_skill_change_reject_busy: reject,
+  doctor_question_library: () => listQuestionLibrary(),
+  doctor_question_library_add: addQuestion,
+  doctor_question_library_add_taken: addQuestion,
+  doctor_question_library_hide: hideQuestion,
+  doctor_question_library_hide_seed: hideQuestion,
+  doctor_regimen_drafts: () => listRegimenDrafts(),
+  doctor_regimen_draft: draftGet,
+  doctor_regimen_draft_missing: draftGet,
+  doctor_regimen_draft_create: draftCreate,
+  doctor_regimen_draft_create_existing: draftCreate,
+  doctor_regimen_draft_fields: draftFields,
+  doctor_regimen_draft_fields_existing: draftFields,
+  doctor_regimen_draft_fields_invalid: draftFields,
+  doctor_regimen_draft_preview: draftPreview,
+  doctor_regimen_draft_preview_diff: draftPreview,
+  doctor_regimen_draft_adopt: draftAdopt,
+  doctor_regimen_draft_adopt_unconfirmed: draftAdopt,
+  doctor_regimen_draft_adopt_token_mismatch: draftAdopt,
+  doctor_regimen_draft_discard: draftDiscard,
+  doctor_regimen_draft_discard_closed: draftDiscard,
+  doctor_regimen_draft_turn: draftTurn,
+  doctor_regimen_draft_turn_failed: draftTurn,
+  doctor_regimen_draft_turn_h1: draftTurn,
 };
 
 const NAMES = fixtureNames();

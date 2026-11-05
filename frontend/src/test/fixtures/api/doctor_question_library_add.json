@@ -1,0 +1,20 @@
+{
+  "method": "POST",
+  "path": "/api/doctor/question-library",
+  "request": {
+    "key": "fatigue",
+    "label": "だるさ",
+    "text": "だるさや疲れやすさはありましたか",
+    "answer_type": "three_level"
+  },
+  "status": 200,
+  "body": {
+    "question": {
+      "key": "fatigue",
+      "label": "だるさ",
+      "text": "だるさや疲れやすさはありましたか",
+      "answer_type": "three_level",
+      "origin": "doctor"
+    }
+  }
+}

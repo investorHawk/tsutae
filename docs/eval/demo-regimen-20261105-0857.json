@@ -1,0 +1,336 @@
+{
+  "kind": "demo-regimen",
+  "note": "症例は全て合成。会話の文は院内の画面に出る文（患者のデータは無い）",
+  "at": "2026-11-05T08:57:16.751033+09:00",
+  "model": "claude-opus-5-5",
+  "status": "ok",
+  "error": null,
+  "limits": {
+    "regimen_max_turns": 12,
+    "regimen_max_budget_usd": 1.0,
+    "regimen_turn_timeout_s": 90.0,
+    "script_max_turns": 6
+  },
+  "turns": [
+    {
+      "n": 1,
+      "kind": "request",
+      "text": "FOLFIRI＋BV を作りたい。大腸がん、14日ごと。ベバシズマブ・イリノテカン・レボホリナート・フルオロウラシル急速静注を Day1 に点滴、フルオロウラシル46時間を持続ポンプで Day1〜3",
+      "elapsed_s": 32.8,
+      "status_code": 200,
+      "turn_error": null,
+      "duration_ms": 30942,
+      "cost_usd": 0.11828300000000001,
+      "tokens_in": 33960,
+      "tokens_out": 3673,
+      "sdk_turns": 4,
+      "tool_calls": 3,
+      "tool_rejected": 0,
+      "h4_denied": 0,
+      "changed": 60,
+      "ai_fields": 59,
+      "missing": 0,
+      "ask": null,
+      "proposed": [
+        "diarrhea",
+        "nausea_appetite",
+        "stomatitis",
+        "fatigue",
+        "bleeding"
+      ],
+      "reply": "FOLFIRI＋BV のフォームを埋めました。必須の欄はすべて入っています。\n\n**先生の文から入れた欄**\n- 基本: 画面の名前「FOLFIRI＋BV」、識別名「FOLFIRI-BV」、対象「大腸がん」、1コース 14日\n- 投与スケジュール:\n  - Day1 に点滴: ベバシズマブ、イリノテカン、レボホリナート、フルオロウラシル（急速静注）\n  - 持続ポンプ: フルオロウラシル（46時間持続）を Day1〜3\n\n**標準の値として補った欄（確認をお願いします）**\n注意する症状は先生の文に無かったので、標準の値として下の7件を足しました。どれもまだ確定していません。\n| 症状 | CTCAE の用語 | つないだ質問 |\n|---|---|---|\n| 下痢 | 下痢 | 下痢（部品集） |\n| 吐き気・食欲 | 悪心、嘔吐、食欲不振 | 吐き気・食欲（部品集） |\n| 口内炎 | 口腔粘膜炎、口腔内痛 | 口内炎（部品集） |\n| だるさ | 疲労、倦怠感 | だるさ（新しい質問） |\n| 熱 | 発熱、悪寒 | 体温（もとからある質問） |\n| 鼻血・歯ぐきの出血 | 鼻出血 | 出血（新しい質問） |\n| 髪が抜ける | 脱毛症 | なし |\n\n**患者への質問**\n部品集から下痢・吐き気と食欲・口内炎の3つを、新しい3択の質問としてだるさと出血の2つを足しました。体温の質問はそのまま残しています。\n\n高血圧と蛋白尿は検査の値なので、質問には入れていません。足したい症状や外したい症状があれば知らせてください。"
+    }
+  ],
+  "totals": {
+    "turns": 1,
+    "elapsed_s": 32.8,
+    "cost_usd": 0.118283,
+    "tokens_in": 33960,
+    "tokens_out": 3673,
+    "sdk_turns_max": 4,
+    "tool_calls": 3,
+    "tool_rejected": 0,
+    "h4_denied": 0,
+    "asks": 0,
+    "proposed": 5
+  },
+  "preview": {
+    "skill_name": "regimen-folfiri-bv",
+    "version": 1,
+    "ai_values": 59,
+    "issues": [],
+    "skill_md_lines": 137
+  },
+  "adopt": {
+    "ok": true,
+    "skill_name": "regimen-folfiri-bv",
+    "version": 1,
+    "regimen": "FOLFIRI-BV",
+    "in_choices": true
+  },
+  "form": {
+    "basic": {
+      "display_name": "FOLFIRI＋BV",
+      "code": "FOLFIRI-BV",
+      "target": "大腸がん",
+      "cycle_days": 14
+    },
+    "drugs": [
+      {
+        "row_id": "drug1",
+        "name": "ベバシズマブ",
+        "route": "infusion",
+        "days": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ],
+        "times_per_day": null,
+        "start_note": null
+      },
+      {
+        "row_id": "drug2",
+        "name": "イリノテカン",
+        "route": "infusion",
+        "days": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ],
+        "times_per_day": null,
+        "start_note": null
+      },
+      {
+        "row_id": "drug3",
+        "name": "レボホリナート",
+        "route": "infusion",
+        "days": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ],
+        "times_per_day": null,
+        "start_note": null
+      },
+      {
+        "row_id": "drug4",
+        "name": "フルオロウラシル（急速静注）",
+        "route": "infusion",
+        "days": [
+          {
+            "start": 1,
+            "end": 1
+          }
+        ],
+        "times_per_day": null,
+        "start_note": null
+      },
+      {
+        "row_id": "drug5",
+        "name": "フルオロウラシル（46時間持続）",
+        "route": "pump",
+        "days": [
+          {
+            "start": 1,
+            "end": 3
+          }
+        ],
+        "times_per_day": null,
+        "start_note": null
+      }
+    ],
+    "side_effects": [
+      {
+        "row_id": "effect1",
+        "phrases": [
+          "下痢",
+          "お腹がゆるい"
+        ],
+        "ctcae_terms": [
+          "下痢"
+        ],
+        "question_key": "diarrhea"
+      },
+      {
+        "row_id": "effect2",
+        "phrases": [
+          "吐き気",
+          "食欲がない",
+          "吐いた"
+        ],
+        "ctcae_terms": [
+          "悪心",
+          "嘔吐",
+          "食欲不振"
+        ],
+        "question_key": "nausea_appetite"
+      },
+      {
+        "row_id": "effect3",
+        "phrases": [
+          "口内炎",
+          "口の中が痛い"
+        ],
+        "ctcae_terms": [
+          "口腔粘膜炎",
+          "口腔内痛"
+        ],
+        "question_key": "stomatitis"
+      },
+      {
+        "row_id": "effect4",
+        "phrases": [
+          "だるい",
+          "疲れやすい"
+        ],
+        "ctcae_terms": [
+          "疲労",
+          "倦怠感"
+        ],
+        "question_key": "fatigue"
+      },
+      {
+        "row_id": "effect5",
+        "phrases": [
+          "熱が出た",
+          "寒気"
+        ],
+        "ctcae_terms": [
+          "発熱",
+          "悪寒"
+        ],
+        "question_key": "fever"
+      },
+      {
+        "row_id": "effect6",
+        "phrases": [
+          "鼻血",
+          "歯ぐきから血が出る"
+        ],
+        "ctcae_terms": [
+          "鼻出血"
+        ],
+        "question_key": "bleeding"
+      },
+      {
+        "row_id": "effect7",
+        "phrases": [
+          "髪が抜ける"
+        ],
+        "ctcae_terms": [
+          "脱毛症"
+        ],
+        "question_key": null
+      }
+    ],
+    "questions": [
+      {
+        "row_id": "q-fever",
+        "key": "fever",
+        "label": "体温",
+        "text": "熱を測りましたか",
+        "answer_type": "temperature"
+      },
+      {
+        "row_id": "question1",
+        "key": "diarrhea",
+        "label": "下痢",
+        "text": "下痢はありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "row_id": "question2",
+        "key": "nausea_appetite",
+        "label": "吐き気・食欲",
+        "text": "吐き気や食欲の落ち込みはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "row_id": "question3",
+        "key": "stomatitis",
+        "label": "口内炎",
+        "text": "口の中の痛みや口内炎はありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "row_id": "question4",
+        "key": "fatigue",
+        "label": "だるさ",
+        "text": "だるさや疲れやすさはありましたか",
+        "answer_type": "three_level"
+      },
+      {
+        "row_id": "question5",
+        "key": "bleeding",
+        "label": "出血",
+        "text": "鼻血や歯ぐきからの出血はありましたか",
+        "answer_type": "three_level"
+      }
+    ],
+    "notes": ""
+  },
+  "sources": {
+    "basic.code": "doctor_text",
+    "basic.cycle_days": "doctor_text",
+    "basic.display_name": "doctor_text",
+    "basic.target": "doctor_text",
+    "drugs.drug1.days": "doctor_text",
+    "drugs.drug1.name": "doctor_text",
+    "drugs.drug1.route": "doctor_text",
+    "drugs.drug2.days": "doctor_text",
+    "drugs.drug2.name": "doctor_text",
+    "drugs.drug2.route": "doctor_text",
+    "drugs.drug3.days": "doctor_text",
+    "drugs.drug3.name": "doctor_text",
+    "drugs.drug3.route": "doctor_text",
+    "drugs.drug4.days": "doctor_text",
+    "drugs.drug4.name": "doctor_text",
+    "drugs.drug4.route": "doctor_text",
+    "drugs.drug5.days": "doctor_text",
+    "drugs.drug5.name": "doctor_text",
+    "drugs.drug5.route": "doctor_text",
+    "questions.question1.answer_type": "standard",
+    "questions.question1.key": "standard",
+    "questions.question1.label": "standard",
+    "questions.question1.text": "standard",
+    "questions.question2.answer_type": "standard",
+    "questions.question2.key": "standard",
+    "questions.question2.label": "standard",
+    "questions.question2.text": "standard",
+    "questions.question3.answer_type": "standard",
+    "questions.question3.key": "standard",
+    "questions.question3.label": "standard",
+    "questions.question3.text": "standard",
+    "questions.question4.answer_type": "standard",
+    "questions.question4.key": "standard",
+    "questions.question4.label": "standard",
+    "questions.question4.text": "standard",
+    "questions.question5.answer_type": "standard",
+    "questions.question5.key": "standard",
+    "questions.question5.label": "standard",
+    "questions.question5.text": "standard",
+    "side_effects.effect1.ctcae_terms": "standard",
+    "side_effects.effect1.phrases": "standard",
+    "side_effects.effect1.question_key": "standard",
+    "side_effects.effect2.ctcae_terms": "standard",
+    "side_effects.effect2.phrases": "standard",
+    "side_effects.effect2.question_key": "standard",
+    "side_effects.effect3.ctcae_terms": "standard",
+    "side_effects.effect3.phrases": "standard",
+    "side_effects.effect3.question_key": "standard",
+    "side_effects.effect4.ctcae_terms": "standard",
+    "side_effects.effect4.phrases": "standard",
+    "side_effects.effect4.question_key": "standard",
+    "side_effects.effect5.ctcae_terms": "standard",
+    "side_effects.effect5.phrases": "standard",
+    "side_effects.effect5.question_key": "standard",
+    "side_effects.effect6.ctcae_terms": "standard",
+    "side_effects.effect6.phrases": "standard",
+    "side_effects.effect6.question_key": "standard",
+    "side_effects.effect7.ctcae_terms": "standard",
+    "side_effects.effect7.phrases": "standard"
+  }
+}

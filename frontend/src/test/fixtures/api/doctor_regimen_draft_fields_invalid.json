@@ -1,0 +1,23 @@
+{
+  "method": "PATCH",
+  "path": "/api/doctor/regimen-drafts/1/fields",
+  "request": {
+    "changes": [
+      {
+        "field_id": "drugs.d-bv.name",
+        "value": "ベバシズマブ 5mg/kg"
+      }
+    ]
+  },
+  "status": 422,
+  "body": {
+    "error": "invalid_fields",
+    "issues": [
+      {
+        "field_id": "drugs.d-bv.name",
+        "code": "dose",
+        "message": "薬の量（数値＋mg 等）は持たない"
+      }
+    ]
+  }
+}

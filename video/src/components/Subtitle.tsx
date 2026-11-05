@@ -6,30 +6,19 @@ import { COLORS, FONT_FAMILY, FONT_SIZE, SUBTITLE_TOP } from "../theme";
 interface SubtitleProps {
   text: string;
   durationInFrames: number;
-  /** 塊を配る区間の開始（フレーム。声の開始。既定は 0） */
-  activeFrom?: number;
-  /** 塊を配る区間の終了（フレーム。声の終了。既定は durationInFrames） */
-  activeTo?: number;
 }
 
-/**
- * 下部の字幕。2 行以内の塊を字数に比例した時間で切り替える。
- * activeFrom / activeTo があればその区間（声の区間）に塊を配る。
- */
+/** 下部の字幕。2 行以内の塊を字数に比例した時間で切り替える */
 export const Subtitle: React.FC<SubtitleProps> = ({
   text,
   durationInFrames,
-  activeFrom = 0,
-  activeTo = durationInFrames,
 }) => {
   const frame = useCurrentFrame();
   const chunks = useMemo(() => buildSubtitleChunks(text), [text]);
   if (chunks.length === 0) return null;
-  const { index, startFrame } = chunkAt(chunks, frame, activeFrom, activeTo);
+  const { index, startFrame } = chunkAt(chunks, frame, durationInFrames);
   const current = chunks[index];
-  // 最初の塊は場面の頭から出す（声の前の lead の間に薄いままにしない）
-  const fadeFrom = index === 0 ? 0 : startFrame;
-  const opacity = interpolate(frame, [fadeFrom, fadeFrom + 4], [0.4, 1], {
+  const opacity = interpolate(frame, [startFrame, startFrame + 4], [0.4, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

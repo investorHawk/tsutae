@@ -1,4 +1,4 @@
-// 字幕: ナレーションを「2 行以内・1 行 25 字前後」の塊に分け、塊の字数に比例して時間を配る。
+// 字幕: 字幕の文を「2 行以内・1 行 25 字前後」の塊に分け、塊の字数に比例して時間を配る。
 import { countChars } from "./text";
 
 export const LINE_TARGET = 25;
@@ -128,7 +128,7 @@ export interface SubtitleChunk {
   end: number;
 }
 
-/** ナレーションを字幕の塊に分け、字数に比例して時間を配る */
+/** 字幕の文を塊に分け、字数に比例して時間を配る */
 export const buildSubtitleChunks = (text: string): SubtitleChunk[] => {
   const pieces = mergeShort(splitSentences(text).flatMap(splitLong));
   const total = pieces.reduce((sum, p) => sum + visibleLength(p), 0) || 1;
@@ -146,22 +146,18 @@ export interface ActiveChunk {
   startFrame: number;
 }
 
-/**
- * frame の時点で出す塊。塊の時間は activeFrom〜activeTo（声の区間）に配り、
- * 区間の前は最初の塊、後は最後の塊を出し続ける。
- */
+/** frame の時点で出す塊。塊の時間は場面全体に配り、場面の終わりより後は最後の塊を出し続ける */
 export const chunkAt = (
   chunks: SubtitleChunk[],
   frame: number,
-  activeFrom: number,
-  activeTo: number,
+  durationInFrames: number,
 ): ActiveChunk => {
-  const span = Math.max(1, activeTo - activeFrom);
-  const progress = Math.min(1, Math.max(0, (frame - activeFrom) / span));
+  const span = Math.max(1, durationInFrames);
+  const progress = Math.min(1, Math.max(0, frame / span));
   const found = chunks.findIndex(
     (c) => progress >= c.start && progress < c.end,
   );
   const index = found >= 0 ? found : Math.max(0, chunks.length - 1);
-  const startFrame = activeFrom + (chunks[index]?.start ?? 0) * span;
+  const startFrame = (chunks[index]?.start ?? 0) * span;
   return { index, startFrame };
 };

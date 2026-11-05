@@ -76,25 +76,6 @@ export interface SceneProps {
   privacy?: string[];
 }
 
-/** scripts/make_voice.py が書く声の一覧（src/voice.generated.json）の 1 行 */
-export interface VoiceClip {
-  /** 場面の id */
-  id: string;
-  /** public からのパス（voice/b/<id>.wav） */
-  file: string;
-  /** 声の長さ（秒） */
-  seconds: number;
-}
-
-/** 場面に重ねる声（applyVoiceTiming が付ける） */
-export interface SceneVoice {
-  file: string;
-  /** 場面の頭から声が始まるまでの秒 */
-  leadSeconds: number;
-  /** 声の長さ（秒） */
-  seconds: number;
-}
-
 export interface Scene {
   id: string;
   seconds: number;
@@ -105,10 +86,9 @@ export interface Scene {
   title?: string;
   /** 字幕（無ければ narration を字幕にする） */
   caption?: string;
+  /** 字幕の文（音声は入れない） */
   narration: string;
   /** storyboards.md の「画面に出すもの」（文書の生成用。描画には使わない） */
   screen?: string;
   props?: SceneProps;
-  /** 場面ごとの声（DemoBVoice のように声から尺を決めた版だけ） */
-  voice?: SceneVoice;
 }

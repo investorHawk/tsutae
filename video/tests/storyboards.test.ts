@@ -59,7 +59,7 @@ describe.each(STORYBOARDS)("$compositionId（$title）", ({ scenes }) => {
     }
   });
 
-  it("(4) ナレーションの合計字数が 450〜800 字（空白を除く）", () => {
+  it("(4) 字幕の文（narration）の合計字数が 450〜800 字（空白を除く）", () => {
     const total = scenes.reduce((sum, s) => sum + countChars(s.narration), 0);
     expect(total).toBeGreaterThanOrEqual(450);
     expect(total).toBeLessThanOrEqual(800);

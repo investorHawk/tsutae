@@ -30,10 +30,10 @@ const sceneLabel = (scene) => {
 
 const HEADER = (title) =>
   [
-    `# ナレーション ${title}`,
+    `# 字幕の文 ${title}`,
     "",
     "生成物: `cd video && npm run docs` で `video/src/storyboards/` から書き出す。手で直さず構成データを直す。",
-    "字幕の列が「（ナレーション）」の場面は、ナレーションをそのまま字幕にする（2 行以内・1 行 25 字前後に自動で区切る）。字数は空白を除いて数える。",
+    "動画に音声のナレーションは入れない。「字幕の文」の列（構成データの `narration`）を字幕にする（2 行以内・1 行 25 字前後に自動で区切る）。別の字幕（`caption`）がある場面だけ「字幕」の列に出す。字数は空白を除いて数える。",
     "",
   ].join("\n");
 
@@ -42,20 +42,20 @@ const narrationDoc = (sb) => {
     ({ scene, from, durationInFrames }) => {
       const start = from / FPS;
       const end = (from + durationInFrames) / FPS;
-      return `| ${mmss(start)}–${mmss(end)} | ${scene.seconds} | ${cell(sceneLabel(scene))} | ${cell(scene.screen)} | ${cell(scene.caption ?? "（ナレーション）")} | ${cell(scene.narration)} | ${countChars(scene.narration)} |`;
+      return `| ${mmss(start)}–${mmss(end)} | ${scene.seconds} | ${cell(sceneLabel(scene))} | ${cell(scene.screen)} | ${cell(scene.caption ?? "（字幕の文のまま）")} | ${cell(scene.narration)} | ${countChars(scene.narration)} |`;
     },
   );
   const total = sb.scenes.reduce((sum, s) => sum + countChars(s.narration), 0);
   const seconds = sb.scenes.reduce((sum, s) => sum + s.seconds, 0);
   return [
     HEADER(sb.title),
-    `合計 ${seconds} 秒・ナレーション ${total} 字（${(total / seconds).toFixed(1)} 字/秒）。Composition: \`${sb.compositionId}\`。`,
+    `合計 ${seconds} 秒・字幕の文 ${total} 字（${(total / seconds).toFixed(1)} 字/秒）。Composition: \`${sb.compositionId}\`。`,
     "",
-    "| 時刻 | 秒 | 場面 | 画面に出すもの | 字幕 | ナレーション | 字数 |",
+    "| 時刻 | 秒 | 場面 | 画面に出すもの | 字幕 | 字幕の文 | 字数 |",
     "|---|---|---|---|---|---|---|",
     ...rows,
     "",
-    "## ナレーション全文（読み上げ用）",
+    "## 字幕の全文",
     "",
     ...sb.scenes.map((s) => s.narration),
     "",

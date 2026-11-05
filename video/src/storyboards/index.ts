@@ -8,13 +8,19 @@ export interface Storyboard {
   compositionId: string;
   title: string;
   scenes: Scene[];
-  /** BGM（public/voice/bgm.wav）を重ねるか。DemoBVoice だけ true */
+  /** BGM（public/audio/bgm.wav）を重ねるか。案 B だけ true */
   bgm?: boolean;
 }
 
 export const STORYBOARDS: Storyboard[] = [
   { variant: "a", compositionId: "DemoA", title: TITLE_A, scenes: scenesA },
-  { variant: "b", compositionId: "DemoB", title: TITLE_B, scenes: scenesB },
+  {
+    variant: "b",
+    compositionId: "DemoB",
+    title: TITLE_B,
+    scenes: scenesB,
+    bgm: true,
+  },
   { variant: "c", compositionId: "DemoC", title: TITLE_C, scenes: scenesC },
 ];
 

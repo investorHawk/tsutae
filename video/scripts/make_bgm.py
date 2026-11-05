@@ -1,8 +1,8 @@
-"""DemoBVoice の BGM を合成して public/voice/bgm.wav に書く（標準ライブラリだけ）。
+"""案 B（DemoB）の BGM を合成して public/audio/bgm.wav に書く（標準ライブラリだけ）。
 
 使い方: cd video && python3 scripts/make_bgm.py [--seconds N] [--seed S] [--out PATH]
 
-- 既定は 150 秒（DemoBVoice の長さ以上。Remotion 側で尺に合わせて切り、フェードアウトする）。
+- 既定は 150 秒（DemoB の長さと同じ。Remotion 側で尺に合わせて切り、フェードアウトする）。
 - 曲はこのファイルの中で正弦波から合成する自作の音だけで、第三者の音源・サンプルは使わない。
   （著作権の制約が無い自作曲）
 - 曲想: 診察室の話に合う、落ち着いて温かく前向きな器楽。F メジャー、88 BPM、
@@ -27,7 +27,7 @@ from operator import add, mul
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUT = ROOT / "public" / "voice" / "bgm.wav"
+DEFAULT_OUT = ROOT / "public" / "audio" / "bgm.wav"
 
 SR = 44100
 BPM = 88
@@ -357,7 +357,7 @@ def describe(pcm: array, elapsed: float) -> str:
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="DemoBVoice の BGM を合成する")
+    parser = argparse.ArgumentParser(description="案 B（DemoB）の BGM を合成する")
     parser.add_argument("--seconds", type=float, default=DEFAULT_SECONDS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)

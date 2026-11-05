@@ -94,6 +94,25 @@
     "visit.about": "受付票の番号を入れると、これまでの記録が先生に届きます。",
     "visit.example": "例: A-023",
     "notify.title": "つたえ",
-    "notify.body": "今日の記録をお願いします。つらい日はボタンひとつで記録になります。"
+    "notify.body": "今日の記録をお願いします。つらい日はボタンひとつで記録になります。",
+    "nav.settings": "設定",
+    "settings.title": "設定",
+    "notify.section_title": "毎日のお知らせ",
+    "notify.about": "1日1回、記録をお願いするお知らせをこのスマホに出します。その日に記録していれば出ません。",
+    "notify.status_on": "お知らせはオンです。",
+    "notify.status_off": "お知らせはオフです。",
+    "notify.unsupported": "この開き方では通知を使えません。iPhoneの方は、Safariの共有ボタンから「ホーム画面に追加」をして、ホーム画面のアイコンから開いてください。",
+    "notify.no_key": "今は通知を使えません（通知の準備ができていません）。受付でお声がけください。",
+    "notify.denied": "通知が許可されていません。スマホの「設定」アプリで「通知」から「つたえ」を選び、通知を許可してください。",
+    "notify.turn_on": "お知らせをオンにする",
+    "notify.turn_off": "お知らせをオフにする",
+    "notify.time_label": "お知らせの時刻",
+    "notify.time_saved": "お知らせの時刻を変えました。",
+    "notify.test": "試しに通知を送る",
+    "notify.test_sent": "10秒ほどで届きます。画面を閉じて待ってください。",
+    "notify.test_too_soon": "続けては送れません。1分ほどたってから、もう一度お試しください。",
+    "notify.not_allowed": "通知の許可がまだです。もう一度押して、許可してください。",
+    "notify.enable_failed": "オンにできませんでした。電波のよいところで、もう一度お試しください。",
+    "notify.banner": "毎日のお知らせをオンにする（設定へ）"
   }
 }

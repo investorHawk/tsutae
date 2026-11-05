@@ -1,0 +1,131 @@
+/**
+ * 端末の通知の API の偽物（jsdom には Notification・PushManager・serviceWorker が無い）。
+ * calls に呼ばれた順を残す。endpoint・鍵は API の fixture と同じ値。
+ */
+import { vi } from "vitest";
+import { base64UrlToBytes } from "../../../patient/pushDevice";
+import { apiFixture } from "../../../test/apiFixtures";
+
+interface SubscribeRequestFixture {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+const REQUEST = apiFixture("patient_push_subscribe")
+  .request as SubscribeRequestFixture;
+
+export const ENDPOINT = REQUEST.endpoint;
+export const KEYS = REQUEST.keys;
+export const PUBLIC_KEY = (
+  apiFixture("patient_push_config").body as { public_key: string }
+).public_key;
+
+export interface FakePushOptions {
+  /** 開いたときの許可の状態 */
+  permission?: NotificationPermission;
+  /** 許可を求めたときの答え */
+  answer?: NotificationPermission;
+  /** 最初から登録がある */
+  subscribed?: boolean;
+  /** subscribe が失敗する */
+  subscribeError?: Error;
+  /** unsubscribe が失敗する */
+  unsubscribeError?: Error;
+}
+
+export interface FakePush {
+  calls: string[];
+  requestPermission: ReturnType<typeof vi.fn>;
+  register: ReturnType<typeof vi.fn>;
+  subscribe: ReturnType<typeof vi.fn>;
+  clearAppBadge: ReturnType<typeof vi.fn>;
+  shown: { close: ReturnType<typeof vi.fn> }[];
+  /** 今の許可の状態を変える（端末の設定で直した、など） */
+  setPermission: (permission: NotificationPermission) => void;
+  isSubscribed: () => boolean;
+  uninstall: () => void;
+}
+
+function defineOnNavigator(name: string, value: unknown) {
+  Object.defineProperty(navigator, name, { configurable: true, value });
+}
+
+function removeFromNavigator(name: string) {
+  delete (navigator as unknown as Record<string, unknown>)[name];
+}
+
+/** 通知を使える端末にする。テストの後で uninstall を呼ぶ。 */
+export function installFakePush(options: FakePushOptions = {}): FakePush {
+  const calls: string[] = [];
+  const notification = {
+    permission: options.permission ?? "default",
+    requestPermission: vi.fn(async () => {
+      calls.push("requestPermission");
+      notification.permission = options.answer ?? "granted";
+      return notification.permission;
+    }),
+  };
+  let current: unknown = null;
+  const makeSubscription = () => ({
+    endpoint: ENDPOINT,
+    options: { applicationServerKey: base64UrlToBytes(PUBLIC_KEY).buffer },
+    toJSON: () => ({ endpoint: ENDPOINT, keys: KEYS }),
+    unsubscribe: vi.fn(async () => {
+      calls.push("unsubscribe");
+      if (options.unsubscribeError) {
+        throw options.unsubscribeError;
+      }
+      current = null;
+      return true;
+    }),
+  });
+  const subscribe = vi.fn(async () => {
+    calls.push("subscribe");
+    if (options.subscribeError) {
+      throw options.subscribeError;
+    }
+    current = makeSubscription();
+    return current;
+  });
+  const shown = [{ close: vi.fn() }];
+  const registration = {
+    pushManager: { getSubscription: async () => current, subscribe },
+    getNotifications: async () => shown,
+  };
+  let registered = false;
+  const register = vi.fn(async () => {
+    calls.push("register");
+    registered = true;
+    return registration;
+  });
+  if (options.subscribed) {
+    current = makeSubscription();
+    registered = true;
+  }
+  defineOnNavigator("serviceWorker", {
+    register,
+    getRegistration: async () => (registered ? registration : undefined),
+    ready: Promise.resolve(registration),
+  });
+  const clearAppBadge = vi.fn(async () => undefined);
+  defineOnNavigator("clearAppBadge", clearAppBadge);
+  vi.stubGlobal("Notification", notification);
+  vi.stubGlobal("PushManager", class {});
+  return {
+    calls,
+    requestPermission: notification.requestPermission,
+    register,
+    subscribe,
+    clearAppBadge,
+    shown,
+    setPermission: (permission) => {
+      notification.permission = permission;
+    },
+    isSubscribed: () => current !== null,
+    uninstall: () => {
+      removeFromNavigator("serviceWorker");
+      removeFromNavigator("clearAppBadge");
+      vi.unstubAllGlobals();
+    },
+  };
+}

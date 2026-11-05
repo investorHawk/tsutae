@@ -4,6 +4,7 @@ import {
   mockFetch,
   type FetchMock,
 } from "../../../test/fetchMock";
+import { apiFixture } from "../../../test/apiFixtures";
 import { ENTRIES, PID, QUESTIONS_RESPONSE, entriesBody } from "./fixtures";
 
 export type Reply = Response | Promise<Response>;
@@ -17,6 +18,14 @@ export interface PatientApiReplies {
   visit?: (body: unknown) => Reply;
   /** POST /api/patient/register（番号の手入力） */
   register?: (body: unknown) => Reply;
+  /** GET push-config */
+  pushConfig?: () => Reply;
+  /** PUT push-subscription */
+  pushSubscribe?: (body: unknown) => Reply;
+  /** DELETE push-subscription */
+  pushUnsubscribe?: (body: unknown) => Reply;
+  /** POST push-test */
+  pushTest?: (body: unknown) => Reply;
 }
 
 const DEFAULTS: Required<PatientApiReplies> = {
@@ -26,6 +35,14 @@ const DEFAULTS: Required<PatientApiReplies> = {
   undo: () => jsonResponse({ ok: true }),
   visit: () => jsonResponse({ ok: true, message_key: "visit.done" }),
   register: () => jsonResponse({ ok: true }),
+  pushConfig: () => jsonResponse(apiFixture("patient_push_config").body),
+  pushSubscribe: (body) =>
+    jsonResponse({
+      ok: true,
+      notify_time: (body as { notify_time: string }).notify_time,
+    }),
+  pushUnsubscribe: () => jsonResponse({ ok: true }),
+  pushTest: () => jsonResponse({ ok: true }),
 };
 
 function bodyOf(init?: RequestInit): unknown {
@@ -55,6 +72,18 @@ export function mockPatientApi(replies: PatientApiReplies = {}): FetchMock {
     }
     if (method === "POST" && url === "/api/patient/register") {
       return r.register(bodyOf(init));
+    }
+    if (method === "GET" && url === "/api/patient/push-config") {
+      return r.pushConfig();
+    }
+    if (method === "PUT" && url === `${base}/push-subscription`) {
+      return r.pushSubscribe(bodyOf(init));
+    }
+    if (method === "DELETE" && url === `${base}/push-subscription`) {
+      return r.pushUnsubscribe(bodyOf(init));
+    }
+    if (method === "POST" && url === `${base}/push-test`) {
+      return r.pushTest(bodyOf(init));
     }
     return jsonResponse({ error: "not_found" }, 404);
   });

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { DoneMessage } from "../../components/patient/Messages";
+import NotifyBanner from "../../components/patient/NotifyBanner";
 import NotRegistered from "../../components/patient/NotRegistered";
 import PatientNav from "../../components/patient/PatientNav";
 import { formatDate } from "../../components/patient/history";
 import TodayForm from "../../components/patient/TodayForm";
 import { loadPid } from "../../patient/pid";
+import { clearDeliveredNotifications } from "../../patient/pushDevice";
 import { usePatientStrings } from "../../strings/PatientStrings";
 
 function cameFromRegister(state: unknown): boolean {
@@ -40,6 +42,8 @@ function TodayTitle({ today }: { today: string | null }) {
 /**
  * P1 今日の記録（/today）。仮名ID が無ければ未登録の案内と番号の入力欄（記録の API は呼ばない）。
  * 下部ナビの「今日の記録」を押すと（location.key が変わり）新しい記録を始める。
+ * 記録できたらバッジと表示中の通知を消す。通知の案内の帯は質問集を読めた後（登録済み）に、
+ * 記録の欄の下へ出す（遅れて出ても「つらくて書けない」の位置を動かさない）。
  */
 export default function Today() {
   const location = useLocation();
@@ -64,12 +68,16 @@ export default function Today() {
         <TodayForm
           key={location.key}
           pid={pid}
-          onSaved={() => setJustRegistered(false)}
+          onSaved={() => {
+            setJustRegistered(false);
+            void clearDeliveredNotifications();
+          }}
           onToday={setToday}
         />
       ) : (
         <NotRegistered />
       )}
+      {pid && today !== null && <NotifyBanner />}
       <PatientNav />
     </section>
   );

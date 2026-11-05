@@ -101,6 +101,33 @@ describe("patient.css", () => {
     );
   });
 
+  it("下のタブはタブの数だけ等分し、折れた「これまでの記録」が --p-nav-h に収まる", () => {
+    const tabs = ruleOf(".patient-app .p-nav-tabs");
+    expect(tabs).toMatch(/grid-auto-flow:\s*column/);
+    expect(tabs).toMatch(/grid-auto-columns:\s*minmax\(0, 1fr\)/);
+    const link = ruleOf(".patient-app .p-nav a");
+    expect(link).toMatch(/min-height:\s*var\(--p-tap\)/);
+    expect(link).toMatch(/line-height:\s*1\.3/);
+    expect(link).toMatch(/padding:\s*4px/);
+    expect(link).toMatch(/font-size:\s*18px/);
+    // 2行（18px × 1.3 × 2）＋ 余白 8px ＋ 枠 4px ＋ タブの上下 20px ＋ 上の線 2px
+    const height = /--p-nav-h:\s*(\d+)px/.exec(css)?.[1];
+    expect(Number(height)).toBeGreaterThanOrEqual(
+      18 * 1.3 * 2 + 8 + 4 + 20 + 2,
+    );
+  });
+
+  it("お知らせの案内の帯は押しやすく（56px 以上）、読みやすい（4.5:1 以上）", () => {
+    const banner = ruleOf(".patient-app .p-notify-banner");
+    expect(banner).toMatch(/min-height:\s*var\(--p-tap\)/);
+    expect(banner).toMatch(/color:\s*var\(--p-primary\)/);
+    expect(banner).toMatch(/background:\s*var\(--p-tag-present-bg\)/);
+    expect(banner).toMatch(/text-decoration:\s*none/);
+    expect(
+      contrast(varOf("--p-primary"), varOf("--p-tag-present-bg")),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("PC-2: タブのある画面は、最後がタブに隠れないよう下をあける", () => {
     const body = ruleOf(".patient-app--with-nav");
     expect(body).toMatch(/padding-bottom:\s*calc\(var\(--p-nav-h\)/);

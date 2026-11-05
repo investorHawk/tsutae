@@ -7,8 +7,9 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { clearPid, savePid } from "./patient/pid";
 import { jsonResponse, mockFetch, type FetchMock } from "./test/fetchMock";
 import { PATIENT_STRINGS_FIXTURE } from "./test/patientStringsFixture";
 
@@ -50,6 +51,32 @@ describe("患者ルートの定型文", () => {
     await userEvent.click(screen.getByTestId("go"));
     await screen.findByRole("heading", { level: 1, name: "これまでの記録" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("患者の設定", () => {
+  beforeEach(() => savePid("P-DEMO0001"));
+  afterEach(() => clearPid());
+
+  it("/settings は患者の設定で、医師の設定（/doctor/settings）とは別", async () => {
+    mockFetch(() => jsonResponse(PATIENT_STRINGS_FIXTURE));
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <App />
+        <Routes>
+          <Route path="*" element={<Where />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { level: 1, name: "設定" });
+    expect(screen.getByTestId("where")).toHaveTextContent(/^\/settings$/);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "毎日のお知らせ" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 });
 

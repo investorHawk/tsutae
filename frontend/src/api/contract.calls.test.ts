@@ -38,14 +38,20 @@ import {
 } from "./doctor";
 import { ApiError } from "./http";
 import {
-  createEntry,
   getPatientStrings,
   getQuestions,
-  listEntries,
   registerPatient,
   submitVisit,
-  undoEntry,
 } from "./patient";
+import {
+  addRecordMark,
+  getDemoConfig,
+  getDemoEntries,
+  getVisitDays,
+  getVisitWindow,
+  undoRecordMark,
+  unregisterPatient,
+} from "./patientDevice";
 import {
   deletePushSubscription,
   getPushConfig,
@@ -56,10 +62,11 @@ import {
 import type {
   AddLibraryQuestionRequest,
   Course,
-  EntryCreate,
   MaskCheckRequest,
   MaskSaveRequest,
   Regimen,
+  UndoRecordMarkRequest,
+  VisitRequest,
 } from "./types";
 import {
   adoptRegimenDraft,
@@ -108,15 +115,24 @@ function idIn(f: ApiFixture): number {
 
 const register: Call = (f) => registerPatient(String(req(f).pid));
 const questions: Call = (f) => getQuestions(pidIn(f));
-const addEntry: Call = (f) => createEntry(pidIn(f), f.request as EntryCreate);
-const entries: Call = (f) => listEntries(pidIn(f));
-const undo: Call = (f) => undoEntry(pidIn(f), idIn(f));
+const recordMark: Call = (f) => addRecordMark(pidIn(f));
+const undoMark: Call = (f) =>
+  undoRecordMark(pidIn(f), f.request as UndoRecordMarkRequest);
+const visitDays: Call = (f) => getVisitDays(pidIn(f));
+const visitWindow: Call = (f) => getVisitWindow(pidIn(f));
+const unregister: Call = (f) =>
+  unregisterPatient(pidIn(f), req(f).endpoint as string | null);
+const demoConfig: Call = (f) => getDemoConfig(pidIn(f));
+const demoEntries: Call = (f) => getDemoEntries(pidIn(f));
 const pushSubscribe: Call = (f) =>
   putPushSubscription(pidIn(f), f.request as PushSubscriptionRequest);
 const pushUnsubscribe: Call = (f) =>
   deletePushSubscription(pidIn(f), String(req(f).endpoint));
 const pushTest: Call = (f) => sendPushTest(pidIn(f), String(req(f).endpoint));
-const visit: Call = (f) => submitVisit(String(req(f).reception_no));
+const visit: Call = (f) => {
+  const body = f.request as VisitRequest;
+  return submitVisit(body.reception_no, body.entries);
+};
 const doctorLogin: Call = (f) => login(String(req(f).password));
 const courses: Call = (f) => listCourses(pidIn(f));
 const patientVisits: Call = (f) => listPatientVisits(pidIn(f));
@@ -163,13 +179,18 @@ const CALLS: Readonly<Record<string, Call>> = {
   patient_strings: () => getPatientStrings(),
   patient_questions: questions,
   patient_questions_forbidden: questions,
-  patient_entry_create: addEntry,
-  patient_entry_create_invalid: addEntry,
-  patient_entries: entries,
-  patient_entries_not_logged_in: entries,
-  patient_entry_undo: undo,
-  patient_entry_undo_not_found: undo,
-  patient_entry_undo_not_undoable: undo,
+  patient_record_mark: recordMark,
+  patient_record_mark_undo: undoMark,
+  patient_record_mark_undo_not_undoable: undoMark,
+  patient_visit_days: visitDays,
+  patient_visit_days_not_logged_in: visitDays,
+  patient_visit_window: visitWindow,
+  patient_visit_window_no_course: visitWindow,
+  patient_unregister: unregister,
+  patient_demo_config: demoConfig,
+  patient_demo_config_other: demoConfig,
+  patient_demo_entries: demoEntries,
+  patient_demo_entries_other: demoEntries,
   patient_push_config: () => getPushConfig(),
   patient_push_config_unavailable: () => getPushConfig(),
   patient_push_subscribe: pushSubscribe,
@@ -183,6 +204,8 @@ const CALLS: Readonly<Record<string, Call>> = {
   visit,
   visit_invalid: visit,
   visit_no_course: visit,
+  visit_with_entries: visit,
+  visit_entries_invalid: visit,
   doctor_login: doctorLogin,
   doctor_login_rejected: doctorLogin,
   doctor_logout: () => logout(),

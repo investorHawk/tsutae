@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { PatientEntry, PatientVisitDay } from "../../api/types";
+import type { DeviceEntry, PatientVisitDay } from "../../api/types";
 import { historyRows } from "./historyRows";
 
-function entry(id: number, recordedAt: string): PatientEntry {
+function entry(id: number, recordedAt: string): DeviceEntry {
   return {
-    id,
+    pid: "P-DEMO0001",
+    client_entry_id: String(id),
     recorded_at: recordedAt,
     record_date: recordedAt.slice(0, 10),
     kind: "too_sick",
@@ -22,7 +23,9 @@ function visit(receivedAt: string): PatientVisitDay {
 /** 行を短い印に（e<id> は記録、v<日付> は受診日の区切り）。 */
 function labels(rows: ReturnType<typeof historyRows>): string[] {
   return rows.map((row) =>
-    row.kind === "entry" ? `e${row.entry.id}` : `v${row.visit.visit_date}`,
+    row.kind === "entry"
+      ? `e${row.entry.client_entry_id}`
+      : `v${row.visit.visit_date}`,
   );
 }
 

@@ -1,28 +1,26 @@
 import { useId, useState } from "react";
 import { isApiError } from "../../api/http";
-import { undoEntry } from "../../api/patient";
+import type { DeviceEntry } from "../../api/types";
+import { undoRecord } from "../../patient/recordEntry";
 import { reloadPage } from "../../patient/reload";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import EntryDetail from "./EntryDetail";
-import type { SummarySource } from "./entrySummary";
+import { summarySourceOf } from "./entrySummary";
 import { DoneMessage, ErrorMessage, Notices } from "./Messages";
 import NotRegistered from "./NotRegistered";
 import { GENERIC_ERROR_KEY, isNotRegistered } from "./patientApi";
 
 /** 記録できた1件（今日の記録の画面に出す分）。 */
 export interface SavedRecord {
-  entryId: number;
+  /** 端末に保存した記録（回答の表の元。なし・測っていないも含む） */
+  entry: DeviceEntry;
   /** today.saved か today.too_sick_done */
   messageKey: string;
+  /** 固定規則の案内（patient_strings のキー） */
   notices: readonly string[];
-  /** 記録した内容（回答の表の元。なし・測っていないも含む） */
-  source: SummarySource;
-  byProxy: boolean;
-  /** 「つらくて書けない」なら取り消せる（P2-5） */
-  undoable: boolean;
 }
 
-/** 取り消しが断られた（409 not_undoable・404 not_found）。もう取り消せない。 */
+/** 取り消しが断られた（409 not_undoable）。もう取り消せない。 */
 const UNDO_FAILED_KEY = "today.undo_failed";
 
 /** 取り消しで未登録と分かり、番号を入れて戻った */
@@ -35,14 +33,13 @@ type UndoState =
   | { name: "failed"; errorKey: string; retry: boolean };
 
 function undoErrorOf(err: unknown): { errorKey: string; retry: boolean } {
-  if (isApiError(err) && (err.status === 404 || err.status === 409)) {
+  if (isApiError(err) && err.status === 409) {
     return { errorKey: UNDO_FAILED_KEY, retry: false };
   }
   return { errorKey: GENERIC_ERROR_KEY, retry: true };
 }
 
 interface TodayDoneProps {
-  pid: string;
   saved: SavedRecord;
   /** 取り消せた（記録する前の画面に戻す） */
   onUndone: () => void;
@@ -50,14 +47,17 @@ interface TodayDoneProps {
   onAddMore: () => void;
 }
 
-/** 取り消しの送信。401/403 の後は同じ番号なら押し直せるように戻し、違う番号は読み直す。 */
-function useUndo(pid: string, entryId: number, onUndone: () => void) {
+/**
+ * 取り消しの送信（サーバーが通したら端末の記録を消す）。401/403 の後は同じ番号なら押し直せる
+ * ように戻し、違う番号は読み直す。
+ */
+function useUndo(entry: DeviceEntry, onUndone: () => void) {
   const [undo, setUndo] = useState<UndoState>({ name: "idle" });
 
   async function handleUndo() {
     setUndo({ name: "sending" });
     try {
-      await undoEntry(pid, entryId);
+      await undoRecord(entry);
       onUndone();
     } catch (err) {
       setUndo(
@@ -69,7 +69,7 @@ function useUndo(pid: string, entryId: number, onUndone: () => void) {
   }
 
   function resumeAfterRegister(registeredPid: string) {
-    if (registeredPid !== pid) {
+    if (registeredPid !== entry.pid) {
       reloadPage();
       return;
     }
@@ -87,7 +87,6 @@ function useUndo(pid: string, entryId: number, onUndone: () => void) {
  * （読み直すと取り消しのボタンが消えて戻れない）。違う番号は読み直す（この記録は別の人のもの）。
  */
 export default function TodayDone({
-  pid,
   saved,
   onUndone,
   onAddMore,
@@ -95,13 +94,13 @@ export default function TodayDone({
   const { t } = usePatientStrings();
   const titleId = useId();
   const { undo, handleUndo, resumeAfterRegister } = useUndo(
-    pid,
-    saved.entryId,
+    saved.entry,
     onUndone,
   );
 
+  // 「つらくて書けない」なら取り消せる（P2-5）
   const canUndo =
-    saved.undoable &&
+    saved.entry.kind === "too_sick" &&
     undo.name !== "not_registered" &&
     !(undo.name === "failed" && !undo.retry);
   return (
@@ -116,8 +115,8 @@ export default function TodayDone({
           {t("today.saved_summary")}
         </h2>
         <EntryDetail
-          byProxy={saved.byProxy}
-          source={saved.source}
+          byProxy={saved.entry.by_proxy}
+          source={summarySourceOf(saved.entry)}
           showFreeTextBody={false}
         />
       </section>

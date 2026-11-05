@@ -6,14 +6,8 @@ import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import History from "./History";
 import { callsTo, mockPatientApi } from "./testing/api";
-import {
-  ENTRIES,
-  PID,
-  VISITS,
-  entriesBody,
-  questionText,
-  s,
-} from "./testing/fixtures";
+import { seedDevice, seedDeviceOnly } from "./testing/device";
+import { ENTRIES, PID, VISITS, questionText, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import { spokenText, visibleText } from "./testing/text";
 
@@ -86,9 +80,10 @@ function visitDayText(month: number, day: number, weekday: number): string {
   );
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   clearPid();
   savePid(PID);
+  await seedDevice(ENTRIES);
 });
 
 afterEach(() => {
@@ -108,7 +103,7 @@ describe("History (P2)", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("reads GET entries and lists them newest first", async () => {
+  it("reads the records on the device and lists them newest first", async () => {
     const fetchMock = mockPatientApi();
     renderHistory();
     const rows = await items();
@@ -117,8 +112,12 @@ describe("History (P2)", () => {
     expect(rows[1]).toHaveTextContent(dateText(10, 31, 6, "19:30"));
     expect(rows[2]).toHaveTextContent(dateText(10, 29, 4, "21:05"));
     expect(
-      callsTo(fetchMock, "GET", `/api/patient/${PID}/entries`),
+      callsTo(fetchMock, "GET", `/api/patient/${PID}/visit-days`),
     ).toHaveLength(1);
+    // The records do not come from the server
+    expect(callsTo(fetchMock, "GET", `/api/patient/${PID}/entries`)).toEqual(
+      [],
+    );
   });
 
   it("shows too_sick, proxy, a table of answers, and free text", async () => {
@@ -243,27 +242,22 @@ describe("History (P2)", () => {
   });
 
   it("an unknown question key: the recorded question text is used in the line", async () => {
-    mockPatientApi({
-      entries: () =>
-        jsonResponse({
-          visits: [],
-          entries: [
-            {
-              ...ENTRIES[1]!,
-              kind: "answers",
-              answers: [
-                {
-                  question_key: "new_question",
-                  value: "hard",
-                  temperature: null,
-                  question_text: "new question text",
-                },
-              ],
-              free_text: null,
-            },
-          ],
-        }),
-    });
+    await seedDeviceOnly([
+      {
+        ...ENTRIES[1]!,
+        kind: "answers",
+        answers: [
+          {
+            question_key: "new_question",
+            value: "hard",
+            temperature: null,
+            question_text: "new question text",
+          },
+        ],
+        free_text: null,
+      },
+    ]);
+    mockPatientApi();
     renderHistory();
     const [only] = await items();
     expect(spokenText(summaryOf(only!))).toContain(
@@ -293,26 +287,21 @@ describe("History (P2)", () => {
 
   it("an unknown key in the details: the question text recorded with the entry", async () => {
     const recordedText = `${questionText("diarrhea")} (v0)`;
-    const fetchMock = mockPatientApi({
-      entries: () =>
-        jsonResponse({
-          visits: [],
-          entries: [
-            {
-              ...ENTRIES[1]!,
-              answers: [
-                {
-                  question_key: "diarrhea_v0",
-                  value: "hard",
-                  temperature: null,
-                  question_text: recordedText,
-                },
-              ],
-              free_text: null,
-            },
-          ],
-        }),
-    });
+    await seedDeviceOnly([
+      {
+        ...ENTRIES[1]!,
+        answers: [
+          {
+            question_key: "diarrhea_v0",
+            value: "hard",
+            temperature: null,
+            question_text: recordedText,
+          },
+        ],
+        free_text: null,
+      },
+    ]);
+    const fetchMock = mockPatientApi();
     renderHistory();
     const [only] = await items();
     expect(within(only!).getByRole("rowheader")).toHaveTextContent(
@@ -329,27 +318,22 @@ describe("History (P2)", () => {
   });
 
   it("question_text null (question no longer known): history.previous_question and the value are still shown", async () => {
-    mockPatientApi({
-      entries: () =>
-        jsonResponse({
-          visits: [],
-          entries: [
-            {
-              ...ENTRIES[1]!,
-              kind: "answers",
-              answers: [
-                {
-                  question_key: "old_question",
-                  value: "hard",
-                  temperature: null,
-                  question_text: null,
-                },
-              ],
-              free_text: null,
-            },
-          ],
-        }),
-    });
+    await seedDeviceOnly([
+      {
+        ...ENTRIES[1]!,
+        kind: "answers",
+        answers: [
+          {
+            question_key: "old_question",
+            value: "hard",
+            temperature: null,
+            question_text: null,
+          },
+        ],
+        free_text: null,
+      },
+    ]);
+    mockPatientApi();
     renderHistory();
     const [only] = await items();
     expect(
@@ -378,25 +362,13 @@ describe("History (P2)", () => {
   });
 
   it.each([
-    ["entries missing", { visits: [] }],
-    [
-      "answers missing",
-      { entries: [{ ...ENTRIES[1]!, answers: undefined }], visits: [] },
-    ],
-    [
-      "answers null",
-      { entries: [{ ...ENTRIES[1]!, answers: null }], visits: [] },
-    ],
-    ["entry is a string", { entries: ["x"], visits: [] }],
-    ["visits missing", { entries: [...ENTRIES] }],
-    [
-      "a visit without received_at",
-      { entries: [], visits: [{ visit_date: "2026-10-30" }] },
-    ],
+    ["visits missing", {}],
+    ["a visit is a string", { visits: ["x"] }],
+    ["a visit without received_at", { visits: [{ visit_date: "2026-10-30" }] }],
   ])(
-    "malformed 200 body (%s): common.load_failed instead of a blank page",
+    "malformed visit-days body (%s): common.load_failed instead of a blank page",
     async (_label, body) => {
-      mockPatientApi({ entries: () => jsonResponse(body) });
+      mockPatientApi({ visitDays: () => jsonResponse(body) });
       renderHistory();
       expect(
         await screen.findByText(s("common.load_failed")),
@@ -407,10 +379,32 @@ describe("History (P2)", () => {
     },
   );
 
+  it("the device cannot be read: common.load_failed", async () => {
+    mockPatientApi();
+    vi.stubGlobal("indexedDB", {
+      open: () => {
+        throw new DOMException("denied", "SecurityError");
+      },
+    });
+    renderHistory();
+    expect(
+      await screen.findByText(s("common.load_failed")),
+    ).toBeInTheDocument();
+  });
+
+  it("records of another number on the same device are not shown", async () => {
+    await seedDeviceOnly([]);
+    await seedDevice([{ ...ENTRIES[2]!, pid: "P-EVAL0001" }]);
+    mockPatientApi();
+    renderHistory();
+    expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
+    expect(screen.queryByText(ENTRIES[2]!.free_text!)).toBeNull();
+  });
+
   describe("visit-day dividers (the days of a reception at the hospital)", () => {
     function withVisits() {
       return mockPatientApi({
-        entries: () => jsonResponse(entriesBody(ENTRIES, VISITS)),
+        visitDays: () => jsonResponse({ visits: [...VISITS] }),
       });
     }
 
@@ -463,8 +457,9 @@ describe("History (P2)", () => {
     });
 
     it("no records but a visit: history.empty and the divider", async () => {
+      await seedDeviceOnly([]);
       mockPatientApi({
-        entries: () => jsonResponse(entriesBody([], VISITS)),
+        visitDays: () => jsonResponse({ visits: [...VISITS] }),
       });
       renderHistory();
       expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
@@ -483,7 +478,8 @@ describe("History (P2)", () => {
   });
 
   it("no entries: history.empty", async () => {
-    mockPatientApi({ entries: () => jsonResponse(entriesBody([])) });
+    await seedDeviceOnly([]);
+    mockPatientApi();
     renderHistory();
     expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: s("history.title") })).toBeNull();
@@ -491,7 +487,7 @@ describe("History (P2)", () => {
 
   it("401: error.not_registered", async () => {
     mockPatientApi({
-      entries: () => jsonResponse({ error: "not_registered" }, 401),
+      visitDays: () => jsonResponse({ error: "not_registered" }, 401),
     });
     renderHistory();
     expect(
@@ -500,12 +496,13 @@ describe("History (P2)", () => {
   });
 
   it("500: common.load_failed and a reload button that reads again", async () => {
+    await seedDeviceOnly([]);
     let fail = true;
     const fetchMock = mockPatientApi({
-      entries: () =>
+      visitDays: () =>
         fail
           ? jsonResponse({ error: "boom" }, 500)
-          : jsonResponse(entriesBody([])),
+          : jsonResponse({ visits: [] }),
     });
     renderHistory();
     expect(
@@ -519,12 +516,12 @@ describe("History (P2)", () => {
     expect(await screen.findByText(s("history.empty"))).toBeInTheDocument();
     expect(screen.queryByText(s("common.load_failed"))).toBeNull();
     expect(
-      callsTo(fetchMock, "GET", `/api/patient/${PID}/entries`),
+      callsTo(fetchMock, "GET", `/api/patient/${PID}/visit-days`),
     ).toHaveLength(2);
   });
 
   it("while loading: common.loading", async () => {
-    mockPatientApi({ entries: () => new Promise<Response>(() => {}) });
+    mockPatientApi({ visitDays: () => new Promise<Response>(() => {}) });
     renderHistory();
     expect(screen.getByText(s("common.loading"))).toBeInTheDocument();
   });

@@ -20,7 +20,6 @@ import {
   has,
   hasNullable,
   isBool,
-  isInt,
   isIsoDate,
   isIsoDateTime,
   isString,
@@ -38,9 +37,6 @@ const ENTRY_KINDS: readonly EntryKind[] = [
   "free_text",
   "mixed",
 ];
-
-const isStringList = (v: unknown): boolean =>
-  Array.isArray(v) && v.every(isString);
 
 /** 項目が存在し、値が null か文字列。 */
 function hasNullableString(v: Item, key: string): boolean {
@@ -64,21 +60,32 @@ function isQuestion(v: Item): boolean {
   );
 }
 
+/** 固定規則。閾値は数（NaN・Infinity は比べられないので通さない）。 */
+function isFixedRule(v: Item): boolean {
+  return (
+    isString(v.question_key) &&
+    typeof v.threshold_celsius === "number" &&
+    Number.isFinite(v.threshold_celsius) &&
+    isString(v.patient_string_key)
+  );
+}
+
 /**
- * GET questions: {skill_version, questions: Question[], today}（key は重複しない。
- * today はサーバーの今日の YYYY-MM-DD）
+ * GET questions: {skill_version, questions: Question[], fixed_rules: FixedRule[], today}
+ * （key は重複しない。today はサーバーの今日の YYYY-MM-DD）
  */
 export function isQuestionsResponse(v: Item): boolean {
   return (
     isString(v.skill_version) &&
     isListWithUniqueKeys(isQuestion, "key")(v.questions) &&
+    everyItem(isFixedRule)(v.fixed_rules) &&
     isIsoDate(v.today)
   );
 }
 
-/** POST entries: {entry_id, notices: string[]} */
-export function isCreateEntryResponse(v: Item): boolean {
-  return isInt(v.entry_id) && isStringList(v.notices);
+/** POST record-marks: {record_date, recorded_at} */
+export function isRecordMarkResponse(v: Item): boolean {
+  return isIsoDate(v.record_date) && isIsoDateTime(v.recorded_at);
 }
 
 function isTemperature(v: unknown): boolean {
@@ -110,9 +117,11 @@ function isPatientAnswer(v: Item): boolean {
   );
 }
 
-function isPatientEntry(v: Item): boolean {
+/** 端末の形の記録（GET demo-entries）。 */
+function isDeviceEntry(v: Item): boolean {
   return (
-    isInt(v.id) &&
+    isString(v.pid) &&
+    isString(v.client_entry_id) &&
     isIsoDateTime(v.recorded_at) &&
     isIsoDate(v.record_date) &&
     oneOf(ENTRY_KINDS)(v.kind) &&
@@ -128,15 +137,24 @@ function isPatientVisitDay(v: Item): boolean {
   return isIsoDate(v.visit_date) && isIsoDateTime(v.received_at);
 }
 
-/**
- * GET entries: {entries: PatientEntry[], visits: PatientVisitDay[]}（受診日は1日1件。
- * visit_date は重複しない）
- */
-export function isPatientEntriesResponse(v: Item): boolean {
-  return (
-    everyItem(isPatientEntry)(v.entries) &&
-    isListWithUniqueKeys(isPatientVisitDay, "visit_date")(v.visits)
-  );
+/** GET visit-days: {visits: PatientVisitDay[]}（受診日は1日1件。visit_date は重複しない） */
+export function isVisitDaysResponse(v: Item): boolean {
+  return isListWithUniqueKeys(isPatientVisitDay, "visit_date")(v.visits);
+}
+
+/** GET visit-window: {start, end} */
+export function isVisitWindowResponse(v: Item): boolean {
+  return isIsoDate(v.start) && isIsoDate(v.end);
+}
+
+/** GET demo-config: {demo_tools} */
+export function isDemoConfigResponse(v: Item): boolean {
+  return isBool(v.demo_tools);
+}
+
+/** GET demo-entries: {entries: DeviceEntry[]}（ID は重複しない） */
+export function isDemoEntriesResponse(v: Item): boolean {
+  return isListWithUniqueKeys(isDeviceEntry, "client_entry_id")(v.entries);
 }
 
 /** POST register: {ok: true} */

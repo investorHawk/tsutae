@@ -39,7 +39,7 @@ describe("Today: after saving", () => {
     );
     await screen.findByText(s("today.too_sick_done"));
     expect(
-      callsTo(fetchMock, "POST", `/api/patient/${PID}/entries`),
+      callsTo(fetchMock, "POST", `/api/patient/${PID}/record-marks`),
     ).toHaveLength(1);
     await waitFor(() => expect(push.clearAppBadge).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(push.shown[0]?.close).toHaveBeenCalledTimes(1));
@@ -47,7 +47,23 @@ describe("Today: after saving", () => {
 
   it("a failed save keeps the badge", async () => {
     mockPatientApi({
-      createEntry: () => jsonResponse({ error: "boom" }, 500),
+      recordMark: () => jsonResponse({ error: "boom" }, 500),
+    });
+    renderPatient([{ path: "/today", element: <Today /> }], "/today");
+    await userEvent.click(
+      await screen.findByRole("button", { name: s("today.too_sick_button") }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: s("today.too_sick_confirm_yes") }),
+    );
+    await screen.findByText(s("error.generic"));
+    expect(push.clearAppBadge).not.toHaveBeenCalled();
+  });
+
+  it("a record that could not be saved on the device keeps the badge", async () => {
+    mockPatientApi();
+    vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
     });
     renderPatient([{ path: "/today", element: <Today /> }], "/today");
     await userEvent.click(

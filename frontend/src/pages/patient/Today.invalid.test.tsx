@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import { mockPatientApi } from "./testing/api";
+import { savedInputs } from "./testing/device";
 import { PID, questionText, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Today from "./Today";
@@ -32,9 +33,13 @@ function expectPageShown() {
 }
 
 describe("Today (P1): malformed 200 bodies", () => {
-  it.each([
+  it.each<[string, unknown]>([
     ["questions missing", { skill_version: "regimen-folfox@1" }],
     ["questions null", { skill_version: "x", questions: null }],
+    [
+      "fixed_rules missing",
+      { skill_version: "x", questions: [], today: "2026-11-09" },
+    ],
     [
       "question without text",
       { skill_version: "x", questions: [{ key: "a" }] },
@@ -55,13 +60,16 @@ describe("Today (P1): malformed 200 bodies", () => {
   );
 
   it.each([
-    ["notices missing", { entry_id: 1 }],
-    ["notices null", { entry_id: 1, notices: null }],
-    ["notices not strings", { entry_id: 1, notices: [1] }],
+    ["recorded_at missing", { record_date: "2026-11-09" }],
+    ["record_date missing", { recorded_at: "2026-11-09T20:00:00+09:00" }],
+    [
+      "recorded_at without an offset",
+      { record_date: "2026-11-09", recorded_at: "2026-11-09T20:00:00" },
+    ],
   ])(
-    "POST entries (%s): error.generic, the input is kept",
+    "POST record-marks (%s): error.generic, the input is kept, nothing is saved",
     async (_label, body) => {
-      mockPatientApi({ createEntry: () => jsonResponse(body) });
+      mockPatientApi({ recordMark: () => jsonResponse(body) });
       renderToday();
       const group = await screen.findByRole("group", {
         name: questionText("diarrhea"),
@@ -78,11 +86,12 @@ describe("Today (P1): malformed 200 bodies", () => {
       expect(
         within(group).getByRole("button", { name: s("answer.present") }),
       ).toHaveAttribute("aria-pressed", "true");
+      expect(await savedInputs()).toEqual([]);
     },
   );
 
-  it("POST entries for too_sick with a malformed body: error.generic", async () => {
-    mockPatientApi({ createEntry: () => jsonResponse({ entry_id: 1 }) });
+  it("POST record-marks for too_sick with a malformed body: error.generic", async () => {
+    mockPatientApi({ recordMark: () => jsonResponse({}) });
     renderToday();
     await userEvent.click(
       await screen.findByRole("button", { name: s("today.too_sick_button") }),

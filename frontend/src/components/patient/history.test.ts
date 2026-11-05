@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { DeviceEntry } from "../../api/types";
 import { ENTRIES, s } from "../../pages/patient/testing/fixtures";
 import {
   formatDate,
@@ -7,29 +8,39 @@ import {
   recordedAtParts,
 } from "./history";
 
+/** 記録の ID の末尾2桁（fixtures の ENTRIES）か、テストで付けた ID。 */
+function idOf(entry: DeviceEntry): string {
+  return entry.client_entry_id.slice(-2).replace(/^0/, "");
+}
+
 describe("newestFirst", () => {
   it("記録日時の新しい順に並べた新しい配列を返す", () => {
     const original = [...ENTRIES];
     const sorted = newestFirst(original);
-    expect(sorted.map((e) => e.id)).toEqual([13, 12, 11]);
-    expect(original.map((e) => e.id)).toEqual([11, 12, 13]);
+    expect(sorted.map(idOf)).toEqual(["13", "12", "11"]);
+    expect(original.map(idOf)).toEqual(["11", "12", "13"]);
   });
 
-  it("同じ日時なら id の大きい方が先", () => {
-    const a = { ...ENTRIES[0]!, id: 1 };
-    const b = { ...ENTRIES[0]!, id: 2 };
-    expect(newestFirst([a, b]).map((e) => e.id)).toEqual([2, 1]);
+  it("同じ日時なら ID の順（並びを毎回同じにする）", () => {
+    const a = { ...ENTRIES[0]!, client_entry_id: "1" };
+    const b = { ...ENTRIES[0]!, client_entry_id: "2" };
+    expect(newestFirst([a, b]).map(idOf)).toEqual(["2", "1"]);
+    expect(newestFirst([b, a]).map(idOf)).toEqual(["2", "1"]);
   });
 
   it("時差の違う書き方でも文字列ではなく時刻で比べる", () => {
     // 11/02 00:30 (+09:00) = 11/01 15:30Z なので、11/01 16:00Z の方が新しい
     const a = {
       ...ENTRIES[0]!,
-      id: 1,
+      client_entry_id: "1",
       recorded_at: "2026-11-02T00:30:00+09:00",
     };
-    const b = { ...ENTRIES[0]!, id: 2, recorded_at: "2026-11-01T16:00:00Z" };
-    expect(newestFirst([a, b]).map((e) => e.id)).toEqual([2, 1]);
+    const b = {
+      ...ENTRIES[0]!,
+      client_entry_id: "2",
+      recorded_at: "2026-11-01T16:00:00Z",
+    };
+    expect(newestFirst([a, b]).map(idOf)).toEqual(["2", "1"]);
   });
 });
 

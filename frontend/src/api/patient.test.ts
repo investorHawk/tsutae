@@ -2,13 +2,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { callOf, jsonResponse, mockFetch } from "../test/fetchMock";
 import { ApiError } from "./http";
 import {
-  createEntry,
   getPatientStrings,
   getQuestions,
-  listEntries,
   registerPatient,
   submitVisit,
 } from "./patient";
+import { addRecordMark, getVisitDays, undoRecordMark } from "./patientDevice";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -52,6 +51,13 @@ describe("患者 API", () => {
           answer_type: "three_level",
         },
       ],
+      fixed_rules: [
+        {
+          question_key: "fever",
+          threshold_celsius: 38,
+          patient_string_key: "fixed_rule.fever_38",
+        },
+      ],
       today: "2026-11-09",
     };
     const fetchMock = mockFetch(() => jsonResponse(body));
@@ -61,54 +67,36 @@ describe("患者 API", () => {
     expect(call.url).toBe("/api/patient/P-DEMO0001/questions");
   });
 
-  it("createEntry: POST /api/patient/{pid}/entries に EntryCreate", async () => {
-    const fetchMock = mockFetch(() =>
-      jsonResponse({ entry_id: 7, notices: ["fixed_rule.fever_38"] }),
-    );
-    const entry = {
-      by_proxy: true,
-      answers: [
-        { question_key: "diarrhea", value: "present" as const },
-        {
-          question_key: "fever",
-          value: "measured" as const,
-          temperature: 38.2,
-        },
-      ],
-      free_text: "点滴の次の日からおなかがゆるい",
+  it("addRecordMark: POST /api/patient/{pid}/record-marks（本文なし）", async () => {
+    const body = {
+      record_date: "2026-11-09",
+      recorded_at: "2026-11-09T20:00:00.000000+09:00",
     };
-    await expect(createEntry("P-DEMO0001", entry)).resolves.toEqual({
-      entry_id: 7,
-      notices: ["fixed_rule.fever_38"],
+    const fetchMock = mockFetch(() => jsonResponse(body));
+    await expect(addRecordMark("P-DEMO0001")).resolves.toEqual(body);
+    const call = callOf(fetchMock);
+    expect(call.method).toBe("POST");
+    expect(call.url).toBe("/api/patient/P-DEMO0001/record-marks");
+    expect(call.body).toBeUndefined();
+  });
+
+  it("undoRecordMark: POST /api/patient/{pid}/record-marks/undo", async () => {
+    const fetchMock = mockFetch(() => jsonResponse({ ok: true }));
+    const request = {
+      recorded_at: "2026-11-09T20:00:00.000000+09:00",
+      clear_mark: true,
+    };
+    await expect(undoRecordMark("P-DEMO0001", request)).resolves.toEqual({
+      ok: true,
     });
     const call = callOf(fetchMock);
     expect(call.method).toBe("POST");
-    expect(call.url).toBe("/api/patient/P-DEMO0001/entries");
-    expect(call.body).toEqual(entry);
+    expect(call.url).toBe("/api/patient/P-DEMO0001/record-marks/undo");
+    expect(call.body).toEqual(request);
   });
 
-  it("createEntry: つらくて書けない", async () => {
-    const fetchMock = mockFetch(() =>
-      jsonResponse({ entry_id: 8, notices: [] }),
-    );
-    await createEntry("P-DEMO0001", { too_sick: true });
-    expect(callOf(fetchMock).body).toEqual({ too_sick: true });
-  });
-
-  it("listEntries: GET /api/patient/{pid}/entries", async () => {
+  it("getVisitDays: GET /api/patient/{pid}/visit-days", async () => {
     const body = {
-      entries: [
-        {
-          id: 1,
-          recorded_at: "2026-11-01T20:00:00+09:00",
-          record_date: "2026-11-01",
-          kind: "too_sick",
-          by_proxy: false,
-          skill_version: "regimen-folfox@1",
-          answers: [],
-          free_text: null,
-        },
-      ],
       visits: [
         {
           visit_date: "2026-11-09",
@@ -117,10 +105,10 @@ describe("患者 API", () => {
       ],
     };
     const fetchMock = mockFetch(() => jsonResponse(body));
-    await expect(listEntries("P-DEMO0001")).resolves.toEqual(body);
+    await expect(getVisitDays("P-DEMO0001")).resolves.toEqual(body);
     const call = callOf(fetchMock);
     expect(call.method).toBe("GET");
-    expect(call.url).toBe("/api/patient/P-DEMO0001/entries");
+    expect(call.url).toBe("/api/patient/P-DEMO0001/visit-days");
   });
 
   it("submitVisit: POST /api/visit {reception_no}", async () => {
@@ -137,11 +125,22 @@ describe("患者 API", () => {
     expect(call.body).toEqual({ reception_no: "A-023" });
   });
 
-  it("pid は経路用にエンコードする", async () => {
+  it("submitVisit: 記録があれば本文に entries を入れる", async () => {
     const fetchMock = mockFetch(() =>
-      jsonResponse({ entries: [], visits: [] }),
+      jsonResponse({ ok: true, message_key: "visit.done" }),
     );
-    await listEntries("../doctor/x");
-    expect(callOf(fetchMock).url).toBe("/api/patient/..%2Fdoctor%2Fx/entries");
+    await submitVisit("A-023", []);
+    expect(callOf(fetchMock).body).toEqual({
+      reception_no: "A-023",
+      entries: [],
+    });
+  });
+
+  it("pid は経路用にエンコードする", async () => {
+    const fetchMock = mockFetch(() => jsonResponse({ visits: [] }));
+    await getVisitDays("../doctor/x");
+    expect(callOf(fetchMock).url).toBe(
+      "/api/patient/..%2Fdoctor%2Fx/visit-days",
+    );
   });
 });

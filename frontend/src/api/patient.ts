@@ -4,20 +4,16 @@
  */
 import { getJson, postJson, seg } from "./http";
 import {
-  isCreateEntryResponse,
   isOkTrue,
-  isPatientEntriesResponse,
   isQuestionsResponse,
   isVisitResponse,
 } from "./patientGuards";
 import type {
-  CreateEntryResponse,
-  EntryCreate,
   OkResponse,
-  PatientEntriesResponse,
   PatientStrings,
   QuestionsResponse,
   RegisterRequest,
+  VisitEntry,
   VisitRequest,
   VisitResponse,
 } from "./types";
@@ -45,42 +41,16 @@ export async function getQuestions(pid: string): Promise<QuestionsResponse> {
   return checked(body, isQuestionsResponse);
 }
 
-export async function createEntry(
-  pid: string,
-  entry: EntryCreate,
-): Promise<CreateEntryResponse> {
-  const body = await postJson(
-    `/api/patient/${seg(pid)}/entries`,
-    entry,
-    OPTIONS,
-  );
-  return checked(body, isCreateEntryResponse);
-}
-
 /**
- * 「つらくて書けない」の取り消し（P2-5）。本人の・作ってすぐの・その記録だけを消す。
- * 条件に合わなければ 409 not_undoable、他人の記録・消した後は 404 not_found。
+ * 受付（POST /api/visit）。entries はスマホに置いた記録（§5.5）。無ければ本文に入れない。
  */
-export async function undoEntry(
-  pid: string,
-  entryId: number,
-): Promise<OkResponse> {
-  const body = await postJson(
-    `/api/patient/${seg(pid)}/entries/${seg(entryId)}/undo`,
-    undefined,
-    OPTIONS,
-  );
-  return checked(body, isOkTrue);
-}
-
-export async function listEntries(
-  pid: string,
-): Promise<PatientEntriesResponse> {
-  const body = await getJson(`/api/patient/${seg(pid)}/entries`, OPTIONS);
-  return checked(body, isPatientEntriesResponse);
-}
-
-export async function submitVisit(receptionNo: string): Promise<VisitResponse> {
-  const body: VisitRequest = { reception_no: receptionNo };
+export async function submitVisit(
+  receptionNo: string,
+  entries?: readonly VisitEntry[],
+): Promise<VisitResponse> {
+  const body: VisitRequest = {
+    reception_no: receptionNo,
+    ...(entries === undefined ? {} : { entries: [...entries] }),
+  };
   return checked(await postJson("/api/visit", body, OPTIONS), isVisitResponse);
 }

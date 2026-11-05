@@ -474,3 +474,16 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - 印刷済み・期限切れで、その患者に開いた受診（受付番号が残り期限内）が他に無ければ、`client_entry_id` のある行を消す。`client_entry_id` の無い行と日付の印は消さない
 - D1 の最後の記録日は `record_marks` から出す。D2 の記録の一覧はそのまま（受付の間だけ行がある）
 - `fixed_rules.notices_for` は Python の側の判定で、画面のコードと同じ表（`frontend/src/test/fixtures/fixed_rule_cases.json`）で確かめる
+
+## 13. スマホ保存の frontend（PR B。`docs/plan-device-records.md` §5.1〜§5.4）
+
+| ファイル | 中身 |
+|---|---|
+| `patient/deviceStore.ts` | IndexedDB の薄い包み（DB `tsutae`、store `entries`、キー `client_entry_id`、索引 `pid_record_date` = `[pid, record_date]`）。読むときは必ず仮名ID で絞る。失敗は例外で返す。接続は操作ごとに開いて閉じ、トランザクションの完了で解決する。起動ごとの最初の保存の後に `navigator.storage.persist()` を1回試す |
+| `patient/recordEntry.ts` | 記録の順序。`recordEntry`（`POST record-marks` → 応答の時刻で端末に保存）、`undoRecord`（同じ日の記録を読む → `record-marks/undo` → 端末から消す）、`toDeviceEntry`（質問の文の写しを持たせる）、`newClientEntryId` |
+| `patient/fixedRules.ts` | `noticesFor(entry, fixed_rules)`。`api/fixed_rules.py` と同じ判定で、同じ表（`src/test/fixtures/fixed_rule_cases.json`）でテストする |
+| `api/patientDevice.ts` | §12 の経路の呼び出しと応答の検査。`POST /api/visit` の `entries` は `api/patient.ts` の `submitVisit` |
+| `components/patient/TodayForm.tsx` | `client_entry_id` を入力の開始時に作り、押し直しても同じ（「追加で記録する」・取り消しの後で作り直す）。印か保存が失敗したら入力を残して `error.generic`。保存できたら `onSaved`（バッジと表示中の通知を消す） |
+| `components/patient/HistoryList.tsx` | P2。端末の記録と `GET visit-days` を読み、`historyRows` で並べる |
+
+テストは dev 依存の `fake-indexeddb` を `src/test/setup.ts` で入れ、テストごとに空の DB から始める。

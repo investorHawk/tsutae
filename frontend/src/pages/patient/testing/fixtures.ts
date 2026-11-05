@@ -4,8 +4,7 @@
  */
 import rawStrings from "../../../../../backend/tsutae/patient_strings.json?raw";
 import type {
-  PatientEntry,
-  PatientEntriesResponse,
+  DeviceEntry,
   PatientStrings,
   PatientVisitDay,
   Question,
@@ -58,6 +57,13 @@ export const QUESTIONS: readonly Question[] = [
 export const QUESTIONS_RESPONSE: QuestionsResponse = {
   skill_version: "regimen-folfox@1",
   questions: [...QUESTIONS],
+  fixed_rules: [
+    {
+      question_key: "fever",
+      threshold_celsius: 38,
+      patient_string_key: "fixed_rule.fever_38",
+    },
+  ],
   /** サーバーの今日（2026-11-09 は月曜） */
   today: "2026-11-09",
 };
@@ -71,12 +77,13 @@ export function questionText(key: string): string {
 }
 
 /**
- * 自分の記録（合成）。API の順（recorded_at 昇順）で並べてある。
- * question_text は記録の skill_version の質問集の文（§8）。
+ * 端末の記録（合成）。recorded_at 昇順で並べてある。
+ * question_text は記録の skill_version の質問集の文の写し。ID は末尾の数で見分ける。
  */
-export const ENTRIES: readonly PatientEntry[] = [
+export const ENTRIES: readonly DeviceEntry[] = [
   {
-    id: 11,
+    pid: PID,
+    client_entry_id: "00000000-0000-4000-8000-000000000011",
     recorded_at: "2026-10-29T21:05:00+09:00",
     record_date: "2026-10-29",
     kind: "too_sick",
@@ -86,7 +93,8 @@ export const ENTRIES: readonly PatientEntry[] = [
     free_text: null,
   },
   {
-    id: 12,
+    pid: PID,
+    client_entry_id: "00000000-0000-4000-8000-000000000012",
     recorded_at: "2026-10-31T19:30:00+09:00",
     record_date: "2026-10-31",
     kind: "mixed",
@@ -109,7 +117,8 @@ export const ENTRIES: readonly PatientEntry[] = [
     free_text: "点滴の次の日からおなかがゆるい",
   },
   {
-    id: 13,
+    pid: PID,
+    client_entry_id: "00000000-0000-4000-8000-000000000013",
     recorded_at: "2026-11-02T08:10:00+09:00",
     record_date: "2026-11-02",
     kind: "free_text",
@@ -127,11 +136,3 @@ export const ENTRIES: readonly PatientEntry[] = [
 export const VISITS: readonly PatientVisitDay[] = [
   { visit_date: "2026-10-30", received_at: "2026-10-30T09:20:00+09:00" },
 ];
-
-/** GET entries の本文（visits は既定で空）。 */
-export function entriesBody(
-  entries: readonly PatientEntry[],
-  visits: readonly PatientVisitDay[] = [],
-): PatientEntriesResponse {
-  return { entries: [...entries], visits: [...visits] };
-}

@@ -3,8 +3,8 @@ import { usePatientStrings } from "../../strings/PatientStrings";
 import EntryCard from "./EntryCard";
 import { type HistoryRow, historyRows } from "./historyRows";
 import { LoadFailed, Loading } from "./LoadStatus";
-import { ErrorMessage } from "./Messages";
-import { NOT_REGISTERED_KEY, isNotRegistered } from "./patientApi";
+import NotRegistered from "./NotRegistered";
+import { isNotRegistered } from "./patientApi";
 import { useAsync } from "./useAsync";
 import VisitDivider from "./VisitDivider";
 
@@ -48,7 +48,7 @@ export default function HistoryList({ pid }: { pid: string }) {
   }
   if (loaded.status === "error") {
     return isNotRegistered(loaded.error) ? (
-      <ErrorMessage messageKey={NOT_REGISTERED_KEY} />
+      <NotRegistered />
     ) : (
       <LoadFailed onReload={loaded.reload} />
     );

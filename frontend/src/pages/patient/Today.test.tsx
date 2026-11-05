@@ -71,7 +71,10 @@ describe("Today (P1): registration", () => {
       screen.getByRole("heading", { level: 1, name: s("today.title") }),
     ).toBeInTheDocument();
     expect(screen.getByText(s("error.not_registered"))).toBeInTheDocument();
-    expect(screen.queryByRole("button")).toBeNull();
+    // The only button is the one for the number (the record form is not shown)
+    expect(screen.getByRole("button")).toHaveAccessibleName(
+      s("register.number_submit"),
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -490,7 +493,7 @@ describe("Today (P1): errors and starting over", () => {
     expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(2);
   });
 
-  it("POST 401: error.not_registered", async () => {
+  it("POST 401: error.not_registered with the number field, not the form", async () => {
     mockPatientApi({
       createEntry: () => jsonResponse({ error: "not_registered" }, 401),
     });
@@ -499,7 +502,12 @@ describe("Today (P1): errors and starting over", () => {
     expect(
       await screen.findByText(s("error.not_registered")),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: s("register.number_submit") }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: s("today.submit") }),
+    ).toBeNull();
   });
 
   it("questions 500: common.load_failed, too_sick still works", async () => {

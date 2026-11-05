@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { isApiError } from "../../api/http";
 import { registerPatient } from "../../api/patient";
 import { ErrorMessage } from "../../components/patient/Messages";
-import { GENERIC_ERROR_KEY } from "../../components/patient/patientApi";
+import {
+  GENERIC_ERROR_KEY,
+  registerErrorKeyOf,
+} from "../../components/patient/patientApi";
 import { isValidPid, loadPid, restorePid, savePid } from "../../patient/pid";
 import { usePatientStrings } from "../../strings/PatientStrings";
 
@@ -16,18 +18,6 @@ function pidProblem(pid: string): string | null {
     return REQUIRED_KEY;
   }
   return isValidPid(pid) ? null : INVALID_KEY;
-}
-
-const TOO_MANY_KEY = "error.too_many_attempts";
-
-function errorKeyOf(err: unknown): string {
-  if (isApiError(err) && err.status === 429) {
-    return TOO_MANY_KEY;
-  }
-  if (isApiError(err) && [400, 404, 422].includes(err.status)) {
-    return INVALID_KEY;
-  }
-  return GENERIC_ERROR_KEY;
 }
 
 /**
@@ -61,7 +51,7 @@ export default function Register() {
       navigate("/today", { replace: true, state: { registered: true } });
     } catch (err) {
       restorePid(previous);
-      setErrorKey(errorKeyOf(err));
+      setErrorKey(registerErrorKeyOf(err, INVALID_KEY));
       setSending(false);
     }
   }

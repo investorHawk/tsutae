@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { isApiError } from "../../api/http";
 import { createEntry, getQuestions } from "../../api/patient";
 import type { EntryCreate, Question } from "../../api/types";
+import { reloadPage } from "../../patient/reload";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import {
   EMPTY_FORM,
@@ -16,11 +17,8 @@ import { summarySourceOf } from "./entrySummary";
 import FreeTextField from "./FreeTextField";
 import { LoadFailed, Loading } from "./LoadStatus";
 import { DoneMessage, ErrorMessage } from "./Messages";
-import {
-  GENERIC_ERROR_KEY,
-  NOT_REGISTERED_KEY,
-  isNotRegistered,
-} from "./patientApi";
+import NotRegistered from "./NotRegistered";
+import { GENERIC_ERROR_KEY, isNotRegistered } from "./patientApi";
 import ProxyToggle from "./ProxyToggle";
 import QuestionList from "./QuestionList";
 import TodayDone, { type SavedRecord } from "./TodayDone";
@@ -40,6 +38,9 @@ type Phase =
 /** 「取り消しました」（取り消して記録する前の画面に戻った） */
 const UNDONE_KEY = "today.undone";
 
+/** 送るときに未登録と分かり、番号を入れて続きに戻った */
+const REGISTERED_KEY = "register.done";
+
 /** 自由記載が長すぎる（送る前の検査と、サーバーの 422 free_text_too_long）。 */
 const FREE_TEXT_TOO_LONG_KEY = "today.free_text_too_long";
 
@@ -53,6 +54,9 @@ const NO_ERRORS: ReadonlyMap<string, TemperatureProblem> = new Map();
  * 入れた内容があれば、それを捨てることを確かめてから（「はい」を押した時だけ）送る。
  * 記録した後は TodayDone（要約・取り消し・追加で記録する）。記録できたら onSaved を呼ぶ。
  * 質問集の応答にあるサーバーの今日は onToday で親（見出し）へ渡す。
+ * 送って 401/403 なら番号の入力欄に替える。入力はこの部品の state に残るので、同じ番号なら
+ * 入力を残して送る前に戻す（押し直すまで送らない）。違う番号は読み直す（質問集も送り先も
+ * 別の人のものになるので、入れた内容を持ち越さない）。
  */
 export default function TodayForm({
   pid,
@@ -95,11 +99,20 @@ export default function TodayForm({
     loaded.status === "ready" ? loaded.data.questions : NO_QUESTIONS;
   const sending = phase.name === "sending";
 
-  if (
-    phase.name === "not_registered" ||
-    (loaded.status === "error" && isNotRegistered(loaded.error))
-  ) {
-    return <ErrorMessage messageKey={NOT_REGISTERED_KEY} />;
+  function resumeAfterRegister(registeredPid: string) {
+    if (registeredPid !== pid) {
+      reloadPage();
+      return;
+    }
+    setInfoKey(REGISTERED_KEY);
+    setPhase({ name: "editing" });
+  }
+
+  if (loaded.status === "error" && isNotRegistered(loaded.error)) {
+    return <NotRegistered />;
+  }
+  if (phase.name === "not_registered") {
+    return <NotRegistered onRegistered={resumeAfterRegister} />;
   }
 
   function startOver() {

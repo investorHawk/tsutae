@@ -229,7 +229,34 @@
   margin-bottom: 8px;
 }
 
+/* QR と「登録の番号」を横に並べる。番号は患者が読んで手で入れるので大きく */
+.doctor-app .d-qr-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+}
+
+.doctor-app .d-qr-number {
+  margin: 0;
+}
+
+.doctor-app .d-qr-number dt {
+  font-weight: 700;
+}
+
+.doctor-app .d-qr-number-value {
+  margin: 4px 0 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: slashed-zero;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
 .doctor-app .d-qr {
+  max-width: 280px;
   margin: 0;
   text-align: center;
 }

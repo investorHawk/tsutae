@@ -228,6 +228,17 @@
   resize: vertical;
 }
 
+/* 登録の番号: 紙や画面を見ながら1字ずつ入れるので大きく、字の幅を揃える */
+.patient-app .p-number-input {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.patient-app .p-number-input::placeholder {
+  font-weight: 400;
+}
+
 .patient-app input[type="checkbox"],
 .patient-app input[type="radio"] {
   display: inline-block;

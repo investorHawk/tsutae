@@ -12,6 +12,24 @@ export function isValidPid(value: string): boolean {
   return PID_PATTERN.test(value);
 }
 
+/** 長音・ダッシュの類（NFKC の後に残るもの）。 */
+const DASH_LIKE =
+  /[\u2010-\u2015\u2212\u2500\u2501\u30FC\uFE58\uFE63\uFF0D\uFF70]/g;
+const PID_BODY = /^[A-Z0-9]{8}$/;
+
+/**
+ * 手で入れた番号を仮名ID の形に揃える（前後の空白・全角・小文字・長音やダッシュ・
+ * 「P-」の抜け）。形が正しいとは限らないので、呼ぶ側で isValidPid に通す。
+ */
+export function normalizePidInput(raw: string): string {
+  const text = raw
+    .normalize("NFKC")
+    .trim()
+    .toUpperCase()
+    .replace(DASH_LIKE, "-");
+  return PID_BODY.test(text) ? `P-${text}` : text;
+}
+
 export function loadPid(): string | null {
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);

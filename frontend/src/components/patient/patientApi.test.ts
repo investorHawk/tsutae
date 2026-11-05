@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../api/http";
-import { errorKeyOf, isNotRegistered } from "./patientApi";
+import { errorKeyOf, isNotRegistered, registerErrorKeyOf } from "./patientApi";
 
 describe("isNotRegistered", () => {
   it("401 と 403 は未登録", () => {
@@ -23,5 +23,30 @@ describe("errorKeyOf", () => {
     );
     expect(errorKeyOf(new ApiError(500, "boom"))).toBe("error.generic");
     expect(errorKeyOf(new TypeError("x"))).toBe("error.generic");
+  });
+});
+
+describe("registerErrorKeyOf", () => {
+  const INVALID = "register.number_invalid";
+
+  it.each([400, 404, 422])("%i は番号の誤りのキー", (status) => {
+    expect(registerErrorKeyOf(new ApiError(status, "x"), INVALID)).toBe(
+      INVALID,
+    );
+  });
+
+  it("429 は error.too_many_attempts", () => {
+    expect(
+      registerErrorKeyOf(new ApiError(429, "too_many_attempts"), INVALID),
+    ).toBe("error.too_many_attempts");
+  });
+
+  it("それ以外は error.generic", () => {
+    expect(registerErrorKeyOf(new ApiError(500, "boom"), INVALID)).toBe(
+      "error.generic",
+    );
+    expect(registerErrorKeyOf(new TypeError("x"), INVALID)).toBe(
+      "error.generic",
+    );
   });
 });

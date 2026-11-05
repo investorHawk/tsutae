@@ -42,6 +42,8 @@ export interface FakePush {
   subscribe: ReturnType<typeof vi.fn>;
   clearAppBadge: ReturnType<typeof vi.fn>;
   shown: { close: ReturnType<typeof vi.fn> }[];
+  /** Service Worker から画面へ知らせを送る（通知を押した、など） */
+  postFromWorker: (data: unknown) => void;
   /** 今の許可の状態を変える（端末の設定で直した、など） */
   setPermission: (permission: NotificationPermission) => void;
   isSubscribed: () => boolean;
@@ -112,8 +114,17 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
     current = makeSubscription();
     registered = true;
   }
+  const messageListeners = new Set<(event: { data: unknown }) => void>();
   defineOnNavigator("serviceWorker", {
     register,
+    addEventListener: (
+      _type: string,
+      listener: (event: { data: unknown }) => void,
+    ) => messageListeners.add(listener),
+    removeEventListener: (
+      _type: string,
+      listener: (event: { data: unknown }) => void,
+    ) => messageListeners.delete(listener),
     getRegistration: async () => (registered ? registration : undefined),
     get ready() {
       // 読むと、一度タスクを挟んでから有効になる（読まずに subscribe すると例外）
@@ -136,6 +147,9 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
     subscribe,
     clearAppBadge,
     shown,
+    postFromWorker: (data) => {
+      messageListeners.forEach((listener) => listener({ data }));
+    },
     setPermission: (permission) => {
       notification.permission = permission;
     },

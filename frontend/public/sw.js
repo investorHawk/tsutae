@@ -7,6 +7,7 @@
  */
 const FALLBACK_TITLE = "つたえ";
 const TODAY_PATH = "/today";
+const OPEN_TODAY_MESSAGE = "tsutae.open-today";
 
 /** 通知の中身。読めないときはタイトルだけ。 */
 function contentOf(event) {
@@ -48,22 +49,30 @@ function pathOf(client) {
   return new URL(client.url).pathname;
 }
 
+/** 患者の画面か。医師の画面と、別のタブで開いた医師のレポート（/api/doctor/...）は動かさない。 */
+function isPatientScreen(client) {
+  const path = pathOf(client);
+  return !path.startsWith("/doctor") && !path.startsWith("/api/");
+}
+
 /** 開いている患者の画面を /today にして手前に出す。無ければ開く。 */
 async function openToday() {
   const windows = await self.clients.matchAll({
     type: "window",
     includeUncontrolled: true,
   });
-  const target = windows.find((w) => !pathOf(w).startsWith("/doctor"));
+  const target = windows.find(isPatientScreen);
   if (!target) {
     return self.clients.openWindow(TODAY_PATH);
   }
   try {
-    // すでに /today なら動かさない（読み直すと書きかけの入力が消える）
-    const moved =
-      pathOf(target) === TODAY_PATH
-        ? target
-        : await target.navigate(TODAY_PATH);
+    if (pathOf(target) === TODAY_PATH) {
+      // 動かさない（読み直すと書きかけの入力が消える）。画面を残した iPhone では前の日の画面の
+      // ことがあるので、日付が変わっていないかは画面に確かめさせる（useNewDayCheck）
+      target.postMessage({ type: OPEN_TODAY_MESSAGE });
+      return await target.focus();
+    }
+    const moved = await target.navigate(TODAY_PATH);
     return await (moved ?? target).focus();
   } catch {
     return self.clients.openWindow(TODAY_PATH);

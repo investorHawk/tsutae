@@ -425,7 +425,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 
 | ファイル | 中身 |
 |---|---|
-| `frontend/public/sw.js` | 通知専用。`push` は `waitUntil` の中で必ず `showNotification`（本文が読めなければタイトルだけ。**送るかどうかはサーバーが決め、端末で握りつぶさない**）。`notificationclick` は `/today` を開く（開いている患者の画面を使い、`/doctor` は動かさない）。**`fetch` のハンドラを書かない**（`homeScreen.test.ts`） |
+| `frontend/public/sw.js` | 通知専用。`push` は `waitUntil` の中で必ず `showNotification`（本文が読めなければタイトルだけ。**送るかどうかはサーバーが決め、端末で握りつぶさない**）。`notificationclick` は `/today` を開く（開いている患者の画面を使い、`/doctor` と別のタブで開いたレポート `/api/doctor/...` は動かさない。すでに `/today` なら移動せず、`tsutae.open-today` の知らせを送って手前に出す）。**`fetch` のハンドラを書かない**（`homeScreen.test.ts`） |
 | `api/patientPush.ts` | 4経路の呼び出し。応答は形を検査する。endpoint は本文で送る |
 | `patient/pushDevice.ts` | 端末の API の包み。Service Worker の登録は `subscribeDevice`（設定でオンにしたとき）だけ |
 | `components/patient/pushStatus.ts` | 純関数 `pushStatusOf`（`unsupported`・`no_key`・`denied`・`on`・`off`）と選べる時刻 |
@@ -434,6 +434,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `components/patient/NotifySettings.tsx`・`pages/patient/Settings.tsx` | P5（`/settings`）。文言は全て `patient_strings.json` |
 | `components/patient/NotifyBanner.tsx` | オフでオンにできるときだけ、今日の記録の欄の下に出す案内の帯 |
 | `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー |
+| `components/patient/useNewDayCheck.ts` | 開いたまま日付が変わった今日の記録に気づく。戻ったとき（`visibilitychange`）と通知を押したとき（`sw.js` の知らせ）に `GET /questions` を読み、画面の今日とサーバーの今日が違うときだけ `pages/patient/Today.tsx` が読み直す。同じ日は完了の画面も書きかけも残す |
 | `patient/useClearNotifications.ts` | アプリを開いたとき・戻ってきたときに、バッジと表示中の通知を消す（`PatientLayout`） |
 
 **動かす環境**: 通知には HTTPS が要る。手順は `README.md` の「動かし方」（Tailscale Funnel → Vite の 5173 → `/api` は 8000 へ）。実機の確認は未実施（仕様書 §9）。

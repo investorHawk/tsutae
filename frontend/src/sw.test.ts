@@ -4,6 +4,7 @@
  * （docs/plan-device-records.md §4.2）。
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { OPEN_TODAY_MESSAGE } from "./patient/pushDevice";
 
 interface Fs {
   readFileSync(path: URL, encoding: "utf8"): string;
@@ -21,6 +22,7 @@ interface FakeWindow {
   url: string;
   navigate: ReturnType<typeof vi.fn>;
   focus: ReturnType<typeof vi.fn>;
+  postMessage: ReturnType<typeof vi.fn>;
 }
 
 let source = "";
@@ -36,6 +38,7 @@ function fakeWindow(path: string): FakeWindow {
     url: `https://tsutae.test${path}`,
     navigate: vi.fn(async () => win),
     focus: vi.fn(async () => win),
+    postMessage: vi.fn(),
   };
   return win;
 }
@@ -230,6 +233,21 @@ describe("sw.js: notificationclick", () => {
     expect(win.focus).toHaveBeenCalledTimes(1);
   });
 
+  it("すでに /today なら、日付が変わっていないかを画面に確かめさせる", async () => {
+    const win = fakeWindow("/today");
+    const w = loadWorker({ windows: [win] });
+    await click(w);
+    expect(win.postMessage).toHaveBeenCalledWith({ type: OPEN_TODAY_MESSAGE });
+    expect(win.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("別の画面から移すときは知らせない（読み込み直されるので要らない）", async () => {
+    const win = fakeWindow("/history");
+    const w = loadWorker({ windows: [win] });
+    await click(w);
+    expect(win.postMessage).not.toHaveBeenCalled();
+  });
+
   it("開いている画面が無ければ /today を開く", async () => {
     const w = loadWorker();
     await click(w);
@@ -242,6 +260,25 @@ describe("sw.js: notificationclick", () => {
     await click(w);
     expect(win.navigate).not.toHaveBeenCalled();
     expect(w.openWindow).toHaveBeenCalledWith("/today");
+  });
+
+  it("別のタブで開いた医師のレポートも動かさず /today を別に開く", async () => {
+    const win = fakeWindow("/api/doctor/visits/3/report");
+    const w = loadWorker({ windows: [win] });
+    await click(w);
+    expect(win.navigate).not.toHaveBeenCalled();
+    expect(win.focus).not.toHaveBeenCalled();
+    expect(w.openWindow).toHaveBeenCalledWith("/today");
+  });
+
+  it("レポートのタブが先に見つかっても、患者の画面を使う", async () => {
+    const report = fakeWindow("/api/doctor/visits/3/report");
+    const patient = fakeWindow("/history");
+    const w = loadWorker({ windows: [report, patient] });
+    await click(w);
+    expect(report.navigate).not.toHaveBeenCalled();
+    expect(patient.navigate).toHaveBeenCalledWith("/today");
+    expect(w.openWindow).not.toHaveBeenCalled();
   });
 
   it("画面を動かせなければ /today を開く", async () => {

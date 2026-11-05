@@ -6,6 +6,9 @@ import type { PushSubscriptionRequest } from "../api/patientPush";
 
 const SERVICE_WORKER_URL = "/sw.js";
 
+/** 通知を押したときに sw.js が /today の画面へ送る知らせの type（sw.js と同じ値）。 */
+export const OPEN_TODAY_MESSAGE = "tsutae.open-today";
+
 export function isPushSupported(): boolean {
   return (
     "serviceWorker" in navigator &&
@@ -90,6 +93,21 @@ export function toSubscriptionRequest(
     throw new Error("push subscription has no keys");
   }
   return { endpoint, keys: { p256dh, auth }, notify_time: notifyTime };
+}
+
+/** 通知を押した知らせを受ける。解除の関数を返す。未対応の端末では何もしない。 */
+export function onOpenTodayMessage(listener: () => void): () => void {
+  if (!("serviceWorker" in navigator)) {
+    return () => undefined;
+  }
+  const worker = navigator.serviceWorker;
+  const onMessage = (event: MessageEvent) => {
+    if (event.data?.type === OPEN_TODAY_MESSAGE) {
+      listener();
+    }
+  };
+  worker.addEventListener("message", onMessage);
+  return () => worker.removeEventListener("message", onMessage);
 }
 
 async function closeShownNotifications(): Promise<void> {

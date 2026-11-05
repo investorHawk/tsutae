@@ -93,6 +93,16 @@ def test_prompt_has_rules(phrase: str) -> None:
     assert phrase in prompt
 
 
+def test_prompt_keeps_unlisted_symptoms_out_of_near_terms() -> None:
+    prompt = build_turn_prompt(_input(new_draft_form()), TEXT)
+    assert "用語の一覧に無い症状は ctcae_terms に入れず、notes に書く" in prompt
+    assert "一覧に無い症状の言い方を、近い用語の行の phrases に混ぜない" in prompt
+    assert "「歯ぐきから血が出る」を「鼻出血」の行に入れない" in prompt
+    # 例の前提: 歯肉出血は一覧に無く、鼻出血はある
+    terms = {item["term"] for item in load_terms()}
+    assert "歯肉出血" not in terms and "鼻出血" in terms
+
+
 def test_prompt_lists_doctor_edit_and_missing_fields_by_ref() -> None:
     form = load_builtin_form("regimen-folfox")
     sources = FieldSources(

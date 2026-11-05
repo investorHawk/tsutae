@@ -181,7 +181,8 @@ export interface AiValue {
   field_id: string;
   label: string;
   value: unknown;
-  source: "doctor_text" | "standard";
+  /** AI が入れた値は標準の値だけ（先生の文からの欄は一覧に出ない） */
+  source: "standard";
 }
 
 export interface SkillMarkdown {

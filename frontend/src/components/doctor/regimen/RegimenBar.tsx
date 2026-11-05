@@ -6,6 +6,7 @@ interface RegimenBarProps {
   /** まだ答えていない Claude の ask（あれば確認へ進めない） */
   ask: ChatAsk | null;
   busy: boolean;
+  /** AI が入れた値（標準の値）の、確認の画面の行の数 */
   aiCount: number;
   onConfirm: () => void;
   onDiscard: () => Promise<void>;
@@ -31,7 +32,7 @@ export default function RegimenBar({
     : missing > 0
       ? `未入力 ${missing}`
       : aiCount > 0
-        ? `そろいました。AI が入れた ${aiCount} 欄は確認の画面でも一覧にします`
+        ? `そろいました。AI が入れた ${aiCount} 行は確認の画面でも一覧にします`
         : "そろいました";
   return (
     <div className="rf-bar rf-bar--sticky">

@@ -15,7 +15,7 @@
   いなければ「質問を提案して」／未入力が残れば「標準の値で埋めて」。未入力が 0 で質問の
   提案が済めば止める。往復は `--max-turns`（既定 6）まで
 - 往復ごとに秒・費用・トークン（`regimen_chat` のログの turn_end。ResultMessage の
-  total_cost_usd など）・ツールの呼び出しと拒否・H4 の拒否・変えた欄・AI の欄・未入力・
+  total_cost_usd など）・ツールの呼び出しと拒否・H4 の拒否・変えた欄・AI の欄（標準の値）・未入力・
   ask・提案した質問・失敗のコードを表で出す。往復が失敗したらそこで止める
 - `--json`: `<out-dir>/demo-regimen-<YYYYMMDD-HHMM>.json`（往復の数字・会話・最後の
   フォーム・確認の結果・上限の設定）と、描けたら同じ名前の `.md`（SKILL.md の全文）を書く
@@ -152,7 +152,7 @@ def apply_logs(turn: Turn, logs: Sequence[Mapping[str, Any]]) -> Turn:
 
 
 def apply_draft(turn: Turn, draft: Mapping[str, Any]) -> Turn:
-    """往復の後の下書きから、変えた欄・AI の欄・未入力・ask・提案を写す。"""
+    """往復の後の下書きから、変えた欄・AI の欄（標準の値）・未入力・ask・提案を写す。"""
     chat = draft.get("chat") or []
     last = chat[-1] if chat else {}
     mine = last.get("role") == "assistant" and last.get("generation") == draft.get(
@@ -162,7 +162,7 @@ def apply_draft(turn: Turn, draft: Mapping[str, Any]) -> Turn:
     return replace(
         turn,
         changed=len(last.get("changed") or []) if mine else 0,
-        ai_fields=sum(1 for v in sources.values() if v in ("standard", "doctor_text")),
+        ai_fields=sum(1 for v in sources.values() if v == "standard"),
         missing=len(draft.get("missing") or []),
         ask=last.get("ask") if mine else None,
         proposed=list(last.get("proposed") or []) if mine else [],
@@ -224,7 +224,7 @@ def _short(text: str | None, limit: int = 120) -> str:
 
 TABLE_HEAD = (
     "| # | 種類 | 秒 | 費用 USD | トークン 入/出 | SDK の回数 | ツール | 拒否 ツール/H4 "
-    "| 変えた欄 | AI の欄 | 未入力 | ask | 提案した質問 | 失敗 |"
+    "| 変えた欄 | AI の欄（標準の値） | 未入力 | ask | 提案した質問 | 失敗 |"
 )
 
 
@@ -337,7 +337,7 @@ def show_preview(client: TestClient, run: Run) -> None:
     md = skill_text(p)
     print(
         f"確認: {_show(p.get('skill_name'))} 版 {_show(p.get('version'))}・"
-        f"AI が入れた値 {len(p.get('ai_values') or [])} 欄・"
+        f"AI が入れた値（標準の値） {len(p.get('ai_values') or [])} 欄・"
         f"検査の欠け {len(p.get('issues') or [])}・"
         f"SKILL.md {len(md.splitlines()) if md else '-'} 行"
     )

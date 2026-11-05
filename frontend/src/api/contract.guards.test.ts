@@ -215,6 +215,11 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ],
   [
     "doctor_regimen_draft_preview",
+    "AI の値の出どころが doctor_text（一覧は標準の値だけ）",
+    (b) => (b.ai_values[0].source = "doctor_text"),
+  ],
+  [
+    "doctor_regimen_draft_preview",
     "検査の結果があるのに SKILL.md がある",
     (b) => (b.issues = [{ field_id: "notes", code: "x", message: "x" }]),
   ],

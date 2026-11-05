@@ -5,6 +5,7 @@ import type {
 } from "../../../api/regimenTypes";
 import { turnFailureText } from "./chatLabels";
 import { changeGroupOf } from "./fieldLabels";
+import { isAiSource } from "./fieldState";
 
 interface ChangeChip {
   key: string;
@@ -18,8 +19,7 @@ function changeChips(draft: RegimenDraft, row: AssistantChatRow): ChangeChip[] {
   const chips = new Map<string, ChangeChip>();
   for (const fieldId of row.changed) {
     const group = changeGroupOf(draft.form, fieldId);
-    const source = draft.sources[fieldId];
-    const ai = source === "standard" || source === "doctor_text";
+    const ai = isAiSource(draft.sources[fieldId]);
     const found = chips.get(group.key);
     if (found) {
       found.ai = found.ai || ai;

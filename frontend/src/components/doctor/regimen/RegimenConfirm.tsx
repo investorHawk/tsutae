@@ -4,6 +4,7 @@ import ErrorNote from "../ErrorNote";
 import TwoStepButton from "../TwoStepButton";
 import { describeRegimenError } from "../errors";
 import AiValueList from "./AiValueList";
+import type { AiRow } from "./aiRows";
 import PhonePreview from "./PhonePreview";
 import type { RegimenConfirmApi } from "./useRegimenConfirm";
 
@@ -14,8 +15,8 @@ interface RegimenConfirmProps {
   editorBusy: boolean;
   /** まだ答えていない Claude の ask（確認の画面で送った往復が聞き返したとき。採用を止める） */
   ask: ChatAsk | null;
-  /** 一覧の「削除」（欄を空にする直接編集）。必須が欠ければフォームへ戻る */
-  onDeleteValue: (fieldId: string) => Promise<void>;
+  /** 一覧の「削除」（行を消すか、標準の値の欄を空にする直接編集）。必須が欠ければフォームへ戻る */
+  onDeleteValue: (row: AiRow) => Promise<void>;
   onBack: () => void;
   onDiscard: () => Promise<void>;
   onAdopt: () => Promise<void>;
@@ -64,10 +65,11 @@ export default function RegimenConfirm({
       {preview.ai_values.length > 0 ? (
         <AiValueList
           values={preview.ai_values}
+          questions={draft.form.questions}
           confirmed={confirm.confirmed}
           disabled={busy}
           onToggle={confirm.setConfirmed}
-          onDelete={(fieldId) => void onDeleteValue(fieldId)}
+          onDelete={(row) => void onDeleteValue(row)}
         />
       ) : null}
       <div className="rf-confirm-grid">

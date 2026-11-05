@@ -1,78 +1,54 @@
 import type { AiValue } from "../../../api/regimenTypes";
-import { formatDays, formatList } from "./fieldValues";
-
-const SOURCE_LABELS: Readonly<Record<AiValue["source"], string>> = {
-  standard: "標準の値",
-  doctor_text: "先生の文から",
-};
-
-/** 値を1行の文字にする（Day の範囲・一覧・数）。 */
-export function valueText(value: unknown): string {
-  if (Array.isArray(value)) {
-    if (value.every((v) => typeof v === "string")) {
-      return formatList(value as string[]);
-    }
-    if (
-      value.every(
-        (v) =>
-          typeof v === "object" && v !== null && "start" in v && "end" in v,
-      )
-    ) {
-      return formatDays(value as { start: number; end: number }[]);
-    }
-  }
-  if (value === null || value === undefined || value === "") {
-    return "（空）";
-  }
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
+import { aiRowsOf, type AiRow, type QuestionLabels } from "./aiRows";
 
 interface AiValueListProps {
   values: readonly AiValue[];
+  /** 対応する質問の欄を短い名前で出すための、今のフォームの質問 */
+  questions: QuestionLabels;
   confirmed: boolean;
   disabled: boolean;
   onToggle: (value: boolean) => void;
-  onDelete: (fieldId: string) => void;
+  onDelete: (row: AiRow) => void;
 }
 
-/** 確認: AI が入れた値の一覧（行ごとに「削除」）とチェック1回。 */
+/** 確認: AI が入れた値（標準の値）の一覧（行ごとに「削除」）とチェック1回。 */
 export default function AiValueList({
   values,
+  questions,
   confirmed,
   disabled,
   onToggle,
   onDelete,
 }: AiValueListProps) {
+  const rows = aiRowsOf(values, questions);
   return (
     <section className="rf-section rf-ai-list" aria-labelledby="rf-ai-h">
       <h3 id="rf-ai-h" tabIndex={-1}>
-        AI が入れた値（{values.length}{" "}
-        件）。採用の前に確かめてください（要らない値は削除できます）
+        AI が入れた値（{rows.length}{" "}
+        件）。先生の文に無かったので、標準の値から入れました（要らない行は削除できます）
       </h3>
       <table className="rf-table">
         <thead>
           <tr>
             <th scope="col">欄</th>
             <th scope="col">値</th>
-            <th scope="col">出どころ</th>
             <th scope="col">
               <span className="rf-sr-only">操作</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          {values.map((v) => (
-            <tr key={v.field_id}>
-              <td>{v.label}</td>
-              <td>{valueText(v.value)}</td>
-              <td>{SOURCE_LABELS[v.source]}</td>
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <td>{row.where}</td>
+              <td>{row.text}</td>
               <td>
                 <button
                   type="button"
                   className="rf-row-delete"
                   disabled={disabled}
-                  aria-label={`${v.label} の値を削除`}
-                  onClick={() => onDelete(v.field_id)}
+                  aria-label={`${row.where} の値を削除`}
+                  onClick={() => onDelete(row)}
                 >
                   削除
                 </button>

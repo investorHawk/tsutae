@@ -215,14 +215,15 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     expect(within(chat).getByText(MSG1)).toBeInTheDocument();
     const cycle = screen.getByLabelText("1コースの日数（7〜42）");
     expect(cycle).toHaveValue("14");
-    expect(fieldOf(cycle)).toHaveAttribute("data-state", "ai");
+    // 先生の文からの欄は青枠、標準の値の欄は AI が入れた
+    expect(fieldOf(cycle)).toHaveAttribute("data-state", "doc");
     expect(
-      within(fieldOf(cycle)).getByText("AI が入れた（先生の文から）"),
+      within(fieldOf(cycle)).getByText("先生の文から"),
     ).toBeInTheDocument();
+    const target = fieldOf(screen.getByLabelText("対象（任意）"));
+    expect(target).toHaveAttribute("data-state", "ai");
     expect(
-      within(fieldOf(screen.getByLabelText("対象（任意）"))).getByText(
-        "AI が入れた（標準の値）",
-      ),
+      within(target).getByText("AI が入れた（標準の値）"),
     ).toBeInTheDocument();
     // ask の欄は赤枠と札
     const days = screen.getByLabelText("Day（ベバシズマブ）");
@@ -233,10 +234,13 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
 
     // 変えた欄の札を押すと、その欄へ focus
     const changed = within(chat).getByRole("group", { name: "変えた欄" });
-    await user.click(
+    expect(
       within(changed).getByRole("button", {
-        name: "基本 · 1コースの日数 （AI が入れた）",
+        name: "基本 · 対象 （AI が入れた）",
       }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(changed).getByRole("button", { name: "基本 · 1コースの日数" }),
     );
     await waitFor(() => expect(cycle).toHaveFocus());
 
@@ -257,7 +261,9 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     const confirmButton = screen.getByRole("button", { name: "確認へ進む" });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     expect(
-      screen.getByText(/そろいました。AI が入れた 2 欄/),
+      screen.getByText(
+        "そろいました。AI が入れた 2 行は確認の画面でも一覧にします",
+      ),
     ).toBeInTheDocument();
     // 答えた後は赤枠が消える
     expect(
@@ -268,15 +274,19 @@ describe("D4 レジメン: 新規（チャットで作って採用する）", ()
     // 2回目の往復: チャットで質問の文を直す → 欄が変わり、変えた欄の札が付く
     await user.type(screen.getByLabelText("Claude に伝える"), `${MSG2}{Enter}`);
     const diarrhea = await screen.findByDisplayValue(DIARRHEA_TEXT);
-    expect(fieldOf(diarrhea)).toHaveAttribute("data-state", "ai");
+    expect(fieldOf(diarrhea)).toHaveAttribute("data-state", "doc");
+    expect(
+      within(fieldOf(diarrhea)).getByText("先生の文から"),
+    ).toBeInTheDocument();
     const groups = within(chat).getAllByRole("group", { name: "変えた欄" });
     expect(
       within(groups[groups.length - 1]).getByRole("button", {
         name: /質問 · 下痢/,
       }),
     ).toBeInTheDocument();
+    // 先生の文からの欄は増えても、AI が入れた行は増えない
     expect(
-      screen.getByText(/そろいました。AI が入れた 3 欄/),
+      screen.getByText(/そろいました。AI が入れた 2 行/),
     ).toBeInTheDocument();
 
     // 確認: AI の値の一覧・SKILL.md の全文・患者の見本

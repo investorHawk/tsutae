@@ -237,6 +237,10 @@ def test_json_has_turns_and_totals(
     assert data["preview"]["issues"] == []
     assert data["preview"]["skill_name"] == "regimen-folfiri-bv"
     assert data["preview"]["ai_values"] > 0
+    # 表と確認の数は同じ意味（標準の値の欄）。先生の文からの欄は sources にだけ残る
+    standard = [k for k, v in data["sources"].items() if v == "standard"]
+    assert turns[-1]["ai_fields"] == data["preview"]["ai_values"] == len(standard)
+    assert "doctor_text" in data["sources"].values()
     assert data["adopt"] is None
     md = sorted(tmp_path.glob("demo-regimen-*.md"))
     assert len(md) == 1 and md[0].stem == files[0].stem

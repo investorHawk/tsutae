@@ -6,7 +6,27 @@ import {
   parseDays,
   parseList,
   parseWholeNumber,
+  valueText,
 } from "./fieldValues";
+
+describe("valueText（値を1行の文字に）", () => {
+  it.each<[unknown, string]>([
+    ["大腸がん", "大腸がん"],
+    [14, "14"],
+    [["下痢", "軟便"], "下痢、軟便"],
+    [
+      [
+        { start: 1, end: 3 },
+        { start: 8, end: 8 },
+      ],
+      "Day1〜3・8",
+    ],
+    [null, "（空）"],
+    ["", "（空）"],
+  ])("%j → %s", (value, text) => {
+    expect(valueText(value)).toBe(text);
+  });
+});
 
 describe("parseDays（Day の範囲の入力 → DayRange[]）", () => {
   it.each([

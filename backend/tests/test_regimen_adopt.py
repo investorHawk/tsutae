@@ -385,6 +385,29 @@ def test_ai_values_need_confirmation(env: Env) -> None:
     assert _adopt(env, draft["id"], token, confirmed=True).version == 1
 
 
+def test_doctor_text_is_not_an_ai_value_and_needs_no_confirmation(env: Env) -> None:
+    """先生の文から入れた欄は一覧に出さず、確かめも要らない（印には入る）。"""
+    draft = _filled_new(env)
+    before = _preview(env, draft["id"])["confirm_token"]
+    _set_sources(env, draft["id"], {"basic.target": "doctor_text"})
+    preview = _preview(env, draft["id"])
+    assert preview["ai_values"] == []
+    assert preview["confirm_token"] != before
+    assert _adopt(env, draft["id"], preview["confirm_token"], confirmed=False)
+
+
+def test_ai_values_list_standard_only_when_sources_are_mixed(env: Env) -> None:
+    draft = _filled_new(env)
+    _set_sources(
+        env,
+        draft["id"],
+        {"basic.target": "doctor_text", "basic.cycle_days": "standard"},
+    )
+    preview = _preview(env, draft["id"])
+    assert [v["field_id"] for v in preview["ai_values"]] == ["basic.cycle_days"]
+    assert {v["source"] for v in preview["ai_values"]} == {"standard"}
+
+
 def test_incomplete_draft_is_invalid_form(env: Env) -> None:
     draft = create_new_draft(env.conn)
     with pytest.raises(DraftError) as exc:

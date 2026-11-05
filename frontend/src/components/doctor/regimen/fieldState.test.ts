@@ -61,18 +61,26 @@ describe("fieldStateOf（4つの状態）", () => {
     expect(fieldStateOf(draft, "basic.code", activeAsk(draft))).toBe("missing");
   });
 
-  it("standard・doctor_text は AI が入れた、doctor_edit は先生が入れた", () => {
-    const draft = {
+  it("standard だけが AI が入れた。doctor_text と doctor_edit は先生の青枠", () => {
+    const draft: RegimenDraft = {
       ...turnDraft(),
       sources: {
         ...turnDraft().sources,
-        "basic.display_name": "doctor_edit" as const,
+        "basic.display_name": "doctor_edit",
       },
     };
+    expect(draft.sources["basic.target"]).toBe("standard");
     expect(fieldStateOf(draft, "basic.target", null)).toBe("ai");
-    expect(fieldStateOf(draft, "basic.cycle_days", null)).toBe("ai");
+    expect(draft.sources["basic.cycle_days"]).toBe("doctor_text");
+    expect(fieldStateOf(draft, "basic.cycle_days", null)).toBe("doc");
     expect(fieldStateOf(draft, "basic.display_name", null)).toBe("doc");
     expect(fieldStateOf(draft, "notes", null)).toBe("plain");
+  });
+
+  it("先生の文からの欄でも、ask の欄なら赤枠のまま（答えるまで）", () => {
+    const draft = turnDraft();
+    const ask = { field_id: "basic.cycle_days", question: "？", options: [] };
+    expect(fieldStateOf(draft, "basic.cycle_days", ask)).toBe("asked");
   });
 
   it("先生が直接入れた欄は ask を指していても赤枠にしない（答えた）", () => {
@@ -89,21 +97,22 @@ describe("fieldStateOf（4つの状態）", () => {
 });
 
 describe("stateTagOf", () => {
-  it("文字の札（AI の値は出どころを添える）", () => {
+  it("文字の札（青枠の札は出どころで出し分ける）", () => {
     expect(stateTagOf("missing")).toBe("未入力（必須）");
     expect(stateTagOf("asked")).toBe("Claude が聞いています");
     expect(stateTagOf("ai", "standard")).toBe("AI が入れた（標準の値）");
-    expect(stateTagOf("ai", "doctor_text")).toBe("AI が入れた（先生の文から）");
     expect(stateTagOf("doc", "doctor_edit")).toBe("先生が入れた");
+    expect(stateTagOf("doc", "doctor_text")).toBe("先生の文から");
     expect(stateTagOf("plain")).toBe("");
   });
 });
 
 describe("aiCountIn・sectionIssues", () => {
-  it("節ごとの AI の欄の数と、節の単位の欠け", () => {
+  it("節ごとの AI の欄の数（standard だけ）と、節の単位の欠け", () => {
     const draft = turnDraft();
-    expect(aiCountIn(draft, "basic")).toBe(3);
-    expect(aiCountIn(draft, "questions")).toBe(4);
+    expect(aiCountIn(draft, "basic")).toBe(1);
+    expect(aiCountIn(draft, "drugs")).toBe(1);
+    expect(aiCountIn(draft, "questions")).toBe(0);
     expect(sectionIssues(draft, "drugs").map((m) => m.code)).toEqual([
       "day1_infusion",
     ]);

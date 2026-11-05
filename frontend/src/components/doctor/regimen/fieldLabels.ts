@@ -19,7 +19,7 @@ export const BASIC_LABELS: Readonly<Record<string, string>> = {
   cycle_days: "1コースの日数",
 };
 
-const ROW_HEADS: Readonly<Record<string, string>> = {
+export const ROW_HEADS: Readonly<Record<string, string>> = {
   drugs: "薬",
   side_effects: "副作用",
   questions: "質問",

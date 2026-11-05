@@ -19,6 +19,10 @@ export default function RegimenLegend() {
         <span className="rf-legend-tag rf-legend-tag--doc">先生が入れた</span>{" "}
         頼まない限り Claude は書き換えない
       </span>
+      <span>
+        <span className="rf-legend-tag rf-legend-tag--doc">先生の文から</span>{" "}
+        先生の文から Claude が入れた。次の文で Claude が直すことがある
+      </span>
     </p>
   );
 }

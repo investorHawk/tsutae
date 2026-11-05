@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import type { PatchRegimenFieldsRequest } from "../../../api/regimenTypes";
+import { deletePatchOf, type AiRow } from "./aiRows";
 import { domIdOf, sectionDomId } from "./fieldLabels";
 import { askKeyOf, openAsk, patchTouchesAsk } from "./fieldState";
-import { emptyValueOf } from "./fieldValues";
 import type { AdoptedRegimen } from "./RegimenDone";
 import {
   NEW_TAB_KEY,
@@ -133,11 +133,12 @@ export function useRegimenScreen(handleError: (err: unknown) => string) {
   );
 
   const deleteValue = useCallback(
-    async (fieldId: string) => {
-      const ok = await editor.patch(
-        { changes: [{ field_id: fieldId, value: emptyValueOf(fieldId) }] },
-        [fieldId],
-      );
+    async (row: AiRow) => {
+      if (!draft) {
+        return;
+      }
+      const { body, fieldIds } = deletePatchOf(draft, row);
+      const ok = await editor.patch(body, fieldIds);
       if (!ok) {
         setNote(
           "その値を削除できませんでした。フォームに戻って欄の下の理由を見てください",
@@ -155,7 +156,7 @@ export function useRegimenScreen(handleError: (err: unknown) => string) {
       }
       focusFirst("rf-ai-h", "rf-skill-h");
     },
-    [confirm, editor],
+    [confirm, draft, editor],
   );
 
   const discard = useCallback(async () => {

@@ -9,6 +9,7 @@ import RegimenDone from "./RegimenDone";
 import RegimenFormView from "./RegimenFormView";
 import RegimenLegend from "./RegimenLegend";
 import RegimenTabs from "./RegimenTabs";
+import { aiRowCountOf } from "./aiRows";
 import {
   RegimenFormContext,
   type RegimenFormContextValue,
@@ -39,12 +40,6 @@ function statusOf(draft: RegimenDraft, view: RegimenView): string {
   return draft.base_version !== null
     ? `下書き（採用するまで患者の画面は版 ${draft.base_version} のまま）`
     : "下書き（まだ患者に出ない）";
-}
-
-function aiCountOf(draft: RegimenDraft): number {
-  return Object.values(draft.sources).filter(
-    (s) => s === "standard" || s === "doctor_text",
-  ).length;
 }
 
 /**
@@ -150,7 +145,7 @@ export default function RegimenSettings() {
                     draft={draft}
                     ask={ask}
                     busy={busy}
-                    aiCount={aiCountOf(draft)}
+                    aiCount={aiRowCountOf(draft.sources)}
                     onConfirm={() => void screen.goConfirm()}
                     onDiscard={screen.discard}
                   />

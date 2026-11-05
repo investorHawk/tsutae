@@ -33,7 +33,7 @@ const ROUTES: readonly Route[] = ["infusion", "oral", "pump"];
 
 const isDraftStatus = oneOf(DRAFT_STATUSES);
 const isSource = oneOf(SOURCES);
-const isAiSource = oneOf(["doctor_text", "standard"] as const);
+const isAiSource = oneOf(["standard"] as const);
 const isRoute = oneOf(ROUTES);
 const isAnswerType = oneOf(["three_level", "temperature"] as const);
 const isSkillKind = oneOf(["full", "diff"] as const);

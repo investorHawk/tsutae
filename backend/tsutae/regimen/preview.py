@@ -1,6 +1,7 @@
 """確認の画面（architecture 9c「確認と採用」）— AI の値・SKILL.md・患者の見本・検査・印。
 
-- `ai_values(form, sources)`: 出どころが standard・doctor_text の欄（欄 id・表示名・値・出どころ）
+- `ai_values(form, sources)`: 出どころが standard（標準の値）の欄（欄 id・表示名・値・出どころ）。
+  先生の文から（doctor_text）・先生が入れた（doctor_edit）の欄は一覧に出さず、確かめも要らない
 - `confirm_token(form, sources, base_version)`: 正規化した form JSON ＋ 出どころ ＋ 元の版の
   sha256。確かめはこの印に結びつく（確かめた後に値が変われば採用できない）
 - `adoption_issues(conn, draft, form, *, skills_dir)`: 採用の前の検査（必須・値・識別名の重複・
@@ -55,7 +56,7 @@ __all__ = [
     "schedule_lock_issues",
 ]
 
-AI_SOURCES = frozenset({"standard", "doctor_text"})
+AI_SOURCES = frozenset({"standard"})
 _FIELD_LABELS = {
     "display_name": "表示名",
     "code": "識別名",
@@ -135,7 +136,7 @@ def field_value(form: RegimenForm, field_id: str) -> Any:
 
 
 def ai_values(form: RegimenForm, sources: FieldSources) -> list[dict[str, Any]]:
-    """AI が入れた値（標準の値・先生の文から）。並びはフォームの欄の順。"""
+    """AI が入れた値（標準の値だけ）。並びはフォームの欄の順。"""
     return [
         {
             "field_id": fid,

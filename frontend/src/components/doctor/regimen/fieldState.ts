@@ -4,8 +4,10 @@
  * - asked（Claude が聞いています・赤枠）: 会話の最後が Claude の ask で、その欄（か行・節）を
  *   指していて、先生がまだ直接入れていない
  * - missing（未入力・ピンク）: draft.missing にある必須の欄
- * - ai（AI が入れた・橙の点線）: 出どころが standard（標準の値）か doctor_text（先生の文から）
- * - doc（先生が入れた・青枠）: 出どころが doctor_edit
+ * - ai（AI が入れた・橙の点線）: 出どころが standard（標準の値）。採用の前に確かめる
+ * - doc（先生の値・青枠）: 出どころが doctor_edit（先生が入れた）か doctor_text（先生の文から）。
+ *   色は同じでもサーバーの保護は違う。Claude から守られるのは doctor_edit だけで
+ *   （overwrite_requested）、doctor_text は次の文で Claude が書き換えられる
  *
  * 強さは asked > missing > ai > doc。
  */
@@ -27,10 +29,8 @@ export const STATE_TAGS: Readonly<Record<FieldState, string>> = {
   plain: "",
 };
 
-const AI_SOURCE_NOTES: Readonly<Record<string, string>> = {
-  standard: "標準の値",
-  doctor_text: "先生の文から",
-};
+const STANDARD_TAG = `${STATE_TAGS.ai}（標準の値）`;
+const DOCTOR_TEXT_TAG = "先生の文から";
 
 /** 会話の最後が Claude の ask なら、その ask（答えるまで有効）。 */
 export function activeAsk(draft: RegimenDraft): ChatAsk | null {
@@ -80,8 +80,9 @@ export function askCovers(ask: ChatAsk | null, fieldId: string): boolean {
   return fieldId === ask.field_id || fieldId.startsWith(`${ask.field_id}.`);
 }
 
-function isAiSource(source: FieldSource | undefined): boolean {
-  return source === "standard" || source === "doctor_text";
+/** AI が入れた値（先生の文に無く、標準の値から入れた欄）か。 */
+export function isAiSource(source: FieldSource | undefined): boolean {
+  return source === "standard";
 }
 
 export function fieldStateOf(
@@ -101,14 +102,16 @@ export function fieldStateOf(
   if (isAiSource(source)) {
     return "ai";
   }
-  return source === "doctor_edit" ? "doc" : "plain";
+  return source === "doctor_edit" || source === "doctor_text" ? "doc" : "plain";
 }
 
-/** 欄の下の札（AI の値は出どころも添える）。 */
+/** 欄の下の札（AI の値は標準の値と添える。青枠の札は出どころで出し分ける）。 */
 export function stateTagOf(state: FieldState, source?: FieldSource): string {
-  if (state === "ai" && source) {
-    const note = AI_SOURCE_NOTES[source];
-    return note ? `${STATE_TAGS.ai}（${note}）` : STATE_TAGS.ai;
+  if (state === "ai" && source === "standard") {
+    return STANDARD_TAG;
+  }
+  if (state === "doc" && source === "doctor_text") {
+    return DOCTOR_TEXT_TAG;
   }
   return STATE_TAGS[state];
 }

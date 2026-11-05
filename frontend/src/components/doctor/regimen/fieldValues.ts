@@ -83,6 +83,27 @@ export function parseWholeNumber(text: string): Parsed<number | null> {
   return { ok: true, value: Number(body) };
 }
 
+/** 値を1行の文字にする（Day の範囲・一覧・数。確認の画面の一覧）。 */
+export function valueText(value: unknown): string {
+  if (Array.isArray(value)) {
+    if (value.every((v) => typeof v === "string")) {
+      return formatList(value as string[]);
+    }
+    if (
+      value.every(
+        (v) =>
+          typeof v === "object" && v !== null && "start" in v && "end" in v,
+      )
+    ) {
+      return formatDays(value as DayRange[]);
+    }
+  }
+  if (value === null || value === undefined || value === "") {
+    return "（空）";
+  }
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 /** 欄を空にする値（一覧の欄は []・補足の指示は ""・ほかは null）。 */
 export function emptyValueOf(fieldId: string): unknown {
   if (fieldId === "notes") {

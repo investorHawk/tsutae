@@ -162,3 +162,53 @@ def test_empty_patch_returns_same_values() -> None:
     form = extra_form("ram_wptx")
     new, sources = apply_patch(form, FieldSources({"notes": "standard"}), FormPatch())
     assert new == form and sources.root == {"notes": "standard"}
+
+
+# --- 確認の画面の「削除」が送る形（画面の deletePatchOf と対になる） --------------------
+
+
+def test_deleting_a_referenced_question_alone_is_rejected() -> None:
+    form = extra_form("folfiri_bv")
+    with pytest.raises(RegimenFormError) as exc:
+        apply_patch(form, EMPTY, FormPatch(deletes=("questions.q-diarrhea",)))
+    assert _codes(exc) == {
+        ("side_effects.se-diarrhea.question_key", "unknown_question")
+    }
+
+
+def test_deleting_a_question_with_its_references_in_one_patch() -> None:
+    form = extra_form("folfiri_bv")
+    ref = "side_effects.se-diarrhea.question_key"
+    sources = FieldSources({ref: "standard", "questions.q-diarrhea.key": "standard"})
+    patch = FormPatch(
+        deletes=("questions.q-diarrhea",),
+        changes=(FieldChange(ref, None),),
+    )
+    new, updated = apply_patch(form, sources, patch)
+    assert "diarrhea" not in [q.key for q in new.questions]
+    assert "diarrhea" not in [s.question_key for s in new.side_effects]
+    assert updated.root == {}  # 消した行と空にした欄の出どころは残らない
+
+
+def test_clearing_a_referenced_question_key_needs_the_references_too() -> None:
+    form = extra_form("folfiri_bv")
+    key = FieldChange("questions.q-diarrhea.key", None)
+    with pytest.raises(RegimenFormError) as exc:
+        apply_patch(form, EMPTY, FormPatch(changes=(key,)))
+    assert _codes(exc) == {
+        ("side_effects.se-diarrhea.question_key", "unknown_question")
+    }
+    ref = FieldChange("side_effects.se-diarrhea.question_key", None)
+    new, _sources = apply_patch(form, EMPTY, FormPatch(changes=(key, ref)))
+    assert "diarrhea" not in [s.question_key for s in new.side_effects]
+
+
+def test_deleting_the_temperature_question_with_references_is_still_rejected() -> None:
+    form = extra_form("folfiri_bv")
+    patch = FormPatch(
+        deletes=("questions.q-fever",),
+        changes=(FieldChange("side_effects.se-fever.question_key", None),),
+    )
+    with pytest.raises(RegimenFormError) as exc:
+        apply_patch(form, EMPTY, patch)
+    assert _codes(exc) == {("questions", "temperature_required")}

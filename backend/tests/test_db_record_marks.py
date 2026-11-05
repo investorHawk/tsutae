@@ -17,7 +17,8 @@ import pytest
 
 from tsutae import db
 from tsutae.config import JST, now
-from tsutae.db.connection import SCHEMA_PATH
+from tsutae.db.connection import SCHEMA_PATH, write_transaction
+from tsutae.db.repo_received import ReceivedEntry, insert_received_rows
 from tsutae.schemas import Entry, EntryCreate
 
 PID = "P-MARK0001"
@@ -26,6 +27,7 @@ SKILL = "regimen-folfox@1"
 AT = datetime(2026, 11, 9, 20, 15, 0, tzinfo=JST)
 TOO_SICK = EntryCreate(too_sick=True)
 FREE = EntryCreate(free_text="夜に熱っぽかった")
+CLIENT_ENTRY_ID = "6f1d3a52-8c47-4b1e-9a60-2f5b7c1d0e34"
 
 
 @pytest.fixture
@@ -132,6 +134,36 @@ def test_undo_refused_after_a_visit_leaves_the_mark(conn: sqlite3.Connection) ->
     earlier = min(AT, now() - timedelta(seconds=1))
     assert not db.undo_record_mark(conn, PID, earlier, clear_mark=True)
     assert len(_marks(conn)) == 1
+
+
+def _receive(conn: sqlite3.Connection, pid: str, recorded_at: datetime) -> None:
+    received = ReceivedEntry(CLIENT_ENTRY_ID, TOO_SICK, recorded_at, SKILL)
+    with write_transaction(conn):
+        insert_received_rows(conn, pid, [received])
+
+
+def test_undo_refused_once_the_record_was_received(conn: sqlite3.Connection) -> None:
+    """同じ受付番号の送り直しは visits の行を作らないので、受け取った行そのものを見る。"""
+    db.add_record_mark(conn, PID, AT)
+    _receive(conn, PID, AT)
+    assert not db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert len(_marks(conn)) == 1
+    assert len(db.list_entries(conn, PID)) == 1
+
+
+def test_undo_ignores_other_received_rows(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT)
+    _receive(conn, PID, AT - timedelta(minutes=1))
+    _receive(conn, OTHER, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert _marks(conn) == []
+
+
+def test_undo_ignores_a_row_without_client_entry_id(conn: sqlite3.Connection) -> None:
+    """受付で受け取っていない行（seed など）は、これまでどおり取り消しを止めない。"""
+    db.add_record_mark(conn, PID, AT)
+    db.add_entry(conn, PID, TOO_SICK, AT, SKILL)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=False)
 
 
 def test_undo_only_touches_its_own_day_and_patient(conn: sqlite3.Connection) -> None:

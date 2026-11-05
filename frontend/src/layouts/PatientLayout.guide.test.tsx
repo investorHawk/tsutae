@@ -93,6 +93,16 @@ describe("iPhone Safari", () => {
     ]);
   });
 
+  it("says what to do in an in-app browser, before the steps that do not work there", async () => {
+    mockApi();
+    renderAt("/register?pid=P-DEMO0001");
+    const list = await screen.findByRole("list");
+    const hint = screen.getByText(s("guide.in_app_browser"));
+    expect(
+      hint.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("shows the number from the URL large, and does not register or save it", async () => {
     const fetchMock = mockApi();
     renderAt("/register?pid=P-DEMO0001");

@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from push_helpers import ENDPOINT, subscription_body, vapid_overrides
 
 from tsutae import db
 from tsutae.api import deps
-from tsutae.config import jst_datetime, now
+from tsutae.config import PATIENT_STRINGS_PATH, jst_datetime, now
 
 C1 = [(1, date(2026, 10, 27))]
 C3 = [(1, date(2026, 9, 27)), (2, date(2026, 10, 13)), (3, date(2026, 10, 27))]
@@ -240,6 +241,16 @@ def test_unregister_bad_body_is_422(client: TestClient, pid: str, body: dict) ->
     r = client.post(f"/api/patient/{pid}/unregister", json=body)
     assert r.status_code == 422
     assert deps.PATIENT_COOKIE in client.cookies
+
+
+def test_reset_strings_say_only_the_current_number_is_deleted() -> None:
+    """消すのは今の番号の記録だけ（§5.9）。端末の記録が全て消えたと思わせない。"""
+    strings = json.loads(PATIENT_STRINGS_PATH.read_text(encoding="utf-8"))
+    assert "今の番号の記録" in strings["device_reset.about"]
+    assert "別の番号" in strings["device_reset.about"]
+    assert "今の番号の記録" in strings["device_reset.confirm_first"]
+    assert "その番号の記録" in strings["device_reset.done"]
+    assert "このスマホに入っている記録" not in strings["device_reset.about"]
 
 
 def test_unregister_other_patient_is_403(client: TestClient, pid: str) -> None:

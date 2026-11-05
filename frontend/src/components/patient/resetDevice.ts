@@ -9,10 +9,28 @@ import {
   currentSubscription,
   isStillSubscribed,
 } from "../../patient/pushDevice";
+import { isApiError } from "../../api/http";
 import { isNotRegistered } from "./patientApi";
 import { pushWritesSettled } from "./pushResend";
 
-/** Cookie がもう無ければ（401・403）、消す相手も無いので成功と同じ。 */
+export interface ResetResult {
+  /** 全て消せたか */
+  cleared: boolean;
+  /** サーバーへ送った通知の endpoint。押し直しのときに渡す */
+  endpoint: string | null;
+}
+
+/** DB にこの患者がいない（別の DB で起動した）。proxy などの 404 と分けるため code も見る。 */
+function isUnknownPatient(err: unknown): boolean {
+  return (
+    isApiError(err) && err.status === 404 && err.code === "unknown_patient"
+  );
+}
+
+/**
+ * Cookie がもう無い（401・403）か、DB に患者がいない（404）なら、消す相手も無いので成功と同じ。
+ * 404 のときは Cookie が残るが、仮名ID が無いので使われず、次の登録で上書きされる。
+ */
 async function unregisterOnServer(
   pid: string,
   endpoint: string | null,
@@ -20,7 +38,7 @@ async function unregisterOnServer(
   try {
     await unregisterPatient(pid, endpoint);
   } catch (err) {
-    if (!isNotRegistered(err)) {
+    if (!isNotRegistered(err) && !isUnknownPatient(err)) {
       throw err;
     }
   }
@@ -49,21 +67,25 @@ async function succeeded(step: () => Promise<void>): Promise<boolean> {
 }
 
 /**
- * サーバーの登録 → ブラウザの通知の登録 → 端末の記録 → 仮名ID の順に消す。全て消せたら true。
- * false でも仮名ID は消えている。呼ぶ側が同じ pid で押し直せる（Cookie が消えた後は成功と同じ）。
+ * サーバーの登録 → ブラウザの通知の登録 → 端末の記録 → 仮名ID の順に消す。
+ * 消せなくても仮名ID は消えている。呼ぶ側が同じ pid と前の endpoint で押し直せる（Cookie が
+ * 消えた後は成功と同じ）。前の回でブラウザの登録を解除していると endpoint はもう読めないので、
+ * 渡された knownEndpoint を送る（サーバーの行を残さないように）。
  * 先に送り直しの PUT を待つ（消した後に届いて、サーバーの登録が戻らないように）。
  */
-export async function resetDevice(pid: string): Promise<boolean> {
+export async function resetDevice(
+  pid: string,
+  knownEndpoint: string | null = null,
+): Promise<ResetResult> {
   await pushWritesSettled();
   const subscription = await currentSubscription().catch(() => undefined);
+  const endpoint = subscription?.endpoint ?? knownEndpoint;
   const results = [
     subscription !== undefined,
-    await succeeded(() =>
-      unregisterOnServer(pid, subscription?.endpoint ?? null),
-    ),
+    await succeeded(() => unregisterOnServer(pid, endpoint)),
     await succeeded(() => removeFromBrowser(subscription ?? null)),
     await succeeded(() => deleteDeviceEntries(pid)),
   ];
   clearPid();
-  return results.every(Boolean);
+  return { cleared: results.every(Boolean), endpoint };
 }

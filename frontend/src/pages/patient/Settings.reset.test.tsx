@@ -164,6 +164,56 @@ describe("Settings: delete this phone's registration and records", () => {
     expect(loadPid()).toBeNull();
   });
 
+  it("the patient is not in the database (404): counts as unregistered, retry is not needed", async () => {
+    await seedDevice(ENTRIES);
+    mockPatientApi({
+      unregister: () => jsonResponse({ error: "unknown_patient" }, 404),
+    });
+    renderSettings();
+    await resetThroughConfirms();
+    expect(await screen.findByText(s("device_reset.done"))).toBeInTheDocument();
+    expect(screen.queryByText(s("device_reset.partial"))).toBeNull();
+    await expect(listDeviceEntries(PID)).resolves.toEqual([]);
+    expect(loadPid()).toBeNull();
+  });
+
+  it("a 404 from something other than the API (a proxy, say) is still a failure", async () => {
+    mockPatientApi({
+      unregister: () => jsonResponse({ error: "not_found" }, 404),
+    });
+    renderSettings();
+    await resetThroughConfirms();
+    expect(
+      await screen.findByText(s("device_reset.partial")),
+    ).toBeInTheDocument();
+  });
+
+  it("the browser still has the subscription: the retry sends its endpoint too", async () => {
+    const push = givenPush({
+      subscribed: true,
+      permission: "granted",
+      unsubscribeError: new Error("x"),
+    });
+    let fail = true;
+    const fetchMock = mockPatientApi({
+      unregister: () =>
+        fail
+          ? jsonResponse({ error: "boom" }, 500)
+          : jsonResponse({ ok: true }),
+    });
+    renderSettings();
+    await resetThroughConfirms();
+    await screen.findByText(s("device_reset.partial"));
+    expect(push.isSubscribed()).toBe(true);
+    fail = false;
+    await userEvent.click(button("device_reset.retry"));
+    await screen.findByText(s("device_reset.partial"));
+    expect(callsTo(fetchMock, "POST", UNREGISTER_URL)).toEqual([
+      { endpoint: ENDPOINT },
+      { endpoint: ENDPOINT },
+    ]);
+  });
+
   it("the server fails: the rest still runs, then says so and can retry", async () => {
     const push = givenPush({ subscribed: true, permission: "granted" });
     await seedDevice(ENTRIES);
@@ -186,7 +236,11 @@ describe("Settings: delete this phone's registration and records", () => {
     fail = false;
     await userEvent.click(button("device_reset.retry"));
     expect(await screen.findByText(s("device_reset.done"))).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", UNREGISTER_URL)).toHaveLength(2);
+    // 1回目で端末の登録は解除済み。押し直しでも同じ endpoint を送らないとサーバーの行が残る
+    expect(callsTo(fetchMock, "POST", UNREGISTER_URL)).toEqual([
+      { endpoint: ENDPOINT },
+      { endpoint: ENDPOINT },
+    ]);
   });
 
   it("unsubscribe fails: the records and the pid are still deleted", async () => {

@@ -17,6 +17,8 @@ const WINDOW_URL = `/api/patient/${PID}/visit-window`;
 const EMOJI = String.fromCodePoint(0x1f600);
 const HIRAGANA_A = String.fromCodePoint(0x3042);
 const KANJI = String.fromCodePoint(0x53d7, 0x4ed8);
+const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b);
+const ZERO_WIDTH_JOINER = String.fromCodePoint(0x200d);
 /** 全角の "A-023"（NFKC で半角の "A-023" になる）。 */
 const FULLWIDTH_A_023 = String.fromCodePoint(
   0xff21,
@@ -81,6 +83,24 @@ describe("Visit (P3)", () => {
     expect(screen.getByText(s("visit.invalid"))).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["a pasted U+200B", `A-023${ZERO_WIDTH_SPACE}`],
+    ["an emoji with ZWJ", `${EMOJI}${ZERO_WIDTH_JOINER}${EMOJI}`],
+    ["a control character", `A${String.fromCodePoint(0)}B`],
+  ])(
+    "a number only the server would refuse (%s): visit.invalid and no request",
+    async (_label, text) => {
+      const fetchMock = mockPatientApi();
+      renderPatient(ROUTES, "/visit");
+      await userEvent.click(field());
+      await userEvent.paste(text);
+      await userEvent.click(submit());
+      expect(screen.getByText(s("visit.invalid"))).toBeInTheDocument();
+      expect(screen.queryByText(s("visit.records_rejected"))).toBeNull();
+      expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([]);
+    },
+  );
 
   it.each([
     ["with Japanese and a space", `${KANJI} 12`],

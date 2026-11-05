@@ -281,7 +281,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `api/app.py` | W3-api | `create_app(settings: Settings \| None = None, *, runner_factory=None, skill_editor=None) -> FastAPI`。`app.state` に settings・runner_factory（既定は `SdkRunner`）・skill_editor（既定は `SdkSkillEditor`）。起動時に `init_db`・`ensure_skill_versions`・`purge_expired`。`backend/tsutae/api/__main__.py` は不要（`uvicorn tsutae.api.app:app`、`app = create_app()` は遅延でよい） |
 | `api/deps.py` | W3-api | 接続はリクエストごと（`Depends` で開いて閉じる）。患者 Cookie `tsutae_pid`（値は `pid + "." + base64url(HMAC-SHA256(secret_key, "patient:" + pid))`。2026-11-04 変更。署名が無い・違えば 401。登録 API はクライアントごとに失敗10回/10分を超えると 429 `too_many_attempts`）、医師 Cookie `tsutae_doctor`（値は発行時刻＋HMAC-SHA256(secret_key)。12時間で失効。標準ライブラリの `hmac` で作る）。どちらも HttpOnly・SameSite=Lax。エラーは `{"error": code}`（401 `not_logged_in`・403 `forbidden`・404 `not_found`・422 `invalid_input`）。`RequestValidationError` も `{"error":"invalid_input"}` に変える（入力の文面を返さない。自由記載が長すぎるときだけ `free_text_too_long`。2026-11-04） |
 | `api/patient.py` | W3-api | §8 の患者 API。**`tsutae.pipeline`・`tsutae.report`・`get_timeline`・`get_report` を import しない**。質問集は `skills.load_regimen_skill`。記録の本文を受ける経路は無い（§12）。38.0℃ の案内は画面のコード（§13 の `patient/fixedRules.ts`）が出し、`api/fixed_rules.py` の純関数 `notices_for(entry: EntryCreate, skill: RegimenSkill) -> list[str]`（体温 ≥ threshold で `patient_string_key`。コードの比較だけ）は同じ表で確かめる Python の側の判定 |
-| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（大文字化・ハイフンの統一はしない）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。本文の `entries` の検査と保存は §12。自由記載の長さは端末が保存の前に確かめる（`today.free_text_too_long`）。今コースが無ければ 409 `{"error":"no_course"}` |
+| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字で、制御文字・書式文字（Cc・Cf）を含むものは断る（大文字化・ハイフンの統一はしない。画面の `normalizeReceptionNo` と同じ表 `frontend/src/test/fixtures/reception_no_cases.json` で確かめる）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。本文の `entries` の検査と保存は §12。自由記載の長さは端末が保存の前に確かめる（`today.free_text_too_long`）。今コースが無ければ 409 `{"error":"no_course"}` |
 | `api/doctor.py` | W3-doctor | §8 の医師 API（skill-changes 以外）。`GET /visits` と `GET /visits/{id}/report` の前に `purge_expired`。レポートは `HTMLResponse` に `Cache-Control: no-store` と `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:`。`POST /courses` は保存前に `validate_courses`（既存＋新規）。events は `{status, events}`（ポーリング） |
 | `api/doctor_skills.py` | W3-doctor | `GET /api/doctor/skills`・`POST/GET /api/doctor/skill-changes`・approve・reject。`tsutae.skillchange` を呼ぶ |
 | `skillchange/`（`editor.py` `service.py` `diff.py`） | W3-skillchange | 下の 9b |
@@ -310,7 +310,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 医師画面の「印刷」は、同じオリジンの非表示 iframe にレポートを読み込んで親から `print()` を呼ぶ（レポートの CSP は script を止めるため）。失敗したら「レポートを開く」から ⌘P
 
 - 医師 API の状態を変える POST（login 以外。logout を含む）は `require_same_origin`: `Sec-Fetch-Site` が cross-site/same-site、または `Origin` が「要求の Host の origin」とも `public_base_url` の origin とも違えば 403 `cross_origin`（どちらのヘッダも無ければ通す）。リバースプロキシが Host を書き換える構成では `public_base_url` を正しく設定する。frontend を別のサブドメインに置く構成は使えない
-- 送り直しの重複防止: 同じ患者・同じ内容の記録が120秒以内にあれば新しく作らずその記録を返す（`db.add_entry_once`）。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）
+- 送り直しの重複防止: 記録の押し直しは端末の同じ ID で置き換わる。受付の送り直しは `client_entry_id` で二重にならない。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）
 
 - `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
 
@@ -458,7 +458,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | 経路 | 入力 | 出力 |
 |---|---|---|
 | `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計。ミリ秒に揃える） |
-| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}`（`recorded_at` は印の応答の値） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある → 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（後から付いた印は残す）。何度呼んでもよい |
+| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}`（`recorded_at` は印の応答の値） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある・その記録を受付で受け取っている（同じ受付番号の送り直しを含む）→ 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（後から付いた印は残す）。何度呼んでもよい |
 | `GET /api/patient/{pid}/visit-window` | — | `{start, end}`（前コースの Day1〜今日。前コースが無ければ今コースの Day1）。今コースが無ければ 409 `no_course` |
 | `GET /api/patient/{pid}/visit-days` | — | `{visits: [{visit_date, received_at}]}`（新しい順。受付番号・状態は返さない） |
 | `POST /api/patient/{pid}/unregister` | `{endpoint}`（string か null） | `{ok: true}` + Cookie を消す。その登録を消す。`record_marks` は消さない |

@@ -46,8 +46,11 @@ def add_record_mark(conn: sqlite3.Connection, pid: str, at: datetime) -> None:
 def undo_record_mark(
     conn: sqlite3.Connection, pid: str, recorded_at: datetime, *, clear_mark: bool
 ) -> bool:
-    """recorded_at の記録の取り消し。その後に受付があれば何も変えずに False。
+    """recorded_at の記録の取り消し。受付に届いていれば何も変えずに False。
 
+    届いているとは、その後に受診ができたか、この時刻の記録を受付で受け取った行があること。
+    同じ受付番号の送り直しは visits の行を作らずに記録だけを入れるので、行そのものも見る
+    （消せると、端末と印だけが消えて「つらくて書けない」がサーバーに残る）。
     clear_mark なら recorded_at の日の印を消す。ただし recorded_at より後に印が付いていれば
     （別の端末が後から書いた）残す。調べるのと消すのを1つの write_transaction で行う。
     時刻の窓は呼び出し側が見る。日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する
@@ -59,6 +62,13 @@ def undo_record_mark(
             (pid, at),
         ).fetchone()
         if visited is not None:
+            return False
+        received = conn.execute(
+            "SELECT 1 FROM entries WHERE patient_id = ? AND recorded_at = ?"
+            " AND client_entry_id IS NOT NULL LIMIT 1",
+            (pid, at),
+        ).fetchone()
+        if received is not None:
             return False
         if clear_mark:
             conn.execute(

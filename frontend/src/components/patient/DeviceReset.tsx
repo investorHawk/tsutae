@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import { resetDevice } from "./resetDevice";
 import { ErrorMessage } from "./Messages";
@@ -65,11 +65,14 @@ export default function DeviceReset({
 }) {
   const { t } = usePatientStrings();
   const [step, setStep] = useState<Step>("idle");
+  const sentEndpoint = useRef<string | null>(null);
 
   async function run() {
     setStep("running");
     onStart();
-    if (await resetDevice(pid)) {
+    const { cleared, endpoint } = await resetDevice(pid, sentEndpoint.current);
+    sentEndpoint.current = endpoint;
+    if (cleared) {
       onCleared();
     } else {
       setStep("partial");

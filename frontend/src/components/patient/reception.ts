@@ -1,13 +1,23 @@
 /**
- * 受付番号（P3）。バックエンド（docs/architecture.md §8b api/visit.py）と同じく、
- * NFKC の後に前後の空白を落とし、1〜32 字（Python と同じく code point で数える）だけを通す。
- * 文字の種類は制限しない（日本語を含む番号も契約上有効）。大文字化・記号の置き換えもしない
- * （サーバーが保存する値と画面で送る値を変えないため）。
+ * 受付番号（P3）。バックエンド（docs/architecture.md §8b api/visit.py）と同じ検査で、NFKC の
+ * 後に前後の空白を落とし、1〜32 字（Python と同じく code point で数える）で、制御文字・書式文字
+ * （Cc・Cf。貼り付けで混じる U+200B や絵文字の ZWJ）を含まないものだけを通す。日本語を含む番号も
+ * 契約上有効。大文字化・記号の置き換えもしない（サーバーが保存する値と画面で送る値を変えないため）。
+ * 同じ表（src/test/fixtures/reception_no_cases.json）を backend のテストも読む。
  */
 export const RECEPTION_NO_MAX = 32;
 
+/** Python の str.strip が落とす空白（JS の trim とは U+FEFF と U+001C〜1F・U+0085 が違う）。 */
+const SPACE =
+  "\\t-\\r\\x1c-\\x20\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const EDGE_SPACE = new RegExp(`^[${SPACE}]+|[${SPACE}]+$`, "g");
+const CONTROL_OR_FORMAT = /[\p{Cc}\p{Cf}]/u;
+
 export function normalizeReceptionNo(input: string): string | null {
-  const value = input.normalize("NFKC").trim();
+  const value = input.normalize("NFKC").replace(EDGE_SPACE, "");
   const length = [...value].length;
-  return length >= 1 && length <= RECEPTION_NO_MAX ? value : null;
+  if (length < 1 || length > RECEPTION_NO_MAX) {
+    return null;
+  }
+  return CONTROL_OR_FORMAT.test(value) ? null : value;
 }

@@ -18,7 +18,7 @@ const INVALID_KEY = "visit.invalid";
 /** 今コースが無い（409 no_course）。受付で声をかけてもらう。 */
 const NO_COURSE_KEY = "visit.no_course";
 const REGISTERED_KEY = "register.done";
-/** 受付番号は送る前に確かめているので、422・413 は記録が断られたとき（§5.5）。 */
+/** 受付番号は送る前にサーバーと同じ検査をしているので、422・413 は記録が断られたとき（§5.5）。 */
 const RECORDS_REJECTED_KEY = "visit.records_rejected";
 
 function errorKeyOf(err: unknown): string {

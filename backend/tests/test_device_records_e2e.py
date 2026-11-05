@@ -526,3 +526,24 @@ def test_push_still_sees_the_mark_after_the_records_are_erased(
         tomorrow = EVENING + timedelta(days=1)
         assert _due(client, sender, tomorrow) == PushCounts(sent=1)
         assert _sent_to(sender) == [SECOND_ENDPOINT]
+
+
+def test_undo_is_refused_after_the_same_number_was_sent_again(
+    tmp_path: Path, fixed_today: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """送り直しは受診の行を作らない。受け取った記録は取り消せず、端末は記録を残す。"""
+    with _patient_client(tmp_path) as client:
+        pid = _new_patient(client)
+        phone = _Phone(client, pid, monkeypatch)
+        phone.send_visit()
+        entry = phone.record(TODAY, too_sick=True)
+        phone.send_visit()
+        undo = client.post(
+            f"/api/patient/{pid}/record-marks/undo",
+            json={"recorded_at": entry["recorded_at"], "clear_mark": True},
+        )
+        assert undo.status_code == 409, undo.text
+        assert undo.json() == {"error": "not_undoable"}
+        with db_conn(client.app) as conn:
+            assert pid in db.marked_patients(conn, date.fromisoformat(TODAY))
+            assert [e.kind for e in db.list_entries(conn, pid)] == ["too_sick"]

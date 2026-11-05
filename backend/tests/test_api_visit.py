@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from datetime import date, timedelta
@@ -71,6 +72,20 @@ def test_normalize_reception_no() -> None:
     assert normalize_reception_no("ｘ" * 32) == "x" * 32
     for bad in ("", "   ", "　", "x" * 33, "A\x00B", "A\nB", "A​B"):
         assert normalize_reception_no(bad) is None, repr(bad)
+
+
+# 画面の normalizeReceptionNo と同じ表で確かめる（画面が通した番号をサーバーが断らないように）
+SHARED_RECEPTION_CASES = json.loads(
+    (
+        Path(__file__).resolve().parents[2]
+        / "frontend/src/test/fixtures/reception_no_cases.json"
+    ).read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize("case", SHARED_RECEPTION_CASES, ids=lambda c: c["name"])
+def test_normalize_reception_no_shared_table(case: dict[str, Any]) -> None:
+    assert normalize_reception_no(case["input"]) == case["expected"]
 
 
 # ---------------------------------------------------------------------------

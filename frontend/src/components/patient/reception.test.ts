@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
+import cases from "../../test/fixtures/reception_no_cases.json";
 import { RECEPTION_NO_MAX, normalizeReceptionNo } from "./reception";
 
 /**
  * 受付番号はバックエンド（§8b api/visit.py）と同じく NFKC＋前後空白除去の後、
- * 1〜32 字（code point で数える）だけを検査する。文字の種類は制限しない。
+ * 1〜32 字（code point で数える）で、制御文字・書式文字（Cc・Cf）を含まないものだけを通す。
  */
+describe("backend の normalize_reception_no と同じ表", () => {
+  it("表は空でなく、書式文字を含む", () => {
+    expect(cases.some((c) => c.input.includes("\u200b"))).toBe(true);
+  });
+
+  it.each(cases)("$name", ({ input, expected }) => {
+    expect(normalizeReceptionNo(input)).toBe(expected);
+  });
+});
+
 describe("normalizeReceptionNo", () => {
   it.each([
     ["A-023", "A-023"],

@@ -137,7 +137,7 @@ describe("changing the time while the app resends", () => {
   it("coming back while the new time is saving: all end on the new time", async () => {
     await openSettingsIdle();
     await userEvent.selectOptions(timeSelect(), "21:30");
-    await waitFor(() => expect(puts.sent.at(-1)).toBe("21:30"));
+    await waitFor(() => expect(puts.sent[puts.sent.length - 1]).toBe("21:30"));
     const changedAt = puts.sent.length - 1;
     setVisibility("hidden");
     setVisibility("visible");
@@ -158,7 +158,7 @@ describe("changing the time while the app resends", () => {
     expect(puts.sent).toHaveLength(before);
     await puts.drain();
     expect(await screen.findByText(s("notify.time_saved"))).toBeInTheDocument();
-    expect(puts.sent.at(-1)).toBe("21:30");
+    expect(puts.sent[puts.sent.length - 1]).toBe("21:30");
     expect(loadNotifyTime()).toBe("21:30");
     expect(timeSelect()).toHaveValue("21:30");
   });
@@ -166,14 +166,14 @@ describe("changing the time while the app resends", () => {
   it("the new time is refused: the resend behind it sends the previous time", async () => {
     await openSettingsIdle();
     await userEvent.selectOptions(timeSelect(), "21:30");
-    await waitFor(() => expect(puts.sent.at(-1)).toBe("21:30"));
+    await waitFor(() => expect(puts.sent[puts.sent.length - 1]).toBe("21:30"));
     setVisibility("hidden");
     setVisibility("visible");
     await settle();
     puts.waiting.shift()?.fail();
     expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
     await puts.drain();
-    expect(puts.sent.at(-1)).toBe("06:00");
+    expect(puts.sent[puts.sent.length - 1]).toBe("06:00");
     expect(loadNotifyTime()).toBe("06:00");
     expect(timeSelect()).toHaveValue("06:00");
   });
@@ -181,14 +181,14 @@ describe("changing the time while the app resends", () => {
   it("leaving the tab while saving: the screen shows the new time on return", async () => {
     await openSettingsIdle();
     await userEvent.selectOptions(timeSelect(), "21:30");
-    await waitFor(() => expect(puts.sent.at(-1)).toBe("21:30"));
+    await waitFor(() => expect(puts.sent[puts.sent.length - 1]).toBe("21:30"));
     await userEvent.click(screen.getByRole("link", { name: LEAVE }));
     await userEvent.click(await screen.findByRole("link", { name: BACK }));
     await puts.drain();
     await screen.findByRole("button", { name: s("notify.turn_off") });
     await puts.drain();
     expect(timeSelect()).toHaveValue("21:30");
-    expect(puts.sent.at(-1)).toBe("21:30");
+    expect(puts.sent[puts.sent.length - 1]).toBe("21:30");
     expect(loadNotifyTime()).toBe("21:30");
   });
 });

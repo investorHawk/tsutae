@@ -65,7 +65,7 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | regimen_drafts（v1.1） | id PK, regimen TEXT NULL（識別名。新規は決まるまで NULL）, base_version INT NULL（新規は NULL）, status CHECK(open/working/adopted/discarded), generation INT, form_json, sources_json, chat_json（院内だけ。採用・破棄で `[]`）, adopted_version NULL, created_at, updated_at, working_since NULL（CHECK: working のときだけ）, closed_at NULL。部分 UNIQUE(regimen) WHERE open/working（1レジメンに開いた下書きは1つ） |
 | question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
 | entries.client_entry_id | 受付で受け取った記録の端末の ID。`(patient_id, client_entry_id)` の部分一意索引（NULL の既存の行は対象外）。`migrate_db` が前の DB に足す（§12） |
-| record_marks（通知） | patient_id FK, record_date, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない** |
+| record_marks（通知） | patient_id FK, record_date, first_marked_at, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない**。時刻はその日の一番先と一番後だけで、取り消しが別の端末の印を消さないように見る。`migrate_db` が前の DB に足す（§12） |
 | push_subscriptions（通知） | id INTEGER PK, patient_id FK, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00'（JST の HH:MM）, last_sent_date NULL, created_at |
 | push_removed_sends（通知） | patient_id PK FK, last_sent_date — 消した登録の送信日（患者ごとに最後の日付だけ）。新しい行が引き継ぐので、オフにしてオンにしても1日1回まで |
 | push_gone_endpoints（通知） | endpoint PK, gone_at — 送信先が 404・410 を返した endpoint。PUT で断る（410）。30 日で忘れる |
@@ -458,7 +458,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | 経路 | 入力 | 出力 |
 |---|---|---|
 | `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計。ミリ秒に揃える） |
-| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}`（`recorded_at` は印の応答の値） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある・その記録を受付で受け取っている（同じ受付番号の送り直しを含む）→ 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（後から付いた印は残す）。何度呼んでもよい |
+| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}`（`recorded_at` は印の応答の値） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある・その記録を受付で受け取っている（同じ受付番号の送り直しを含む）→ 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（他の時刻の印があれば、先に付いたものも後から付いたものも残す）。何度呼んでもよい |
 | `GET /api/patient/{pid}/visit-window` | — | `{start, end}`（前コースの Day1〜今日。前コースが無ければ今コースの Day1）。今コースが無ければ 409 `no_course` |
 | `GET /api/patient/{pid}/visit-days` | — | `{visits: [{visit_date, received_at}]}`（新しい順。受付番号・状態は返さない） |
 | `POST /api/patient/{pid}/unregister` | `{endpoint}`（string か null） | `{ok: true}` + Cookie を消す。その登録を消す。`record_marks` は消さない |

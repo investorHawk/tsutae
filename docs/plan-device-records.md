@@ -114,7 +114,7 @@ iPhone（iOS 18 以降）だけで確かめる。Android の端末は無いの�
 ### 4.4 日付の印
 
 ```
-record_marks(patient_id, record_date, last_marked_at, PK(patient_id, record_date))
+record_marks(patient_id, record_date, first_marked_at, last_marked_at, PK(patient_id, record_date))
 push_subscriptions(id, patient_id, endpoint UNIQUE, p256dh, auth, notify_time, last_sent_date, created_at)
 ```
 
@@ -157,7 +157,7 @@ PR A の時点では `POST /entries` が印も書き、既存の `entries` か�
 ### 5.4 P2 と取り消し
 
 - P2 は端末の記録を読む。受診日は新しい `GET /{pid}/visit-days` から（日付と受付の時刻だけ）
-- 「つらくて書けない」の取り消し（技術判断）: サーバーは記録の種類を持たないので、端末が `POST /{pid}/record-marks/undo` に `{recorded_at, clear_mark}` を送る。`recorded_at` はその記録を保存したときにサーバーが返した値、`clear_mark` は「その日に端末の記録が他に無い」とき true。サーバーは自分の時計で `recorded_at` から 10 分以内か、その後に受付が無いかを確かめ、外れれば 409。通れば端末の記録を消す。端末の時計は使わない
+- 「つらくて書けない」の取り消し（技術判断）: サーバーは記録の種類を持たないので、端末が `POST /{pid}/record-marks/undo` に `{recorded_at, clear_mark}` を送る。`recorded_at` はその記録を保存したときにサーバーが返した値、`clear_mark` は「その日に端末の記録が他に無い」とき true。サーバーは自分の時計で `recorded_at` から 10 分以内か、その後に受付が無いかを確かめ、外れれば 409。通れば端末の記録を消す。`clear_mark` でも、その日に他の時刻の印があれば（別の端末が先か後に書いた）印は残す。端末の時計は使わない
 - `POST /entries`・`GET /entries`・`POST /entries/{id}/undo` は患者 API から外す
 
 ### 5.5 受診タブと受付

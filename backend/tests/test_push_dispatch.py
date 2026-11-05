@@ -124,6 +124,20 @@ def test_undo_brings_the_notification_back(
     assert send_due_once(settings, sender, AT) == PushCounts(sent=1)
 
 
+def test_undo_does_not_bring_it_back_when_another_phone_wrote_earlier(
+    settings: Settings, conn: sqlite3.Connection
+) -> None:
+    """§4.1 の「どの端末で書いても送らない」。別のスマホの先の記録は取り消しで消えない。"""
+    _subscribe(conn)
+    db.add_record_mark(conn, PID, AT - timedelta(hours=2))
+    marked_at = AT - timedelta(hours=1)
+    db.add_record_mark(conn, PID, marked_at)
+    assert db.undo_record_mark(conn, PID, marked_at, clear_mark=True)
+    sender = FakePushSender()
+    assert send_due_once(settings, sender, AT) == PushCounts()
+    assert sender.calls == []
+
+
 def test_no_course_is_not_sent(settings: Settings, conn: sqlite3.Connection) -> None:
     db.create_patient(conn, "FOLFOX", patient_id="P-DISP0009")
     _subscribe(conn, pid="P-DISP0009")

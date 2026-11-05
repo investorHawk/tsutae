@@ -7,8 +7,8 @@
 - `POST /{pid}/record-marks/undo`（recorded_at・clear_mark）: 押し間違いの取り消し。サーバーは
   記録の種類を持たないので、種類は端末が見る。recorded_at から UNDO_WINDOW 以内で、その後に
   受付が無く、その記録を受付で受け取っていないときだけ通す（外れれば 409 not_undoable）。
-  clear_mark（その日に端末の記録が他に無い）なら印を消す。端末の記録を消すのは、この応答を
-  見た端末
+  clear_mark（その日に端末の記録が他に無い）なら印を消す。他の時刻の印があれば（別の端末の分）
+  残す。端末の記録を消すのは、この応答を見た端末
 - `GET /{pid}/visit-window`: 受診で送る範囲（`visit_entries.visit_window_of`）
 - `GET /{pid}/visit-days`: 受診日と受付の時刻だけ（受付番号・状態は返さない）
 - `POST /{pid}/unregister`（endpoint か null）: この端末の通知の登録と Cookie を消す。

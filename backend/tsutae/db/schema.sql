@@ -197,10 +197,12 @@ CREATE TABLE IF NOT EXISTS regimen_forms (
 );
 
 -- 日付の印（plan-device-records §4.4）。その日に記録があったことだけ。中身・種類は持たない。
--- 書いた人に通知を送らないために使う
+-- 書いた人に通知を送らないために使う。first・last はその日の一番先と一番後の時刻で、取り消しが
+-- 別の端末の印を消さないように見る（同じなら、その日の印は1つだけ）
 CREATE TABLE IF NOT EXISTS record_marks (
     patient_id TEXT NOT NULL REFERENCES patients (id),
     record_date TEXT NOT NULL,
+    first_marked_at TEXT NOT NULL,
     last_marked_at TEXT NOT NULL,
     PRIMARY KEY (patient_id, record_date)
 );

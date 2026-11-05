@@ -333,7 +333,7 @@ regimen_forms(skill_name, version, form_json, sources_json, created_at, PK(skill
 regimen_drafts(id, regimen TEXT NULL, base_skill TEXT NULL, base_version INT NULL, form_json, sources_json, chat_json,
                generation INT, status TEXT[open|working|adopted|discarded], turns, cost_usd, created_at, updated_at)  -- v1.1。regimen は新規で識別名が決まるまで NULL
 question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|adopted], hidden BOOL, created_at)  -- v1.1
-record_marks(patient_id, record_date DATE, last_marked_at DATETIME, PK(patient_id, record_date))  -- 記録があった日付の印（中身なし）。記録のときにサーバーが付ける（`record-marks`）。受付で受け取った記録では付けない（`client_entry_id` の無い既存の行からは起動時に作る）
+record_marks(patient_id, record_date DATE, first_marked_at DATETIME, last_marked_at DATETIME, PK(patient_id, record_date))  -- 記録があった日付の印（中身なし）。記録のときにサーバーが付ける（`record-marks`）。受付で受け取った記録では付けない（`client_entry_id` の無い既存の行からは起動時に作る）
 push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00', last_sent_date DATE NULL, created_at)  -- 通知の登録（端末ごと）
 ```
 
@@ -342,7 +342,7 @@ push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_ti
 | 経路 | 用途 | 読む表 |
 |---|---|---|
 | `POST /api/patient/{pid}/record-marks` | 今日の日付の印を付ける（本文なし。`record_date`・`recorded_at` を返す。端末はこの値で記録を保存する） | record_marks |
-| `POST /api/patient/{pid}/record-marks/undo` | 「つらくて書けない」の取り消し（4.1。`{recorded_at, clear_mark}`。10分を過ぎた・その後に受付があれば 409。`clear_mark` ならその日の印を消す） | visits, record_marks |
+| `POST /api/patient/{pid}/record-marks/undo` | 「つらくて書けない」の取り消し（4.1。`{recorded_at, clear_mark}`。10分を過ぎた・その後に受付があれば 409。`clear_mark` ならその日の印を消す。他の時刻の印があれば残す） | visits, record_marks |
 | `GET /api/patient/{pid}/visit-window` | 受付で送る範囲（前コースの Day1〜今日） | courses |
 | `GET /api/patient/{pid}/visit-days` | 受診日（日付・受付の時刻だけ。P2 の区切り） | visits |
 | `POST /api/patient/{pid}/unregister` | この端末の登録を解除（本文に `endpoint`。通知の登録と Cookie を消す。日付の印は消さない） | push_subscriptions |

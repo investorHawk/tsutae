@@ -2,7 +2,8 @@
 
 - `POST /{pid}/record-marks`（本文なし）: サーバーの時計で今日の印を付け、記録日と時刻を返す
 - `POST /{pid}/record-marks/undo`（`{recorded_at, clear_mark}`）: サーバーの時計で 10 分以内で、
-  その後に受付が無ければ通す。外れれば 409 not_undoable。clear_mark なら印を消す
+  その後に受付が無ければ通す。外れれば 409 not_undoable。clear_mark なら印を消す（他の時刻の
+  印があれば残す）
 - サーバーは記録の種類を知らない。端末の記録を消すのは端末（この応答を見てから）
 """
 
@@ -231,6 +232,18 @@ def test_undo_keeps_a_mark_written_later(client: TestClient, pid: str) -> None:
         )
     assert _undo(client, pid, first["recorded_at"]).status_code == 200
     assert _marked(client, pid)
+
+
+def test_undo_keeps_a_mark_written_earlier(client: TestClient, pid: str) -> None:
+    """別のスマホが先に書いた日。この端末は他の記録を知らないので clear_mark を送る。"""
+    with db_conn(client.app) as conn:
+        db.add_record_mark(conn, pid, now() - timedelta(hours=1))
+    body = _mark(client, pid)
+    assert _undo(client, pid, body["recorded_at"], clear=True).status_code == 200
+    assert _marked(client, pid)
+    with db_conn(client.app) as conn:
+        assert db.last_record_dates(conn) == {pid: TODAY}
+        assert [m.record_date for m in db.list_record_marks(conn, pid)] == [TODAY]
 
 
 def test_undo_touches_only_this_patient(client: TestClient, pid: str) -> None:

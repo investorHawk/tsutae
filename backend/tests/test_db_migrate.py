@@ -147,6 +147,55 @@ def test_migrations_are_listed_per_table() -> None:
         )
 
 
+OLD_RECORD_MARKS = """
+CREATE TABLE IF NOT EXISTS record_marks (
+    patient_id TEXT NOT NULL REFERENCES patients (id),
+    record_date TEXT NOT NULL,
+    last_marked_at TEXT NOT NULL,
+    PRIMARY KEY (patient_id, record_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_record_marks_date ON record_marks (record_date);
+"""
+
+
+def _old_record_marks_db(path: Path) -> sqlite3.Connection:
+    conn = connect(path)
+    init_db(conn)
+    conn.execute("DROP TABLE record_marks")
+    conn.executescript(OLD_RECORD_MARKS)
+    conn.execute(
+        "INSERT INTO patients (id, regimen, created_at) VALUES (?, ?, ?)",
+        ("P-MARK0001", "FOLFOX", TS),
+    )
+    conn.execute(
+        "INSERT INTO record_marks VALUES (?, ?, ?)",
+        ("P-MARK0001", "2026-11-09", TS),
+    )
+    conn.commit()
+    return conn
+
+
+def test_old_record_marks_gets_the_first_time_and_keeps_rows(
+    tmp_db_path: Path,
+) -> None:
+    """前の形の印は last_marked_at を一番先の時刻にも写す（取り消しの窓は10分なので足りる）。"""
+    conn = _old_record_marks_db(tmp_db_path)
+    try:
+        assert migrate_db(conn) == ["record_marks"]
+        row = conn.execute("SELECT * FROM record_marks").fetchone()
+        assert dict(row) == {
+            "patient_id": "P-MARK0001",
+            "record_date": "2026-11-09",
+            "first_marked_at": TS,
+            "last_marked_at": TS,
+        }
+        assert "idx_record_marks_date" in _index_names(conn, "record_marks")
+        assert migrate_db(conn) == []
+    finally:
+        conn.close()
+
+
 def test_migrate_refuses_inside_transaction(tmp_db_path: Path) -> None:
     conn = _old_db(tmp_db_path)
     conn.execute(

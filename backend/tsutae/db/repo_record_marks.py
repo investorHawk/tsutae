@@ -29,11 +29,13 @@ __all__ = [
 def upsert_mark_row(conn: sqlite3.Connection, pid: str, at: datetime) -> None:
     """at の日の印を付ける。呼び出し側で write_transaction を開いておくこと。"""
     conn.execute(
-        "INSERT INTO record_marks (patient_id, record_date, last_marked_at)"
-        " VALUES (?, ?, ?)"
+        "INSERT INTO record_marks"
+        " (patient_id, record_date, first_marked_at, last_marked_at)"
+        " VALUES (?, ?, ?, ?)"
         " ON CONFLICT (patient_id, record_date) DO UPDATE SET"
+        " first_marked_at = MIN(first_marked_at, excluded.first_marked_at),"
         " last_marked_at = MAX(last_marked_at, excluded.last_marked_at)",
-        (pid, date_to_db(to_jst_date(at)), dt_to_db(at)),
+        (pid, date_to_db(to_jst_date(at)), dt_to_db(at), dt_to_db(at)),
     )
 
 
@@ -51,9 +53,10 @@ def undo_record_mark(
     届いているとは、その後に受診ができたか、この時刻の記録を受付で受け取った行があること。
     同じ受付番号の送り直しは visits の行を作らずに記録だけを入れるので、行そのものも見る
     （消せると、端末と印だけが消えて「つらくて書けない」がサーバーに残る）。
-    clear_mark なら recorded_at の日の印を消す。ただし recorded_at より後に印が付いていれば
-    （別の端末が後から書いた）残す。調べるのと消すのを1つの write_transaction で行う。
-    時刻の窓は呼び出し側が見る。日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する
+    clear_mark なら recorded_at の日の印を消す。ただし recorded_at の他に印が付いていれば
+    （別の端末が先か後に書いた）残す。端末は他の端末の記録を知らないので、clear_mark だけでは
+    決められない。調べるのと消すのを1つの write_transaction で行う。時刻の窓は呼び出し側が見る。
+    日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する
     """
     at = dt_to_db(recorded_at)
     with write_transaction(conn):
@@ -73,8 +76,8 @@ def undo_record_mark(
         if clear_mark:
             conn.execute(
                 "DELETE FROM record_marks WHERE patient_id = ? AND record_date = ?"
-                " AND last_marked_at <= ?",
-                (pid, date_to_db(to_jst_date(recorded_at)), at),
+                " AND first_marked_at = ? AND last_marked_at = ?",
+                (pid, date_to_db(to_jst_date(recorded_at)), at, at),
             )
     return True
 
@@ -117,8 +120,10 @@ def backfill_record_marks(conn: sqlite3.Connection) -> None:
     """
     with write_transaction(conn):
         conn.execute(
-            "INSERT INTO record_marks (patient_id, record_date, last_marked_at)"
-            " SELECT patient_id, record_date, MAX(recorded_at) FROM entries"
+            "INSERT INTO record_marks"
+            " (patient_id, record_date, first_marked_at, last_marked_at)"
+            " SELECT patient_id, record_date, MIN(recorded_at), MAX(recorded_at)"
+            " FROM entries"
             " WHERE client_entry_id IS NULL"
             " GROUP BY patient_id, record_date"
             " ON CONFLICT (patient_id, record_date) DO NOTHING"

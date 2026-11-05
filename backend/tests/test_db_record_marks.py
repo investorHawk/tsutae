@@ -127,6 +127,50 @@ def test_undo_keeps_a_later_mark(conn: sqlite3.Connection) -> None:
     assert len(_marks(conn)) == 1
 
 
+def test_undo_keeps_an_earlier_mark(conn: sqlite3.Connection) -> None:
+    """別の端末が先に書いた日は、端末から他の記録が見えなくても（clear_mark）印を消さない。"""
+    earlier = AT - timedelta(hours=1)
+    db.add_record_mark(conn, PID, earlier)
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert db.marked_patients(conn, AT.date()) == {PID}
+    assert db.last_record_dates(conn) == {PID: AT.date()}
+    assert [m.record_date for m in db.list_record_marks(conn, PID)] == [AT.date()]
+
+
+def test_undo_keeps_an_earlier_mark_written_out_of_order(
+    conn: sqlite3.Connection,
+) -> None:
+    """付いた順が時刻の順と違っても、その日の一番先の時刻を覚えている。"""
+    db.add_record_mark(conn, PID, AT)
+    db.add_record_mark(conn, PID, AT - timedelta(hours=1))
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert len(_marks(conn)) == 1
+
+
+def test_undo_again_keeps_an_earlier_mark(conn: sqlite3.Connection) -> None:
+    """押し直しても（応答が届かなかったとき）先の印は残る。"""
+    db.add_record_mark(conn, PID, AT - timedelta(hours=1))
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert len(_marks(conn)) == 1
+
+
+def test_undo_clears_a_mark_written_again_after_an_undo(
+    conn: sqlite3.Connection,
+) -> None:
+    """取り消して印が消えた後に書き直せば、その時刻がその日の唯一の印になる。"""
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    again = AT + timedelta(minutes=1)
+    db.add_record_mark(conn, PID, again)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)  # 前の分の押し直し
+    assert len(_marks(conn)) == 1
+    assert db.undo_record_mark(conn, PID, again, clear_mark=True)
+    assert _marks(conn) == []
+
+
 def test_undo_refused_after_a_visit_leaves_the_mark(conn: sqlite3.Connection) -> None:
     db.add_record_mark(conn, PID, AT)
     expires = now() + timedelta(hours=24)
@@ -218,6 +262,20 @@ def test_init_db_makes_marks_from_old_entries(tmp_db_path: Path) -> None:
         assert _marks(conn) == expected
         db.init_db(conn)  # 何度流しても同じ
         assert _marks(conn) == expected
+    finally:
+        conn.close()
+
+
+def test_backfilled_mark_keeps_the_earlier_entry_of_the_day(tmp_db_path: Path) -> None:
+    """移行で作った印も、同じ日に先の記録があれば取り消しで消えない。"""
+    conn = _old_db(tmp_db_path)
+    try:
+        db.init_db(conn)
+        latest = datetime(2026, 11, 8, 21, 0, 0, tzinfo=JST)
+        assert db.undo_record_mark(conn, PID, latest, clear_mark=True)
+        assert date(2026, 11, 8) in {
+            m.record_date for m in db.list_record_marks(conn, PID)
+        }
     finally:
         conn.close()
 

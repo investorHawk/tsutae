@@ -437,4 +437,4 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `components/patient/useNewDayCheck.ts` | 開いたまま日付が変わった今日の記録に気づく。戻ったとき（`visibilitychange`）と通知を押したとき（`sw.js` の知らせ）に `GET /questions` を読み、画面の今日とサーバーの今日が違うときだけ `pages/patient/Today.tsx` が読み直す。同じ日は完了の画面も書きかけも残す |
 | `patient/useClearNotifications.ts` | アプリを開いたとき・戻ってきたときに、バッジと表示中の通知を消す（`PatientLayout`） |
 
-**動かす環境**: 通知には HTTPS が要る。手順は `README.md` の「動かし方」（Tailscale Funnel → Vite の 5173 → `/api` は 8000 へ）。実機の確認は未実施（仕様書 §9）。
+**動かす環境**: 通知には HTTPS が要る。手順は `README.md` の「動かし方」（Tailscale Funnel → `vite preview` の 5173 → `/api` は 8000 へ。開発サーバーは出さない）。実機の確認は未実施（仕様書 §9）。

@@ -48,14 +48,14 @@
 
 ```bash
 # Tailscale のアプリを入れてログインし、管理画面で HTTPS と Funnel を許可する（コマンドは導入時に確かめる）
-tailscale funnel --bg 5173
 TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=https://<Mac 名>.<tailnet>.ts.net make dev-api   # 鍵・パスワードも渡す
-(cd frontend && npx vite)
+(cd frontend && npm run build && npx vite preview --host 127.0.0.1 --port 5173 --strictPort)
+tailscale funnel --bg 5173   # preview が動いてから開く
 caffeinate -dims   # 通知の時刻に Mac を眠らせない
 ```
 
-- 今の Vite 5.4.8 に `server.allowedHosts` の検査は無い（`node_modules` で確認）。上げるときは設定が要る
-- 開発サーバーの HMR が Funnel 越しに接続し直しを繰り返さないか、画面と Console で確かめる。繰り返すなら `server.hmr.clientPort: 443` にする。撮影は `vite build` と `vite preview --port 5173` の方が安全なので、通しで確かめて決める
+- **Funnel に出すのは `vite preview` だけ。開発サーバーは出さない**。今の Vite 5.4.8 の開発サーバーは `/@fs/<絶対パス>?import&raw??` で `server.fs` の検査を抜け、インターネットから `.env` や DB を読まれる。preview は `dist/` の中だけを返し、`/api` は `server.proxy` を引き継いで 8000 へ渡す（`frontend/src/previewServing.test.ts`）。画面を直したら `npm run build` からやり直す
+- 今の Vite 5.4.8 に `allowedHosts` の検査は無い（`node_modules` で確認）。上げるときは `preview.allowedHosts` に `.ts.net` を足す
 - `public_base_url` が https になると Cookie に `Secure` が付く。医師画面は同じ URL か localhost で開く
 - 今の `http://192.168.1.9:5173` のホーム画面アプリは別のオリジンなので、追加し直す
 

@@ -9,7 +9,7 @@
 | 項目 | 値 |
 |---|---|
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
-| テスト件数 | 6286件 通過 / 全6286件（backend 4105/4105、frontend 2181/2181。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
+| テスト件数 | 6308件 通過 / 全6308件（backend 4111/4111、frontend 2197/2197。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 2回実測（`docs/eval/2026-11-04.md`・`2026-11-04-2.md`、合成2人・4コース・出来事61件）。2回目: 日付 93.4%、用語 75.4%、食い違い 再現率 100%・適合率 100%、改善中→なし 0件（9件中）、否定→あり 0件（18件中）、引用 100%。失敗 15 件のうち 11 件は「異常感覚」と「錯感覚」の当て分け（正解ラベルの臨床レビュー待ち） |
 | 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で5回）。**本物の Claude**: Agent SDK のスモーク7項目が全て OK、デモ患者の変換が1回で成功（ready・AI変換なしでない・H2 の拒否0回、2026-11-04）。一文で頼む D4（当時は regimen-folfox に質問を足す書き換え。今はレポートの形式だけ）の本物の書き換えも1回で成功（pending・差分 2 行追加・H3 の拒否0回・約 0.10 ドル、2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`）。新しい D4 レジメン（チャットで作る）も FOLFIRI＋BV で2回通した（どちらも1往復・未入力0・ツール3回・拒否0・H4 の拒否0、一時の写しの上で採用まで。32.8 秒・約 0.12 ドルと 36.0 秒・約 0.13 ドル、2026-11-05。`docs/eval/demo-regimen-20261105-0857.json`・`demo-regimen-20261105-2025.json`）。レジメンの画面のブラウザでの通しは未実施。毎日の通知は自動テストまでで、実機では未確認 |
 
@@ -132,6 +132,7 @@ make dev-web                           # http://127.0.0.1:5173
     DOCTOR_PASSWORD=<デモ用のパスワード> make dev-api
   (cd frontend && npx vite --host 0.0.0.0)
   ```
+  開発サーバーを同じ Wi-Fi に開くので、Wi-Fi の中の人には `.env` まで読める（下の Funnel の注意と同じ穴）。自宅など信頼できる Wi-Fi でだけ使い、終わったら止める
 - 毎日の通知を試す（HTTPS が要る。同じ Wi-Fi の `http://` では通知を使えない。Tailscale Funnel の固定 URL を使う）:
   1. Tailscale のアプリを入れてログインし、管理画面で HTTPS と Funnel を許可する。コマンドと画面は導入時に確かめる（この手順はまだ実機で通していない）。URL が変わると、ホーム画面アプリ・通知の登録が別物になるので、Quick Tunnel は使わない
   2. 通知の鍵（VAPID）を作り、出た3行を `.env` に書く（コミットしない）。`TSUTAE_VAPID_SUBJECT` は自分の連絡先（`mailto:` か `https://`）に直す
@@ -142,16 +143,17 @@ make dev-web                           # http://127.0.0.1:5173
   3. `TSUTAE_SECRET` と `DOCTOR_PASSWORD` も `.env` に決まった値で書く。既定値のままだと起動が止まる。`TSUTAE_SECRET` を起動のたびに変えると患者の Cookie が無効になり、番号を入れ直すことになる
   4. 起動する（実際の URL は公開の資料に書かない）
      ```bash
-     tailscale funnel --bg 5173
      TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=https://<Mac 名>.<tailnet>.ts.net make dev-api
-     (cd frontend && npx vite --host 127.0.0.1)
+     (cd frontend && npm run build && npx vite preview --host 127.0.0.1 --port 5173 --strictPort)
+     tailscale funnel --bg 5173   # preview が動いてから開く
      caffeinate -dims   # 通知の時刻に Mac を眠らせない
      ```
   5. iPhone の Safari で URL を開く → ホーム画面に追加 → アプリで番号を入れる → 設定で「お知らせをオンにする」→「試しに通知を送る」（10 秒後に届く）。確かめる項目は `docs/plan-device-records.md` §9
 
   - **`TSUTAE_TODAY=2026-11-09` を付ける**。`make seed` はデモ患者の未来の日付にも記録を入れるので、`P-DEMO0001` には 11/7・11/8 の日付の印がある。実際の日付で動かすと、この2日は記録していなくても毎日の通知が届かず、ログにも何も出ない（判定は仕様どおり。試送は印を見ないので届く）。11/9 には印が無く、20:00 の登録で届くことを一時 DB で確かめた（11/6・11/9〜11/15 は送り、11/7・11/8 は送らない）。送った後や記録した後は、その日はもう届かない。サーバーを起動し直すと日付が 11/9 に戻るので、続けて確かめるときは `TSUTAE_TODAY=2026-11-10` のように次の日にする（`make seed` のままなら 11/15 まで印は無い）
-  - 開けるのは 5173 だけでよい（`/api` は Vite が 8000 へ渡す）。`--host 127.0.0.1` は、この Mac では `localhost` が先に `::1` になり、Funnel の転送先（127.0.0.1 の見込み）に届かないおそれがあるため。同じ Wi-Fi には開かない
-  - 開発サーバーの HMR が接続し直しを繰り返すなら `server.hmr.clientPort: 443` にする。撮影は `vite build` と `vite preview --host 127.0.0.1 --port 5173` の方が安全なので、通しで確かめて決める。今の Vite 5.4.8 に `server.allowedHosts` の検査は無い（上げるときは設定が要る）
+  - **Funnel に出すのは `vite preview` だけ。開発サーバーは出さない**（`npx vite`・`make dev-web`）。今の Vite 5.4.8 の開発サーバーは `/@fs/<絶対パス>?import&raw??` で `server.fs` の検査を抜けるので、インターネットから `.env`（API キー・署名の鍵・VAPID の秘密鍵）や DB を読まれる。`--bg` の Funnel は残り続けるので、出したまま開発サーバーを起動しない。preview は `dist/` の中だけを返す（`frontend/src/previewServing.test.ts` で確かめている。Funnel 越しは未確認）。画面を直したら `npm run build` からやり直す
+  - 開けるのは 5173 だけでよい（`/api` は preview が 8000 へ渡す。`server.proxy` を引き継ぐ）。`--host 127.0.0.1` は、この Mac では `localhost` が先に `::1` になり、Funnel の転送先（127.0.0.1 の見込み）に届かないおそれがあるため。同じ Wi-Fi には開かない
+  - Vite 5.4.8 に `allowedHosts` の検査は無い。上げるときは `preview.allowedHosts` に `.ts.net` を足す（`docs/decisions.md`）
   - `TSUTAE_PUBLIC_BASE_URL` が https になると Cookie に `Secure` が付く。医師画面は同じ URL か localhost で開く（ログインできなければ同じ URL で）
   - `http://<Mac の IP>:5173` で追加したホーム画面アプリは別のオリジンなので、追加し直す
   - Funnel は外から届くので、撮影の前後以外は止める（`tailscale funnel reset`。導入時に確かめる）

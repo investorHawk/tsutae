@@ -8,7 +8,7 @@
    - D4 レジメンは `! .venv/bin/python scripts/run_demo_regimen.py --json` で一度通す（本物の Claude で FOLFIRI＋BV を新しいレジメンとしてチャットで作る。一時の DB と Skill の写しの上で行い、本体の Skill と data/ の DB は変えない。`--adopt` を付けると写しの上で採用まで流す。往復ごとの秒・費用・拒否の回数が表で出て、`docs/eval/demo-regimen-*.json|md` に残る）
    - レポートの形式（一文の D4）は `! .venv/bin/python scripts/run_demo_skill_change.py` で一度通す（本体の SKILL.md は変えない。差分は `docs/eval/demo-skill-change-*.diff`）
 2. 撮影用の DB を新しく作る（既存の DB は消さない）: `TSUTAE_DB=data/demo-take1.db make seed`
-3. 起動: `TSUTAE_DB=data/demo-take1.db TSUTAE_TODAY=2026-11-09 make dev-api` と `make dev-web`（スマホで撮るなら README の「スマホで試す」）
+3. 起動: `TSUTAE_DB=data/demo-take1.db TSUTAE_TODAY=2026-11-09 make dev-api` と `make dev-web`（スマホで撮るなら README の「スマホで試す」）。**開発サーバーは Funnel に出さない**（`.env` まで読まれる）。Funnel を使う間は `make dev-web` を止め、README の Funnel の手順（`npm run build` と `vite preview`）で起動する
 4. ブラウザの拡大率・ウィンドウの大きさを決める。医師画面は院内PCの想定で横長、患者画面はスマホ幅
 5. 通知のカット（場面 2 の頭）は**他の場面より先に撮る**。通知が失敗しても他の場面は撮れる。iPhone の実機で、HTTPS（README の Tailscale Funnel の手順）と通知の鍵が要る。試送は日付の印・送る期間・時刻を見ないので、どの日付でも届く。HTTPS が使えなければこのカットを外す（`docs/plan-device-records.md` §10）
 

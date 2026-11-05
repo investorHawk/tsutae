@@ -65,11 +65,16 @@ def marked_patients(conn: sqlite3.Connection, day: date) -> set[str]:
 
 
 def backfill_record_marks(conn: sqlite3.Connection) -> None:
-    """既存の entries から印を作る。今ある印は変えない（何度呼んでもよい）。"""
+    """既存の entries から印を作る。今ある印は変えない（何度呼んでもよい）。
+
+    受付で受け取った記録（client_entry_id のある行）は数えない。印はサーバーが記録のときに
+    付けるもので、取り消した日の印が起動のたびに戻らないように。
+    """
     with write_transaction(conn):
         conn.execute(
             "INSERT INTO record_marks (patient_id, record_date, last_marked_at)"
             " SELECT patient_id, record_date, MAX(recorded_at) FROM entries"
+            " WHERE client_entry_id IS NULL"
             " GROUP BY patient_id, record_date"
             " ON CONFLICT (patient_id, record_date) DO NOTHING"
         )

@@ -28,11 +28,18 @@ CREATE TABLE IF NOT EXISTS entries (
     record_date TEXT NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('too_sick', 'answers', 'free_text', 'mixed')),
     by_proxy INTEGER NOT NULL DEFAULT 0 CHECK (by_proxy IN (0, 1)),
-    skill_version TEXT NOT NULL
+    skill_version TEXT NOT NULL,
+    client_entry_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_patient_date
     ON entries (patient_id, record_date, recorded_at);
+
+-- 受付で受け取った記録の ID（plan-device-records §5.5）。送り直しで二重にしない。
+-- NULL の行（seed・変換のテストが入れる既存の形）は対象外で、印刷でも消さない
+CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_client_id
+    ON entries (patient_id, client_entry_id)
+    WHERE client_entry_id IS NOT NULL;
 
 -- rowid を残す（WITHOUT ROWID にしない）。回答の挿入順を rowid で引く
 CREATE TABLE IF NOT EXISTS closed_answers (

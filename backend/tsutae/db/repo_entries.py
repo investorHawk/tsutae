@@ -179,10 +179,27 @@ def insert_entry_rows(
     検査（validate_skill_version・患者の有無）は呼び出し側で済ませ、
     write_transaction を開いておくこと。
     """
+    entry_id = insert_entry_row(conn, pid, entry, recorded_at, skill_version)
+    upsert_mark_row(conn, pid, to_jst(recorded_at))
+    return entry_id
+
+
+def insert_entry_row(
+    conn: sqlite3.Connection,
+    pid: str,
+    entry: EntryCreate,
+    recorded_at: datetime,
+    skill_version: str,
+    client_entry_id: str | None = None,
+) -> int:
+    """記録の行（回答・自由記載を含む）だけを入れて id を返す。印は書かない。
+
+    write_transaction を開いておくこと。
+    """
     at = to_jst(recorded_at)
     cur = conn.execute(
         "INSERT INTO entries (patient_id, recorded_at, record_date, kind,"
-        " by_proxy, skill_version) VALUES (?, ?, ?, ?, ?, ?)",
+        " by_proxy, skill_version, client_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             pid,
             dt_to_db(at),
@@ -190,6 +207,7 @@ def insert_entry_rows(
             entry.kind,
             int(entry.by_proxy),
             skill_version,
+            client_entry_id,
         ),
     )
     entry_id = int(cur.lastrowid)
@@ -203,7 +221,6 @@ def insert_entry_rows(
             "INSERT INTO free_texts (entry_id, text) VALUES (?, ?)",
             (entry_id, entry.free_text),
         )
-    upsert_mark_row(conn, pid, at)
     return entry_id
 
 

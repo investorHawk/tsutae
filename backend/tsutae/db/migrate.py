@@ -14,7 +14,8 @@ CREATE 文を見て古い形の表だけを SQLite の「12-step generalized ALT
 8. COMMIT。finally で `PRAGMA foreign_keys = ON`
 
 対象は `MIGRATIONS`（表名・古いかの判定・新しい CREATE 文）。今は pipeline_logs（T93）と
-patients（regimen の CHECK を外す。T95）。新しい CREATE 文は schema.sql
+patients（regimen の CHECK を外す。T95）と entries（client_entry_id を足す。
+plan-device-records §5.5）。新しい CREATE 文は schema.sql
 から引く（同じ文を2か所に書かない）。何度呼んでもよい（新しい形なら何もしない）。
 """
 
@@ -86,6 +87,10 @@ def _patients_outdated(sql: str) -> bool:
     return "'FOLFOX'" in sql
 
 
+def _entries_outdated(sql: str) -> bool:
+    return "client_entry_id" not in sql
+
+
 def _copy_with_rowid(new: str, columns: Sequence[str]) -> str:
     """rowid も写す（主キーが TEXT の表。list_patients は同じ時刻を rowid 順に並べる）。"""
     names = ", ".join(columns)
@@ -105,6 +110,12 @@ MIGRATIONS: tuple[TableMigration, ...] = (
         is_outdated=_patients_outdated,
         create_sql=lambda: schema_create_statement("patients"),
         copy_sql=_copy_with_rowid,
+    ),
+    # スマホ保存: 受付で受け取った記録の ID。closed_answers・free_texts・doctor_masks が参照する
+    TableMigration(
+        table="entries",
+        is_outdated=_entries_outdated,
+        create_sql=lambda: schema_create_statement("entries"),
     ),
 )
 

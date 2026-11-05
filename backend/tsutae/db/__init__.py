@@ -61,6 +61,7 @@ from tsutae.db.repo_question_library import (
     list_library_questions,
     seed_question_library,
 )
+from tsutae.db.repo_received import ReceivedEntry
 from tsutae.db.repo_record_marks import backfill_record_marks, marked_patients
 from tsutae.db.repo_seed import seed_patient
 from tsutae.db.repo_skills import (
@@ -98,6 +99,7 @@ __all__ = [
     "PushSubscription",
     "QuestionConflictError",
     "QuestionInputError",
+    "ReceivedEntry",
     "VisitClosedError",
     "VisitGeneratingError",
     "add_entry",

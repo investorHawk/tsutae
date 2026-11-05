@@ -486,7 +486,9 @@ describe("Settings: the service removed the subscription (410)", () => {
     return jsonResponse(fixture.body, fixture.status);
   };
 
-  it("on opening: lets go on the device, says off and what to do", async () => {
+  // 外枠の下で開く場合は外枠の送り直しが先に 410 を受ける（pushResend.test.tsx）。
+  // ここは設定の画面自身の PUT が 410 を受けたとき
+  it("the screen's own re-send: lets go on the device, says off and what to do", async () => {
     const push = givenPush({ permission: "granted", subscribed: true });
     mockPatientApi({ pushSubscribe: gone });
     renderSettings();

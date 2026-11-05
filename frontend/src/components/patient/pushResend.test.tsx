@@ -4,7 +4,7 @@
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PatientLayout from "../../layouts/PatientLayout";
 import { saveNotifyTime } from "../../patient/notifyTime";
@@ -113,6 +113,8 @@ afterEach(async () => {
   releaseHeld();
   releaseHeld = () => undefined;
   await settle();
+  // 聞き手のいない間の解除の知らせを、次のテストへ持ち越さない
+  onSubscriptionDropped(() => undefined)();
   fake?.uninstall();
   fake = null;
   delete (document as unknown as Record<string, unknown>).visibilityState;
@@ -315,6 +317,68 @@ describe("the settings screen stays open while the layout resends", () => {
     await resendSubscription();
     stop();
     expect(told).toHaveBeenCalledWith(ENDPOINT);
+  });
+});
+
+describe("the resend finds it gone before the settings screen is there", () => {
+  it("410 on opening /settings: the screen says off and what to do", async () => {
+    const push = givenPush(ON);
+    const fetchMock = mockPatientApi({ pushSubscribe: replyGone });
+    renderInLayout("/settings", "/settings", <Settings />);
+    expect(await screen.findByText(s("notify.expired"))).toBeInTheDocument();
+    expect(screen.getByText(s("notify.status_off"))).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: s("notify.turn_on") }),
+    ).toBeEnabled();
+    expect(push.isSubscribed()).toBe(false);
+    // オフと読めたので、設定の画面からはもう送らない（外枠の1本だけ）
+    expect(callsTo(fetchMock, "PUT", SUBSCRIPTION_URL)).toHaveLength(1);
+  });
+
+  it("gone on another tab: said when the settings tab is opened, and only once", async () => {
+    const push = givenPush(ON);
+    mockPatientApi({ pushSubscribe: replyGone });
+    render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <Routes>
+          <Route element={<PatientLayout />}>
+            <Route path="/history" element={<Link to="/settings">go</Link>} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const go = await screen.findByRole("link", { name: "go" });
+    await waitFor(() => expect(push.isSubscribed()).toBe(false));
+    await settle();
+    await userEvent.click(go);
+    expect(await screen.findByText(s("notify.expired"))).toBeInTheDocument();
+    expect(screen.getByText(s("notify.status_off"))).toBeInTheDocument();
+  });
+
+  it("does not say it again when the screen is opened the next time", async () => {
+    const push = givenPush(ON);
+    mockPatientApi({ pushSubscribe: replyGone });
+    const first = renderInLayout("/settings", "/settings", <Settings />);
+    await screen.findByText(s("notify.expired"));
+    first.unmount();
+    expect(push.isSubscribed()).toBe(false);
+    renderInLayout("/settings", "/settings", <Settings />);
+    await screen.findByRole("button", { name: s("notify.turn_on") });
+    expect(screen.queryByText(s("notify.expired"))).toBeNull();
+  });
+
+  it("the next listener is told once, the one after is not", async () => {
+    givenPush(ON);
+    mockPatientApi({ pushSubscribe: replyGone });
+    await resendSubscription();
+    const first = vi.fn();
+    onSubscriptionDropped(first)();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledWith(ENDPOINT);
+    const second = vi.fn();
+    onSubscriptionDropped(second)();
+    expect(second).not.toHaveBeenCalled();
   });
 });
 

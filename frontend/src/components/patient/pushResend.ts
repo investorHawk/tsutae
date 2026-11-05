@@ -5,13 +5,13 @@
  * 失敗は出さない（記録の邪魔をしない。次に開いたときにやり直す）。
  */
 import { useEffect } from "react";
-import { loadNotifyTime } from "../../patient/notifyTime";
 import { loadPid } from "../../patient/pid";
 import { isPushSupported } from "../../patient/pushDevice";
 import {
   dropGoneSubscription,
   isSubscriptionGone,
   saveSubscription,
+  savesSettled,
 } from "./pushActions";
 import { loadPushState, statusOfState, type PushState } from "./pushState";
 
@@ -21,15 +21,31 @@ type DroppedListener = (endpoint: string) => void;
 
 const droppedListeners = new Set<DroppedListener>();
 
+/** 聞き手のいない間に解除した登録（アプリを開いて読み込みの間など）。次の聞き手に1回だけ伝える。 */
+let unheardDrop: string | null = null;
+
 /**
- * 送り直しで「送信先に消された」と分かり、端末でも解除したときに呼ぶ（開いている設定の画面が
- * オフの表示に変わるように）。解除の関数を返す。
+ * 送り直しで「送信先に消された」と分かり、端末でも解除したときに呼ぶ（設定の画面が
+ * オフの表示と理由を出せるように）。解除の関数を返す。
  */
 export function onSubscriptionDropped(listener: DroppedListener): () => void {
   droppedListeners.add(listener);
+  if (unheardDrop !== null) {
+    const endpoint = unheardDrop;
+    unheardDrop = null;
+    listener(endpoint);
+  }
   return () => {
     droppedListeners.delete(listener);
   };
+}
+
+function tellDropped(endpoint: string): void {
+  if (droppedListeners.size === 0) {
+    unheardDrop = endpoint;
+    return;
+  }
+  droppedListeners.forEach((listener) => listener(endpoint));
 }
 
 async function resendOnce(): Promise<void> {
@@ -48,11 +64,11 @@ async function resendOnce(): Promise<void> {
     return;
   }
   try {
-    await saveSubscription(pid, subscription, loadNotifyTime());
+    await saveSubscription(pid, subscription);
   } catch (err) {
     if (isSubscriptionGone(err)) {
       await dropGoneSubscription(subscription);
-      droppedListeners.forEach((listener) => listener(subscription.endpoint));
+      tellDropped(subscription.endpoint);
     }
   }
 }
@@ -63,9 +79,12 @@ export function resendSubscription(): Promise<void> {
   return latest;
 }
 
-/** 送り直しが終わってから状態を読む（送信先に消された登録をオンと見せない）。 */
+/**
+ * 送り直しと時刻の保存が終わってから状態を読む（送信先に消された登録をオンと見せない。
+ * 保存の途中でタブを移って戻っても、新しい時刻を出す）。
+ */
 export function settledPushState(): Promise<PushState> {
-  return latest.then(loadPushState);
+  return latest.then(savesSettled).then(loadPushState);
 }
 
 /** アプリを開いたとき・戻ってきたときに送り直す（戻る間に DB が新しくなることがある）。 */

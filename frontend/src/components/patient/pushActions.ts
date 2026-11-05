@@ -5,7 +5,7 @@ import {
   putPushSubscription,
   sendPushTest,
 } from "../../api/patientPush";
-import { saveNotifyTime } from "../../patient/notifyTime";
+import { loadNotifyTime, saveNotifyTime } from "../../patient/notifyTime";
 import {
   isStillSubscribed,
   subscribeDevice,
@@ -30,17 +30,32 @@ export async function dropGoneSubscription(
   await subscription.unsubscribe().catch(() => false);
 }
 
-/** サーバーに登録・時刻を送り、受け入れられた時刻を端末にも控える。 */
-export async function saveSubscription(
+let lastSave: Promise<unknown> = Promise.resolve();
+
+/** 登録の PUT が全て終わるのを待つ（端末の時刻を読む前に）。失敗しない。 */
+export function savesSettled(): Promise<unknown> {
+  return lastSave;
+}
+
+/**
+ * サーバーに登録・時刻を送り、受け入れられた時刻を端末にも控える。
+ * PUT は呼ばれた順に1本ずつ送る（時刻の変更と送り直しが重なっても、古い時刻が後から届いて
+ * サーバーと端末の控えを戻さないように）。時刻を省くと、順番が来たときの端末の時刻を送る。
+ */
+export function saveSubscription(
   pid: string,
   subscription: PushSubscription,
-  notifyTime: string,
+  notifyTime?: string,
 ): Promise<void> {
-  const saved = await putPushSubscription(
-    pid,
-    toSubscriptionRequest(subscription, notifyTime),
-  );
-  saveNotifyTime(saved.notify_time);
+  const save = lastSave.then(async () => {
+    const saved = await putPushSubscription(
+      pid,
+      toSubscriptionRequest(subscription, notifyTime ?? loadNotifyTime()),
+    );
+    saveNotifyTime(saved.notify_time);
+  });
+  lastSave = save.catch(() => undefined);
+  return save;
 }
 
 /**

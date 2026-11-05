@@ -113,7 +113,8 @@ export function usePushSettings(pid: string, initial: PushState): PushSettings {
     // 開いたときの1回だけ
   }, []);
 
-  // 開いている間に外枠の送り直しが解除したら、オフの表示にする（戻ってきたときなど）
+  // 外枠の送り直しが解除したら、オフの表示と理由を出す（戻ってきたときなど。
+  // この画面を開く前に解除した分も、ここで1回だけ届く）
   useEffect(
     () =>
       onSubscriptionDropped((endpoint) => {

@@ -333,7 +333,7 @@ regimen_forms(skill_name, version, form_json, sources_json, created_at, PK(skill
 regimen_drafts(id, regimen TEXT NULL, base_skill TEXT NULL, base_version INT NULL, form_json, sources_json, chat_json,
                generation INT, status TEXT[open|working|adopted|discarded], turns, cost_usd, created_at, updated_at)  -- v1.1。regimen は新規で識別名が決まるまで NULL
 question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|adopted], hidden BOOL, created_at)  -- v1.1
-record_marks(patient_id, record_date DATE, last_marked_at DATETIME, PK(patient_id, record_date))  -- 記録があった日付の印（中身なし）。記録のときにサーバーが付ける（`record-marks`）。受付で受け取った記録では付けない
+record_marks(patient_id, record_date DATE, last_marked_at DATETIME, PK(patient_id, record_date))  -- 記録があった日付の印（中身なし）。記録のときにサーバーが付ける（`record-marks`）。受付で受け取った記録では付けない（`client_entry_id` の無い既存の行からは起動時に作る）
 push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00', last_sent_date DATE NULL, created_at)  -- 通知の登録（端末ごと）
 ```
 

@@ -19,13 +19,16 @@ const ROUTE_OPTIONS = [
   })),
 ];
 
+/** 薬の名前の候補の datalist（節に1つ。全ての行の名前の欄が同じものを指す）。 */
+const DRUG_NAMES_LIST_ID = "rf-drug-names";
+
 const asText = (text: string): Parsed<string | null> => ({
   ok: true,
   value: text.trim() === "" ? null : text.trim(),
 });
 
 function DrugRowView({ drug }: { drug: DrugRow }) {
-  const { draft, locked } = useRegimenForm();
+  const { draft, locked, drugNames } = useRegimenForm();
   const { deleteRow } = useRowActions();
   const base = `drugs.${drug.row_id}`;
   const oral = drug.route === "oral";
@@ -41,6 +44,7 @@ function DrugRowView({ drug }: { drug: DrugRow }) {
           value={drug.name ?? ""}
           parse={asText}
           placeholder="例: オキサリプラチン"
+          list={drugNames.length > 0 ? DRUG_NAMES_LIST_ID : undefined}
         />
       </td>
       <td>
@@ -105,7 +109,7 @@ function DrugRowView({ drug }: { drug: DrugRow }) {
 
 /** 投与スケジュール: 薬ごとに 名前・経路・Day の範囲（複数）・内服の回数・飲み始め＋Day の帯。 */
 export default function DrugsSection() {
-  const { draft, locked } = useRegimenForm();
+  const { draft, locked, drugNames } = useRegimenForm();
   const { addRow, adding } = useRowActions();
   const { drugs } = draft.form;
   return (
@@ -131,6 +135,13 @@ export default function DrugsSection() {
       ) : null}
       {drugs.length > 0 ? (
         <>
+          {drugNames.length > 0 ? (
+            <datalist id={DRUG_NAMES_LIST_ID}>
+              {drugNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          ) : null}
           <div className="rf-table-wrap">
             <table className="rf-table">
               <thead>

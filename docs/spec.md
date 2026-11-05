@@ -341,6 +341,7 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 | `POST /api/doctor/skill-changes` | 一文 → Skill 書き換え → 差分（v1.1 から report-format だけ。regimen は 400 `use_regimen_editor`） | skill_changes |
 | `POST /api/doctor/skill-changes/{id}/approve` | 承認 | skill_changes |
 | `GET /api/doctor/regimens` | レジメンの一覧（識別名・表示名・版。患者登録の選択肢にも使う）（v1.1） | — |
+| `GET /api/doctor/regimen-drug-names` | 薬の名前の候補（`{names}`。採用済みのレジメンの今の版の form の薬 → 固定の5つの順で重複なし。名前だけで量は持たない）（v1.1） | skill_versions, regimen_forms |
 | `POST /api/doctor/regimen-drafts` | 下書きを作る（新規、または既存の版から。開いた下書きがあればそれを返す。採用済みの版のフォームもこの応答で読む）（v1.1） | regimen_drafts |
 | `GET /api/doctor/regimen-drafts/{id}` | 下書き（フォーム・出どころ・会話・状態） | regimen_drafts |
 | `PATCH /api/doctor/regimen-drafts/{id}/fields` | 欄の直接編集・行の削除（`null`）。H1 などの検査に掛かれば 422 で欄の id。応答中は 409 | regimen_drafts |

@@ -27,6 +27,8 @@
   掛かれば 422 `{error: "h1_blocked"}`（Claude を呼ばず保存しない）。working の間は 409
   working。本体は `tsutae.regimen.chat_turn.run_turn`、Claude は `app.state.regimen_chat`
 - 下書きの form は `prose`（描画用の文。画面に出さない）を除いて返す
+- `GET /regimen-drug-names` → `{names: [薬の名前]}`（入力の候補。採用済みのレジメンの薬 → 固定の
+  5つの順。読めない form は飛ばす。`tsutae.regimen.drug_names`）
 """
 
 from __future__ import annotations
@@ -62,6 +64,7 @@ from tsutae.regimen.drafts import (
     require_open,
     target_version,
 )
+from tsutae.regimen.drug_names import regimen_drug_names
 from tsutae.regimen.edit import FieldChange, FormPatch, RowAdd
 from tsutae.regimen.preview import build_preview
 from tsutae.regimen.text_checks import FieldIssue
@@ -311,3 +314,8 @@ async def post_turn(
     except DraftError as exc:
         return _error(exc)
     return {"draft": _view(conn, outcome.draft), "turn_error": outcome.error}
+
+
+@router.get("/regimen-drug-names")
+def get_regimen_drug_names(conn: Conn, settings: AppSettings) -> dict[str, list[str]]:
+    return {"names": regimen_drug_names(conn, settings.skills_dir)}

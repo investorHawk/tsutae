@@ -1,5 +1,7 @@
-import type { KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent } from "react";
 import type { FieldIssue, RegimenDraft } from "../../../api/regimenTypes";
+import ChatDrugChips from "./ChatDrugChips";
+import { appendDrugName, showsDrugChips } from "./chatDrugNames";
 import { H1_BLOCKED_TEXT, blockedWhere } from "./chatLabels";
 import { activeAsk } from "./fieldState";
 
@@ -11,6 +13,7 @@ interface ChatInputProps {
   busy: boolean;
   blocked: readonly FieldIssue[] | null;
   notice: string | null;
+  drugNames: readonly string[];
   text: string;
   onText: (text: string) => void;
   onSend: () => void;
@@ -25,18 +28,26 @@ function isComposing(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
  * チャットの入力欄。⌘+Enter（Ctrl+Enter）か「送る」で送る。Enter・Shift+Enter・Option+Enter は
  * ブラウザのまま改行する（途中で送ってしまわないため）。変換中は送らない。
  * H1 に掛かったときは入力の文を返さず決まった文で知らせ、入力欄の文は残す。
+ * 新しいレジメンの最初の文の間だけ、薬の候補の札を入力欄の上に出す（押すと入力欄に入る）。
  */
 export default function ChatInput({
   draft,
   busy,
   blocked,
   notice,
+  drugNames,
   text,
   onText,
   onSend,
 }: ChatInputProps) {
   const ask = activeAsk(draft);
   const existing = draft.base_version !== null;
+  const textRef = useRef<HTMLTextAreaElement>(null);
+
+  function addDrugName(name: string) {
+    onText(appendDrugName(text, name, TURN_TEXT_MAX));
+    textRef.current?.focus();
+  }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const sendKey = event.metaKey || event.ctrlKey;
@@ -68,12 +79,16 @@ export default function ChatInput({
           {notice}
         </p>
       ) : null}
+      {showsDrugChips(draft, drugNames) ? (
+        <ChatDrugChips names={drugNames} disabled={busy} onPick={addDrugName} />
+      ) : null}
       <label htmlFor="rf-chat-text" className="rf-field-label">
         {existing
           ? `このレジメンを直す（版 ${draft.version} の下書きになります）`
           : "Claude に伝える"}
       </label>
       <textarea
+        ref={textRef}
         id="rf-chat-text"
         rows={3}
         value={text}

@@ -1,5 +1,7 @@
 /**
- * D4 レジメンの欄の4つの状態（純関数）。色だけに頼らず、欄の下に文字の札も出す。
+ * D4 レジメンの欄の4つの状態（純関数）。欄の下に文字の札を見せるのは、先生が何かをする必要の
+ * ある asked と missing だけ。ai と doc は色と枠の線で見せ、札の文字は読み上げにだけ残す
+ * （showsStateTag。意味は上の凡例と節の見出しの件数で分かる）。
  *
  * - asked（Claude が聞いています・赤枠）: 会話の最後が Claude の ask で、その欄（か行・節）を
  *   指していて、先生がまだ直接入れていない
@@ -105,7 +107,7 @@ export function fieldStateOf(
   return source === "doctor_edit" || source === "doctor_text" ? "doc" : "plain";
 }
 
-/** 欄の下の札（AI の値は標準の値と添える。青枠の札は出どころで出し分ける）。 */
+/** 欄の札の文字（AI の値は標準の値と添える。青枠は出どころで出し分ける）。 */
 export function stateTagOf(state: FieldState, source?: FieldSource): string {
   if (state === "ai" && source === "standard") {
     return STANDARD_TAG;
@@ -114,6 +116,11 @@ export function stateTagOf(state: FieldState, source?: FieldSource): string {
     return DOCTOR_TEXT_TAG;
   }
   return STATE_TAGS[state];
+}
+
+/** 札を画面に見せるか（見せない札も読み上げ用に DOM には残す）。 */
+export function showsStateTag(state: FieldState): boolean {
+  return state === "asked" || state === "missing";
 }
 
 /** 節（basic・drugs など）の中で AI が入れた欄の数。 */

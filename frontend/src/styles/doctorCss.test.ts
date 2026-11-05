@@ -14,6 +14,7 @@ let doctorCss = "";
 let boardCss = "";
 let uiCss = "";
 let patientCss = "";
+let panelsCss = "";
 
 beforeAll(async () => {
   // vitest は CSS の import を空にするので、node の fs で直接読む（patientCss.test.ts と同じ）
@@ -24,6 +25,7 @@ beforeAll(async () => {
   patientCss = read("./patient.css");
   boardCss = read("../components/doctor/board.css");
   uiCss = read("../components/doctor/doctor-ui.css");
+  panelsCss = read("../components/doctor/regimen/regimen-panels.css");
 });
 
 function varOf(css: string, name: string): string {
@@ -72,6 +74,7 @@ describe("医師画面の色の比", () => {
     ["要確認（橙の地に濃い橙）", "--d-warn-text", "--d-warn-bg"],
     ["代理（紫の地に紫）", "--d-proxy-text", "--d-proxy-bg"],
     ["受診日の文字（白の地に緑）", "--d-visit", "--d-bg"],
+    ["無効の主ボタン（灰の地）", "--d-disabled-text", "--d-disabled-bg"],
   ])("文字 %s は 4.5:1 以上", (_label, text, bg) => {
     expect(contrast(d(text), d(bg))).toBeGreaterThanOrEqual(4.5);
   });
@@ -153,5 +156,56 @@ describe("経過表と注意の規則が変数を使う", () => {
       /var\(--d-warn-border\)/,
     );
     expect(uiCss).not.toMatch(/#c9a227|#ffe9a8|#fff8e5/i);
+  });
+});
+
+describe("主ボタンの無効の見た目", () => {
+  const PRIMARY = ".doctor-app button.d-primary";
+
+  it("押せないときは灰色（紺のままにしない）", () => {
+    const rule = ruleOf(doctorCss, `${PRIMARY}:disabled`);
+    expect(rule).toMatch(/color:\s*var\(--d-disabled-text\)/);
+    expect(rule).toMatch(/background:\s*var\(--d-disabled-bg\)/);
+    expect(rule).toMatch(/border-color:\s*var\(--d-disabled-bg\)/);
+    const [r, g, b] = rgbOf(d("--d-disabled-bg"));
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(10);
+  });
+
+  it("hover でも変わらない（主ボタンの hover の規則が無い）", () => {
+    for (const css of [doctorCss, uiCss, panelsCss]) {
+      expect(css).not.toMatch(/\.d-primary[^{]*:hover/);
+    }
+  });
+});
+
+describe("チャットの枠", () => {
+  const CHAT = ".doctor-app .rf-chat";
+
+  it("高さと sticky の位置は useChatFit の変数（下の値は変数が入るまでの保険）", () => {
+    const rule = ruleOf(panelsCss, CHAT);
+    expect(rule).toMatch(/top:\s*var\(--rf-chat-top\);/);
+    expect(rule).toMatch(
+      /height:\s*var\(--rf-chat-h,\s*calc\(100vh - 64px\)\)/,
+    );
+    expect(rule).toMatch(/min-height:\s*320px/);
+    expect(rule).toMatch(/max-height:\s*960px/);
+  });
+
+  it("会話が縮んでスクロールし、入力欄は縮まない", () => {
+    const log = ruleOf(panelsCss, ".doctor-app .rf-chat-log");
+    expect(log).toMatch(/min-height:\s*0/);
+    expect(log).toMatch(/overflow-y:\s*auto/);
+    expect(ruleOf(panelsCss, ".doctor-app .rf-chat-input")).toMatch(
+      /flex:\s*0 0 auto/,
+    );
+  });
+
+  it("狭い画面では今までどおり高さを決めない（基本の規則より後ろで上書きする）", () => {
+    const at = panelsCss.indexOf("@media (max-width: 960px)");
+    expect(at).toBeGreaterThan(panelsCss.indexOf(`${CHAT} {`));
+    const narrow = panelsCss.slice(at);
+    expect(narrow).toMatch(
+      /\.rf-chat \{[^}]*position:\s*static;[^}]*height:\s*auto;[^}]*min-height:\s*0;/,
+    );
   });
 });

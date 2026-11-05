@@ -123,6 +123,7 @@ JSON_ROUTES = frozenset(
         ("GET", "/api/doctor/patients"),
         ("POST", "/api/doctor/patients"),
         ("GET", "/api/doctor/regimens"),
+        ("GET", "/api/doctor/regimen-drug-names"),
         ("GET", "/api/doctor/patients/{}/courses"),
         ("GET", "/api/doctor/patients/{}/visits"),
         ("GET", "/api/doctor/patients/{}/entries"),

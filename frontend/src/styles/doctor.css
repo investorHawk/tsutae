@@ -24,6 +24,9 @@
   --d-warn-text: #9a4a00;
   --d-proxy-bg: #f1ecfa;
   --d-proxy-text: #6b4fa0;
+  /* 押せない主ボタン（灰色。doctorCss.test.ts で比を検査） */
+  --d-disabled-bg: #dfe2e6;
+  --d-disabled-text: #565b62;
 
   min-height: 100vh;
   font-size: 15px;
@@ -146,6 +149,12 @@
   color: #ffffff;
   background: var(--d-primary);
   border-color: var(--d-primary);
+}
+
+.doctor-app button.d-primary:disabled {
+  color: var(--d-disabled-text);
+  background: var(--d-disabled-bg);
+  border-color: var(--d-disabled-bg);
 }
 
 .doctor-app button.d-danger {

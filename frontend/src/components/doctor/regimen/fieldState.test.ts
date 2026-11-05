@@ -11,6 +11,7 @@ import {
   patchTouchesAsk,
   sectionErrors,
   sectionIssues,
+  showsStateTag,
   stateTagOf,
 } from "./fieldState";
 import { changeGroupOf } from "./fieldLabels";
@@ -97,13 +98,23 @@ describe("fieldStateOf（4つの状態）", () => {
 });
 
 describe("stateTagOf", () => {
-  it("文字の札（青枠の札は出どころで出し分ける）", () => {
+  it("札の文字（青枠は出どころで出し分ける。見せない札は読み上げに使う）", () => {
     expect(stateTagOf("missing")).toBe("未入力（必須）");
     expect(stateTagOf("asked")).toBe("Claude が聞いています");
     expect(stateTagOf("ai", "standard")).toBe("AI が入れた（標準の値）");
     expect(stateTagOf("doc", "doctor_edit")).toBe("先生が入れた");
     expect(stateTagOf("doc", "doctor_text")).toBe("先生の文から");
     expect(stateTagOf("plain")).toBe("");
+  });
+});
+
+describe("showsStateTag", () => {
+  it("欄の下に見せるのは、先生が何かをする必要のある2つだけ", () => {
+    expect(showsStateTag("missing")).toBe(true);
+    expect(showsStateTag("asked")).toBe(true);
+    expect(showsStateTag("ai")).toBe(false);
+    expect(showsStateTag("doc")).toBe(false);
+    expect(showsStateTag("plain")).toBe(false);
   });
 });
 

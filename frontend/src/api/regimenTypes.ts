@@ -134,6 +134,11 @@ export interface RegimenDraftsResponse {
   drafts: RegimenDraftSummary[];
 }
 
+/** GET /regimen-drug-names（入力の候補。採用済みのレジメンの薬 → 固定の5つの順）。 */
+export interface RegimenDrugNamesResponse {
+  names: string[];
+}
+
 export interface RegimenDraftResponse {
   draft: RegimenDraft;
 }

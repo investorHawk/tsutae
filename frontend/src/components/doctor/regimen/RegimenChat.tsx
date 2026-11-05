@@ -2,18 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import type { FieldIssue, RegimenDraft } from "../../../api/regimenTypes";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
+import { useChatFit } from "./useChatFit";
 
 interface RegimenChatProps {
   draft: RegimenDraft;
   busy: boolean;
   blocked: readonly FieldIssue[] | null;
   notice: string | null;
+  /** 薬の名前の候補（読めなければ空） */
+  drugNames: readonly string[];
   onSend: (text: string) => Promise<boolean>;
   onJump: (fieldId: string) => void;
 }
 
 /**
- * 右のチャット（固定表示・新しい行で下へ送る）。1回送ると1回答える。応答中は送れない。
+ * 右のチャット（固定表示・高さは画面の下端まで・新しい行で下へ送る）。1回送ると1回答える。応答中は送れない。
  * 選択肢を押すと、その文を送る。
  */
 export default function RegimenChat({
@@ -21,10 +24,12 @@ export default function RegimenChat({
   busy,
   blocked,
   notice,
+  drugNames,
   onSend,
   onJump,
 }: RegimenChatProps) {
   const [text, setText] = useState("");
+  const chatRef = useChatFit();
   const logRef = useRef<HTMLOListElement>(null);
   const existing = draft.base_version !== null;
 
@@ -48,7 +53,7 @@ export default function RegimenChat({
 
   const lastIndex = draft.chat.length - 1;
   return (
-    <aside className="rf-chat" aria-label="Claude とのチャット">
+    <aside ref={chatRef} className="rf-chat" aria-label="Claude とのチャット">
       <div className="rf-chat-head">
         <span className="rf-chat-title">Claude と決める</span>
         <span className="rf-chat-sub">
@@ -93,6 +98,7 @@ export default function RegimenChat({
         busy={busy}
         blocked={blocked}
         notice={notice}
+        drugNames={drugNames}
         text={text}
         onText={setText}
         onSend={() => void send(text, true)}

@@ -51,6 +51,7 @@ from api_helpers import (  # noqa: E402
     seed_synthetic,
     set_patient_cookie,
 )
+from dump_api_device import demo_tools_flow, record_mark_flow  # noqa: E402
 from dump_api_push import push_flow  # noqa: E402
 from dump_api_regimen import regimen_drafts_flow  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
@@ -64,7 +65,7 @@ from pipeline_fakes import (  # noqa: E402
 
 from tsutae import db  # noqa: E402
 from tsutae.config import JST, SKILLS_HOME  # noqa: E402
-from tsutae.schemas import EntryCreate, RunStats  # noqa: E402
+from tsutae.schemas import RunStats  # noqa: E402
 from tsutae.skillchange.lock import skill_lock  # noqa: E402
 from tsutae.skillchange.workcopy import work_copy_path  # noqa: E402
 
@@ -416,7 +417,7 @@ def _patient_flow(rec: Recorder) -> None:
     # 受付（変換はバックグラウンド。TestClient は応答の前に済ませる）
     rec.call("visit", "POST", "/api/visit", {"reception_no": "A-023"})
     rec.call("visit_invalid", "POST", "/api/visit", {"reception_no": "   "}, expect=422)
-    _record_mark_flow(rec)
+    record_mark_flow(rec, DEMO, EVAL_A, FIXED_NOW, f"{REGIMEN_SKILL}@1")
     push_flow(rec, DEMO)
     with rec.without_cookies():
         rec.call(
@@ -425,7 +426,7 @@ def _patient_flow(rec: Recorder) -> None:
             f"/api/patient/{DEMO}/visit-days",
             expect=401,
         )
-    _demo_tools_flow(rec)
+    demo_tools_flow(rec, DEMO, EVAL_A)
     set_patient_cookie(rec.client, NO_COURSE)
     rec.call(
         "visit_no_course", "POST", "/api/visit", {"reception_no": "B-7"}, expect=409
@@ -437,96 +438,6 @@ def _patient_flow(rec: Recorder) -> None:
         expect=409,
     )
     set_patient_cookie(rec.client, DEMO)
-
-
-def _record_mark_flow(rec: Recorder) -> None:
-    """記録の印 → 端末の記録を受付で送る → 範囲・受診日。
-
-    受け取った記録は印刷で消えるので、医師の画面の fixture に今日の行が残るよう、
-    client_entry_id の無い行も1件入れる（印刷でも消えない）。
-    """
-    mark = rec.call("patient_record_mark", "POST", f"/api/patient/{DEMO}/record-marks")
-    answers = [
-        {"question_key": "fever", "value": "measured", "temperature": 38.2},
-        {"question_key": "diarrhea", "value": "present", "temperature": None},
-    ]
-    with db_conn(rec.client.app) as conn:
-        kept = EntryCreate(answers=answers)
-        db.add_entry(conn, DEMO, kept, FIXED_NOW, f"{REGIMEN_SKILL}@1")
-    entry = {
-        "client_entry_id": "11111111-1111-4111-8111-111111111111",
-        "recorded_at": mark["recorded_at"],
-        "record_date": mark["record_date"],
-        "kind": "answers",
-        "by_proxy": False,
-        "skill_version": f"{REGIMEN_SKILL}@1",
-        "answers": answers,
-        "free_text": None,
-    }
-    rec.call(
-        "visit_with_entries",
-        "POST",
-        "/api/visit",
-        {"reception_no": "A-023", "entries": [entry]},
-    )
-    bad = {**entry, "answers": [{"question_key": "unknown_question", "value": "none"}]}
-    rec.call(
-        "visit_entries_invalid",
-        "POST",
-        "/api/visit",
-        {"reception_no": "A-023", "entries": [bad]},
-        expect=422,
-    )
-    rec.call("patient_visit_window", "GET", f"/api/patient/{DEMO}/visit-window")
-    rec.call("patient_visit_days", "GET", f"/api/patient/{DEMO}/visit-days")
-    _undo_flow(rec, mark["recorded_at"])
-
-
-def _undo_flow(rec: Recorder, recorded_at: str) -> None:
-    """取り消し（§5.4）。受付の後は 409、受付の無い評価A は印を消せる。登録の解除も評価A で。"""
-    rec.call(
-        "patient_record_mark_undo_not_undoable",
-        "POST",
-        f"/api/patient/{DEMO}/record-marks/undo",
-        {"recorded_at": recorded_at, "clear_mark": True},
-        expect=409,
-    )
-    with rec.without_cookies():
-        set_patient_cookie(rec.client, EVAL_A)
-        marked = rec.client.post(f"/api/patient/{EVAL_A}/record-marks")
-        if marked.status_code != 200:
-            raise DumpError(f"印: status {marked.status_code}")
-        rec.call(
-            "patient_record_mark_undo",
-            "POST",
-            f"/api/patient/{EVAL_A}/record-marks/undo",
-            {"recorded_at": marked.json()["recorded_at"], "clear_mark": True},
-        )
-        rec.call(
-            "patient_unregister",
-            "POST",
-            f"/api/patient/{EVAL_A}/unregister",
-            {"endpoint": None},
-        )
-
-
-def _demo_tools_flow(rec: Recorder) -> None:
-    """撮影用の見本（§5.10）。デモ患者だけに出る。評価A には出ない。"""
-    rec.call("patient_demo_config", "GET", f"/api/patient/{DEMO}/demo-config")
-    rec.call("patient_demo_entries", "GET", f"/api/patient/{DEMO}/demo-entries")
-    with rec.without_cookies():
-        set_patient_cookie(rec.client, EVAL_A)
-        rec.call(
-            "patient_demo_config_other",
-            "GET",
-            f"/api/patient/{EVAL_A}/demo-config",
-        )
-        rec.call(
-            "patient_demo_entries_other",
-            "GET",
-            f"/api/patient/{EVAL_A}/demo-entries",
-            expect=404,
-        )
 
 
 def _add_open_visits(app: FastAPI) -> tuple[int, int]:

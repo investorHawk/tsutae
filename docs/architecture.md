@@ -64,6 +64,8 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | regimen_forms（v1.1） | skill_name, version INT, form_json TEXT（正規化した `RegimenForm`）, created_at, PK(skill_name, version), FK(skill_name, version) → skill_versions — D4 で採用した版のフォーム（採用と同じトランザクション）。FOLFOX/CAPOX@1 はリポジトリの `regimen_forms/*.json` |
 | regimen_drafts（v1.1） | id PK, regimen TEXT NULL（識別名。新規は決まるまで NULL）, base_version INT NULL（新規は NULL）, status CHECK(open/working/adopted/discarded), generation INT, form_json, sources_json, chat_json（院内だけ。採用・破棄で `[]`）, adopted_version NULL, created_at, updated_at, working_since NULL（CHECK: working のときだけ）, closed_at NULL。部分 UNIQUE(regimen) WHERE open/working（1レジメンに開いた下書きは1つ） |
 | question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
+| record_marks（通知） | patient_id FK, record_date, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない** |
+| push_subscriptions（通知） | id INTEGER PK, patient_id FK, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00'（JST の HH:MM）, last_sent_date NULL, created_at |
 
 `skill_versions` は「その日の記録に使った質問集」を後から引くためのスナップショット（未設問「−−」の表示に使う）。起動時に現在の SKILL.md が未登録なら登録する。
 
@@ -387,3 +389,48 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 
 ## 10. 時計・デモ
 - `TSUTAE_TODAY=2026-11-09` でデモの「今日」を固定。`scripts/seed_demo.py` が合成データを DB に入れる（W3）
+
+## 11. 毎日の通知（PR A。`docs/plan-device-records.md` §3・§4）
+
+決まり（回数・文・送る期間）は仕様書 §4.1。ここには実装の形だけを書く。
+
+| ファイル | 中身 |
+|---|---|
+| `push/decide.py` | 純関数。`decide_send(at, *, notify_time, last_sent_date, marked_today, last_day1, cycle_days) -> Decision`（`due`・`sent_today`・`before_time`・`window_passed`・`marked`・`no_course`・`period_over`）。`SEND_WINDOW` は 10 分、`GRACE_DAYS` は 14。日付と時刻は JST で見る |
+| `push/payload.py` | `notification_payload() -> str`（JSON: title・body・url・badge）。**引数を取らない**。文は `patient_strings.json` の `notify.title`・`notify.body` |
+| `push/sender.py` | `PushSender` プロトコル `sender(target, payload)`、本物は `WebPushSender`（pywebpush。TTL 3600 秒・タイムアウト 10 秒）。送信先のエラーは `PushSendError(status_code)`。`load_vapid(settings) -> VapidConfig \| None` |
+| `push/dispatch.py` | `send_due_once(settings, sender, at=None) -> PushCounts`（全ての登録を判定して送る。1件の失敗で止めない）、`send_test_once(settings, sender, subscription_id)`（試送。印・期間・時刻を見ず、`last_sent_date` も使わない） |
+| `api/patient_push.py` | 下の4経路。`PushTestLimiter`（プロセス内の dict）、`is_push_service_url`、`send_test_later` |
+| `api/app.py` | `_install_push`（`app.state.push_sender`・`push_public_key`・`push_test_limiter`・`push_test_delay_s`）、`_push_loop`（`PUSH_INTERVAL_S` = 60 秒ごとに `asyncio.to_thread(send_due_once, ...)`。`_purge_loop` と同じく lifespan の中。`--workers 1` が前提）。`create_app(push_sender=...)` で偽物に差し替える |
+| `db/repo_record_marks.py` | `upsert_mark_row`（`insert_entry_rows` の中で呼ぶので、どの経路で記録を入れても同じトランザクションで印が付く）、`clear_mark_if_no_entries`（取り消しの後）、`marked_patients`、`backfill_record_marks`（`init_db` のたび。今ある印は変えない） |
+| `db/repo_push.py` | `upsert_push_subscription`（endpoint で一意。同じ患者なら `last_sent_date` を保ち、別の患者の番号で登録し直したら行をその患者に移して空にする）、`claim_push_send`・`release_push_send`、削除と読み出し |
+| `scripts/gen_vapid.py` | 鍵を標準出力に出すだけ。ファイルに書かない |
+
+| 経路 | 入力 | 出力 |
+|---|---|---|
+| `GET /api/patient/push-config` | — | `{available, public_key}`（使えないときは `false`・`null`） |
+| `PUT /api/patient/{pid}/push-subscription` | `{endpoint, keys: {p256dh, auth}, notify_time}`（notify_time は 30 分刻み。省くと 20:00） | `{ok: true, notify_time}`。鍵が無ければ 503 `push_unavailable`、形が違えば 422 |
+| `DELETE /api/patient/{pid}/push-subscription` | `{endpoint}` | `{ok: true}`（無くても 200） |
+| `POST /api/patient/{pid}/push-test` | `{endpoint}` | `{ok: true}`。応答の後に 10 秒待って1通送る。その患者の登録に無ければ 404 `not_found`、1分以内の2回目は 429 `push_test_too_soon`、鍵が無ければ 503 `push_unavailable` |
+
+- **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は登録を消す。応答の前にタイムアウトしたときだけ二重に届く余地がある
+- **鍵**: `TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（`mailto:` か `https://`）。全て無ければ警告なしで使えない。欠け（`missing`）・subject の誤り（`bad_subject`）・読めない鍵（例外の型名）・組でない（`key_mismatch`）は警告に理由のコードだけを出して使えない。どれも起動は止めない
+- **入力の検査**: endpoint は既知の送信サービスの https だけ（`fcm.googleapis.com`・`*.push.apple.com`・`*.push.services.mozilla.com`・`*.notify.windows.com`。ポートは 443、ユーザー情報は不可）。p256dh は 65 バイトの P-256 の点、auth は 16 バイト
+- **ログ**: 件数と例外の型名だけ。仮名ID・endpoint・例外の文面を出さない
+- **守ること**: 通知のモジュールは `reports`・`timelines`・`regimen_drafts` を読まない。本文は全ての患者で同じ（`tests/test_architecture.py`）
+
+**フロント**
+
+| ファイル | 中身 |
+|---|---|
+| `frontend/public/sw.js` | 通知専用。`push` は `waitUntil` の中で必ず `showNotification`（本文が読めなければタイトルだけ。**送るかどうかはサーバーが決め、端末で握りつぶさない**）。`notificationclick` は `/today` を開く（開いている患者の画面を使い、`/doctor` は動かさない）。**`fetch` のハンドラを書かない**（`homeScreen.test.ts`） |
+| `api/patientPush.ts` | 4経路の呼び出し。応答は形を検査する。endpoint は本文で送る |
+| `patient/pushDevice.ts` | 端末の API の包み。Service Worker の登録は `subscribeDevice`（設定でオンにしたとき）だけ |
+| `components/patient/pushStatus.ts` | 純関数 `pushStatusOf`（`unsupported`・`no_key`・`denied`・`on`・`off`）と選べる時刻 |
+| `components/patient/pushState.ts`・`pushActions.ts`・`usePushSettings.ts` | 状態を読む／端末とサーバーの登録を揃える／画面の状態。許可を求めるのはボタンの onClick の最初だけ |
+| `components/patient/NotifySettings.tsx`・`pages/patient/Settings.tsx` | P5（`/settings`）。文言は全て `patient_strings.json` |
+| `components/patient/NotifyBanner.tsx` | オフでオンにできるときだけ、今日の記録の欄の下に出す案内の帯 |
+| `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー |
+| `patient/useClearNotifications.ts` | アプリを開いたとき・戻ってきたときに、バッジと表示中の通知を消す（`PatientLayout`） |
+
+**動かす環境**: 通知には HTTPS が要る。手順は `README.md` の「動かし方」（Tailscale Funnel → Vite の 5173 → `/api` は 8000 へ）。実機の確認は未実施（仕様書 §9）。

@@ -1,6 +1,6 @@
 # つたえ 仕様書
 
-- 版: v1.0（2026-11-03 先生承認。v0.1 ドラフトから締切・未決4件を確定）。2026-11-04 先生の指示で「つらくて書けない」の取り消しを追記（4.1・P2・16）。同日夕方、押した後の確認と3秒の自動記録に改めた（4.1）。2026-11-04 夜、先生の指示で未処理の記載を医師が伏せ字にして変換し直せるようにした（3.2 D6・13.2・13.3・16）。同日夜、13.3 に実運用の前に決めることを追記。**v1.1（2026-11-04 夜、先生の提案。2026-11-04 先生承認）: D4 をレジメンとレポートの形式に分け、レジメンは「左に Skill のフォーム・右に Claude とのチャット」で作る・直す画面にした。レジメンの数を FOLFOX/CAPOX の2つに固定しない（1・2・3・4・5・8・9・10・11・12・13.3・14・15・16・17・19・20。方針とタスクは `docs/plan-d4-regimen.md`）**
+- 版: v1.0（2026-11-03 先生承認。v0.1 ドラフトから締切・未決4件を確定）。2026-11-04 先生の指示で「つらくて書けない」の取り消しを追記（4.1・P2・16）。同日夕方、押した後の確認と3秒の自動記録に改めた（4.1）。2026-11-04 夜、先生の指示で未処理の記載を医師が伏せ字にして変換し直せるようにした（3.2 D6・13.2・13.3・16）。同日夜、13.3 に実運用の前に決めることを追記。**v1.1（2026-11-04 夜、先生の提案。2026-11-04 先生承認）: D4 をレジメンとレポートの形式に分け、レジメンは「左に Skill のフォーム・右に Claude とのチャット」で作る・直す画面にした。レジメンの数を FOLFOX/CAPOX の2つに固定しない（1・2・3・4・5・8・9・10・11・12・13.3・14・15・16・17・19・20。方針とタスクは `docs/plan-d4-regimen.md`）**。2026-11-06、毎日の通知を追記（3.1 P5・15・16・18・19・20。差分は `docs/plan-device-records.md` §13 の PR A の行）
 - 正本の企画: `docs/reference/concept.md`。本書は実装に必要な粒度まで落としたもの。企画と矛盾する箇所は `docs/decisions.md` に理由つきで記録する
 - 大会: Built with Claude (Code): Japan 2026（提出 2026-11-08 20:00 JST、ソロ、公開リポジトリ）
 - **症例は全て合成。本書に登場する患者・記録・数値はすべて架空**
@@ -43,8 +43,9 @@
 | P2 自分の記録一覧 | 入力したものを日付順に表示。編集不可（4.1 の「つらくて書けない」の取り消しだけは例外）。AIのまとめは一切出さない | 必須 |
 | P3 受診時 | 院内QRを読んで開く。当日の受付番号を入力 → 「先生に届けました」の定型文のみ | 必須 |
 | P4 固定規則の表示 | 38.0℃以上を入力した時に、施設が既に患者に渡している案内文をそのまま表示 | 必須（デモでは触れるだけ） |
+| P5 設定 | 毎日のお知らせ: オン・オフ、時刻（30 分刻み。既定 20:00）、試しに通知を送る。通知を使えないとき（未対応の端末・鍵が無い・許可が拒否された）は理由と次の操作を定型文で出す | 必須 |
 
-患者画面の文言は `patient_strings.json` の定型文と、医師が承認・採用した Skill の質問文だけ（採用した質問文は医師の文として扱う。`docs/decisions.md`）。下書き・チャットの文・変換の結果が患者画面に届く経路は無い（8節 H4）。
+患者画面の文言は `patient_strings.json` の定型文と、医師が承認・採用した Skill の質問文だけ（採用した質問文は医師の文として扱う。`docs/decisions.md`）。毎日の通知の文も `patient_strings.json` の固定文で、症状・レジメン名・薬の名前・AI の文を入れない。下書き・チャットの文・変換の結果が患者画面に届く経路は無い（8節 H4）。
 
 ### 3.2 医師 Web（React、院内PCのブラウザ）
 | 画面 | 内容 | 区分 |
@@ -323,16 +324,22 @@ regimen_forms(skill_name, version, form_json, sources_json, created_at, PK(skill
 regimen_drafts(id, regimen TEXT NULL, base_skill TEXT NULL, base_version INT NULL, form_json, sources_json, chat_json,
                generation INT, status TEXT[open|working|adopted|discarded], turns, cost_usd, created_at, updated_at)  -- v1.1。regimen は新規で識別名が決まるまで NULL
 question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|adopted], hidden BOOL, created_at)  -- v1.1
+record_marks(patient_id, record_date DATE, last_marked_at DATETIME, PK(patient_id, record_date))  -- 記録があった日付の印（中身なし）。記録と同じトランザクションで書き、既存の entries からも作る
+push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00', last_sent_date DATE NULL, created_at)  -- 通知の登録（端末ごと）
 ```
 
 ## 16. API（FastAPI、要点）
 
 | 経路 | 用途 | 読む表 |
 |---|---|---|
-| `POST /api/patient/{pid}/entries` | 記録の保存 | entries 系 |
+| `POST /api/patient/{pid}/entries` | 記録の保存（日付の印も同じトランザクションで書く） | entries 系, record_marks |
 | `GET /api/patient/{pid}/entries` | 自分の記録一覧と受診日（日付・受付の時刻だけ） | entries 系, visits |
-| `POST /api/patient/{pid}/entries/{entry_id}/undo` | 「つらくて書けない」の取り消し（4.1。条件に合わなければ 409） | entries, visits |
+| `POST /api/patient/{pid}/entries/{entry_id}/undo` | 「つらくて書けない」の取り消し（4.1。条件に合わなければ 409。その日の記録が無くなれば印も消す） | entries, visits, record_marks |
 | `GET /api/patient/{pid}/questions` | 今日の質問集（Skill から） | — |
+| `GET /api/patient/push-config` | 通知の公開鍵と、通知を使えるか | — |
+| `PUT /api/patient/{pid}/push-subscription` | 通知の登録・時刻の変更（endpoint で一意。鍵が無ければ 503） | push_subscriptions |
+| `DELETE /api/patient/{pid}/push-subscription` | この端末の通知を切る（endpoint は本文で受ける） | push_subscriptions |
+| `POST /api/patient/{pid}/push-test` | 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで。日付の印・送る期間・時刻の条件は見ない | push_subscriptions |
 | `POST /api/visit` | QR 後の受付番号登録 → 変換開始 | visits |
 | `GET /api/doctor/visits` | 印刷待ち一覧 | visits, reports |
 | `GET /api/doctor/visits/{id}/report` | レポート HTML | reports |
@@ -356,7 +363,8 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 | `POST /api/doctor/visits/{id}/regenerate` | AI でもう一度変換（失敗・AI変換なし・医師の伏せ字あり） | visits, doctor_masks |
 | `GET /api/doctor/pipeline/{visit_id}/events` | D5 用のログ（SSE） | pipeline_logs |
 
-- `/api/patient/*` は `reports`・`timelines`・`regimen_drafts` を**読まない**（アーキテクチャテストで保証。v1.1 で `regimen_drafts` を足す）
+- `/api/patient/*` は `reports`・`timelines`・`regimen_drafts` を**読まない**（アーキテクチャテストで保証。v1.1 で `regimen_drafts` を足す）。通知の送信の処理も同じ
+- 日付の印だけを付ける経路（`record-marks`）はまだ無い。今は記録の保存が印も書く（`docs/plan-device-records.md` §4.4。経路はスマホ保存と一緒に足す）
 - 医師 API は環境変数の単一パスワード（デモ用）
 
 ## 17. 合成データと精度評価
@@ -383,7 +391,7 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 ## 18. テスト方針
 
 - TDD（RED → GREEN → REFACTOR）。バックエンド pytest、フロント vitest、E2E は受診フロー1本（Playwright、余力）
-- アーキテクチャテスト: 患者 API が `reports`/`timelines` を参照しないこと、`patient_strings.json` 以外の文字列を患者レスポンスに返さないこと
+- アーキテクチャテスト: 患者 API が `reports`/`timelines` を参照しないこと、`patient_strings.json` 以外の文字列を患者レスポンスに返さないこと。通知の文が固定文だけで患者ごとに変わらないこと、通知の処理が `reports` 等を読まないこと、`sw.js` に `fetch` が無いこと
 - Hook テスト: H1〜H4 を偽のツール呼び出しで発火させる単体テスト
 - README の「テスト件数」は `make test` が書き出す数値から自動更新
 
@@ -391,8 +399,8 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 
 | 項目 | 内容 |
 |---|---|
-| バックエンド | Python 3.12（uv で導入。システムの 3.9 は使わない）、FastAPI、SQLite、`claude-agent-sdk` |
-| フロント | React + Vite + TypeScript、印刷 CSS。患者用と医師用は同一アプリの別ルート。スマホのホーム画面に置くと、アイコンから全画面で開く（manifest。Service Worker は使わない） |
+| バックエンド | Python 3.12（uv で導入。システムの 3.9 は使わない）、FastAPI、SQLite、`claude-agent-sdk`、`pywebpush`（毎日の通知） |
+| フロント | React + Vite + TypeScript、印刷 CSS。患者用と医師用は同一アプリの別ルート。スマホのホーム画面に置くと、アイコンから全画面で開く（manifest）。Service Worker は通知専用（`fetch` を扱わない） |
 | 認証 | 患者: 仮名ID の Cookie／医師: 環境変数パスワード |
 | 変換 | Agent SDK（主エージェント＋サブエージェント3役＋カスタムツール＋Hook 4本＋Skill はレジメンの数＋レポートの形式）。モデルは `claude-opus-5-5` を既定とし、サブエージェントは `claude-sonnet-5-5` で試す |
 | 印刷 | HTML → ブラウザ印刷 → PDF。実機印刷は別 Mac で行い動画に収める |
@@ -400,7 +408,7 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 
 ## 20. 範囲外と余力
 
-**範囲外（README に明記）**: 音声入力、オフラインでの動作（Service Worker）、電子カルテ連携、受診間の通知、患者への助言、CAPOX と D4 で足したレジメンの合成データ・評価、医師2名以上の形式、薬の量の管理、レジメンの削除（採用した版は残す）、コース内の2回目以降の点滴（Day8・15 など）の延期・中止の記録、内服だけのレジメン、数値の回答（血圧など。回答の型は3択と体温だけ）
+**範囲外（README に明記）**: 音声入力、オフラインでの動作（Service Worker は通知専用）、電子カルテ連携、受診の間の医療機関への通知、患者への助言、CAPOX と D4 で足したレジメンの合成データ・評価、医師2名以上の形式、薬の量の管理、レジメンの削除（採用した版は残す）、コース内の2回目以降の点滴（Day8・15 など）の延期・中止の記録、内服だけのレジメン、数値の回答（血圧など。回答の型は3択と体温だけ）
 
 **余力（優先順）**: ① 診察室プリンタへの自動印刷（`lp` を叩く常駐スクリプト）、② 前コースの AI 変換結果の表示（現状はクローズのみ）、③ Playwright E2E、④ 印刷用端末の MCP サーバー化
 

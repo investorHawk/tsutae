@@ -144,6 +144,23 @@ export function isOkTrue(v: Item): boolean {
   return v.ok === true;
 }
 
+/** GET push-config: 使えるときは公開鍵があり、使えないときは null。 */
+export function isPushConfigResponse(v: Item): boolean {
+  if (v.available === true) {
+    return isString(v.public_key) && v.public_key !== "";
+  }
+  return v.available === false && v.public_key === null;
+}
+
+/** PUT push-subscription: {ok: true, notify_time}（JST の HH:MM。30 分刻み）。 */
+export function isPushSubscriptionResponse(v: Item): boolean {
+  return (
+    v.ok === true &&
+    isString(v.notify_time) &&
+    /^(?:[01][0-9]|2[0-3]):(?:00|30)$/.test(v.notify_time)
+  );
+}
+
 /** POST visit: {ok: true, message_key} */
 export function isVisitResponse(v: Item): boolean {
   return v.ok === true && isString(v.message_key);

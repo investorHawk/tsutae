@@ -51,6 +51,7 @@ from api_helpers import (  # noqa: E402
     seed_synthetic,
     set_patient_cookie,
 )
+from dump_api_push import push_flow  # noqa: E402
 from dump_api_regimen import regimen_drafts_flow  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -117,6 +118,10 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/patient/{}/entries"),
         ("GET", "/api/patient/{}/entries"),
         ("POST", "/api/patient/{}/entries/{}/undo"),
+        ("GET", "/api/patient/push-config"),
+        ("PUT", "/api/patient/{}/push-subscription"),
+        ("DELETE", "/api/patient/{}/push-subscription"),
+        ("POST", "/api/patient/{}/push-test"),
         ("POST", "/api/visit"),
         ("POST", "/api/doctor/login"),
         ("POST", "/api/doctor/logout"),
@@ -428,6 +433,7 @@ def _patient_flow(rec: Recorder) -> None:
     )
     rec.call("patient_entries", "GET", f"/api/patient/{DEMO}/entries")
     _undo_flow(rec, saved["entry_id"])
+    push_flow(rec, DEMO)
     with rec.without_cookies():
         rec.call(
             "patient_entries_not_logged_in",

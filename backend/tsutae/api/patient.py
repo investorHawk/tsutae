@@ -6,7 +6,8 @@
   検査する（未知の質問・回答の型違いは 422 invalid_input）
 - 記録の送り直し（タイムアウトの後など）: 同じ患者・同じ内容（EntryCreate を正規化した
   形が一致）の記録が直近 120 秒以内にあれば、新しく作らずその entry_id と notices を
-  返す（`db.add_entry_once`）
+  返す（`db.add_entry_once`）。記録を入れると日付の印（record_marks）も同じトランザクションで
+  付く（通知の判定が使う。取り消しでその日の記録が無くなれば印も消える）
 - 取り消し（P2-5）: `POST /{pid}/entries/{entry_id}/undo` は、本人の「つらくて書けない」
   の記録で、作ってから UNDO_WINDOW 以内・その後に受診の受付が無いものだけを消す
   （`db.undo_too_sick_entry`）。他人の記録は 404 not_found、条件に合わなければ

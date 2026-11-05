@@ -280,6 +280,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `api/doctor_skills.py` | W3-doctor | `GET /api/doctor/skills`・`POST/GET /api/doctor/skill-changes`・approve・reject。`tsutae.skillchange` を呼ぶ |
 | `skillchange/`（`editor.py` `service.py` `diff.py`） | W3-skillchange | 下の 9b |
 | `scripts/seed_demo.py` | W3-api | `python scripts/seed_demo.py [--db PATH]`: 合成3人（`tsutae.dataset`）とコース・記録を入れ、`ensure_skill_versions`。既にいる患者は飛ばす（**DB を消さない**） |
+| `api/patient_push.py` `push/*.py` `db/repo_push.py` `db/repo_record_marks.py` | 通知（PR A） | 毎日の通知（`docs/plan-device-records.md` §4）。判定は純関数 `push/decide.py`、本文は `push/payload.py`（`patient_strings.json` の固定文だけ）、送信は `app.state.push_sender`（既定は `push/sender.py` の `WebPushSender`、鍵が無ければ None）、周期は `api/app.py` の `_push_loop`。**`reports`・`timelines`・`regimen_drafts` を読まない** |
 | `tests/test_api_*.py` `tests/test_architecture.py` | 各担当 | `fastapi.testclient.TestClient`。runner は `pipeline_fakes.FakeRunner`、editor は偽物。アーキテクチャテストは `ast` で `api/patient.py` の import を検査 |
 
 ### W3 後の決定（2026-11-04）

@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-DEMO0001/push-test",
+  "request": {
+    "endpoint": "https://web.push.apple.com/QFixtureDeviceToken"
+  },
+  "status": 429,
+  "body": {
+    "error": "push_test_too_soon"
+  }
+}

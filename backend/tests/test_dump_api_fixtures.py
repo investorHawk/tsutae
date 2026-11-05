@@ -87,7 +87,7 @@ def test_generation_is_deterministic(
 def test_envelopes_have_the_same_shape(generated: dict[str, Any]) -> None:
     for name, envelope in generated.items():
         assert set(envelope) == ENVELOPE_KEYS, name
-        assert envelope["method"] in ("GET", "POST", "PATCH", "DELETE"), name
+        assert envelope["method"] in ("GET", "POST", "PUT", "PATCH", "DELETE"), name
         assert envelope["path"].startswith("/api/"), name
         assert isinstance(envelope["status"], int), name
         if envelope["status"] >= 400:

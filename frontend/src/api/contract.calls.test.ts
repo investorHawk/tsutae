@@ -46,6 +46,13 @@ import {
   submitVisit,
   undoEntry,
 } from "./patient";
+import {
+  deletePushSubscription,
+  getPushConfig,
+  putPushSubscription,
+  sendPushTest,
+  type PushSubscriptionRequest,
+} from "./patientPush";
 import type {
   AddLibraryQuestionRequest,
   Course,
@@ -104,6 +111,11 @@ const questions: Call = (f) => getQuestions(pidIn(f));
 const addEntry: Call = (f) => createEntry(pidIn(f), f.request as EntryCreate);
 const entries: Call = (f) => listEntries(pidIn(f));
 const undo: Call = (f) => undoEntry(pidIn(f), idIn(f));
+const pushSubscribe: Call = (f) =>
+  putPushSubscription(pidIn(f), f.request as PushSubscriptionRequest);
+const pushUnsubscribe: Call = (f) =>
+  deletePushSubscription(pidIn(f), String(req(f).endpoint));
+const pushTest: Call = (f) => sendPushTest(pidIn(f), String(req(f).endpoint));
 const visit: Call = (f) => submitVisit(String(req(f).reception_no));
 const doctorLogin: Call = (f) => login(String(req(f).password));
 const courses: Call = (f) => listCourses(pidIn(f));
@@ -158,6 +170,15 @@ const CALLS: Readonly<Record<string, Call>> = {
   patient_entry_undo: undo,
   patient_entry_undo_not_found: undo,
   patient_entry_undo_not_undoable: undo,
+  patient_push_config: () => getPushConfig(),
+  patient_push_config_unavailable: () => getPushConfig(),
+  patient_push_subscribe: pushSubscribe,
+  patient_push_subscribe_invalid: pushSubscribe,
+  patient_push_subscribe_unavailable: pushSubscribe,
+  patient_push_unsubscribe: pushUnsubscribe,
+  patient_push_test: pushTest,
+  patient_push_test_not_found: pushTest,
+  patient_push_test_too_soon: pushTest,
   visit,
   visit_invalid: visit,
   visit_no_course: visit,

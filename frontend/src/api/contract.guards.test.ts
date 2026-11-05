@@ -42,6 +42,8 @@ import {
   isCreateEntryResponse,
   isOkTrue as isPatientOk,
   isPatientEntriesResponse,
+  isPushConfigResponse,
+  isPushSubscriptionResponse,
   isQuestionsResponse,
   isVisitResponse,
 } from "./patientGuards";
@@ -60,6 +62,11 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   patient_entry_create: isCreateEntryResponse,
   patient_entries: isPatientEntriesResponse,
   patient_entry_undo: isPatientOk,
+  patient_push_config: isPushConfigResponse,
+  patient_push_config_unavailable: isPushConfigResponse,
+  patient_push_subscribe: isPushSubscriptionResponse,
+  patient_push_unsubscribe: isPatientOk,
+  patient_push_test: isPatientOk,
   patient_strings: (body) => validatePatientStrings(body) !== null,
   visit: isVisitResponse,
   doctor_login: isDoctorOk,
@@ -141,6 +148,20 @@ type Mutate = (body: any) => void;
 
 /** [fixture, 壊し方の説明, 壊す操作]。壊した本文は guard に拒まれる。 */
 const BROKEN: Array<[string, string, Mutate]> = [
+  // 通知（plan-device-records §4.3）
+  ["patient_push_config", "使えるのに鍵が無い", (b) => (b.public_key = null)],
+  ["patient_push_config", "available が無い", (b) => delete b.available],
+  [
+    "patient_push_config_unavailable",
+    "使えないのに鍵がある",
+    (b) => (b.public_key = "x"),
+  ],
+  [
+    "patient_push_subscribe",
+    "時刻が 30 分刻みでない",
+    (b) => (b.notify_time = "20:15"),
+  ],
+  ["patient_push_subscribe", "時刻が無い", (b) => delete b.notify_time],
   // レジメンの一覧（T95）
   ["doctor_regimens", "regimens が無い", (b) => delete b.regimens],
   ["doctor_regimens", "識別名が小文字", (b) => (b.regimens[0].code = "folfox")],

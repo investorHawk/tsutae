@@ -1,9 +1,10 @@
 """FastAPI アプリ（docs/architecture.md §8b）。`uvicorn tsutae.api.app:app` で起動する。
 
 - `create_app(settings=None, *, runner_factory=None, skill_editor=None,
-  regimen_chat=None)`。`app.state` に settings・runner_factory（既定 `SdkRunner`）・
-  skill_editor（既定 `SdkSkillEditor`。`tsutae.skillchange` が無ければ None）・
-  regimen_chat（D4 レジメンの1往復。既定 `SdkRegimenChat`）・skills_home を置く
+  regimen_chat=None, push_sender=None)`。`app.state` に settings・runner_factory（既定
+  `SdkRunner`）・skill_editor（既定 `SdkSkillEditor`。`tsutae.skillchange` が無ければ None）・
+  regimen_chat（D4 レジメンの1往復。既定 `SdkRegimenChat`）・skills_home・push_sender（既定は
+  VAPID の鍵があれば `WebPushSender`、無ければ None で通知を使えない）を置く
 - create_app は設定を検査する（`settings_check`。公開の構成で既定の鍵・パスワードなら
   `InsecureSettingsError` で起動しない。手元では警告だけ）
 - 起動時（lifespan）に `init_db`・`ensure_skill_versions`・`seed_question_library`
@@ -17,6 +18,9 @@
 - 周期タスクでは purge の後に `orphans.recover_stale`: 動きの無い generating
   （最後のログから pipeline_timeout_s + 120 秒以上）だけを同じやり方で救う
   （稼働中に生成が DB を開けずに抜けた受診を、再起動を待たずに回収する）
+- 起動中は `PUSH_INTERVAL_S` ごとに毎日の通知の対象を探して送る周期タスク
+  （`app.state.push_task`）も置く。`_purge_loop` と同じ形で、例外で止めない。sender は毎回
+  `app.state.push_sender` から読む。`--workers 1` が前提（plan-device-records §4.3）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
 - 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`・
   `tsutae.api.doctor_question_library`・`tsutae.api.doctor_regimen_drafts`）は、モジュールがあれば
@@ -40,13 +44,15 @@ from fastapi import FastAPI
 from starlette.types import ASGIApp
 
 from tsutae import db
-from tsutae.api import orphans, patient, visit
+from tsutae.api import orphans, patient, patient_push, visit
 from tsutae.api.deps import install_error_handlers
 from tsutae.api.error_guard import SuppressServerErrors
 from tsutae.api.settings_check import check_settings
 from tsutae.config import Settings, get_settings, load_env_file, now
 from tsutae.pipeline.runner import SdkRunner
 from tsutae.pipeline.service import ensure_skill_versions
+from tsutae.push.dispatch import send_due_once
+from tsutae.push.sender import WebPushSender, load_vapid
 from tsutae.regimen.chat_sdk import SdkRegimenChat
 from tsutae.regimen.recover import (
     recover_abandoned_turns,
@@ -56,6 +62,7 @@ from tsutae.regimen.recover import (
 __all__ = [
     "OPTIONAL_ROUTERS",
     "PURGE_INTERVAL_S",
+    "PUSH_INTERVAL_S",
     "create_app",
     "purge_once",
     "startup",
@@ -69,6 +76,7 @@ OPTIONAL_ROUTERS = (
 )
 SKILLCHANGE_MODULE = "tsutae.skillchange"
 PURGE_INTERVAL_S = 600.0
+PUSH_INTERVAL_S = 60.0
 _log = logging.getLogger(__name__)
 _app: FastAPI | None = None
 
@@ -126,6 +134,25 @@ async def _purge_loop(settings: Settings, interval_s: float) -> None:
         await _recover_stale_once(settings)
 
 
+async def _push_loop(app: FastAPI, interval_s: float) -> None:
+    """interval_s ごとに毎日の通知を送る。失敗は型名だけ残す。"""
+    while True:
+        await asyncio.sleep(interval_s)
+        sender = app.state.push_sender
+        if sender is None:
+            continue
+        try:
+            await asyncio.to_thread(send_due_once, app.state.settings, sender)
+        except Exception as exc:  # noqa: BLE001 — 通知の失敗でサーバを止めない
+            _log.warning("api.push_failed error_type=%s", type(exc).__name__)
+
+
+async def _stop(task: asyncio.Task[None]) -> None:
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     purged = startup(app.state.settings)
@@ -136,12 +163,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         _log.info("生成中のまま残った受診 %d 件を AI 変換なしにした", recovered)
     task = asyncio.create_task(_purge_loop(app.state.settings, PURGE_INTERVAL_S))
     app.state.purge_task = task
+    push_task = asyncio.create_task(_push_loop(app, PUSH_INTERVAL_S))
+    app.state.push_task = push_task
     try:
         yield
     finally:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        await _stop(push_task)
+        await _stop(task)
 
 
 class _TsutaeApp(FastAPI):
@@ -191,12 +219,25 @@ def skills_home_of(settings: Settings) -> Path:
     return Path(settings.skills_dir).parent.parent
 
 
+def _install_push(app: FastAPI, settings: Settings, push_sender: Any) -> None:
+    """通知の状態を app.state に置く。鍵が無くても起動を止めない。"""
+    vapid = load_vapid(settings)
+    app.state.push_public_key = vapid.public_key if vapid is not None else None
+    if push_sender is not None:
+        app.state.push_sender = push_sender
+    else:
+        app.state.push_sender = WebPushSender(vapid) if vapid is not None else None
+    app.state.push_test_limiter = patient_push.PushTestLimiter()
+    app.state.push_test_delay_s = patient_push.PUSH_TEST_DELAY_S
+
+
 def create_app(
     settings: Settings | None = None,
     *,
     runner_factory: Callable[[], Any] | None = None,
     skill_editor: Any = None,
     regimen_chat: Any = None,
+    push_sender: Any = None,
 ) -> FastAPI:
     resolved = settings if settings is not None else get_settings()
     check_settings(resolved)
@@ -216,8 +257,10 @@ def create_app(
         regimen_chat if regimen_chat is not None else SdkRegimenChat(resolved)
     )
     app.state.skills_home = skills_home_of(resolved)
+    _install_push(app, resolved, push_sender)
     install_error_handlers(app)
     app.include_router(patient.router)
+    app.include_router(patient_push.router)
     app.include_router(visit.router)
     app.state.optional_routers = tuple(
         name for name in OPTIONAL_ROUTERS if _include_optional(app, name)

@@ -6,6 +6,9 @@
 
 行を消すときは送った日を `push_removed_sends` に残し、新しい行が引き継ぐ（オフにして
 オンにしても1日1回まで）。送信先に消された endpoint は `push_gone_endpoints` に覚える。
+
+1人の患者の行は `MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT` までで、超えたら古い行から消す（断ると
+正しい端末がオンにできなくなる。消された端末は開いたときの送り直しで戻る）。
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from tsutae.db.connection import (
 )
 
 __all__ = [
+    "MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT",
     "PushSubscription",
     "claim_push_send",
     "delete_push_subscription",
@@ -38,6 +42,8 @@ __all__ = [
 
 _COLUMNS = "id, patient_id, endpoint, p256dh, auth, notify_time, last_sent_date"
 _GONE_KEEP = timedelta(days=30)
+# 本人と家族のスマホ、機種変更の前後が入る数。全員の毎日の送信は行の数だけ時間がかかる
+MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT = 5
 
 
 @dataclass(frozen=True)
@@ -78,6 +84,7 @@ def upsert_push_subscription(
     同じ端末が別の番号で登録し直したら、その患者の行になる（前の患者の通知は止まる）。
     last_sent_date は同じ患者なら保つ（時刻を変えても1日1回まで）。新しい行は、その患者の
     消した登録の送信日を引き継ぐ（オフにしてオンにしても1日1回まで）。
+    上限を超えたら、この endpoint 以外の古い行を同じトランザクションで消す。
     """
     require_exists(conn, "patients", pid, "patient")
     with write_transaction(conn):
@@ -95,6 +102,7 @@ def upsert_push_subscription(
             " notify_time = excluded.notify_time",
             (pid, endpoint, p256dh, auth, notify_time, pid, dt_to_db(created_at)),
         )
+        _remove_over_limit(conn, pid, endpoint)
     saved = get_push_subscription(conn, pid, endpoint)
     if saved is None:  # pragma: no cover - 直前に書いた行が無いのは異常
         raise RuntimeError("push subscription was not saved")
@@ -142,6 +150,18 @@ def _keep_sent_date(
         " last_sent_date = MAX(last_sent_date, excluded.last_sent_date)",
         args,
     )
+
+
+def _remove_over_limit(conn: sqlite3.Connection, pid: str, endpoint: str) -> None:
+    """上限を超えた分を古い行から消す。今登録した endpoint は、id が古くても残す。"""
+    where = (
+        "patient_id = ? AND endpoint <> ? AND id NOT IN ("
+        "SELECT id FROM push_subscriptions WHERE patient_id = ? AND endpoint <> ?"
+        " ORDER BY id DESC LIMIT ?)"
+    )
+    args = (pid, endpoint, pid, endpoint, MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT - 1)
+    _keep_sent_date(conn, where, args)
+    conn.execute(f"DELETE FROM push_subscriptions WHERE {where}", args)
 
 
 def delete_push_subscription(conn: sqlite3.Connection, pid: str, endpoint: str) -> bool:

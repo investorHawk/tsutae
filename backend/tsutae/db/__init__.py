@@ -39,6 +39,7 @@ from tsutae.db.repo_patients import (
     upsert_course,
 )
 from tsutae.db.repo_push import (
+    MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT,
     PushSubscription,
     claim_push_send,
     delete_push_subscription,
@@ -91,6 +92,7 @@ from tsutae.db.repo_visits import (
 )
 
 __all__ = [
+    "MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT",
     "NotFoundError",
     "PATIENT_ID_PATTERN",
     "PushSubscription",

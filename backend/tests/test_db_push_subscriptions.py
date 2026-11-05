@@ -237,3 +237,67 @@ def test_old_gone_endpoints_are_forgotten(conn: sqlite3.Connection) -> None:
     db.mark_push_endpoint_gone(conn, SECOND, AT + timedelta(days=31))
     assert db.is_push_endpoint_gone(conn, ENDPOINT) is False
     assert db.is_push_endpoint_gone(conn, SECOND) is True
+
+
+# ---------------------------------------------------------------------------
+# 患者ごとの登録の上限（超えたら古い行から消す）
+# ---------------------------------------------------------------------------
+
+
+def _endpoint(n: int) -> str:
+    return f"https://web.push.apple.com/device-{n}"
+
+
+def _endpoints(conn: sqlite3.Connection, pid: str = PID) -> list[str]:
+    return [s.endpoint for s in db.list_push_subscriptions(conn) if s.patient_id == pid]
+
+
+def test_rows_per_patient_are_capped_and_the_oldest_goes(
+    conn: sqlite3.Connection,
+) -> None:
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    for n in range(limit + 3):
+        _save(conn, endpoint=_endpoint(n))
+    assert _endpoints(conn) == [_endpoint(n) for n in range(3, limit + 3)]
+
+
+def test_cap_is_per_patient(conn: sqlite3.Connection) -> None:
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    _save(conn, pid=OTHER, endpoint=ENDPOINT)
+    for n in range(limit + 1):
+        _save(conn, endpoint=_endpoint(n))
+    assert _endpoints(conn, OTHER) == [ENDPOINT]
+
+
+def test_saving_again_at_the_cap_removes_nothing(conn: sqlite3.Connection) -> None:
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    for n in range(limit):
+        _save(conn, endpoint=_endpoint(n))
+    _save(conn, endpoint=_endpoint(0), notify_time="21:00")
+    assert _endpoints(conn) == [_endpoint(n) for n in range(limit)]
+
+
+def test_row_moved_from_another_patient_is_kept_at_the_cap(
+    conn: sqlite3.Connection,
+) -> None:
+    """移ってきた行は id が古くても、今登録した端末なので消さない。"""
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    _save(conn, pid=OTHER, endpoint=ENDPOINT)
+    for n in range(limit):
+        _save(conn, endpoint=_endpoint(n))
+    _save(conn, endpoint=ENDPOINT)
+    remaining = _endpoints(conn)
+    assert len(remaining) == limit
+    assert ENDPOINT in remaining
+    assert _endpoint(0) not in remaining
+
+
+def test_removed_by_the_cap_keeps_the_one_a_day_rule(conn: sqlite3.Connection) -> None:
+    """古い行の送信日は残り、新しい行が引き継ぐ（消されても同じ日に2通目を送らない）。"""
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    oldest = _save(conn, endpoint=_endpoint(0))
+    assert db.claim_push_send(conn, oldest.id, DAY)
+    for n in range(1, limit + 1):
+        _save(conn, endpoint=_endpoint(n))
+    assert _endpoint(0) not in _endpoints(conn)
+    assert _save(conn, endpoint=_endpoint(99)).last_sent_date == DAY

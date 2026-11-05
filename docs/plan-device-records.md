@@ -98,15 +98,16 @@ iPhone（iOS 18 以降）だけで確かめる。Android の端末は無いの�
 - 送信のループ: `_purge_loop` と同じく lifespan の中。`--workers 1` が前提。1 分ごとに対象を探し、`asyncio.to_thread` で送る。送る処理は差し替えられる形にしてテストする
 - 時計は `config.now()`・`today()`（`TSUTAE_TODAY` でも動く）
 - `last_sent_date` で二重に送らない。404・410 の登録は消す。TTL は 3600 秒
-- ログは件数と例外の型名だけ。仮名ID・endpoint は出さない
+- ログは件数と例外の型名、送信先が返した状態コードだけ。仮名ID・endpoint は出さない
 
 | 経路 | 用途 |
 |---|---|
 | `GET /api/patient/push-config` | 公開鍵と、通知を使えるか |
 | `PUT /api/patient/{pid}/push-subscription` | 登録・時刻の変更（endpoint で一意） |
 | `DELETE /api/patient/{pid}/push-subscription` | この端末の通知を切る |
-| `POST /api/patient/{pid}/push-test` | 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで。**印・送る期間・時刻の条件は見ない**（撮影の日付でも必ず届くように） |
+| `POST /api/patient/{pid}/push-test` | 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで（患者ごとの合計にも上限）。**印・送る期間・時刻の条件は見ない**（撮影の日付でも必ず届くように） |
 
+- 1人の患者の登録は5件まで。超えたら古い行から消す（送信のループと試送の回数を、1人の患者が増やせないように）
 - 新しい経路も `reports`・`timelines`・`regimen_drafts` を読まない。送る文字列は `patient_strings.json` からだけ（アーキテクチャテストに足す）
 
 ### 4.4 日付の印

@@ -401,11 +401,11 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `push/decide.py` | 純関数。`decide_send(at, *, notify_time, last_sent_date, marked_today, last_day1, cycle_days) -> Decision`（`due`・`sent_today`・`before_time`・`window_passed`・`marked`・`no_course`・`period_over`）。`SEND_WINDOW` は 10 分、`GRACE_DAYS` は 14。日付と時刻は JST で見る |
 | `push/payload.py` | `notification_payload() -> str`（JSON: title・body・url・badge）。**引数を取らない**。文は `patient_strings.json` の `notify.title`・`notify.body` |
 | `push/sender.py` | `PushSender` プロトコル `sender(target, payload)`、本物は `WebPushSender`（pywebpush。TTL 3600 秒・タイムアウト 10 秒）。送信先のエラーは `PushSendError(status_code)`。`load_vapid(settings) -> VapidConfig \| None` |
-| `push/dispatch.py` | `send_due_once(settings, sender, at=None) -> PushCounts`（全ての登録を判定して送る。1件の失敗で止めない）、`send_test_once(settings, sender, subscription_id)`（試送。印・期間・時刻を見ず、`last_sent_date` も使わない） |
-| `api/patient_push.py` | 下の4経路。`PushTestLimiter`（プロセス内の dict）、`is_push_service_url`、`send_test_later` |
+| `push/dispatch.py` | `send_due_once(settings, sender, at=None) -> PushCounts`（全ての登録を判定して送る。1件の失敗で止めない）、`send_test_once(settings, sender, subscription_id)`（試送。印・期間・時刻を見ず、`last_sent_date` も使わない）。送れなかったときのログは型名と状態コード（`push.send_failed error_type=... status=...`）、試送の結果は `push.test_done result=...`。仮名ID・endpoint は出さない |
+| `api/patient_push.py` | 下の4経路。`PushTestLimiter`（プロセス内の dict。登録ごとに1分に1回、患者ごとに1分に登録の上限の回数まで）、`is_push_service_url`、`send_test_later` |
 | `api/app.py` | `_install_push`（`app.state.push_sender`・`push_public_key`・`push_test_limiter`・`push_test_delay_s`）、`_push_loop`（`PUSH_INTERVAL_S` = 60 秒ごとに `asyncio.to_thread(send_due_once, ...)`。`_purge_loop` と同じく lifespan の中。`--workers 1` が前提）。`create_app(push_sender=...)` で偽物に差し替える |
 | `db/repo_record_marks.py` | `upsert_mark_row`（`insert_entry_rows` の中で呼ぶので、どの経路で記録を入れても同じトランザクションで印が付く）、`clear_mark_if_no_entries`（取り消しの後）、`marked_patients`、`backfill_record_marks`（`init_db` のたび。今ある印は変えない） |
-| `db/repo_push.py` | `upsert_push_subscription`（endpoint で一意。同じ患者なら `last_sent_date` を保ち、別の患者の番号で登録し直したら行をその患者に移して空にする）、`claim_push_send`・`release_push_send`、削除と読み出し |
+| `db/repo_push.py` | `upsert_push_subscription`（endpoint で一意。同じ患者なら `last_sent_date` を保ち、別の患者の番号で登録し直したら行をその患者に移し、その患者の消した登録の送信日を引き継ぐ。1人の患者の行は `MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT` = 5 までで、超えたら今の endpoint 以外の古い行を消す。消す行の送信日も残す）、`claim_push_send`・`release_push_send`、削除と読み出し |
 | `scripts/gen_vapid.py` | 鍵を標準出力に出すだけ。ファイルに書かない |
 
 | 経路 | 入力 | 出力 |
@@ -413,7 +413,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `GET /api/patient/push-config` | — | `{available, public_key}`（使えないときは `false`・`null`） |
 | `PUT /api/patient/{pid}/push-subscription` | `{endpoint, keys: {p256dh, auth}, notify_time}`（notify_time は 30 分刻み。省くと 20:00） | `{ok: true, notify_time}`。鍵が無ければ 503 `push_unavailable`、形が違えば 422、送信先に消された endpoint は 410 `push_subscription_gone` |
 | `DELETE /api/patient/{pid}/push-subscription` | `{endpoint}` | `{ok: true}`（無くても 200） |
-| `POST /api/patient/{pid}/push-test` | `{endpoint}` | `{ok: true}`。応答の後に 10 秒待って1通送る。その患者の登録に無ければ 404 `not_found`、1分以内の2回目は 429 `push_test_too_soon`、鍵が無ければ 503 `push_unavailable` |
+| `POST /api/patient/{pid}/push-test` | `{endpoint}` | `{ok: true}`。応答の後に 10 秒待って1通送る。その患者の登録に無ければ 404 `not_found`、1分以内の2回目と、患者ごとの1分の上限を超えたときは 429 `push_test_too_soon`、鍵が無ければ 503 `push_unavailable` |
 
 - **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は今日の分を戻してから登録を消し、endpoint を `push_gone_endpoints` に覚える。応答の前にタイムアウトしたときだけ二重に届く余地がある
 - **鍵**: `TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（`mailto:` か `https://`）。全て無ければ警告なしで使えない。欠け（`missing`）・subject の誤り（`bad_subject`）・読めない鍵（例外の型名）・組でない（`key_mismatch`）は警告に理由のコードだけを出して使えない。どれも起動は止めない

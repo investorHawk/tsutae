@@ -5,7 +5,8 @@
 - 送信先が 404・410 を返した登録は消し、endpoint を覚える（端末が送り直してきたら断って伝える）
 - 送る前に今日の分を取り（`claim_push_send`）、送れなければ戻す。窓（10 分）の間は次の周期で
   やり直せるが、窓を過ぎたら送らない。1回送れた後は送らない
-- ログは件数と例外の型名だけ。仮名ID・endpoint・例外の文面を出さない（exc_info も付けない）
+- ログは件数と例外の型名、送信先が返した状態コードだけ。仮名ID・endpoint・例外の文面を出さない
+  （exc_info も付けない）。状態コードで 403（鍵や subject の誤り）と 5xx（一時的な失敗）を見分ける
 """
 
 from __future__ import annotations
@@ -76,7 +77,11 @@ def _deliver(
     except PushSendError as exc:
         if exc.status_code in _GONE_STATUSES:
             return "gone"
-        _log.warning("push.send_failed error_type=%s", type(exc).__name__)
+        _log.warning(
+            "push.send_failed error_type=%s status=%s",
+            type(exc).__name__,
+            exc.status_code,
+        )
         return "failed"
     except Exception as exc:  # noqa: BLE001 — 1件の失敗で他の端末を止めない
         _log.warning("push.send_failed error_type=%s", type(exc).__name__)
@@ -204,6 +209,8 @@ def send_test_once(
         result = _deliver(sender, subscription, notification_payload())
         if result == "gone":
             _remove_gone(conn, subscription, now())
+        # 応答はもう返しているので、届かない理由を調べる手がかりはログだけ
+        _log.info("push.test_done result=%s", result)
         return result
     finally:
         conn.close()

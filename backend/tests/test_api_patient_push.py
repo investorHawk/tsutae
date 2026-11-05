@@ -269,6 +269,19 @@ def test_subscribe_needs_the_right_cookie(client: TestClient) -> None:
     assert client.put(_url(pid), json=subscription_body()).status_code == 403
 
 
+def test_subscribe_keeps_only_the_newest_rows_of_a_patient(client: TestClient) -> None:
+    """1人の患者が行を増やし続けて、全員の毎日の送信を遅らせられない。"""
+    pid = _ready(client)
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    endpoints = [f"https://web.push.apple.com/row-{n}" for n in range(limit + 5)]
+    for endpoint in endpoints:
+        r = client.put(_url(pid), json=subscription_body(endpoint=endpoint))
+        assert r.status_code == 200
+    with db_conn(client.app) as conn:
+        saved = [s.endpoint for s in db.list_push_subscriptions(conn)]
+    assert saved == endpoints[-limit:]
+
+
 def test_subscribe_without_keys_is_unavailable(tmp_path: Path) -> None:
     with api_client(tmp_path) as c:
         pid = add_patient(c.app)
@@ -346,6 +359,18 @@ def test_unsubscribe_does_not_touch_other_patients(client: TestClient) -> None:
         assert len(db.list_push_subscriptions(conn)) == 1
 
 
+def test_unsubscribe_needs_the_right_cookie(client: TestClient) -> None:
+    pid = _ready(client)
+    client.put(_url(pid), json=subscription_body())
+    other = add_patient(client.app)
+    client.cookies.clear()
+    assert _delete(client, pid).status_code == 401
+    set_patient_cookie(client, other)
+    assert _delete(client, pid).status_code == 403
+    with db_conn(client.app) as conn:
+        assert len(db.list_push_subscriptions(conn)) == 1
+
+
 def test_unsubscribe_needs_a_cookie_and_works_without_keys(tmp_path: Path) -> None:
     with api_client(tmp_path) as c:
         pid = add_patient(c.app)
@@ -413,6 +438,51 @@ def test_push_test_refuses_another_patients_device(
     set_patient_cookie(client, other)
     assert _test_send(client, other).status_code == 404
     assert sender.calls == []
+
+
+def test_push_test_needs_the_right_cookie(
+    client: TestClient, sender: FakePushSender
+) -> None:
+    """endpoint を知っていても、Cookie が無ければ他人の端末へ試送を出せない。"""
+    pid = _ready(client)
+    client.put(_url(pid), json=subscription_body())
+    other = add_patient(client.app)
+    client.cookies.clear()
+    assert _test_send(client, pid).status_code == 401
+    set_patient_cookie(client, other)
+    assert _test_send(client, pid).status_code == 403
+    assert sender.calls == []
+
+
+def test_push_test_goes_after_the_period(
+    client: TestClient, sender: FakePushSender
+) -> None:
+    """送る期間を過ぎたコースでも届く（§4.3。撮影の日付でも必ず届くように）。"""
+    client.app.state.push_test_delay_s = 0.0
+    pid = add_patient(client.app, courses=[(1, date(2020, 1, 1))])
+    register(client, pid)
+    client.put(_url(pid), json=subscription_body())
+    assert _test_send(client, pid).status_code == 200
+    assert len(sender.calls) == 1
+
+
+def test_push_test_is_limited_per_patient_when_devices_are_swapped(
+    client: TestClient, sender: FakePushSender, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """登録を作り替えて回数を増やせない（1分あたり、患者ごとの登録の上限まで）。"""
+    pid = _ready(client)
+    clock = {"at": datetime(2026, 11, 9, 9, 0, 0, tzinfo=JST)}
+    monkeypatch.setattr(patient_push, "now", lambda: clock["at"])
+    limit = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT
+    codes = []
+    for n in range(limit + 3):
+        endpoint = f"https://web.push.apple.com/swap-{n}"
+        client.put(_url(pid), json=subscription_body(endpoint=endpoint))
+        codes.append(_test_send(client, pid, endpoint).status_code)
+    assert codes == [200] * limit + [429] * 3
+    assert len(sender.calls) == limit
+    clock["at"] = datetime(2026, 11, 9, 9, 1, 0, tzinfo=JST)
+    assert _test_send(client, pid, endpoint).status_code == 200
 
 
 def test_push_test_without_keys_is_unavailable(tmp_path: Path) -> None:

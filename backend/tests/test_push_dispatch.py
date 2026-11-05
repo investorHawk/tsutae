@@ -414,3 +414,109 @@ def test_gone_test_send_remembers_and_keeps_the_day_already_sent(
     assert send_test_once(settings, sender, saved.id) == "gone"
     assert db.is_push_endpoint_gone(conn, ENDPOINT) is True
     assert _subscribe(conn, endpoint=SECOND_ENDPOINT).last_sent_date == AT.date()
+
+
+# ---------------------------------------------------------------------------
+# 送る前に今日の分を取る（書けなければ送らない。DB の不調で毎分届かないように）
+# ---------------------------------------------------------------------------
+
+
+def test_claim_failure_sends_nothing(
+    settings: Settings, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _subscribe(conn)
+
+    def locked(*_args: Any, **_kwargs: Any) -> bool:
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(db, "claim_push_send", locked)
+    sender = FakePushSender()
+    assert send_due_once(settings, sender, AT) == PushCounts(failed=1)
+    assert sender.calls == []
+
+
+def test_claim_refused_sends_nothing(
+    settings: Settings, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _subscribe(conn)
+    monkeypatch.setattr(db, "claim_push_send", lambda *_args: False)
+    sender = FakePushSender()
+    assert send_due_once(settings, sender, AT) == PushCounts(skipped=1)
+    assert sender.calls == []
+
+
+def test_the_day_is_taken_before_sending(
+    settings: Settings, conn: sqlite3.Connection
+) -> None:
+    saved = _subscribe(conn)
+    seen: list[date | None] = []
+
+    def sender(_target: Any, _payload: str) -> None:
+        current = db.get_push_subscription_by_id(conn, saved.id)
+        seen.append(current.last_sent_date)
+
+    assert send_due_once(settings, sender, AT) == PushCounts(sent=1)
+    assert seen == [AT.date()]
+
+
+# ---------------------------------------------------------------------------
+# 試送は送る期間を見ない（§4.3。撮影の日付でも必ず届くように）
+# ---------------------------------------------------------------------------
+
+
+def test_test_send_after_the_period_still_goes(
+    settings: Settings, conn: sqlite3.Connection
+) -> None:
+    db.create_patient(conn, "FOLFOX", patient_id="P-DISP0009")
+    db.upsert_course(
+        conn,
+        Course(patient_id="P-DISP0009", course_no=1, infusion_date=date(2020, 1, 1)),
+    )
+    saved = _subscribe(conn, pid="P-DISP0009")
+    sender = FakePushSender()
+    assert send_test_once(settings, sender, saved.id) == "sent"
+    assert len(sender.calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# ログの状態コード（403 と 5xx を見分ける。仮名ID・endpoint は出さない）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("status", [403, 429, 503])
+def test_daily_failure_logs_the_status_code(
+    settings: Settings,
+    conn: sqlite3.Connection,
+    caplog: pytest.LogCaptureFixture,
+    status: int,
+) -> None:
+    _subscribe(conn)
+    sender = FakePushSender(errors={ENDPOINT: PushSendError(status)})
+    with caplog.at_level(logging.WARNING):
+        send_due_once(settings, sender, AT)
+    assert f"push.send_failed error_type=PushSendError status={status}" in caplog.text
+    assert ENDPOINT not in caplog.text
+    assert PID not in caplog.text
+
+
+def test_test_send_logs_the_status_code_and_the_result(
+    settings: Settings, conn: sqlite3.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    saved = _subscribe(conn)
+    sender = FakePushSender(errors={ENDPOINT: PushSendError(403)})
+    with caplog.at_level(logging.INFO):
+        assert send_test_once(settings, sender, saved.id) == "failed"
+    assert "push.send_failed error_type=PushSendError status=403" in caplog.text
+    assert "push.test_done result=failed" in caplog.text
+    assert ENDPOINT not in caplog.text
+    assert PID not in caplog.text
+
+
+def test_test_send_logs_success_without_the_device(
+    settings: Settings, conn: sqlite3.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    saved = _subscribe(conn)
+    with caplog.at_level(logging.INFO):
+        assert send_test_once(settings, FakePushSender(), saved.id) == "sent"
+    assert "push.test_done result=sent" in caplog.text
+    assert ENDPOINT not in caplog.text

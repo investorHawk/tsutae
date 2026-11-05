@@ -4,8 +4,8 @@
 - `PUT /{pid}/push-subscription`: 登録・時刻の変更（endpoint で一意）。鍵が無ければ 503。
   送信先に消された endpoint は 410 push_subscription_gone（端末が解除してオフになる）
 - `DELETE /{pid}/push-subscription`: この端末の通知を切る（無くても 200）
-- `POST /{pid}/push-test`: 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで（超えたら
-  429 push_test_too_soon）。印・送る期間・時刻の条件を見ない
+- `POST /{pid}/push-test`: 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで、患者ごとに
+  1分に登録の上限の回数まで（超えたら 429 push_test_too_soon）。印・送る期間・時刻の条件を見ない
 - endpoint は本文で受ける（URL に入れるとアクセスログに残る）
 - サーバーは endpoint へ要求を出すので、決まった送信サービスの https だけを受ける（SSRF の守り）
 - 変換結果（reports・timelines）と D4 の下書きを読まない（アーキテクチャテストで検査）
@@ -156,23 +156,34 @@ class EndpointIn(BaseModel):
 
 
 class PushTestLimiter:
-    """登録ごとの試送の時刻を覚える（プロセス内。`--workers 1` が前提）。"""
+    """試送の時刻を覚える（プロセス内。`--workers 1` が前提）。
 
-    def __init__(self, interval: timedelta = PUSH_TEST_INTERVAL) -> None:
+    登録ごとに1分に1回まで。登録を作り替えて回数を増やせないよう、患者ごとの合計も数える。
+    """
+
+    def __init__(
+        self,
+        interval: timedelta = PUSH_TEST_INTERVAL,
+        per_patient: int = db.MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT,
+    ) -> None:
         self._interval = interval
-        self._last: dict[int, datetime] = {}
+        self._per_patient = per_patient
+        self._last: dict[int, tuple[str, datetime]] = {}
         self._lock = threading.Lock()
 
-    def allow(self, subscription_id: int, at: datetime) -> bool:
+    def allow(self, subscription_id: int, patient_id: str, at: datetime) -> bool:
         with self._lock:
             self._last = {
-                key: when
-                for key, when in self._last.items()
-                if at - when < self._interval
+                key: sent
+                for key, sent in self._last.items()
+                if at - sent[1] < self._interval
             }
             if subscription_id in self._last:
                 return False
-            self._last[subscription_id] = at
+            used = sum(1 for who, _ in self._last.values() if who == patient_id)
+            if used >= self._per_patient:
+                return False
+            self._last[subscription_id] = (patient_id, at)
             return True
 
 
@@ -251,7 +262,8 @@ def push_test(
     subscription = db.get_push_subscription(conn, patient["id"], body.endpoint)
     if subscription is None:
         raise ApiError(404, "not_found")
-    if not request.app.state.push_test_limiter.allow(subscription.id, now()):
+    limiter = request.app.state.push_test_limiter
+    if not limiter.allow(subscription.id, patient["id"], now()):
         raise ApiError(429, "push_test_too_soon")
     background.add_task(send_test_later, request.app, subscription.id)
     return {"ok": True}

@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { ErrorMessage } from "../components/patient/Messages";
 import { GENERIC_ERROR_KEY } from "../components/patient/patientApi";
+import { useResendSubscription } from "../components/patient/pushResend";
 import { useClearNotifications } from "../patient/useClearNotifications";
 import {
   PatientStringsProvider,
@@ -34,12 +35,14 @@ function SyntheticNotice({ pathname }: { pathname: string }) {
 /**
  * 下のタブ（PatientNav。画面の下に固定）のある画面は patient-app--with-nav で
  * 下をあける（本文の最後がタブに隠れないように）。
- * アプリを開いたらバッジと表示中の通知を消す（医師の画面はこの外枠を通らない）。
+ * アプリを開いたらバッジと表示中の通知を消し、オンの端末の登録を送り直す（医師の画面はこの
+ * 外枠を通らない）。
  */
 export default function PatientLayout() {
   const { pathname } = useLocation();
   const withNav = !isRegister(pathname);
   useClearNotifications();
+  useResendSubscription();
   return (
     <PatientStringsProvider>
       <div className={`patient-app${withNav ? " patient-app--with-nav" : ""}`}>

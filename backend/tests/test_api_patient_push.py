@@ -278,6 +278,40 @@ def test_subscribe_without_keys_is_unavailable(tmp_path: Path) -> None:
         assert r.json() == {"error": "push_unavailable"}
 
 
+def test_subscribe_again_after_the_service_said_gone_is_refused(
+    client: TestClient, sender: FakePushSender
+) -> None:
+    """送り直しで行を戻さず 410 を返す（端末はこれで解除してオフの表示になる）。"""
+    pid = _ready(client)
+    client.put(_url(pid), json=subscription_body())
+    at = datetime(2026, 11, 9, 20, 0, tzinfo=JST)
+    sender.errors[ENDPOINT] = PushSendError(410)
+    assert send_due_once(client.app.state.settings, sender, at) == PushCounts(gone=1)
+    for _ in range(2):  # 同時に送り直されても、どちらも同じ答え
+        r = client.put(_url(pid), json=subscription_body())
+        assert r.status_code == 410
+        assert r.json() == {"error": "push_subscription_gone"}
+    with db_conn(client.app) as conn:
+        assert db.list_push_subscriptions(conn) == []
+    r = client.put(_url(pid), json=subscription_body(endpoint=SECOND_ENDPOINT))
+    assert r.status_code == 200
+
+
+def test_after_a_gone_test_send_the_retry_says_gone(
+    client: TestClient, sender: FakePushSender
+) -> None:
+    """試送の 404 → 登録し直し、と進む端末にも分かる。"""
+    pid = _ready(client)
+    client.put(_url(pid), json=subscription_body())
+    sender.errors[ENDPOINT] = PushSendError(410)
+    assert client.post(_url(pid, "push-test"), json={"endpoint": ENDPOINT}).is_success
+    assert (
+        client.post(_url(pid, "push-test"), json={"endpoint": ENDPOINT}).status_code
+        == 404
+    )
+    assert client.put(_url(pid), json=subscription_body()).status_code == 410
+
+
 # ---------------------------------------------------------------------------
 # DELETE /push-subscription
 # ---------------------------------------------------------------------------

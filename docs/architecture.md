@@ -66,6 +66,8 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
 | record_marks（通知） | patient_id FK, record_date, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない** |
 | push_subscriptions（通知） | id INTEGER PK, patient_id FK, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00'（JST の HH:MM）, last_sent_date NULL, created_at |
+| push_removed_sends（通知） | patient_id PK FK, last_sent_date — 消した登録の送信日（患者ごとに最後の日付だけ）。新しい行が引き継ぐので、オフにしてオンにしても1日1回まで |
+| push_gone_endpoints（通知） | endpoint PK, gone_at — 送信先が 404・410 を返した endpoint。PUT で断る（410）。30 日で忘れる |
 
 `skill_versions` は「その日の記録に使った質問集」を後から引くためのスナップショット（未設問「−−」の表示に使う）。起動時に現在の SKILL.md が未登録なら登録する。
 
@@ -409,11 +411,11 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | 経路 | 入力 | 出力 |
 |---|---|---|
 | `GET /api/patient/push-config` | — | `{available, public_key}`（使えないときは `false`・`null`） |
-| `PUT /api/patient/{pid}/push-subscription` | `{endpoint, keys: {p256dh, auth}, notify_time}`（notify_time は 30 分刻み。省くと 20:00） | `{ok: true, notify_time}`。鍵が無ければ 503 `push_unavailable`、形が違えば 422 |
+| `PUT /api/patient/{pid}/push-subscription` | `{endpoint, keys: {p256dh, auth}, notify_time}`（notify_time は 30 分刻み。省くと 20:00） | `{ok: true, notify_time}`。鍵が無ければ 503 `push_unavailable`、形が違えば 422、送信先に消された endpoint は 410 `push_subscription_gone` |
 | `DELETE /api/patient/{pid}/push-subscription` | `{endpoint}` | `{ok: true}`（無くても 200） |
 | `POST /api/patient/{pid}/push-test` | `{endpoint}` | `{ok: true}`。応答の後に 10 秒待って1通送る。その患者の登録に無ければ 404 `not_found`、1分以内の2回目は 429 `push_test_too_soon`、鍵が無ければ 503 `push_unavailable` |
 
-- **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は登録を消す。応答の前にタイムアウトしたときだけ二重に届く余地がある
+- **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は今日の分を戻してから登録を消し、endpoint を `push_gone_endpoints` に覚える。応答の前にタイムアウトしたときだけ二重に届く余地がある
 - **鍵**: `TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（`mailto:` か `https://`）。全て無ければ警告なしで使えない。欠け（`missing`）・subject の誤り（`bad_subject`）・読めない鍵（例外の型名）・組でない（`key_mismatch`）は警告に理由のコードだけを出して使えない。どれも起動は止めない
 - **入力の検査**: endpoint は既知の送信サービスの https だけ（`fcm.googleapis.com`・`*.push.apple.com`・`*.push.services.mozilla.com`・`*.notify.windows.com`。ポートは 443、ユーザー情報は不可）。`\` を受けず、ホストは英数字・`.`・`-` だけで、送信に使う urllib3 の読み方でも同じホストになること。本物の送信はリダイレクトを追わない。p256dh は 65 バイトの P-256 の点、auth は 16 バイト
 - **ログ**: 件数と例外の型名だけ。仮名ID・endpoint・例外の文面を出さない
@@ -428,6 +430,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `patient/pushDevice.ts` | 端末の API の包み。Service Worker の登録は `subscribeDevice`（設定でオンにしたとき）だけ |
 | `components/patient/pushStatus.ts` | 純関数 `pushStatusOf`（`unsupported`・`no_key`・`denied`・`on`・`off`）と選べる時刻 |
 | `components/patient/pushState.ts`・`pushActions.ts`・`usePushSettings.ts` | 状態を読む／端末とサーバーの登録を揃える／画面の状態。許可を求めるのはボタンの onClick の最初だけ |
+| `components/patient/pushResend.ts` | オンの端末の登録を送り直す。アプリを開いたとき・戻ってきたとき（`PatientLayout`）と番号を登録したとき（P0・番号の入力欄）。410 なら端末でも解除する。設定と案内の帯は、送り直しが終わってから状態を読む |
 | `components/patient/NotifySettings.tsx`・`pages/patient/Settings.tsx` | P5（`/settings`）。文言は全て `patient_strings.json` |
 | `components/patient/NotifyBanner.tsx` | オフでオンにできるときだけ、今日の記録の欄の下に出す案内の帯 |
 | `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー |

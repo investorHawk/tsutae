@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { loadNotifyTime, saveNotifyTime } from "../../patient/notifyTime";
 import { askPermission, currentPermission } from "../../patient/pushDevice";
 import {
+  dropGoneSubscription,
+  isSubscriptionGone,
   saveSubscription,
   sendTest as sendTestTo,
+  SUBSCRIPTION_GONE_KEY,
   testErrorKeyOf,
   turnOff,
   turnOn,
@@ -73,6 +76,7 @@ function usePermission(initial: NotificationPermission) {
 /**
  * 設定の画面の毎日のお知らせ（docs/plan-device-records.md §4.5）。
  * 開いたときにオンなら登録を送り直す（DB を作り直すと、画面はオンなのに届かなくなるため）。
+ * 送信先に消された登録はサーバーが 410 で断るので、端末でも解除してオフにする。
  */
 export function usePushSettings(pid: string, initial: PushState): PushSettings {
   const { publicKey } = initial;
@@ -82,12 +86,26 @@ export function usePushSettings(pid: string, initial: PushState): PushSettings {
   const task = usePushTask();
   const status = statusOfState({ publicKey, permission, subscription });
 
+  /** 送信先に消された登録なら、端末でも解除してオフにする。そうなら案内のキーを返す。 */
+  function goneKeyOf(err: unknown): string | null {
+    if (!isSubscriptionGone(err) || !subscription) {
+      return null;
+    }
+    void dropGoneSubscription(subscription);
+    setSubscription(null);
+    return SUBSCRIPTION_GONE_KEY;
+  }
+
   useEffect(() => {
     if (status === "on" && subscription) {
       saveSubscription(pid, subscription, notifyTime).catch((err: unknown) => {
         // 他の失敗は次に開いたときにやり直す。画面は今の状態のまま使える
         if (isNotRegistered(err)) {
           task.setNotRegistered(true);
+        }
+        const goneKey = goneKeyOf(err);
+        if (goneKey !== null) {
+          task.setFeedback({ kind: "error", key: goneKey });
         }
       });
     }
@@ -137,7 +155,13 @@ export function usePushSettings(pid: string, initial: PushState): PushSettings {
         await saveSubscription(pid, subscription, time);
         task.setFeedback({ kind: "done", key: TIME_SAVED_KEY });
       },
-      () => {
+      (err) => {
+        const goneKey = goneKeyOf(err);
+        if (goneKey !== null) {
+          // オフになったので、選んだ時刻はオンにしたときに送る
+          saveNotifyTime(time);
+          return goneKey;
+        }
         setNotifyTime(previous);
         return GENERIC_ERROR_KEY;
       },
@@ -148,10 +172,13 @@ export function usePushSettings(pid: string, initial: PushState): PushSettings {
     if (!subscription) {
       return;
     }
-    void task.run(async () => {
-      await sendTestTo(pid, subscription, notifyTime);
-      task.setFeedback({ kind: "done", key: TEST_SENT_KEY });
-    }, testErrorKeyOf);
+    void task.run(
+      async () => {
+        await sendTestTo(pid, subscription, notifyTime);
+        task.setFeedback({ kind: "done", key: TEST_SENT_KEY });
+      },
+      (err) => goneKeyOf(err) ?? testErrorKeyOf(err),
+    );
   }
 
   return {

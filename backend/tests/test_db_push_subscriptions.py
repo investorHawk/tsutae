@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -134,3 +134,106 @@ def test_release_does_not_touch_another_day(conn: sqlite3.Connection) -> None:
     assert db.claim_push_send(conn, saved.id, DAY)
     db.release_push_send(conn, saved.id, date(2026, 11, 8), None)
     assert db.get_push_subscription_by_id(conn, saved.id).last_sent_date == DAY
+
+
+# ---------------------------------------------------------------------------
+# オフにしてからオンにしても1日1回まで（§4.1）
+# ---------------------------------------------------------------------------
+
+
+def test_off_then_on_keeps_the_day_already_sent(conn: sqlite3.Connection) -> None:
+    """オンにし直すと endpoint が変わり新しい行になるが、送った日は引き継ぐ。"""
+    saved = _save(conn)
+    assert db.claim_push_send(conn, saved.id, DAY)
+    assert db.delete_push_subscription(conn, PID, ENDPOINT)
+    again = _save(conn, endpoint=SECOND)
+    assert again.last_sent_date == DAY
+    assert db.claim_push_send(conn, again.id, DAY) is False
+    assert db.claim_push_send(conn, again.id, date(2026, 11, 10)) is True
+
+
+def test_off_then_on_without_a_send_starts_empty(conn: sqlite3.Connection) -> None:
+    _save(conn)
+    db.delete_push_subscription(conn, PID, ENDPOINT)
+    assert _save(conn, endpoint=SECOND).last_sent_date is None
+
+
+def test_delete_by_id_also_keeps_the_day_sent(conn: sqlite3.Connection) -> None:
+    saved = _save(conn)
+    assert db.claim_push_send(conn, saved.id, DAY)
+    db.delete_push_subscription_by_id(conn, saved.id)
+    assert _save(conn, endpoint=SECOND).last_sent_date == DAY
+
+
+def test_kept_day_is_per_patient(conn: sqlite3.Connection) -> None:
+    saved = _save(conn)
+    assert db.claim_push_send(conn, saved.id, DAY)
+    db.delete_push_subscription(conn, PID, ENDPOINT)
+    assert _save(conn, pid=OTHER, endpoint=SECOND).last_sent_date is None
+
+
+def test_refused_delete_keeps_nothing(conn: sqlite3.Connection) -> None:
+    saved = _save(conn)
+    assert db.claim_push_send(conn, saved.id, DAY)
+    assert db.delete_push_subscription(conn, OTHER, ENDPOINT) is False
+    assert _save(conn, pid=OTHER, endpoint=SECOND).last_sent_date is None
+
+
+def test_kept_day_only_moves_forward(conn: sqlite3.Connection) -> None:
+    new = _save(conn)
+    assert db.claim_push_send(conn, new.id, DAY)
+    db.delete_push_subscription(conn, PID, ENDPOINT)
+    old = _save(conn, endpoint=SECOND)
+    db.release_push_send(conn, old.id, DAY, date(2026, 11, 8))
+    db.delete_push_subscription(conn, PID, SECOND)
+    assert _save(conn, endpoint=ENDPOINT).last_sent_date == DAY
+
+
+def test_second_device_still_on_keeps_its_own_day(conn: sqlite3.Connection) -> None:
+    """もう1台の登録の送り直しは、自分の送信日を保つ（端末ごとの時刻で届く）。"""
+    first = _save(conn)
+    second = _save(conn, endpoint=SECOND, notify_time="21:00")
+    assert db.claim_push_send(conn, first.id, DAY)
+    db.delete_push_subscription(conn, PID, ENDPOINT)
+    resent = _save(conn, endpoint=SECOND, notify_time="21:00")
+    assert resent.id == second.id
+    assert resent.last_sent_date is None
+
+
+def test_moving_a_device_to_another_patient_uses_that_patients_day(
+    conn: sqlite3.Connection,
+) -> None:
+    other = _save(conn, pid=OTHER, endpoint=SECOND)
+    assert db.claim_push_send(conn, other.id, DAY)
+    db.delete_push_subscription(conn, OTHER, SECOND)
+    saved = _save(conn)
+    assert db.claim_push_send(conn, saved.id, date(2026, 11, 8))
+    assert _save(conn, pid=OTHER).last_sent_date == DAY
+
+
+# ---------------------------------------------------------------------------
+# 送信先に消された endpoint
+# ---------------------------------------------------------------------------
+
+
+def test_gone_endpoint_is_remembered(conn: sqlite3.Connection) -> None:
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is False
+    db.mark_push_endpoint_gone(conn, ENDPOINT, AT)
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is True
+    assert db.is_push_endpoint_gone(conn, SECOND) is False
+
+
+def test_marking_again_is_fine(conn: sqlite3.Connection) -> None:
+    db.mark_push_endpoint_gone(conn, ENDPOINT, AT)
+    db.mark_push_endpoint_gone(conn, ENDPOINT, AT + timedelta(days=1))
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is True
+
+
+def test_old_gone_endpoints_are_forgotten(conn: sqlite3.Connection) -> None:
+    """30 日で忘れる。忘れた後に送り直されても、次の送信でまた覚える。"""
+    db.mark_push_endpoint_gone(conn, ENDPOINT, AT)
+    db.mark_push_endpoint_gone(conn, SECOND, AT + timedelta(days=29, hours=23))
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is True
+    db.mark_push_endpoint_gone(conn, SECOND, AT + timedelta(days=31))
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is False
+    assert db.is_push_endpoint_gone(conn, SECOND) is True

@@ -5,11 +5,19 @@ import {
   type FetchMock,
 } from "../../../test/fetchMock";
 import { apiFixture } from "../../../test/apiFixtures";
-import { ENTRIES, PID, QUESTIONS_RESPONSE, entriesBody } from "./fixtures";
+import {
+  ENTRIES,
+  PID,
+  QUESTIONS_RESPONSE,
+  STRINGS,
+  entriesBody,
+} from "./fixtures";
 
 export type Reply = Response | Promise<Response>;
 
 export interface PatientApiReplies {
+  /** GET strings（外枠の PatientLayout が読む） */
+  strings?: () => Reply;
   questions?: () => Reply;
   createEntry?: (body: unknown) => Reply;
   entries?: () => Reply;
@@ -29,6 +37,7 @@ export interface PatientApiReplies {
 }
 
 const DEFAULTS: Required<PatientApiReplies> = {
+  strings: () => jsonResponse(STRINGS),
   questions: () => jsonResponse(QUESTIONS_RESPONSE),
   createEntry: () => jsonResponse({ entry_id: 1, notices: [] }),
   entries: () => jsonResponse(entriesBody(ENTRIES)),
@@ -54,6 +63,9 @@ export function mockPatientApi(replies: PatientApiReplies = {}): FetchMock {
   const base = `/api/patient/${PID}`;
   return mockFetch((url, init) => {
     const method = init?.method ?? "GET";
+    if (method === "GET" && url === "/api/patient/strings") {
+      return r.strings();
+    }
     if (method === "GET" && url === `${base}/questions`) {
       return r.questions();
     }

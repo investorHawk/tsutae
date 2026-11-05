@@ -462,6 +462,99 @@ describe("Settings: on", () => {
   });
 });
 
+describe("Settings: the service removed the subscription (410)", () => {
+  const gone = () => {
+    const fixture = apiFixture("patient_push_subscribe_gone");
+    return jsonResponse(fixture.body, fixture.status);
+  };
+
+  it("on opening: lets go on the device, says off and what to do", async () => {
+    const push = givenPush({ permission: "granted", subscribed: true });
+    mockPatientApi({ pushSubscribe: gone });
+    renderSettings();
+    expect(await screen.findByText(s("notify.expired"))).toBeInTheDocument();
+    await findOffScreen();
+    expect(screen.getByText(s("notify.status_off"))).toBeInTheDocument();
+    await waitFor(() => expect(push.isSubscribed()).toBe(false));
+    expect(
+      screen.queryByRole("button", { name: s("notify.test") }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("then turning on again gets a new subscription", async () => {
+    const push = givenPush({ permission: "granted", subscribed: true });
+    let isGone = true;
+    mockPatientApi({
+      pushSubscribe: (body) =>
+        isGone
+          ? gone()
+          : jsonResponse({
+              ok: true,
+              notify_time: (body as { notify_time: string }).notify_time,
+            }),
+    });
+    renderSettings();
+    const on = await findOffScreen();
+    isGone = false;
+    await userEvent.click(on);
+    await findOnScreen();
+    expect(push.subscribe).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(s("notify.expired"))).not.toBeInTheDocument();
+  });
+
+  it("test notification: 404, then the retry says gone", async () => {
+    const push = givenPush({ permission: "granted", subscribed: true });
+    let isGone = false;
+    const fetchMock = mockPatientApi({
+      pushSubscribe: (body) =>
+        isGone
+          ? gone()
+          : jsonResponse({
+              ok: true,
+              notify_time: (body as { notify_time: string }).notify_time,
+            }),
+      pushTest: () => {
+        const fixture = apiFixture("patient_push_test_not_found");
+        return jsonResponse(fixture.body, fixture.status);
+      },
+    });
+    renderSettings();
+    await findOnScreen();
+    await waitFor(() => expect(putCalls(fetchMock)).toHaveLength(1));
+    isGone = true;
+    await userEvent.click(button("notify.test"));
+    expect(await screen.findByText(s("notify.expired"))).toBeInTheDocument();
+    await findOffScreen();
+    expect(push.isSubscribed()).toBe(false);
+    expect(screen.queryByText(s("notify.test_sent"))).not.toBeInTheDocument();
+  });
+
+  it("changing the time: says off and keeps the chosen time on the device", async () => {
+    const push = givenPush({ permission: "granted", subscribed: true });
+    saveNotifyTime("06:00");
+    let isGone = false;
+    const fetchMock = mockPatientApi({
+      pushSubscribe: (body) =>
+        isGone
+          ? gone()
+          : jsonResponse({
+              ok: true,
+              notify_time: (body as { notify_time: string }).notify_time,
+            }),
+    });
+    renderSettings();
+    await findOnScreen();
+    await waitFor(() => expect(putCalls(fetchMock)).toHaveLength(1));
+    isGone = true;
+    await userEvent.selectOptions(timeSelect(), "21:30");
+    expect(await screen.findByText(s("notify.expired"))).toBeInTheDocument();
+    await findOffScreen();
+    expect(push.isSubscribed()).toBe(false);
+    expect(timeSelect()).toHaveValue("21:30");
+    expect(loadNotifyTime()).toBe("21:30");
+  });
+});
+
 describe("Settings: test notification", () => {
   function replyOf(name: string) {
     const fixture = apiFixture(name);

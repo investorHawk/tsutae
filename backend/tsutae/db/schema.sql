@@ -212,3 +212,17 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     last_sent_date TEXT,
     created_at TEXT NOT NULL
 );
+
+-- 消した登録の「その日は送った」（§4.1 の1日1回）。患者ごとに最後の日付だけ。オンにし直すと
+-- endpoint が変わって行も新しくなるので、新しい行がここから引き継ぐ
+CREATE TABLE IF NOT EXISTS push_removed_sends (
+    patient_id TEXT PRIMARY KEY REFERENCES patients (id),
+    last_sent_date TEXT NOT NULL
+);
+
+-- 送信先が 404・410 を返した endpoint。端末はそれを知らずに送り直すので、ここで断って伝える
+-- （行を戻すと、次の送信でまた消えて、画面はオンのまま届かない）。30 日で忘れる
+CREATE TABLE IF NOT EXISTS push_gone_endpoints (
+    endpoint TEXT PRIMARY KEY,
+    gone_at TEXT NOT NULL
+);

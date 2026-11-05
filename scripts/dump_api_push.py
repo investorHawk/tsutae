@@ -6,11 +6,19 @@ endpoint と鍵は合成の値（p256dh・auth は RFC 8291 の例）。
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
+
+from api_helpers import db_conn
+
+from tsutae import db
+from tsutae.config import JST
 
 # RFC 8292 の例の形の値（65 バイトの点の base64url。送信には使わない）
 FIXTURE_PUBLIC_KEY = "BA1Hxzyi1RUM1b5wjxsn7nGxAszw2u61m164i3MrAIxHF6YK5h4SDYic-dRuU_RCPCfA5aq9ojSwk5Y2EmClBPs"
 ENDPOINT = "https://web.push.apple.com/QFixtureDeviceToken"
+GONE_ENDPOINT = "https://web.push.apple.com/QFixtureGoneDeviceToken"
+GONE_AT = datetime(2026, 11, 9, 9, 0, tzinfo=JST)
 SUBSCRIPTION = {
     "endpoint": ENDPOINT,
     "keys": {
@@ -63,4 +71,13 @@ def push_flow(rec: Any, pid: str) -> None:
         f"{base}/push-test",
         only_endpoint,
         expect=404,
+    )
+    with db_conn(rec.client.app) as conn:
+        db.mark_push_endpoint_gone(conn, GONE_ENDPOINT, GONE_AT)
+    rec.call(
+        "patient_push_subscribe_gone",
+        "PUT",
+        subscription,
+        {**SUBSCRIPTION, "endpoint": GONE_ENDPOINT},
+        expect=410,
     )

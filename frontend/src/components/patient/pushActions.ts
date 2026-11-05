@@ -14,6 +14,21 @@ import { GENERIC_ERROR_KEY } from "./patientApi";
 
 const TEST_TOO_SOON_KEY = "notify.test_too_soon";
 
+/** 送信先に消された登録の案内（オンにし直すと新しい登録になる）。 */
+export const SUBSCRIPTION_GONE_KEY = "notify.expired";
+
+/** サーバーが「送信先に消された登録」と答えた（PUT の 410）。 */
+export function isSubscriptionGone(err: unknown): boolean {
+  return isApiError(err) && err.status === 410;
+}
+
+/** 消された登録を端末でも解除する。解除できなくても次の送り直しでまた試す。 */
+export async function dropGoneSubscription(
+  subscription: PushSubscription,
+): Promise<void> {
+  await subscription.unsubscribe().catch(() => false);
+}
+
 /** サーバーに登録・時刻を送り、受け入れられた時刻を端末にも控える。 */
 export async function saveSubscription(
   pid: string,

@@ -173,6 +173,7 @@ const CALLS: Readonly<Record<string, Call>> = {
   patient_push_config: () => getPushConfig(),
   patient_push_config_unavailable: () => getPushConfig(),
   patient_push_subscribe: pushSubscribe,
+  patient_push_subscribe_gone: pushSubscribe,
   patient_push_subscribe_invalid: pushSubscribe,
   patient_push_subscribe_unavailable: pushSubscribe,
   patient_push_unsubscribe: pushUnsubscribe,

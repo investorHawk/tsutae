@@ -49,7 +49,7 @@
 ```bash
 # Tailscale のアプリを入れてログインし、管理画面で HTTPS と Funnel を許可する（コマンドは導入時に確かめる）
 tailscale funnel --bg 5173
-TSUTAE_PUBLIC_BASE_URL=https://<Mac 名>.<tailnet>.ts.net make dev-api   # 鍵・パスワードも渡す
+TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=https://<Mac 名>.<tailnet>.ts.net make dev-api   # 鍵・パスワードも渡す
 (cd frontend && npx vite)
 caffeinate -dims   # 通知の時刻に Mac を眠らせない
 ```
@@ -271,6 +271,8 @@ TDD で進める。Claude API は呼ばない。
 ### 実機（先生の iPhone）
 
 **PR A**: Funnel で開く → 追加 → 番号 → オン → 試送がロック画面に届く → 押すと `/today` → バッジが付いて消える → 指定した時刻に届く → 記録した日は届かない → オフで届かない
+
+毎日の送信は `TSUTAE_TODAY=2026-11-09` で動かして確かめる（または日付の印の無い患者で）。`make seed` の `P-DEMO0001` には 11/7・11/8 の印があり、実際の日付で動かすとこの2日は記録していなくても届かない（試送は印を見ないので届く）。「指定した時刻に届く」の後は同じ日にもう届かないので（§4.1）、「記録した日は届かない」は次の日で確かめる。サーバーを起動し直すと日付が戻るので、そのときは `TSUTAE_TODAY=2026-11-10` にする。
 
 **PR B**: 記録して閉じ、開き直しても P2 にある → 再起動後もある → 見本を入れる → 受診タブで送る → D3 → A4 → 印刷済みで DB の記録が消える → 38℃ の案内 → 取り消し → 消す → Safari は案内だけ → 通信を見て、記録のときに本文を送っていない
 

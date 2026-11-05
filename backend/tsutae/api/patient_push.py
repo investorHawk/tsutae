@@ -1,7 +1,8 @@
 """通知の患者 API（docs/plan-device-records.md §4.3）。Cookie `tsutae_pid` で識別する。
 
 - `GET /push-config`: 公開鍵と、通知を使えるか（鍵が無ければ available=false）
-- `PUT /{pid}/push-subscription`: 登録・時刻の変更（endpoint で一意）。鍵が無ければ 503
+- `PUT /{pid}/push-subscription`: 登録・時刻の変更（endpoint で一意）。鍵が無ければ 503。
+  送信先に消された endpoint は 410 push_subscription_gone（端末が解除してオフになる）
 - `DELETE /{pid}/push-subscription`: この端末の通知を切る（無くても 200）
 - `POST /{pid}/push-test`: 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで（超えたら
   429 push_test_too_soon）。印・送る期間・時刻の条件を見ない
@@ -213,6 +214,8 @@ def put_subscription(
 ) -> dict[str, Any]:
     patient = require_patient(pid, request, conn)
     _require_available(request.app)
+    if db.is_push_endpoint_gone(conn, body.endpoint):
+        raise ApiError(410, "push_subscription_gone")
     saved = db.upsert_push_subscription(
         conn,
         patient["id"],

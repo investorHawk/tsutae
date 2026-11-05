@@ -10,6 +10,7 @@ import {
 import { reloadPage } from "../../patient/reload";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import { ErrorMessage } from "./Messages";
+import { resendSubscription } from "./pushResend";
 import {
   GENERIC_ERROR_KEY,
   NOT_REGISTERED_KEY,
@@ -32,6 +33,8 @@ async function saveAndRegister(pid: string): Promise<string | null> {
   }
   try {
     await registerPatient(pid);
+    // この端末の通知が前の患者の判定で動き続けないよう、今の番号の登録にする
+    void resendSubscription();
     return null;
   } catch (err) {
     restorePid(previous);

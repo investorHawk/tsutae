@@ -2,7 +2,7 @@
 
 - `send_due_once`: 全ての登録を判定し（`decide`）、対象に送る。1件の失敗で止めない
 - `send_test_once`: 試送。印・期間・時刻を見ず、その日の分（last_sent_date）も使わない
-- 送信先が 404・410 を返した登録は消す
+- 送信先が 404・410 を返した登録は消し、endpoint を覚える（端末が送り直してきたら断って伝える）
 - 送る前に今日の分を取り（`claim_push_send`）、送れなければ戻す。窓（10 分）の間は次の周期で
   やり直せるが、窓を過ぎたら送らない。1回送れた後は送らない
 - ログは件数と例外の型名だけ。仮名ID・endpoint・例外の文面を出さない（exc_info も付けない）
@@ -14,7 +14,7 @@ import logging
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from typing import Literal
 
 from tsutae import db
@@ -62,7 +62,6 @@ class _CycleDays:
 
 
 def _deliver(
-    conn: sqlite3.Connection,
     sender: PushSender,
     subscription: db.PushSubscription,
     payload: str,
@@ -76,7 +75,6 @@ def _deliver(
         sender(target, payload)
     except PushSendError as exc:
         if exc.status_code in _GONE_STATUSES:
-            db.delete_push_subscription_by_id(conn, subscription.id)
             return "gone"
         _log.warning("push.send_failed error_type=%s", type(exc).__name__)
         return "failed"
@@ -84,6 +82,13 @@ def _deliver(
         _log.warning("push.send_failed error_type=%s", type(exc).__name__)
         return "failed"
     return "sent"
+
+
+def _remove_gone(
+    conn: sqlite3.Connection, subscription: db.PushSubscription, at: datetime
+) -> None:
+    db.delete_push_subscription_by_id(conn, subscription.id)
+    db.mark_push_endpoint_gone(conn, subscription.endpoint, at)
 
 
 def _due_decision(
@@ -117,14 +122,18 @@ def _send_daily(
     conn: sqlite3.Connection,
     sender: PushSender,
     subscription: db.PushSubscription,
-    day: date,
+    at: datetime,
     payload: str,
 ) -> str:
+    day = to_jst_date(at)
     if not db.claim_push_send(conn, subscription.id, day):
         return "skipped"
-    result = _deliver(conn, sender, subscription, payload)
-    if result == "failed":
+    result = _deliver(sender, subscription, payload)
+    if result != "sent":
+        # 届いていないので今日の分を戻す（消すときに「送った」と残さない）
         db.release_push_send(conn, subscription.id, day, subscription.last_sent_date)
+    if result == "gone":
+        _remove_gone(conn, subscription, at)
     return result
 
 
@@ -145,7 +154,7 @@ def _process_one(
         return "skipped"
     if decision != "due":
         return None
-    return _send_daily(conn, sender, subscription, to_jst_date(at), payload)
+    return _send_daily(conn, sender, subscription, at, payload)
 
 
 def send_due_once(
@@ -192,6 +201,9 @@ def send_test_once(
         subscription = db.get_push_subscription_by_id(conn, subscription_id)
         if subscription is None:
             return None
-        return _deliver(conn, sender, subscription, notification_payload())
+        result = _deliver(sender, subscription, notification_payload())
+        if result == "gone":
+            _remove_gone(conn, subscription, now())
+        return result
     finally:
         conn.close()

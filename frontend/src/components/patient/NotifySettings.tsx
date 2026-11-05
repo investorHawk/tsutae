@@ -4,7 +4,8 @@ import { usePatientStrings } from "../../strings/PatientStrings";
 import { LoadFailed, Loading } from "./LoadStatus";
 import { DoneMessage, ErrorMessage } from "./Messages";
 import NotRegistered from "./NotRegistered";
-import { loadPushState, type PushState } from "./pushState";
+import { settledPushState } from "./pushResend";
+import type { PushState } from "./pushState";
 import { NOTIFY_TIMES } from "./pushStatus";
 import { SendingMessage } from "./TooSickButton";
 import { useAsync } from "./useAsync";
@@ -102,7 +103,7 @@ function NotifyControls({ pid, state }: { pid: string; state: PushState }) {
 }
 
 function NotifyLoader({ pid }: { pid: string }) {
-  const loaded = useAsync(loadPushState, pid);
+  const loaded = useAsync(settledPushState, pid);
   if (loaded.status === "loading") {
     return <Loading />;
   }

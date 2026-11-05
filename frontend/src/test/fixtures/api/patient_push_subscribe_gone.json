@@ -1,0 +1,16 @@
+{
+  "method": "PUT",
+  "path": "/api/patient/P-DEMO0001/push-subscription",
+  "request": {
+    "endpoint": "https://web.push.apple.com/QFixtureGoneDeviceToken",
+    "keys": {
+      "p256dh": "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+      "auth": "BTBZMqHH6r4Tts7J_aSIgg"
+    },
+    "notify_time": "20:00"
+  },
+  "status": 410,
+  "body": {
+    "error": "push_subscription_gone"
+  }
+}

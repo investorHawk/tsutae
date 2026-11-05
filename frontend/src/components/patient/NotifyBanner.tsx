@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import { isPushSupported } from "../../patient/pushDevice";
 import { usePatientStrings } from "../../strings/PatientStrings";
-import { loadPushState, statusOfState } from "./pushState";
+import { settledPushState } from "./pushResend";
+import { statusOfState } from "./pushState";
 import { useAsync } from "./useAsync";
 
 function BannerWhenOff() {
   const { t } = usePatientStrings();
-  const loaded = useAsync(loadPushState, "push");
+  const loaded = useAsync(settledPushState, "push");
   if (loaded.status !== "ready" || statusOfState(loaded.data) !== "off") {
     return null;
   }

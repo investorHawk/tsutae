@@ -345,3 +345,72 @@ def test_test_send_result(
     assert send_test_once(settings, sender, saved.id) == expected
     remaining = db.get_push_subscription_by_id(conn, saved.id)
     assert (remaining is None) == (expected == "gone")
+
+
+# ---------------------------------------------------------------------------
+# オフにしてからオンにしても1日1回まで（§4.1）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("new_time", ["20:00", "21:00"])
+def test_off_then_on_does_not_send_twice_a_day(
+    settings: Settings, conn: sqlite3.Connection, new_time: str
+) -> None:
+    _subscribe(conn)
+    sender = FakePushSender()
+    assert send_due_once(settings, sender, AT) == PushCounts(sent=1)
+    db.delete_push_subscription(conn, PID, ENDPOINT)
+    _subscribe(conn, endpoint=SECOND_ENDPOINT, notify_time=new_time)
+    assert send_due_once(settings, sender, AT + timedelta(minutes=5)) == PushCounts()
+    assert send_due_once(settings, sender, AT + timedelta(hours=1)) == PushCounts()
+    assert len(sender.calls) == 1
+    next_day = AT + timedelta(days=1, hours=1 if new_time == "21:00" else 0)
+    assert send_due_once(settings, sender, next_day) == PushCounts(sent=1)
+
+
+# ---------------------------------------------------------------------------
+# 送信先に消された登録（端末がオンのまま、送り直しで行が戻るのを防ぐ）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_gone_daily_send_remembers_the_endpoint(
+    settings: Settings, conn: sqlite3.Connection, status: int
+) -> None:
+    _subscribe(conn)
+    sender = FakePushSender(errors={ENDPOINT: PushSendError(status)})
+    send_due_once(settings, sender, AT)
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is True
+
+
+def test_gone_daily_send_does_not_use_up_the_day(
+    settings: Settings, conn: sqlite3.Connection
+) -> None:
+    """届かなかったので、オンにし直した新しい登録にはその日の分を送る。"""
+    _subscribe(conn)
+    sender = FakePushSender(errors={ENDPOINT: PushSendError(410)})
+    send_due_once(settings, sender, AT)
+    _subscribe(conn, endpoint=SECOND_ENDPOINT)
+    later = AT + timedelta(minutes=1)
+    assert send_due_once(settings, sender, later) == PushCounts(sent=1)
+
+
+def test_failed_daily_send_does_not_remember_the_endpoint(
+    settings: Settings, conn: sqlite3.Connection
+) -> None:
+    _subscribe(conn)
+    sender = FakePushSender(errors={ENDPOINT: PushSendError(500)})
+    send_due_once(settings, sender, AT)
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is False
+
+
+def test_gone_test_send_remembers_and_keeps_the_day_already_sent(
+    settings: Settings, conn: sqlite3.Connection
+) -> None:
+    saved = _subscribe(conn)
+    sender = FakePushSender()
+    assert send_due_once(settings, sender, AT) == PushCounts(sent=1)
+    sender.errors[ENDPOINT] = PushSendError(410)
+    assert send_test_once(settings, sender, saved.id) == "gone"
+    assert db.is_push_endpoint_gone(conn, ENDPOINT) is True
+    assert _subscribe(conn, endpoint=SECOND_ENDPOINT).last_sent_date == AT.date()

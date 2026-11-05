@@ -130,7 +130,38 @@ describe("findSubscription", () => {
 });
 
 describe("subscribeDevice", () => {
-  it("/sw.js を登録し、有効になるのを待って userVisibleOnly で登録する", async () => {
+  it("有効になる前は subscribe しない（例外になる端末がある）", async () => {
+    const registration = fakeRegistration();
+    let active = false;
+    registration.pushManager.subscribe.mockImplementation(async () => {
+      if (!active) {
+        throw new Error("no active service worker");
+      }
+      return fakeSubscription();
+    });
+    let activate: () => void = () => undefined;
+    const ready = new Promise((resolve) => {
+      activate = () => {
+        active = true;
+        resolve(registration);
+      };
+    });
+    const worker = {
+      register: vi.fn(async () => registration),
+      getRegistration: vi.fn(async () => registration),
+      ready,
+    };
+    setNavigator("serviceWorker", worker);
+    const subscribing = subscribeDevice(KEY);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(worker.register).toHaveBeenCalledWith("/sw.js");
+    expect(registration.pushManager.subscribe).not.toHaveBeenCalled();
+    activate();
+    await expect(subscribing).resolves.toBeDefined();
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("/sw.js を登録し、userVisibleOnly で登録する", async () => {
     const registration = fakeRegistration();
     const worker = installWorker(registration);
     await subscribeDevice(KEY);

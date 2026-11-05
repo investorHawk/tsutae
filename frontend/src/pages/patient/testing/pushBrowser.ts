@@ -31,6 +31,8 @@ export interface FakePushOptions {
   subscribeError?: Error;
   /** unsubscribe が失敗する */
   unsubscribeError?: Error;
+  /** unsubscribe が例外を出さずに false を返す（解除できなかった） */
+  unsubscribeReturnsFalse?: boolean;
 }
 
 export interface FakePush {
@@ -75,12 +77,20 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
       if (options.unsubscribeError) {
         throw options.unsubscribeError;
       }
+      if (options.unsubscribeReturnsFalse) {
+        return false;
+      }
       current = null;
       return true;
     }),
   });
+  // 本物と同じく、register の直後は有効でなく、ready が解決してから subscribe できる
+  let active = options.subscribed === true;
   const subscribe = vi.fn(async () => {
     calls.push("subscribe");
+    if (!active) {
+      throw new Error("no active service worker");
+    }
     if (options.subscribeError) {
       throw options.subscribeError;
     }
@@ -105,7 +115,15 @@ export function installFakePush(options: FakePushOptions = {}): FakePush {
   defineOnNavigator("serviceWorker", {
     register,
     getRegistration: async () => (registered ? registration : undefined),
-    ready: Promise.resolve(registration),
+    get ready() {
+      // 読むと、一度タスクを挟んでから有効になる（読まずに subscribe すると例外）
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          active = true;
+          resolve(registration);
+        }, 0);
+      });
+    },
   });
   const clearAppBadge = vi.fn(async () => undefined);
   defineOnNavigator("clearAppBadge", clearAppBadge);

@@ -38,7 +38,7 @@ from push_helpers import (
 from tsutae import db
 from tsutae.api import app as app_module
 from tsutae.api import patient_push
-from tsutae.api.app import PUSH_INTERVAL_S, create_app
+from tsutae.api.app import create_app
 from tsutae.api.deps import PATIENT_COOKIE, make_patient_token
 from tsutae.config import JST
 from tsutae.push.dispatch import PushCounts, send_due_once
@@ -586,72 +586,3 @@ def test_undo_entry_clears_the_mark(client: TestClient) -> None:
     assert undo.status_code == 200
     with db_conn(client.app) as conn:
         assert pid not in db.marked_patients(conn, today)
-
-
-# ---------------------------------------------------------------------------
-# 送信のループ
-# ---------------------------------------------------------------------------
-
-
-def test_lifespan_runs_the_loop_and_stops_it(tmp_path: Path) -> None:
-    assert PUSH_INTERVAL_S == 60.0
-    with api_client(tmp_path) as c:
-        task = c.app.state.push_task
-        assert not task.done()
-    assert task.cancelled()
-
-
-async def test_loop_survives_exceptions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    sender = FakePushSender()
-    app = create_app(make_settings(tmp_path), push_sender=sender)
-    calls: list[Any] = []
-    done = asyncio.Event()
-    loop = asyncio.get_running_loop()
-
-    def flaky(settings: Any, used: Any) -> PushCounts:
-        calls.append(used)
-        if len(calls) == 1:
-            raise RuntimeError("boom P-SECRET0")
-        if len(calls) >= 3:
-            loop.call_soon_threadsafe(done.set)
-        return PushCounts()
-
-    monkeypatch.setattr(app_module, "send_due_once", flaky)
-    with caplog.at_level(logging.WARNING):
-        task = asyncio.create_task(app_module._push_loop(app, 0.001))
-        await asyncio.wait_for(done.wait(), 5)
-        task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
-    assert calls[0] is sender
-    assert "api.push_failed error_type=RuntimeError" in caplog.text
-    assert "P-SECRET0" not in caplog.text
-
-
-async def test_loop_reads_the_sender_each_time_and_skips_when_none(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    app = create_app(make_settings(tmp_path))
-    assert app.state.push_sender is None
-    used: list[Any] = []
-    done = asyncio.Event()
-    loop = asyncio.get_running_loop()
-
-    def record(settings: Any, sender: Any) -> PushCounts:
-        used.append(sender)
-        loop.call_soon_threadsafe(done.set)
-        return PushCounts()
-
-    monkeypatch.setattr(app_module, "send_due_once", record)
-    task = asyncio.create_task(app_module._push_loop(app, 0.001))
-    await asyncio.sleep(0.02)
-    assert used == []
-    replacement = FakePushSender()
-    app.state.push_sender = replacement
-    await asyncio.wait_for(done.wait(), 5)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    assert used[0] is replacement

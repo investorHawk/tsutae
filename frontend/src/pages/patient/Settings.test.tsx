@@ -232,6 +232,19 @@ describe("Settings: off", () => {
     expect(button("notify.test")).toBeInTheDocument();
   });
 
+  it("a time chosen while off stays on the device (leaving and coming back)", async () => {
+    givenPush();
+    mockPatientApi();
+    const first = renderSettings();
+    await findOffScreen();
+    await userEvent.selectOptions(timeSelect(), "07:30");
+    expect(loadNotifyTime()).toBe("07:30");
+    first.unmount();
+    renderSettings();
+    await findOffScreen();
+    expect(timeSelect()).toHaveValue("07:30");
+  });
+
   it("the chosen time goes with the PUT and is kept on the device", async () => {
     givenPush();
     const fetchMock = mockPatientApi();
@@ -393,6 +406,22 @@ describe("Settings: on", () => {
     expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
     expect(button("notify.turn_off")).toBeEnabled();
     expect(callsTo(fetchMock, "DELETE", SUBSCRIPTION_URL)).toEqual([]);
+  });
+
+  it("unsubscribe returns false: stays on with the error, no DELETE", async () => {
+    const push = givenPush({
+      permission: "granted",
+      subscribed: true,
+      unsubscribeReturnsFalse: true,
+    });
+    const fetchMock = mockPatientApi();
+    renderSettings();
+    await userEvent.click(await findOnScreen());
+    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(button("notify.turn_off")).toBeEnabled();
+    expect(screen.getByText(s("notify.status_on"))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "DELETE", SUBSCRIPTION_URL)).toEqual([]);
+    expect(push.isSubscribed()).toBe(true);
   });
 
   it("changing the time sends PUT and is kept on the device", async () => {

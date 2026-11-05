@@ -45,9 +45,11 @@ function loadWorker({
   windows = [] as FakeWindow[],
   badge = true,
   badgeFails = false,
+  showResult = Promise.resolve() as Promise<unknown>,
+  claimResult = Promise.resolve() as Promise<unknown>,
 } = {}) {
   const listeners = new Map<string, Listener>();
-  const showNotification = vi.fn(async () => undefined);
+  const showNotification = vi.fn(() => showResult);
   const setAppBadge = vi.fn(async () => {
     if (badgeFails) {
       throw new Error("badge is not available");
@@ -55,17 +57,27 @@ function loadWorker({
   });
   const openWindow = vi.fn(async () => null);
   const matchAll = vi.fn(async () => windows);
+  const claim = vi.fn(() => claimResult);
+  const skipWaiting = vi.fn(async () => undefined);
   const self = {
     addEventListener: (type: string, listener: Listener) => {
       listeners.set(type, listener);
     },
     registration: { showNotification },
-    clients: { matchAll, openWindow, claim: vi.fn(async () => undefined) },
+    clients: { matchAll, openWindow, claim },
     navigator: badge ? { setAppBadge } : {},
-    skipWaiting: vi.fn(async () => undefined),
+    skipWaiting,
   };
   new Function("self", source)(self);
-  return { listeners, showNotification, setAppBadge, openWindow, matchAll };
+  return {
+    listeners,
+    showNotification,
+    setAppBadge,
+    openWindow,
+    matchAll,
+    claim,
+    skipWaiting,
+  };
 }
 
 /** ハンドラを呼び、waitUntil に渡された仕事が全て終わるまで待つ。 */
@@ -84,9 +96,59 @@ async function dispatch(
   await Promise.all(work);
 }
 
+/** あとで終わらせられる Promise。 */
+function deferred() {
+  let finish: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  return { promise, finish };
+}
+
+/**
+ * ハンドラを呼び、waitUntil の仕事の完了を見張る（dispatch と違って待たない）。
+ * 仕事が残っているあいだ isSettled は false。
+ */
+function dispatchWatching(
+  listeners: Map<string, Listener>,
+  type: string,
+  fields: Partial<FakeEvent> = {},
+) {
+  const work: Promise<unknown>[] = [];
+  const listener = listeners.get(type);
+  if (!listener) {
+    throw new Error(`${type} のハンドラが無い`);
+  }
+  listener({ waitUntil: (p) => work.push(p), ...fields });
+  let settled = false;
+  const all = Promise.all(work).then(() => {
+    settled = true;
+  });
+  return { all, isSettled: () => settled };
+}
+
+/** 待ち中の Promise を一通り進める（タイマーを使わない仕事はこれで終わる）。 */
+async function flush() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 const PAYLOAD = { title: "Title", body: "Body", url: "/today", badge: 1 };
 
 describe("sw.js: push", () => {
+  it("通知を出し終えるまで waitUntil の仕事が終わらない（先に止められない）", async () => {
+    const shown = deferred();
+    const w = loadWorker({ showResult: shown.promise });
+    const watch = dispatchWatching(w.listeners, "push", {
+      data: { json: () => PAYLOAD },
+    });
+    await flush();
+    expect(w.showNotification).toHaveBeenCalledTimes(1);
+    expect(watch.isSettled()).toBe(false);
+    shown.finish();
+    await watch.all;
+    expect(watch.isSettled()).toBe(true);
+  });
+
   it("本文の title と body で通知を出し、バッジを付ける", async () => {
     const w = loadWorker();
     await dispatch(w.listeners, "push", { data: { json: () => PAYLOAD } });
@@ -192,10 +254,27 @@ describe("sw.js: notificationclick", () => {
 });
 
 describe("sw.js: 登録の直後", () => {
-  it("待たずに有効になり、開いている画面を受け持つ（navigate に要る）", async () => {
+  it("install で待たずに有効になる（直した sw.js に古い版が残らない）", () => {
     const w = loadWorker();
-    expect(w.listeners.has("install")).toBe(true);
-    await dispatch(w.listeners, "activate");
+    const install = w.listeners.get("install");
+    if (!install) {
+      throw new Error("install のハンドラが無い");
+    }
+    expect(w.skipWaiting).not.toHaveBeenCalled();
+    install({ waitUntil: () => undefined });
+    expect(w.skipWaiting).toHaveBeenCalledTimes(1);
+  });
+
+  it("activate で開いている画面を受け持ち、終わるまで待つ（navigate に要る）", async () => {
+    const claimed = deferred();
+    const w = loadWorker({ claimResult: claimed.promise });
+    const watch = dispatchWatching(w.listeners, "activate");
+    await flush();
+    expect(w.claim).toHaveBeenCalledTimes(1);
+    expect(watch.isSettled()).toBe(false);
+    claimed.finish();
+    await watch.all;
+    expect(watch.isSettled()).toBe(true);
   });
 
   it("通信のハンドラを登録しない", () => {

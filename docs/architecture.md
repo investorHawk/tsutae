@@ -251,7 +251,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|
 | `POST /api/doctor/login` / `POST /api/doctor/logout` | `{ok}` |
 | `GET /api/doctor/patients` | `{patients: [{id, regimen, created_at, register_url}]}` |
-| `POST /api/doctor/patients {regimen}` | `{id, register_url}`（register_url = `{public_base_url}/register?pid=<id>`、QR はフロントで描く） |
+| `POST /api/doctor/patients {regimen}` | `{id, register_url}`（register_url = `{public_base_url}/register?pid=<id>`、登録用 QR はフロントで描く。QR はアプリを入れる入口で、受診の受付には使わない。受付は受診タブ `/visit`） |
 | `GET /api/doctor/patients/{pid}/courses` / `POST /api/doctor/courses`（`Course`） | `{courses: Course[]}` / `Course` |
 | `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count}]}` |
 | `GET /api/doctor/visits/{id}/report` | `text/html`（A4 印刷用） |
@@ -280,8 +280,8 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|---|
 | `api/app.py` | W3-api | `create_app(settings: Settings \| None = None, *, runner_factory=None, skill_editor=None) -> FastAPI`。`app.state` に settings・runner_factory（既定は `SdkRunner`）・skill_editor（既定は `SdkSkillEditor`）。起動時に `init_db`・`ensure_skill_versions`・`purge_expired`。`backend/tsutae/api/__main__.py` は不要（`uvicorn tsutae.api.app:app`、`app = create_app()` は遅延でよい） |
 | `api/deps.py` | W3-api | 接続はリクエストごと（`Depends` で開いて閉じる）。患者 Cookie `tsutae_pid`（値は `pid + "." + base64url(HMAC-SHA256(secret_key, "patient:" + pid))`。2026-11-04 変更。署名が無い・違えば 401。登録 API はクライアントごとに失敗10回/10分を超えると 429 `too_many_attempts`）、医師 Cookie `tsutae_doctor`（値は発行時刻＋HMAC-SHA256(secret_key)。12時間で失効。標準ライブラリの `hmac` で作る）。どちらも HttpOnly・SameSite=Lax。エラーは `{"error": code}`（401 `not_logged_in`・403 `forbidden`・404 `not_found`・422 `invalid_input`）。`RequestValidationError` も `{"error":"invalid_input"}` に変える（入力の文面を返さない。自由記載が長すぎるときだけ `free_text_too_long`。2026-11-04） |
-| `api/patient.py` | W3-api | §8 の患者 API。**`tsutae.pipeline`・`tsutae.report`・`get_timeline`・`get_report` を import しない**。質問集は `skills.load_regimen_skill`、記録の `question_text` は `db.get_skill_version` の `questions_json` から引く。notices は `api/fixed_rules.py` の純関数 `notices_for(entry: EntryCreate, skill: RegimenSkill) -> list[str]`（体温 ≥ threshold で `patient_string_key`。コードの比較だけ） |
-| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（大文字化・ハイフンの統一はしない）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。自由記載が長すぎるときの患者向けキーは `today.free_text_too_long`。今コースが無ければ 409 `{"error":"no_course"}` |
+| `api/patient.py` | W3-api | §8 の患者 API。**`tsutae.pipeline`・`tsutae.report`・`get_timeline`・`get_report` を import しない**。質問集は `skills.load_regimen_skill`。記録の本文を受ける経路は無い（§12）。38.0℃ の案内は画面のコード（§13 の `patient/fixedRules.ts`）が出し、`api/fixed_rules.py` の純関数 `notices_for(entry: EntryCreate, skill: RegimenSkill) -> list[str]`（体温 ≥ threshold で `patient_string_key`。コードの比較だけ）は同じ表で確かめる Python の側の判定 |
+| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（大文字化・ハイフンの統一はしない）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。本文の `entries` の検査と保存は §12。自由記載の長さは端末が保存の前に確かめる（`today.free_text_too_long`）。今コースが無ければ 409 `{"error":"no_course"}` |
 | `api/doctor.py` | W3-doctor | §8 の医師 API（skill-changes 以外）。`GET /visits` と `GET /visits/{id}/report` の前に `purge_expired`。レポートは `HTMLResponse` に `Cache-Control: no-store` と `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:`。`POST /courses` は保存前に `validate_courses`（既存＋新規）。events は `{status, events}`（ポーリング） |
 | `api/doctor_skills.py` | W3-doctor | `GET /api/doctor/skills`・`POST/GET /api/doctor/skill-changes`・approve・reject。`tsutae.skillchange` を呼ぶ |
 | `skillchange/`（`editor.py` `service.py` `diff.py`） | W3-skillchange | 下の 9b |
@@ -391,6 +391,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 
 ## 10. 時計・デモ
 - `TSUTAE_TODAY=2026-11-09` でデモの「今日」を固定。`scripts/seed_demo.py` が合成データを DB に入れる（W3）
+- 撮影と通しは `scripts/seed_demo.py --device-records`（患者・コース・日付の印だけ）の新しい DB で動かし、`TSUTAE_DEMO_TOOLS=1` でデモ患者の設定に出る「見本の記録を入れる」から端末へ記録を入れる（§12・§13。手順は `docs/demo-script.md`）。`make seed` の既定の動きは、テスト・`run_demo_visit.py`・評価のために変えない
 
 ## 11. 毎日の通知（PR A。`docs/plan-device-records.md` §3・§4）
 

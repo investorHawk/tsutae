@@ -71,9 +71,9 @@ export const scenesB: Scene[] = [
     kind: "footage",
     footage: ["F4"],
     title: "受診日",
-    screen: "QR → 受付番号 → 先生に届けました",
+    screen: "受診タブ → 受付番号 → 先生に届けました",
     narration:
-      "受診日は院内の QR を読んで受付番号を入れるだけ。患者さんの画面に AI の文は出ません。",
+      "受診日は受診タブで受付番号を入れて送るだけ。患者さんの画面に AI の文は出ません。",
     props: { callouts: ["患者さんの画面に AI の文は出ない"] },
   },
   {

@@ -411,7 +411,7 @@ class SyntheticPatient(Frozen):
     patient_id: str
     role: Literal["demo", "eval"]
     regimen: BuiltinRegimen
-    visit_date: date  # この日に受診（QR）する想定
+    visit_date: date  # この日に受診（受付）する想定
     reception_no: str
     courses: list[SyntheticCourse]
     entries: list[SyntheticEntry]

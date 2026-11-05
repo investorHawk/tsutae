@@ -52,7 +52,7 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     device: "phone",
     minSeconds: 10,
     content:
-      "QR を読む（カメラ越しでも可）→ 受付番号 A-023 → 「先生に届けました」",
+      "下の「受診」タブ → 受付番号 A-023 → 「先生に届ける」→ 「先生に届けました。」",
   },
   F5: {
     id: "F5",

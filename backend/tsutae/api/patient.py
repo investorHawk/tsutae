@@ -21,11 +21,9 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 from datetime import timedelta
-from functools import lru_cache
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Path, Request, Response
@@ -43,7 +41,8 @@ from tsutae.api.deps import (
     set_patient_cookie,
 )
 from tsutae.api.fixed_rules import notices_for
-from tsutae.config import PATIENT_STRINGS_PATH, Settings, now, today
+from tsutae.config import Settings, now, today
+from tsutae.patient_strings import load_patient_strings
 from tsutae.schemas import AnswerType, Entry, EntryCreate, RegimenSkill
 from tsutae.skills import SkillValidationError, load_regimen_skill
 
@@ -65,16 +64,6 @@ class RegisterIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pid: str = Field(max_length=64)
-
-
-@lru_cache(maxsize=1)
-def _patient_strings() -> dict[str, str]:
-    data = json.loads(PATIENT_STRINGS_PATH.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or not all(
-        isinstance(k, str) and isinstance(v, str) for k, v in data.items()
-    ):
-        raise ValueError("patient_strings.json は文字列→文字列の対応")
-    return data
 
 
 def _regimen_skill(patient: dict[str, Any], settings: Settings) -> RegimenSkill:
@@ -115,7 +104,7 @@ def register(
 
 @router.get("/strings")
 def strings() -> dict[str, str]:
-    return dict(_patient_strings())
+    return dict(load_patient_strings())
 
 
 @router.get("/{pid}/questions")

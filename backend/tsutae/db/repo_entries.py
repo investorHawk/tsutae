@@ -4,6 +4,8 @@ recorded_at は JST で保存し、record_date は config.to_jst_date(recorded_a
 `add_entry_once` は同じ患者・同じ内容（`entry_content` が一致）の記録が直近 window
 以内にあれば、新しく作らずそれを返す（送り直しで二重にしない）。
 `undo_too_sick_entry` は患者が押し間違えた「つらくて書けない」を消す（取り消し。P2-5）。
+記録の行を入れると日付の印（record_marks）も同じトランザクションで付き、取り消しでその日の
+記録が無くなれば印も消える（通知の判定が使う。plan-device-records §4.4）。
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from tsutae.db.connection import (
     to_jst,
     write_transaction,
 )
+from tsutae.db.repo_record_marks import clear_mark_if_no_entries, upsert_mark_row
 from tsutae.schemas import ClosedAnswer, Entry, EntryCreate
 
 SKILL_VERSION_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]*@[1-9][0-9]*")
@@ -111,7 +114,8 @@ def undo_too_sick_entry(
     """
     with write_transaction(conn):
         row = conn.execute(
-            "SELECT kind, recorded_at FROM entries WHERE id = ? AND patient_id = ?",
+            "SELECT kind, recorded_at, record_date FROM entries"
+            " WHERE id = ? AND patient_id = ?",
             (entry_id, pid),
         ).fetchone()
         if row is None:
@@ -126,6 +130,7 @@ def undo_too_sick_entry(
         if visited is not None:
             return "not_undoable"
         conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+        clear_mark_if_no_entries(conn, pid, row["record_date"])
     return "deleted"
 
 
@@ -169,7 +174,7 @@ def insert_entry_rows(
     recorded_at: datetime,
     skill_version: str,
 ) -> int:
-    """記録の行（回答・自由記載を含む）を入れて id を返す。
+    """記録の行（回答・自由記載を含む）と日付の印を入れて id を返す。
 
     検査（validate_skill_version・患者の有無）は呼び出し側で済ませ、
     write_transaction を開いておくこと。
@@ -198,6 +203,7 @@ def insert_entry_rows(
             "INSERT INTO free_texts (entry_id, text) VALUES (?, ?)",
             (entry_id, entry.free_text),
         )
+    upsert_mark_row(conn, pid, at)
     return entry_id
 
 

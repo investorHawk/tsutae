@@ -87,5 +87,7 @@
   "symptom.hand_foot": "手のひら・足の裏",
   "symptom.fever": "体温",
   "visit.about": "受付票の番号を入れると、これまでの記録が先生に届きます。",
-  "visit.example": "例: A-023"
+  "visit.example": "例: A-023",
+  "notify.title": "つたえ",
+  "notify.body": "今日の記録をお願いします。つらい日はボタンひとつで記録になります。"
 }

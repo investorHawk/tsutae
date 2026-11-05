@@ -83,15 +83,18 @@ def write_transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
-    """古い形の表を作り直してから（`migrate.migrate_db`）schema.sql を流す。
+    """古い形の表を作り直してから（`migrate.migrate_db`）schema.sql を流し、既存の
+    entries から日付の印を作る（`backfill_record_marks`。表ができた後でないと書けない）。
 
     schema.sql は CREATE ... IF NOT EXISTS のみ、移行も新しい形なら何もしないので、
     何度呼んでもよい。
     """
     from tsutae.db.migrate import migrate_db  # migrate は SCHEMA_PATH をここから引く
+    from tsutae.db.repo_record_marks import backfill_record_marks
 
     migrate_db(conn)
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    backfill_record_marks(conn)
 
 
 def to_jst(value: datetime) -> datetime:

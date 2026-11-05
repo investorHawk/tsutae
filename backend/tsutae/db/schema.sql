@@ -188,3 +188,27 @@ CREATE TABLE IF NOT EXISTS regimen_forms (
     PRIMARY KEY (skill_name, version),
     FOREIGN KEY (skill_name, version) REFERENCES skill_versions (skill_name, version)
 );
+
+-- 日付の印（plan-device-records §4.4）。その日に記録があったことだけ。中身・種類は持たない。
+-- 書いた人に通知を送らないために使う
+CREATE TABLE IF NOT EXISTS record_marks (
+    patient_id TEXT NOT NULL REFERENCES patients (id),
+    record_date TEXT NOT NULL,
+    last_marked_at TEXT NOT NULL,
+    PRIMARY KEY (patient_id, record_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_record_marks_date ON record_marks (record_date);
+
+-- 通知の登録（§4.3）。端末（endpoint）ごとに1行。notify_time は JST の HH:MM（30 分刻み）。
+-- last_sent_date で1日1回に抑える
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY,
+    patient_id TEXT NOT NULL REFERENCES patients (id),
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    notify_time TEXT NOT NULL DEFAULT '20:00',
+    last_sent_date TEXT,
+    created_at TEXT NOT NULL
+);

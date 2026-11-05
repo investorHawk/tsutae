@@ -391,7 +391,7 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 | 項目 | 内容 |
 |---|---|
 | バックエンド | Python 3.12（uv で導入。システムの 3.9 は使わない）、FastAPI、SQLite、`claude-agent-sdk` |
-| フロント | React + Vite + TypeScript、印刷 CSS。患者用と医師用は同一アプリの別ルート |
+| フロント | React + Vite + TypeScript、印刷 CSS。患者用と医師用は同一アプリの別ルート。スマホのホーム画面に置くと、アイコンから全画面で開く（manifest。Service Worker は使わない） |
 | 認証 | 患者: 仮名ID の Cookie／医師: 環境変数パスワード |
 | 変換 | Agent SDK（主エージェント＋サブエージェント3役＋カスタムツール＋Hook 4本＋Skill はレジメンの数＋レポートの形式）。モデルは `claude-opus-5-5` を既定とし、サブエージェントは `claude-sonnet-5-5` で試す |
 | 印刷 | HTML → ブラウザ印刷 → PDF。実機印刷は別 Mac で行い動画に収める |
@@ -399,7 +399,7 @@ question_library(key TEXT PK, label, text, answer_type, origin TEXT[seed|doctor|
 
 ## 20. 範囲外と余力
 
-**範囲外（README に明記）**: 音声入力、PWA、電子カルテ連携、受診間の通知、患者への助言、CAPOX と D4 で足したレジメンの合成データ・評価、医師2名以上の形式、薬の量の管理、レジメンの削除（採用した版は残す）、コース内の2回目以降の点滴（Day8・15 など）の延期・中止の記録、内服だけのレジメン、数値の回答（血圧など。回答の型は3択と体温だけ）
+**範囲外（README に明記）**: 音声入力、オフラインでの動作（Service Worker）、電子カルテ連携、受診間の通知、患者への助言、CAPOX と D4 で足したレジメンの合成データ・評価、医師2名以上の形式、薬の量の管理、レジメンの削除（採用した版は残す）、コース内の2回目以降の点滴（Day8・15 など）の延期・中止の記録、内服だけのレジメン、数値の回答（血圧など。回答の型は3択と体温だけ）
 
 **余力（優先順）**: ① 診察室プリンタへの自動印刷（`lp` を叩く常駐スクリプト）、② 前コースの AI 変換結果の表示（現状はクローズのみ）、③ Playwright E2E、④ 印刷用端末の MCP サーバー化
 

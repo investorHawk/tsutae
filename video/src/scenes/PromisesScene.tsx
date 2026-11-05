@@ -73,7 +73,7 @@ export const PromisesScene: React.FC<SceneComponentProps> = ({
   const dont = scene.props?.dont ?? [];
   const privacy = scene.props?.privacy ?? [];
   const total = dont.length + privacy.length;
-  // ナレーションの順（しないこと → 情報の扱い）に、場面の 8 割で出し切る
+  // 字幕の順（しないこと → 情報の扱い）に、場面の 8 割で出し切る
   const step = (durationInFrames * 0.8) / Math.max(1, total);
   const startAt = (i: number) => Math.round(14 + i * step);
   return (

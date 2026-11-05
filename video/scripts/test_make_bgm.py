@@ -112,6 +112,11 @@ class TestSong(unittest.TestCase):
 
 
 class TestMain(unittest.TestCase):
+    def test_default_out_is_public_audio(self) -> None:
+        # footage-manifest.mjs の BGM_PATH と同じ場所（git 管理外の public/audio/*.wav）
+        video_root = Path(__file__).resolve().parent.parent
+        self.assertEqual(bgm.DEFAULT_OUT, video_root / "public" / "audio" / "bgm.wav")
+
     def test_writes_wav(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "sub" / "bgm.wav"

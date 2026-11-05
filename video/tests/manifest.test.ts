@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FOOTAGE, FOOTAGE_IDS } from "../src/footage";
-import {
-  audioFiles,
-  footageFiles,
-  screenFiles,
-} from "../src/footage.generated";
+import { footageFiles, screenFiles } from "../src/footage.generated";
 
 describe("撮影リストと manifest", () => {
   it("撮影リストは F1〜F10 の 10 本", () => {
@@ -28,10 +24,6 @@ describe("撮影リストと manifest", () => {
       expect(FOOTAGE_IDS).toContain(id);
       expect(path).toMatch(/^footage\/F\d+([_-].*)?\.(mp4|mov)$/i);
     }
-  });
-
-  it("manifest の音声は narration-a|b|c だけ", () => {
-    for (const a of audioFiles) expect(a).toMatch(/^narration-[abc]$/);
   });
 
   it("manifest の静止画は既知の id で public/screens/F<n>-<k>.png を k の順に指す", () => {

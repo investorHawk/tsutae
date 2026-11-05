@@ -3,10 +3,13 @@
 - Cookie の患者で受診を作る（status=generating、course_no は今コース、
   expires_at = now + report_ttl_hours）。今コースが無ければ 409 no_course
 - 受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（制御文字は不可）
+- 本文の entries はスマホに置いた記録（plan-device-records §5.5。検査は `visit_entries`）。
+  1件でも不正なら全体を 422 にして何も保存しない。受診の作成と記録の保存は同じトランザクション。
+  同じ ID は二重にならない。本文が 5MB を超えたら 413（`body_limit`）
 - 送り直し（タイムアウトの後など）: 同じ患者で、受付番号が残っていて期限内の受診が
   今日すでにあり、正規化した受付番号が同じなら、新しく作らず生成も起動しないで同じ
   応答を返す（`db.create_visit_once`。status は問わない: failed でも作り直さない）。
-  受付番号が違えば新しく作る
+  受付番号が違えば新しく作る。新しい ID の記録は保存するが、変換はし直さない
 - 変換は BackgroundTasks で。新しい接続を開き、`app.state.runner_factory()` の runner で
   `tsutae.pipeline.service.generate_visit_report` を呼ぶ（呼ぶときに属性を引くので
   テストで差し替えられる）。例外は外へ出さず（型名だけログ）、生成中のままなら failed
@@ -22,12 +25,18 @@ from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tsutae import db
 from tsutae.api.deps import ApiError, AppSettings, Conn, current_patient
+from tsutae.api.visit_entries import (
+    MAX_VISIT_ENTRIES,
+    VisitEntryIn,
+    check_unique_ids,
+    received_entries,
+    visit_window_of,
+)
 from tsutae.config import Settings, now, today
-from tsutae.course import CourseValidationError, current_course
 from tsutae.db import VisitClosedError
 from tsutae.pipeline import service
 
@@ -43,6 +52,11 @@ class VisitIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reception_no: str = Field(max_length=256)
+    entries: list[VisitEntryIn] = Field(
+        default_factory=list, max_length=MAX_VISIT_ENTRIES
+    )
+
+    _unique_ids = field_validator("entries")(check_unique_ids)
 
 
 def normalize_reception_no(value: str) -> str | None:
@@ -53,16 +67,6 @@ def normalize_reception_no(value: str) -> str | None:
     if any(unicodedata.category(ch) in ("Cc", "Cf") for ch in cleaned):
         return None
     return cleaned
-
-
-def _current_course_no(conn: sqlite3.Connection, pid: str) -> int:
-    try:
-        course = current_course(db.list_courses(conn, pid), today())
-    except CourseValidationError as exc:
-        raise ApiError(400, exc.code) from exc
-    if course is None:
-        raise ApiError(409, "no_course")
-    return course.course_no
 
 
 @router.post("/api/visit")
@@ -77,14 +81,16 @@ def create_visit(
     reception_no = normalize_reception_no(body.reception_no)
     if reception_no is None:
         raise ApiError(422, "invalid_input")
-    course_no = _current_course_no(conn, patient["id"])
+    window = visit_window_of(conn, patient["id"])
+    entries = received_entries(conn, patient["regimen"], body.entries, window)
     visit_id, created = db.create_visit_once(
         conn,
         patient["id"],
         reception_no,
         today(),
         now() + timedelta(hours=settings.report_ttl_hours),
-        course_no,
+        window.course_no,
+        entries,
     )
     if created:
         background.add_task(

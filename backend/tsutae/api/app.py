@@ -22,6 +22,7 @@
   （`app.state.push_task`）も置く。`_purge_loop` と同じ形で、例外で止めない。sender は毎回
   `app.state.push_sender` から読む。`--workers 1` が前提（plan-device-records §4.3）
 - 最も外側に `SuppressServerErrors` を置く（想定外の例外を uvicorn へ投げ直さない）
+- `POST /api/visit` の本文は `BodyLimit` で 5MB まで（スマホの記録が届く経路。超えたら 413）
 - 医師 API（`tsutae.api.doctor`・`tsutae.api.doctor_skills`・
   `tsutae.api.doctor_question_library`・`tsutae.api.doctor_regimen_drafts`）は、モジュールがあれば
   `router` を載せる（無ければ飛ばす。中の import の失敗は隠さない）
@@ -45,9 +46,11 @@ from starlette.types import ASGIApp
 
 from tsutae import db
 from tsutae.api import orphans, patient, patient_push, visit
+from tsutae.api.body_limit import BodyLimit
 from tsutae.api.deps import install_error_handlers
 from tsutae.api.error_guard import SuppressServerErrors
 from tsutae.api.settings_check import check_settings
+from tsutae.api.visit_entries import VISIT_BODY_MAX_BYTES
 from tsutae.config import Settings, get_settings, load_env_file, now
 from tsutae.pipeline.runner import SdkRunner
 from tsutae.pipeline.service import ensure_skill_versions
@@ -259,6 +262,7 @@ def create_app(
     app.state.skills_home = skills_home_of(resolved)
     _install_push(app, resolved, push_sender)
     install_error_handlers(app)
+    app.add_middleware(BodyLimit, path="/api/visit", max_bytes=VISIT_BODY_MAX_BYTES)
     app.include_router(patient.router)
     app.include_router(patient_push.router)
     app.include_router(visit.router)

@@ -306,3 +306,19 @@ def test_purge_erases_after_a_printed_visit_left_entries(
     assert _client_ids(conn) == [UUID_A]
     assert db.purge_expired(conn, now() + timedelta(hours=2)) == 1
     assert _client_ids(conn) == []
+
+
+def test_erased_text_does_not_stay_in_the_files(tmp_db_path: Path) -> None:
+    """消した原文が DB の本体にも WAL にも残らない（secure_delete と checkpoint）。"""
+    conn = db.connect(tmp_db_path)
+    db.init_db(conn)
+    db.create_patient(conn, "FOLFOX", patient_id=PID)
+    secret = "（合成）消えるはずの原文".encode()
+    entry = EntryCreate(free_text=secret.decode())
+    received = ReceivedEntry(UUID_A, entry, AT, SKILL)
+    visit_id, _ = _open_visit(conn, entries=(received,))
+    assert db.mark_printed(conn, visit_id)
+    conn.close()
+    files = [p for p in tmp_db_path.parent.iterdir() if p.is_file()]
+    assert files
+    assert [p.name for p in files if secret in p.read_bytes()] == []

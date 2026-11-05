@@ -1,6 +1,6 @@
 {
-  "method": "POST",
-  "path": "/api/patient/P-EVAL0001/entries/93/undo",
+  "method": "GET",
+  "path": "/api/patient/P-EVAL0001/demo-entries",
   "request": null,
   "status": 404,
   "body": {

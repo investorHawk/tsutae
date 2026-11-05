@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-EVAL0001/unregister",
+  "request": {
+    "endpoint": null
+  },
+  "status": 200,
+  "body": {
+    "ok": true
+  }
+}

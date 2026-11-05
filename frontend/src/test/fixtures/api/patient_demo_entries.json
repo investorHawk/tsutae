@@ -1,13 +1,14 @@
 {
   "method": "GET",
-  "path": "/api/patient/P-DEMO0001/entries",
+  "path": "/api/patient/P-DEMO0001/demo-entries",
   "request": null,
   "status": 200,
   "body": {
     "entries": [
       {
-        "id": 1,
-        "recorded_at": "2026-09-27T20:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-1",
+        "recorded_at": "2026-09-27T20:30:00.000000+09:00",
         "record_date": "2026-09-27",
         "kind": "answers",
         "by_proxy": false,
@@ -47,8 +48,9 @@
         "free_text": null
       },
       {
-        "id": 2,
-        "recorded_at": "2026-09-28T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-2",
+        "recorded_at": "2026-09-28T21:00:00.000000+09:00",
         "record_date": "2026-09-28",
         "kind": "mixed",
         "by_proxy": false,
@@ -88,8 +90,9 @@
         "free_text": "朝から水道の水がつめたくて、指先がピリピリする。食欲はいつもの半分くらい"
       },
       {
-        "id": 3,
-        "recorded_at": "2026-09-29T19:40:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-3",
+        "recorded_at": "2026-09-29T19:40:00.000000+09:00",
         "record_date": "2026-09-29",
         "kind": "too_sick",
         "by_proxy": false,
@@ -98,8 +101,9 @@
         "free_text": null
       },
       {
-        "id": 4,
-        "recorded_at": "2026-09-30T20:10:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-4",
+        "recorded_at": "2026-09-30T20:10:00.000000+09:00",
         "record_date": "2026-09-30",
         "kind": "too_sick",
         "by_proxy": false,
@@ -108,8 +112,9 @@
         "free_text": null
       },
       {
-        "id": 5,
-        "recorded_at": "2026-10-01T21:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-5",
+        "recorded_at": "2026-10-01T21:30:00.000000+09:00",
         "record_date": "2026-10-01",
         "kind": "too_sick",
         "by_proxy": false,
@@ -118,8 +123,9 @@
         "free_text": null
       },
       {
-        "id": 6,
-        "recorded_at": "2026-10-02T20:45:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-6",
+        "recorded_at": "2026-10-02T20:45:00.000000+09:00",
         "record_date": "2026-10-02",
         "kind": "mixed",
         "by_proxy": false,
@@ -159,8 +165,9 @@
         "free_text": "やっと書ける。ポンプを外した日からずっとだるくて寝てた。きょうは下痢が2回"
       },
       {
-        "id": 7,
-        "recorded_at": "2026-10-03T21:10:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-7",
+        "recorded_at": "2026-10-03T21:10:00.000000+09:00",
         "record_date": "2026-10-03",
         "kind": "mixed",
         "by_proxy": false,
@@ -200,8 +207,9 @@
         "free_text": "口内炎ができて、ごはんがしみるる。冷蔵庫のたまごを出したら指がピリピリした"
       },
       {
-        "id": 8,
-        "recorded_at": "2026-10-04T20:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-8",
+        "recorded_at": "2026-10-04T20:00:00.000000+09:00",
         "record_date": "2026-10-04",
         "kind": "mixed",
         "by_proxy": false,
@@ -241,8 +249,9 @@
         "free_text": "きょうは下痢はなかった。口内炎はまだいたい"
       },
       {
-        "id": 9,
-        "recorded_at": "2026-10-06T21:20:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-9",
+        "recorded_at": "2026-10-06T21:20:00.000000+09:00",
         "record_date": "2026-10-06",
         "kind": "mixed",
         "by_proxy": false,
@@ -282,8 +291,9 @@
         "free_text": "手のピリピリはだいぶ楽になった。口内炎もちょっとましになってきた"
       },
       {
-        "id": 10,
-        "recorded_at": "2026-10-07T20:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-10",
+        "recorded_at": "2026-10-07T20:30:00.000000+09:00",
         "record_date": "2026-10-07",
         "kind": "answers",
         "by_proxy": false,
@@ -323,8 +333,9 @@
         "free_text": null
       },
       {
-        "id": 11,
-        "recorded_at": "2026-10-08T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-11",
+        "recorded_at": "2026-10-08T21:00:00.000000+09:00",
         "record_date": "2026-10-08",
         "kind": "mixed",
         "by_proxy": false,
@@ -364,8 +375,9 @@
         "free_text": "楓台クリニックで口内炎のくすりをもらった。まだしみる。吐き気はなかった"
       },
       {
-        "id": 12,
-        "recorded_at": "2026-10-10T20:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-12",
+        "recorded_at": "2026-10-10T20:00:00.000000+09:00",
         "record_date": "2026-10-10",
         "kind": "mixed",
         "by_proxy": false,
@@ -405,8 +417,9 @@
         "free_text": "あしたは2回目の点滴。指先のしびれがすこしのこってる。娘の電話がかわった 090-0000-0000"
       },
       {
-        "id": 13,
-        "recorded_at": "2026-10-12T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-13",
+        "recorded_at": "2026-10-12T21:00:00.000000+09:00",
         "record_date": "2026-10-12",
         "kind": "mixed",
         "by_proxy": false,
@@ -446,8 +459,9 @@
         "free_text": "ごはんの味がへんなのは先週木曜までで、いまはふつう"
       },
       {
-        "id": 14,
-        "recorded_at": "2026-10-13T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-14",
+        "recorded_at": "2026-10-13T21:00:00.000000+09:00",
         "record_date": "2026-10-13",
         "kind": "answers",
         "by_proxy": false,
@@ -487,8 +501,9 @@
         "free_text": null
       },
       {
-        "id": 15,
-        "recorded_at": "2026-10-14T20:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-15",
+        "recorded_at": "2026-10-14T20:30:00.000000+09:00",
         "record_date": "2026-10-14",
         "kind": "mixed",
         "by_proxy": false,
@@ -528,8 +543,9 @@
         "free_text": "また冷たいものでピリピリ。ペットボトルはタオルでつかんでる。しゃっくりもとまらない"
       },
       {
-        "id": 16,
-        "recorded_at": "2026-10-15T20:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-16",
+        "recorded_at": "2026-10-15T20:00:00.000000+09:00",
         "record_date": "2026-10-15",
         "kind": "too_sick",
         "by_proxy": false,
@@ -538,8 +554,9 @@
         "free_text": null
       },
       {
-        "id": 17,
-        "recorded_at": "2026-10-16T19:50:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-17",
+        "recorded_at": "2026-10-16T19:50:00.000000+09:00",
         "record_date": "2026-10-16",
         "kind": "too_sick",
         "by_proxy": false,
@@ -548,8 +565,9 @@
         "free_text": null
       },
       {
-        "id": 18,
-        "recorded_at": "2026-10-17T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-18",
+        "recorded_at": "2026-10-17T21:00:00.000000+09:00",
         "record_date": "2026-10-17",
         "kind": "too_sick",
         "by_proxy": false,
@@ -558,8 +576,9 @@
         "free_text": null
       },
       {
-        "id": 19,
-        "recorded_at": "2026-10-18T19:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-19",
+        "recorded_at": "2026-10-18T19:30:00.000000+09:00",
         "record_date": "2026-10-18",
         "kind": "mixed",
         "by_proxy": true,
@@ -599,8 +618,9 @@
         "free_text": "妻が代わりに書きます。ポンプを外した日の夜から下痢がつづいてて、きょうも3回。ほとんど食べれてない"
       },
       {
-        "id": 20,
-        "recorded_at": "2026-10-19T21:15:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-20",
+        "recorded_at": "2026-10-19T21:15:00.000000+09:00",
         "record_date": "2026-10-19",
         "kind": "mixed",
         "by_proxy": false,
@@ -640,8 +660,9 @@
         "free_text": "点滴の次の日から続いてた手のピリピリ、きょうは少しまし。口内炎がひとつできた"
       },
       {
-        "id": 21,
-        "recorded_at": "2026-10-20T07:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-21",
+        "recorded_at": "2026-10-20T07:30:00.000000+09:00",
         "record_date": "2026-10-20",
         "kind": "answers",
         "by_proxy": false,
@@ -681,8 +702,9 @@
         "free_text": null
       },
       {
-        "id": 22,
-        "recorded_at": "2026-10-20T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-22",
+        "recorded_at": "2026-10-20T21:00:00.000000+09:00",
         "record_date": "2026-10-20",
         "kind": "free_text",
         "by_proxy": false,
@@ -691,8 +713,9 @@
         "free_text": "下痢はなかった。口内炎がしみて、ごはんはおかゆだけ"
       },
       {
-        "id": 23,
-        "recorded_at": "2026-10-22T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-23",
+        "recorded_at": "2026-10-22T21:00:00.000000+09:00",
         "record_date": "2026-10-22",
         "kind": "answers",
         "by_proxy": false,
@@ -732,8 +755,9 @@
         "free_text": null
       },
       {
-        "id": 24,
-        "recorded_at": "2026-10-23T20:20:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-24",
+        "recorded_at": "2026-10-23T20:20:00.000000+09:00",
         "record_date": "2026-10-23",
         "kind": "mixed",
         "by_proxy": false,
@@ -773,8 +797,9 @@
         "free_text": "スーパーの冷凍コーナーで手がジンジンした。手袋をもっていけばよかった"
       },
       {
-        "id": 25,
-        "recorded_at": "2026-10-25T20:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-25",
+        "recorded_at": "2026-10-25T20:00:00.000000+09:00",
         "record_date": "2026-10-25",
         "kind": "mixed",
         "by_proxy": false,
@@ -814,8 +839,9 @@
         "free_text": "となりの鈴木さんがりんごをむいてくれた。手のしびれはあいかわらづ"
       },
       {
-        "id": 26,
-        "recorded_at": "2026-10-26T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-26",
+        "recorded_at": "2026-10-26T21:00:00.000000+09:00",
         "record_date": "2026-10-26",
         "kind": "mixed",
         "by_proxy": false,
@@ -855,8 +881,9 @@
         "free_text": "口内炎は先週木曜までいたかった。あしたは3回目の点滴"
       },
       {
-        "id": 27,
-        "recorded_at": "2026-10-27T20:50:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-27",
+        "recorded_at": "2026-10-27T20:50:00.000000+09:00",
         "record_date": "2026-10-27",
         "kind": "answers",
         "by_proxy": false,
@@ -896,8 +923,9 @@
         "free_text": null
       },
       {
-        "id": 28,
-        "recorded_at": "2026-10-28T08:10:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-28",
+        "recorded_at": "2026-10-28T08:10:00.000000+09:00",
         "record_date": "2026-10-28",
         "kind": "free_text",
         "by_proxy": false,
@@ -906,8 +934,9 @@
         "free_text": "朝からしゃっくりがとまらない"
       },
       {
-        "id": 29,
-        "recorded_at": "2026-10-28T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-29",
+        "recorded_at": "2026-10-28T21:00:00.000000+09:00",
         "record_date": "2026-10-28",
         "kind": "mixed",
         "by_proxy": false,
@@ -947,8 +976,9 @@
         "free_text": "点滴の次の日から冷たいものがだめになるのは前とおなじ。きょうも水道の水でピリピリ。食欲もあまりない"
       },
       {
-        "id": 30,
-        "recorded_at": "2026-10-29T20:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-30",
+        "recorded_at": "2026-10-29T20:00:00.000000+09:00",
         "record_date": "2026-10-29",
         "kind": "too_sick",
         "by_proxy": false,
@@ -957,8 +987,9 @@
         "free_text": null
       },
       {
-        "id": 31,
-        "recorded_at": "2026-10-30T19:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-31",
+        "recorded_at": "2026-10-30T19:30:00.000000+09:00",
         "record_date": "2026-10-30",
         "kind": "too_sick",
         "by_proxy": false,
@@ -967,8 +998,9 @@
         "free_text": null
       },
       {
-        "id": 32,
-        "recorded_at": "2026-10-31T18:10:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-32",
+        "recorded_at": "2026-10-31T18:10:00.000000+09:00",
         "record_date": "2026-10-31",
         "kind": "too_sick",
         "by_proxy": false,
@@ -977,8 +1009,9 @@
         "free_text": null
       },
       {
-        "id": 33,
-        "recorded_at": "2026-10-31T22:15:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-33",
+        "recorded_at": "2026-10-31T22:15:00.000000+09:00",
         "record_date": "2026-10-31",
         "kind": "mixed",
         "by_proxy": true,
@@ -1018,8 +1051,9 @@
         "free_text": "妻が代わりに入力します。夕方から下痢が3回あった。ほとんど食べてない"
       },
       {
-        "id": 34,
-        "recorded_at": "2026-11-01T20:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-34",
+        "recorded_at": "2026-11-01T20:30:00.000000+09:00",
         "record_date": "2026-11-01",
         "kind": "mixed",
         "by_proxy": false,
@@ -1059,8 +1093,9 @@
         "free_text": "下痢は2回。きのうよりはまし"
       },
       {
-        "id": 35,
-        "recorded_at": "2026-11-02T21:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-35",
+        "recorded_at": "2026-11-02T21:00:00.000000+09:00",
         "record_date": "2026-11-02",
         "kind": "mixed",
         "by_proxy": false,
@@ -1100,8 +1135,9 @@
         "free_text": "おとといの夜から口内炎がいたい。おかゆにした"
       },
       {
-        "id": 36,
-        "recorded_at": "2026-11-03T21:30:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-36",
+        "recorded_at": "2026-11-03T21:30:00.000000+09:00",
         "record_date": "2026-11-03",
         "kind": "mixed",
         "by_proxy": false,
@@ -1141,8 +1177,9 @@
         "free_text": "夕方さむけがして熱をはかったら37.9。ねる前にもう一回はかる"
       },
       {
-        "id": 37,
-        "recorded_at": "2026-11-05T20:40:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-37",
+        "recorded_at": "2026-11-05T20:40:00.000000+09:00",
         "record_date": "2026-11-05",
         "kind": "mixed",
         "by_proxy": false,
@@ -1182,8 +1219,9 @@
         "free_text": "熱はもう出ていない。口内炎はまだすこしいたい"
       },
       {
-        "id": 38,
-        "recorded_at": "2026-11-05T21:50:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-38",
+        "recorded_at": "2026-11-05T21:50:00.000000+09:00",
         "record_date": "2026-11-05",
         "kind": "free_text",
         "by_proxy": false,
@@ -1192,8 +1230,9 @@
         "free_text": "磯鷲さんにもらった漢方をのんでみた。おなかがあったかい感じ"
       },
       {
-        "id": 39,
-        "recorded_at": "2026-11-07T20:15:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-39",
+        "recorded_at": "2026-11-07T20:15:00.000000+09:00",
         "record_date": "2026-11-07",
         "kind": "mixed",
         "by_proxy": false,
@@ -1233,8 +1272,9 @@
         "free_text": "しびれはだいぶ楽。口内炎も少しまし"
       },
       {
-        "id": 40,
-        "recorded_at": "2026-11-08T20:00:00+09:00",
+        "pid": "P-DEMO0001",
+        "client_entry_id": "demo-40",
+        "recorded_at": "2026-11-08T20:00:00.000000+09:00",
         "record_date": "2026-11-08",
         "kind": "mixed",
         "by_proxy": false,
@@ -1272,35 +1312,6 @@
           }
         ],
         "free_text": "あしたは受診日。佐藤先生にきくことをメモした。きょうは吐き気も下痢もなかった"
-      },
-      {
-        "id": 92,
-        "recorded_at": "2026-11-09T10:00:00+09:00",
-        "record_date": "2026-11-09",
-        "kind": "answers",
-        "by_proxy": false,
-        "skill_version": "regimen-folfox@1",
-        "answers": [
-          {
-            "question_key": "fever",
-            "value": "measured",
-            "temperature": 38.2,
-            "question_text": "熱を測りましたか"
-          },
-          {
-            "question_key": "diarrhea",
-            "value": "present",
-            "temperature": null,
-            "question_text": "下痢はありましたか"
-          }
-        ],
-        "free_text": null
-      }
-    ],
-    "visits": [
-      {
-        "visit_date": "2026-11-09",
-        "received_at": "2026-11-09T10:00:00+09:00"
       }
     ]
   }

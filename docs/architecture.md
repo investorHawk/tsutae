@@ -64,6 +64,7 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | regimen_forms（v1.1） | skill_name, version INT, form_json TEXT（正規化した `RegimenForm`）, created_at, PK(skill_name, version), FK(skill_name, version) → skill_versions — D4 で採用した版のフォーム（採用と同じトランザクション）。FOLFOX/CAPOX@1 はリポジトリの `regimen_forms/*.json` |
 | regimen_drafts（v1.1） | id PK, regimen TEXT NULL（識別名。新規は決まるまで NULL）, base_version INT NULL（新規は NULL）, status CHECK(open/working/adopted/discarded), generation INT, form_json, sources_json, chat_json（院内だけ。採用・破棄で `[]`）, adopted_version NULL, created_at, updated_at, working_since NULL（CHECK: working のときだけ）, closed_at NULL。部分 UNIQUE(regimen) WHERE open/working（1レジメンに開いた下書きは1つ） |
 | question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
+| entries.client_entry_id | 受付で受け取った記録の端末の ID。`(patient_id, client_entry_id)` の部分一意索引（NULL の既存の行は対象外）。`migrate_db` が前の DB に足す（§12） |
 | record_marks（通知） | patient_id FK, record_date, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない** |
 | push_subscriptions（通知） | id INTEGER PK, patient_id FK, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00'（JST の HH:MM）, last_sent_date NULL, created_at |
 | push_removed_sends（通知） | patient_id PK FK, last_sent_date — 消した登録の送信日（患者ごとに最後の日付だけ）。新しい行が引き継ぐので、オフにしてオンにしても1日1回まで |
@@ -236,10 +237,10 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|---|
 | `POST /api/patient/register` | `{pid}` | `{ok: true}` + Cookie。未知の pid は 404 `{"error":"unknown_patient"}` |
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
-| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない） |
-| `POST /api/patient/{pid}/entries` | `EntryCreate` | `{entry_id, notices: string[]}`（notices は patient_strings のキー。例 `["fixed_rule.fever_38"]`） |
-| `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}], visits: [{visit_date, received_at}]}`（自分の記録のみ。AI の出力は含まない。`question_text` はその記録の skill_version の質問集の文で、見つからなければ null。フロントは null のとき `history.previous_question` を出す。`visits` は下の「UI の見直しで足した経路」） |
-| `POST /api/visit` | `{reception_no}`（Cookie で患者識別） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |
+| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], fixed_rules: [{question_key, threshold_celsius, patient_string_key}], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない。`fixed_rules` は画面のコードで比べる規則で、体温はサーバーに送らない） |
+| `POST /api/visit` | `{reception_no, entries?}`（Cookie で患者識別。`entries` は §12） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |
+
+記録の経路（`POST`・`GET /{pid}/entries`、`POST /{pid}/entries/{id}/undo`）は外した。記録はスマホに置く（§12）。
 
 - Cookie の pid と経路の `{pid}` が違えば 403。患者 API のモジュールは `reports`・`timelines`・pipeline を import しない（アーキテクチャテスト）
 - 患者画面に出る文字列は `patient_strings.json` と、医師が承認した Skill の質問文だけ
@@ -315,9 +316,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 ### UI の見直しで足した経路（2026-11-04 午後、修正ボード）
 | 経路 | 応答 |
 |---|---|
-| `POST /api/patient/{pid}/entries/{entry_id}/undo` | `{ok: true}`。本人の「つらくて書けない」の記録で、作ってから10分以内（`UNDO_WINDOW`）・その後に受付が無いものだけ消す（`db.undo_too_sick_entry`）。他人の記録・無い記録は 404 `not_found`、条件に合わなければ 409 `not_undoable`（P2-5） |
 | `GET /api/doctor/patients`（追加項目） | 各患者に `last_record_date`・`current_course_no`（`config.today()` の今コース）・`next_visit`（今コースの次回受診予定日。今日より前なら null）。無ければ null（D3-2） |
-| `GET /api/patient/{pid}/entries`（追加項目） | `visits: [{visit_date, received_at}]`: 本人の受診日（受付のあった日。状態・印刷済み・期限切れを問わない）と、その日の最初の受付の時刻（+09:00）を新しい順。1日1件（`db.list_visit_days`）。受付番号・状態・id・レポート・未処理の件数は返さない。P2 は受付の時刻の位置に「受診日 11月9日（月）」の区切り（`history.visit_day`）を入れる（受付と同じ時刻の記録は受付の前とみなす） |
 | `GET /api/doctor/patients/{pid}/visits` | その患者の受診を新しい順（印刷済み・期限切れも）。受付番号は消えていれば null、`report_available` は開ける ready か（D4-1） |
 | `GET /api/doctor/patients/{pid}/entries` | 直近30件と総数。クローズ回答はコードのまま、自由記載は有無（`has_free_text`）だけで原文は返さない（D4-1） |
 | `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | 各記録に `marks: [{start, end}]`（原文の中の疑われた語の位置、code point）。原文の中で見つからない区間には付けない（D7-2） |
@@ -404,7 +403,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `push/dispatch.py` | `send_due_once(settings, sender, at=None) -> PushCounts`（全ての登録を判定して送る。1件の失敗で止めない）、`send_test_once(settings, sender, subscription_id)`（試送。印・期間・時刻を見ず、`last_sent_date` も使わない）。送れなかったときのログは型名と状態コード（`push.send_failed error_type=... status=...`）、試送の結果は `push.test_done result=...`。仮名ID・endpoint は出さない |
 | `api/patient_push.py` | 下の4経路。`PushTestLimiter`（プロセス内の dict。登録ごとに1分に1回、患者ごとに1分に登録の上限の回数まで）、`is_push_service_url`、`send_test_later` |
 | `api/app.py` | `_install_push`（`app.state.push_sender`・`push_public_key`・`push_test_limiter`・`push_test_delay_s`）、`_push_loop`（`PUSH_INTERVAL_S` = 60 秒ごとに `asyncio.to_thread(send_due_once, ...)`。`_purge_loop` と同じく lifespan の中。`--workers 1` が前提）。`create_app(push_sender=...)` で偽物に差し替える |
-| `db/repo_record_marks.py` | `upsert_mark_row`（`insert_entry_rows` の中で呼ぶので、どの経路で記録を入れても同じトランザクションで印が付く）、`clear_mark_if_no_entries`（取り消しの後）、`marked_patients`、`backfill_record_marks`（`init_db` のたび。今ある印は変えない） |
+| `db/repo_record_marks.py` | `add_record_mark`・`undo_record_mark`（§12）、`upsert_mark_row`（`insert_entry_rows` の中でも呼ぶので、seed と `add_entry` は行と同じトランザクションで印が付く）、`marked_patients`、`last_record_dates`（D1）、`backfill_record_marks`（`init_db` のたび。今ある印は変えない。受付で受け取った行は数えない） |
 | `db/repo_push.py` | `upsert_push_subscription`（endpoint で一意。同じ患者なら `last_sent_date` を保ち、別の患者の番号で登録し直したら行をその患者に移し、その患者の消した登録の送信日を引き継ぐ。1人の患者の行は `MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT` = 5 までで、超えたら今の endpoint 以外の古い行を消す。消す行の送信日も残す）、`claim_push_send`・`release_push_send`、削除と読み出し |
 | `scripts/gen_vapid.py` | 鍵を標準出力に出すだけ。ファイルに書かない |
 
@@ -438,3 +437,39 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `patient/useClearNotifications.ts` | アプリを開いたとき・戻ってきたときに、バッジと表示中の通知を消す（`PatientLayout`） |
 
 **動かす環境**: 通知には HTTPS が要る。手順は `README.md` の「動かし方」（Tailscale Funnel → `vite preview` の 5173 → `/api` は 8000 へ。開発サーバーは出さない）。実機の確認は未実施（仕様書 §9）。
+
+## 12. スマホ保存の backend（PR B。`docs/plan-device-records.md` §5）
+
+決まりは仕様書 §5。ここには実装の形だけを書く。記録の中身はスマホに置き、受付のときだけサーバーへ届く。変換は今までどおり `entries` を読む。
+
+| ファイル | 中身 |
+|---|---|
+| `api/patient_device.py` | 下の表の印・範囲・受診日・登録の解除。本文に記録の中身の欄を持たない |
+| `api/patient_demo.py` | 撮影の見本（`TSUTAE_DEMO_TOOLS=1`。`Settings.demo_tools`） |
+| `api/visit_entries.py` | 受付の記録の本文（`VisitEntryIn`）と検査（`received_entries`）、送る範囲（`visit_window_of`） |
+| `api/skill_questions.py` | `version_questions`（その版の質問集） |
+| `api/body_limit.py` | `BodyLimit`。`POST /api/visit` の本文を読みながら数え、5MB を超えたら 413 `body_too_large` |
+| `db/repo_received.py` | `ReceivedEntry`、`insert_received_rows`（ある ID は飛ばす）、`erase_received_rows`（開いた受診が他に無ければ消す）。呼び出し側のトランザクションの中で動く |
+| `db/repo_visits.py` | `create_visit_once(..., entries)` で受診と記録を同じトランザクションに。`mark_printed`・`purge_expired` が同じトランザクションで受け取った記録を消す |
+| `scripts/seed_demo.py --device-records` | 患者・コース・日付の印だけを入れる。既定の動きは変えない |
+
+| 経路 | 入力 | 出力 |
+|---|---|---|
+| `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計） |
+| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark}` | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある → 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（後から付いた印は残す）。何度呼んでもよい |
+| `GET /api/patient/{pid}/visit-window` | — | `{start, end}`（前コースの Day1〜今日。前コースが無ければ今コースの Day1）。今コースが無ければ 409 `no_course` |
+| `GET /api/patient/{pid}/visit-days` | — | `{visits: [{visit_date, received_at}]}`（新しい順。受付番号・状態は返さない） |
+| `POST /api/patient/{pid}/unregister` | `{endpoint}`（string か null） | `{ok: true}` + Cookie を消す。その登録を消す。`record_marks` は消さない |
+| `GET /api/patient/{pid}/demo-config` | — | `{demo_tools}`（環境変数があり、デモ患者のときだけ true） |
+| `GET /api/patient/{pid}/demo-entries` | — | `{entries: 端末の形}`（今日までの合成データ。ID は `demo-<seq>`）。それ以外は 404 |
+
+**端末の形**（`demo-entries`・IndexedDB）: `{pid, client_entry_id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}`
+
+**受付で送る形**（`POST /api/visit` の `entries[]`）: 端末の形から `pid` と `question_text` を外したもの。知らない項目は 422。
+
+- 検査: 500 件まで。ID は小文字の UUID か `demo-<数字>`（同じ本文に同じ ID があれば 422）。`recorded_at` は時差つきで、JST の日付が `record_date` と同じ。`kind` は中身と合う。記録日は範囲内。`skill_version` はこの患者のレジメンの登録済みの版で、回答はその版の質問集に照らす。1件でも不正なら全体を 422 にして受診も作らない。今コースが無ければ 409 `no_course`
+- 同じ患者の同じ ID は入れない。送り直しで新しい ID の記録が増えても変換はし直さない（PR C の範囲）
+- 受け取った記録は日付の印を書かない。起動時の `backfill_record_marks` も数えない
+- 印刷済み・期限切れで、その患者に開いた受診（受付番号が残り期限内）が他に無ければ、`client_entry_id` のある行を消す。`client_entry_id` の無い行と日付の印は消さない
+- D1 の最後の記録日は `record_marks` から出す。D2 の記録の一覧はそのまま（受付の間だけ行がある）
+- `fixed_rules.notices_for` は Python の側の判定で、画面のコードと同じ表（`frontend/src/test/fixtures/fixed_rule_cases.json`）で確かめる

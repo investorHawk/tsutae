@@ -1,6 +1,6 @@
 {
   "method": "GET",
-  "path": "/api/patient/P-DEMO0001/entries",
+  "path": "/api/patient/P-DEMO0001/visit-days",
   "request": null,
   "status": 401,
   "body": {

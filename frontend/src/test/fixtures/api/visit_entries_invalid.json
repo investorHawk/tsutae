@@ -1,0 +1,28 @@
+{
+  "method": "POST",
+  "path": "/api/visit",
+  "request": {
+    "reception_no": "A-023",
+    "entries": [
+      {
+        "client_entry_id": "11111111-1111-4111-8111-111111111111",
+        "recorded_at": "2026-11-09T10:00:00.000000+09:00",
+        "record_date": "2026-11-09",
+        "kind": "answers",
+        "by_proxy": false,
+        "skill_version": "regimen-folfox@1",
+        "answers": [
+          {
+            "question_key": "unknown_question",
+            "value": "none"
+          }
+        ],
+        "free_text": null
+      }
+    ]
+  },
+  "status": 422,
+  "body": {
+    "error": "invalid_input"
+  }
+}

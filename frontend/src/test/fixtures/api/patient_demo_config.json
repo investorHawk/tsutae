@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/patient/P-DEMO0001/demo-config",
+  "request": null,
+  "status": 200,
+  "body": {
+    "demo_tools": true
+  }
+}

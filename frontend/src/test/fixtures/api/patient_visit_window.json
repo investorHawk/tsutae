@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/patient/P-DEMO0001/visit-window",
+  "request": null,
+  "status": 200,
+  "body": {
+    "start": "2026-10-13",
+    "end": "2026-11-09"
+  }
+}

@@ -415,7 +415,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 
 - **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は登録を消す。応答の前にタイムアウトしたときだけ二重に届く余地がある
 - **鍵**: `TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（`mailto:` か `https://`）。全て無ければ警告なしで使えない。欠け（`missing`）・subject の誤り（`bad_subject`）・読めない鍵（例外の型名）・組でない（`key_mismatch`）は警告に理由のコードだけを出して使えない。どれも起動は止めない
-- **入力の検査**: endpoint は既知の送信サービスの https だけ（`fcm.googleapis.com`・`*.push.apple.com`・`*.push.services.mozilla.com`・`*.notify.windows.com`。ポートは 443、ユーザー情報は不可）。p256dh は 65 バイトの P-256 の点、auth は 16 バイト
+- **入力の検査**: endpoint は既知の送信サービスの https だけ（`fcm.googleapis.com`・`*.push.apple.com`・`*.push.services.mozilla.com`・`*.notify.windows.com`。ポートは 443、ユーザー情報は不可）。`\` を受けず、ホストは英数字・`.`・`-` だけで、送信に使う urllib3 の読み方でも同じホストになること。本物の送信はリダイレクトを追わない。p256dh は 65 バイトの P-256 の点、auth は 16 バイト
 - **ログ**: 件数と例外の型名だけ。仮名ID・endpoint・例外の文面を出さない
 - **守ること**: 通知のモジュールは `reports`・`timelines`・`regimen_drafts` を読まない。本文は全ての患者で同じ（`tests/test_architecture.py`）
 

@@ -34,6 +34,7 @@ from push_helpers import (
 
 from tsutae.push.payload import notification_payload
 from tsutae.push.sender import (
+    SEND_TIMEOUT_S,
     PushSendError,
     PushTarget,
     WebPushSender,
@@ -209,3 +210,26 @@ def test_padded_public_key_is_normalized(tmp_path: Path) -> None:
     )
     assert config is not None
     assert config.public_key == overrides["vapid_public_key"]
+
+
+def test_real_send_does_not_follow_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """宛先の検査はリダイレクトの先に効かないので、追わない（SSRF の守り）。"""
+    posted: list[dict[str, Any]] = []
+
+    def fake_post(url: str, **kwargs: Any) -> FakeResponse:
+        posted.append({"url": url, **kwargs})
+        return FakeResponse(status_code=307, reason="Temporary Redirect")
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    settings = make_settings(tmp_path, **vapid_overrides())
+    config = load_vapid(settings)
+    assert config is not None
+    with pytest.raises(PushSendError) as caught:
+        WebPushSender(config)(_target(), notification_payload())
+    assert caught.value.status_code == 307
+    (call,) = posted
+    assert call["url"] == ENDPOINT
+    assert call["allow_redirects"] is False
+    assert call["timeout"] == SEND_TIMEOUT_S

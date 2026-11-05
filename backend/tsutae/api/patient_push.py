@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import APIRouter, BackgroundTasks, FastAPI, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from urllib3.util import parse_url
 
 from tsutae import db
 from tsutae.api.deps import ApiError, AppSettings, Conn, require_patient
@@ -53,7 +54,8 @@ _PUSH_HOST_SUFFIXES = (
     ".push.services.mozilla.com",
     ".notify.windows.com",
 )
-_URL_CHARS = re.compile(r"[\x21-\x7e]+")
+_URL_CHARS = re.compile(r"[\x21-\x5b\x5d-\x7e]+")  # 表示できる ASCII のうち「\」以外
+_HOST_NAME = re.compile(r"[a-z0-9-]+(?:\.[a-z0-9-]+)*")
 _B64URL = re.compile(r"[A-Za-z0-9_-]+")
 _NOTIFY_TIME = re.compile(r"(?:[01][0-9]|2[0-3]):(?:00|30)")
 _P256DH_LENGTH = 65
@@ -61,17 +63,30 @@ _AUTH_LENGTH = 16
 _log = logging.getLogger(__name__)
 
 
+def _host_as_sent(url: str) -> str | None:
+    """送信に使う requests（urllib3）が読むホスト。urlsplit と読み方が違うことがある。"""
+    host = parse_url(url).host
+    return None if host is None else host.lower()
+
+
 def is_push_service_url(url: str) -> bool:
-    """既知の送信サービスの https の URL か（他の宛先へサーバーから要求を出さない）。"""
+    """既知の送信サービスの https の URL か（他の宛先へサーバーから要求を出さない）。
+
+    検査と送信で URL の読み方が違うと検査が抜ける（「\\」など）ので、「\\」を受けず、
+    ホストは名前に使う文字だけにして、送信側の読み方でも同じホストになることを確かめる。
+    """
     if not _URL_CHARS.fullmatch(url):
         return False
     try:
         parts = urlsplit(url)
         host = (parts.hostname or "").lower()
         port = parts.port
+        host_as_sent = _host_as_sent(url)
     except ValueError:
         return False
     if parts.scheme != "https" or parts.username is not None or port not in (None, 443):
+        return False
+    if not _HOST_NAME.fullmatch(host) or host_as_sent != host:
         return False
     return host in _PUSH_HOSTS or host.endswith(_PUSH_HOST_SUFFIXES)
 

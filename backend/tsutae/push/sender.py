@@ -17,6 +17,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+import requests
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
@@ -109,12 +110,23 @@ def load_vapid(settings: Settings) -> VapidConfig | None:
     return VapidConfig(public_key=public, subject=subject, signer=signer)
 
 
+class _NoRedirects:
+    """既定の送信先。リダイレクトを追わない（追うと、検査していない宛先へ要求が出る）。
+
+    `webpush` に追わない指定が無いので、使われる `post` の形で requests を包む。3xx は
+    `webpush` がエラーにする。
+    """
+
+    def post(self, url: str, **kwargs: Any) -> requests.Response:
+        return requests.post(url, allow_redirects=False, **kwargs)
+
+
 class WebPushSender:
     """本物の送信。session は requests.Session の形のもの（テストで送信先を差し替える）。"""
 
     def __init__(self, config: VapidConfig, *, session: Any = None) -> None:
         self._config = config
-        self._session = session
+        self._session = session if session is not None else _NoRedirects()
 
     def __call__(self, target: PushTarget, payload: str) -> None:
         try:

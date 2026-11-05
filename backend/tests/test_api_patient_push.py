@@ -8,9 +8,11 @@ import logging
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import http_ece
 import pytest
+import requests
 from api_helpers import (
     FakePushSender,
     add_patient,
@@ -166,6 +168,19 @@ def test_time_must_be_on_the_half_hour(client: TestClient, time_value: str) -> N
         "https://evilweb.push.apple.com.example/x",
         "https://user:pw@web.push.apple.com/x",
         "https://evil.example\\@web.push.apple.com/x",
+        # 「\\」: urlsplit はホストの一部と読むが、requests は手前までをホストと読む
+        "https://evil.example\\.push.apple.com/x",
+        "https://internal.example\\.push.apple.com/x",
+        "https://127.0.0.1\\.push.apple.com/x",
+        "https://169.254.169.254\\.push.apple.com/x",
+        "https://localhost\\.notify.windows.com/x",
+        "https://web.push.apple.com\\x",
+        "https://web.push.apple.com/x\\y",
+        "https://evil.example?.push.apple.com/x",
+        "https://evil.example#.push.apple.com/x",
+        "https://evil.example;.push.apple.com/x",
+        "https://evil%2Eexample.push.apple.com/x",
+        "https://.push.apple.com/x",
         "https://web.push.apple.com:8443/x",
         "https://web.push.apple.com/x\ny",
         "https://web.push.apple.com/ x",
@@ -197,6 +212,31 @@ def test_known_push_services_are_accepted(client: TestClient, endpoint: str) -> 
     pid = _ready(client)
     r = client.put(_url(pid), json=subscription_body(endpoint=endpoint))
     assert r.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "https://web.push.apple.com/QAbc",
+        "https://fcm.googleapis.com/fcm/send/abc:def",
+        "https://wns2-par02p.notify.windows.com/w/?token=abc",
+        "https://evil.example\\.push.apple.com/x",
+        "https://127.0.0.1\\.push.apple.com/x",
+        "https://evil.example?.push.apple.com/x",
+        "https://evil.example#.push.apple.com/x",
+        "https://user:pw@web.push.apple.com/x",
+        "https://evil.example\\@web.push.apple.com/x",
+        "https://web.push.apple.com.evil.example/x",
+    ],
+)
+def test_accepted_url_goes_to_the_same_host_when_sent(endpoint: str) -> None:
+    """検査を通る URL は、実際に送る requests でも送信サービスのホストになる。"""
+    if not patient_push.is_push_service_url(endpoint):
+        return
+    sent_to = urlsplit(requests.Request("POST", endpoint).prepare().url).hostname
+    assert sent_to == "fcm.googleapis.com" or sent_to.endswith(
+        (".push.apple.com", ".notify.windows.com")
+    )
 
 
 @pytest.mark.parametrize(

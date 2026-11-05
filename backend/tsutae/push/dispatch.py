@@ -7,6 +7,8 @@
   やり直せるが、窓を過ぎたら送らない。1回送れた後は送らない
 - ログは件数と例外の型名、送信先が返した状態コードだけ。仮名ID・endpoint・例外の文面を出さない
   （exc_info も付けない）。状態コードで 403（鍵や subject の誤り）と 5xx（一時的な失敗）を見分ける
+- 件数と試送の結果も WARNING で出す。uvicorn の既定は root を設定しないので、INFO だと
+  サーバーのログに残らない（実機の確認の手掛かりはログだけ）。回数は送った分だけで、毎分は出ない
 """
 
 from __future__ import annotations
@@ -187,7 +189,7 @@ def send_due_once(
         conn.close()
     counts = PushCounts(**results)
     if results:
-        _log.info(
+        _log.warning(
             "push.done sent=%d gone=%d failed=%d skipped=%d",
             counts.sent,
             counts.gone,
@@ -210,7 +212,7 @@ def send_test_once(
         if result == "gone":
             _remove_gone(conn, subscription, now())
         # 応答はもう返しているので、届かない理由を調べる手がかりはログだけ
-        _log.info("push.test_done result=%s", result)
+        _log.warning("push.test_done result=%s", result)
         return result
     finally:
         conn.close()

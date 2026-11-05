@@ -520,3 +520,40 @@ def test_test_send_logs_success_without_the_device(
         assert send_test_once(settings, FakePushSender(), saved.id) == "sent"
     assert "push.test_done result=sent" in caplog.text
     assert ENDPOINT not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("errors", "result"),
+    [
+        ({}, "sent"),
+        ({ENDPOINT: PushSendError(410)}, "gone"),
+        ({ENDPOINT: PushSendError(403)}, "failed"),
+    ],
+)
+def test_test_send_result_stays_at_the_default_log_level(
+    settings: Settings,
+    conn: sqlite3.Connection,
+    caplog: pytest.LogCaptureFixture,
+    errors: dict[str, Exception],
+    result: str,
+) -> None:
+    """uvicorn の既定は root を設定せず、実効レベルは WARNING のまま。それでも残る。"""
+    saved = _subscribe(conn)
+    with caplog.at_level(logging.WARNING):
+        assert send_test_once(settings, FakePushSender(errors=errors), saved.id) == (
+            result
+        )
+    assert f"push.test_done result={result}" in caplog.text
+    assert ENDPOINT not in caplog.text
+    assert PID not in caplog.text
+
+
+def test_daily_counts_stay_at_the_default_log_level(
+    settings: Settings, conn: sqlite3.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    _subscribe(conn)
+    with caplog.at_level(logging.WARNING):
+        send_due_once(settings, FakePushSender(), AT)
+    assert "push.done sent=1 gone=0 failed=0 skipped=0" in caplog.text
+    assert ENDPOINT not in caplog.text
+    assert PID not in caplog.text

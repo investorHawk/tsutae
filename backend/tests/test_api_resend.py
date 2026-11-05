@@ -1,7 +1,5 @@
-"""患者の送り直し（タイムアウトの後）で二重にしないこと。
+"""患者の受付の送り直し（タイムアウトの後）で二重にしないこと。記録の ID は test_api_visit_entries。
 
-- `POST /api/patient/{pid}/entries`: 同じ患者・同じ内容の記録が直近 120 秒以内にあれば、
-  新しく作らずその entry_id と notices を返す
 - `POST /api/visit`: 同じ患者で、受付番号が残っていて期限内の受診が今日すでにあり、
   正規化した受付番号が同じなら、新しく作らず生成も起動しない
 """
@@ -18,17 +16,10 @@ from fastapi.testclient import TestClient
 from pipeline_fakes import FakeRunner
 
 from tsutae import db
-from tsutae.config import jst_datetime, now, today
-from tsutae.schemas import ClosedAnswer, EntryCreate
+from tsutae.config import now, today
+from tsutae.schemas import EntryCreate
 
 C3 = [(1, date(2026, 9, 27)), (2, date(2026, 10, 13)), (3, date(2026, 10, 27))]
-FEVER = {
-    "answers": [
-        {"question_key": "fever", "value": "measured", "temperature": 38.2},
-        {"question_key": "diarrhea", "value": "present"},
-    ],
-    "free_text": "（合成）だるい",
-}
 
 
 @pytest.fixture
@@ -57,133 +48,6 @@ def _entries(client: TestClient, pid: str) -> list[Any]:
 def _visits(client: TestClient) -> list[dict[str, Any]]:
     with db_conn(client.app) as conn:
         return db.list_visits(conn)
-
-
-# ---------------------------------------------------------------------------
-# 記録
-# ---------------------------------------------------------------------------
-
-
-def test_same_entry_twice_is_saved_once(client: TestClient, pid: str) -> None:
-    url = f"/api/patient/{pid}/entries"
-    first = client.post(url, json=FEVER)
-    second = client.post(url, json=FEVER)
-    assert first.status_code == second.status_code == 200
-    assert second.json() == first.json()
-    assert first.json()["notices"]  # 38.0 以上の注意も同じく返す
-    assert len(_entries(client, pid)) == 1
-
-
-def test_same_entry_normalized_is_saved_once(client: TestClient, pid: str) -> None:
-    """回答の順・自由記載の前後の空白・既定値の有無が違っても同じ内容。"""
-    url = f"/api/patient/{pid}/entries"
-    first = client.post(url, json=FEVER)
-    reordered = {
-        "too_sick": False,
-        "by_proxy": False,
-        "answers": list(reversed(FEVER["answers"])),
-        "free_text": "  （合成）だるい \n",
-    }
-    second = client.post(url, json=reordered)
-    assert second.json()["entry_id"] == first.json()["entry_id"]
-    assert len(_entries(client, pid)) == 1
-
-
-def test_too_sick_twice_is_saved_once(client: TestClient, pid: str) -> None:
-    url = f"/api/patient/{pid}/entries"
-    ids = {client.post(url, json={"too_sick": True}).json()["entry_id"] for _ in "12"}
-    assert len(ids) == 1
-    assert len(_entries(client, pid)) == 1
-
-
-@pytest.mark.parametrize(
-    "other",
-    [
-        {**FEVER, "free_text": "（合成）だるい。少し"},
-        {**FEVER, "by_proxy": True},
-        {"answers": FEVER["answers"][:1], "free_text": FEVER["free_text"]},
-        {"too_sick": True},
-    ],
-)
-def test_different_entry_is_saved(client: TestClient, pid: str, other: dict) -> None:
-    url = f"/api/patient/{pid}/entries"
-    first = client.post(url, json=FEVER).json()["entry_id"]
-    second = client.post(url, json=other).json()["entry_id"]
-    assert first != second
-    assert len(_entries(client, pid)) == 2
-
-
-def test_same_entry_after_120_seconds_is_saved(client: TestClient, pid: str) -> None:
-    entry = EntryCreate.model_validate(FEVER)
-    with db_conn(client.app) as conn:
-        old = db.add_entry(
-            conn, pid, entry, now() - timedelta(seconds=121), "regimen-folfox@1"
-        )
-    r = client.post(f"/api/patient/{pid}/entries", json=FEVER)
-    assert r.json()["entry_id"] != old.id
-    assert len(_entries(client, pid)) == 2
-
-
-def test_same_entry_of_other_patient_is_saved(client: TestClient, pid: str) -> None:
-    entry = EntryCreate.model_validate(FEVER)
-    other = add_patient(client.app, courses=C3)
-    with db_conn(client.app) as conn:
-        db.add_entry(conn, other, entry, now(), "regimen-folfox@1")
-    r = client.post(f"/api/patient/{pid}/entries", json=FEVER)
-    assert r.status_code == 200
-    assert len(_entries(client, pid)) == 1
-    assert len(_entries(client, other)) == 1
-
-
-def test_add_entry_once_returns_existing(client: TestClient, pid: str) -> None:
-    entry = EntryCreate(
-        answers=[ClosedAnswer(question_key="nausea", value="present")],
-        free_text="（合成）むかむか",
-    )
-    window = timedelta(seconds=120)
-    with db_conn(client.app) as conn:
-        at = now()
-        first = db.add_entry_once(conn, pid, entry, at, "regimen-folfox@1", window)
-        again = db.add_entry_once(
-            conn, pid, entry, at + timedelta(seconds=119), "regimen-folfox@1", window
-        )
-        later = db.add_entry_once(
-            conn, pid, entry, at + timedelta(seconds=121), "regimen-folfox@1", window
-        )
-    assert again.id == first.id
-    assert later.id != first.id
-
-
-def test_add_entry_once_new_skill_version_is_a_new_entry(
-    client: TestClient, pid: str
-) -> None:
-    # D4 の承認で版が上がった直後の同じ内容の記録は、別の記録（記録ごとに版を持つ）
-    entry = EntryCreate(free_text="（合成）むかむか")
-    window = timedelta(seconds=120)
-    with db_conn(client.app) as conn:
-        at = now()
-        first = db.add_entry_once(conn, pid, entry, at, "regimen-folfox@1", window)
-        after = db.add_entry_once(
-            conn, pid, entry, at + timedelta(seconds=30), "regimen-folfox@2", window
-        )
-    assert after.id != first.id
-    assert after.skill_version == "regimen-folfox@2"
-
-
-def test_add_entry_once_across_midnight_is_a_new_entry(
-    client: TestClient, pid: str
-) -> None:
-    # 23:59 と 0:00 の同じ内容は別の日の記録（1日に複数回・日ごとに数える）
-    entry = EntryCreate(free_text="（合成）だるい")
-    window = timedelta(seconds=120)
-    late = jst_datetime(date(2026, 11, 8), 23, 59)
-    with db_conn(client.app) as conn:
-        first = db.add_entry_once(conn, pid, entry, late, "regimen-folfox@1", window)
-        next_day = db.add_entry_once(
-            conn, pid, entry, late + timedelta(seconds=90), "regimen-folfox@1", window
-        )
-    assert next_day.id != first.id
-    assert next_day.record_date == date(2026, 11, 9)
 
 
 # ---------------------------------------------------------------------------

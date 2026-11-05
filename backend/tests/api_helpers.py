@@ -20,16 +20,17 @@
   署名で直接作る。医師 API が無くても使える）
 - 通知の sender は `FakePushSender`（既定。本物の送信に出ない）。VAPID の鍵は環境変数に
   左右されないよう既定で無し（鍵ありのテストは `push_helpers.vapid_overrides()` を渡す）
+- 撮影用の見本も環境変数に左右されないよう既定で無し（ありのテストは `demo_tools=True`）
 """
 
 from __future__ import annotations
 
 import importlib.util
 import sqlite3
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -69,6 +70,7 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         vapid_public_key=None,
         vapid_private_key=None,
         vapid_subject=None,
+        demo_tools=False,
     )
     return replace(base, **overrides)
 
@@ -195,6 +197,21 @@ def add_entry(
 ) -> int:
     with db_conn(app) as conn:
         return db.add_entry(conn, pid, entry, now(), skill_version).id
+
+
+def record_entry(client: TestClient, pid: str, body: Mapping[str, Any]) -> int:
+    """記録を1件サーバーに置いて id を返す（変換・D2 など、記録がある前提のテスト用）。
+
+    患者 API に記録の経路は無いので DB に直接入れる。今の版と時刻は記録の順序と同じく
+    `GET /questions` と `POST /record-marks` から受け取るので、印も付く。
+    """
+    url = f"/api/patient/{pid}"
+    version = client.get(f"{url}/questions").json()["skill_version"]
+    mark = client.post(f"{url}/record-marks").json()
+    entry = EntryCreate.model_validate(body)
+    at = datetime.fromisoformat(mark["recorded_at"])
+    with db_conn(client.app) as conn:
+        return db.add_entry(conn, pid, entry, at, version).id
 
 
 def register(client: TestClient, pid: str) -> Any:

@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from api_helpers import api_client, login_doctor, register
+from api_helpers import api_client, login_doctor, record_entry, register
 from e2e_scripts import grid_row, live_prepared, post_visit, report_html, section
 from fastapi.testclient import TestClient
 from pipeline_fakes import FakeRunner, Step, standard_steps
@@ -205,8 +205,7 @@ def _patient_with_records(client: TestClient, monkeypatch: pytest.MonkeyPatch) -
         monkeypatch.setenv("TSUTAE_TODAY", day)
         body = client.get(f"/api/patient/{pid}/questions").json()
         assert body["skill_version"] == f"{NAME}@1"
-        r = client.post(f"/api/patient/{pid}/entries", json=_entry_body(spec))
-        assert r.status_code == 200, (day, r.text)
+        record_entry(client, pid, _entry_body(spec))
     monkeypatch.setenv("TSUTAE_TODAY", TODAY)
     login_doctor(client)  # 日付を動かしたので医師の Cookie を取り直す
     return pid

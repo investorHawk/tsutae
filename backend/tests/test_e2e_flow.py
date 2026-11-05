@@ -1,7 +1,7 @@
 """デモの筋書きを TestClient で通す結合テスト（docs/spec.md 3・6・9・10・11 節、docs/plan.md）。
 
 筋書き: 合成3人を投入 → 医師がログインして患者一覧・コース → 患者が登録・質問集・記録
-（38.0℃で固定規則、つらくて書けない、家族の代わり入力）・履歴 → 受付（A-023）→
+（38.0℃で固定規則、つらくて書けない、家族の代わり入力）→ 受付（A-023）→
 台本どおりの FakeRunner（正解ラベルが AI の結果）で ready → 医師がレポートを読む →
 D6（未処理の原文）・D5（Hook の発火、文面なし）→ 印刷済みで削除。別の筋として
 runner の失敗・タイムアウト（AI変換なし）、D4（質問を足す → 承認 → 翌日の質問集と
@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from api_helpers import db_conn, register
+from api_helpers import db_conn, record_entry, register
 from claude_agent_sdk import ClaudeSDKError
 from e2e_scripts import (
     DEMO_PID,
@@ -49,10 +49,12 @@ from fastapi.testclient import TestClient
 from pipeline_fakes import RaisingRunner, SlowRunner
 
 from tsutae import db
+from tsutae.api.fixed_rules import notices_for
 from tsutae.config import BACKEND_ROOT
 from tsutae.pipeline.prompt import JSON_FENCE
 from tsutae.pipeline.tools import EMIT_REPORT_TOOL, EMIT_TIMELINE_TOOL
 from tsutae.report.labels import has_severity_word
+from tsutae.schemas import EntryCreate
 from tsutae.skills import load_regimen_skill
 from tsutae.synthetic import all_patients
 
@@ -60,16 +62,6 @@ FOLFOX_KEYS = ["numbness", "diarrhea", "stomatitis", "nausea_appetite", "fever"]
 SYNTHETIC_IDS = {p.patient_id for p, _labels in all_patients()}
 UNPROCESSED_TEXT = "磯鷲さんにもらった漢方をのんでみた。おなかがあったかい感じ"
 PROXY_TEXT = "家族が代わりに入力。夕方は少しだけ食べられた"
-ENTRY_KEYS = {
-    "id",
-    "recorded_at",
-    "record_date",
-    "kind",
-    "by_proxy",
-    "skill_version",
-    "answers",
-    "free_text",
-}
 
 
 def _answers(fever: float | None = None, **values: str) -> list[dict[str, Any]]:
@@ -84,18 +76,6 @@ def _answers(fever: float | None = None, **values: str) -> list[dict[str, Any]]:
     extra = {k: v for k, v in values.items() if k not in FOLFOX_KEYS}
     out += [{"question_key": k, "value": v} for k, v in extra.items()]
     return out
-
-
-def _post_entry(client: TestClient, body: dict[str, Any], pid: str = DEMO_PID) -> Any:
-    r = client.post(f"/api/patient/{pid}/entries", json=body)
-    assert r.status_code == 200, r.text
-    return r.json()
-
-
-def _history(client: TestClient, pid: str = DEMO_PID) -> list[dict[str, Any]]:
-    r = client.get(f"/api/patient/{pid}/entries")
-    assert r.status_code == 200, r.text
-    return r.json()["entries"]
 
 
 @pytest.fixture
@@ -149,22 +129,22 @@ TODAY_BODIES: list[dict[str, Any]] = [
 ]
 
 
-def record_today(client: TestClient) -> list[dict[str, Any]]:
+def record_today(client: TestClient) -> list[int]:
     """TODAY_BODIES をこの順に記録する。"""
-    return [_post_entry(client, body) for body in TODAY_BODIES]
+    return [record_entry(client, DEMO_PID, body) for body in TODAY_BODIES]
 
 
 def _patient_view(client: TestClient) -> dict[str, Any]:
-    """患者画面が読む応答（履歴と質問集）そのもの。"""
+    """患者画面が読む応答（受診日と質問集）そのもの。"""
     out: dict[str, Any] = {}
-    for name in ("entries", "questions"):
+    for name in ("visit-days", "questions"):
         r = client.get(f"/api/patient/{DEMO_PID}/{name}")
         assert r.status_code == 200, r.text
         out[name] = r.json()
     return out
 
 
-def test_patient_registers_records_and_sees_history(client: TestClient) -> None:
+def test_patient_registers_records_and_gets_fixed_rules(client: TestClient) -> None:
     r = client.post("/api/patient/register", json={"pid": "P-ZZZZZZZZ"})
     assert r.status_code == 404 and r.json() == {"error": "unknown_patient"}
     assert register(client, DEMO_PID).json() == {"ok": True}
@@ -173,45 +153,28 @@ def test_patient_registers_records_and_sees_history(client: TestClient) -> None:
     body = r.json()
     assert body["skill_version"] == "regimen-folfox@1"
     assert [q["key"] for q in body["questions"]] == FOLFOX_KEYS
-    texts = {q["key"]: q["text"] for q in body["questions"]}
-    fever38, fever379, too_sick, proxy = record_today(client)
-    assert fever38["notices"] == ["fixed_rule.fever_38"]
-    assert fever379["notices"] == []
-    assert too_sick["notices"] == [] and proxy["notices"] == []
+    assert body["fixed_rules"] == [
+        {
+            "question_key": "fever",
+            "threshold_celsius": 38.0,
+            "patient_string_key": "fixed_rule.fever_38",
+        }
+    ]
     strings = client.get("/api/patient/strings").json()
     assert "38.0℃以上" in strings["fixed_rule.fever_38"]
-    history = _history(client)
-    assert len(history) == 40 + 4
-    mine = {e["id"]: e for e in history[-4:]}
-    assert all(set(e) == ENTRY_KEYS for e in history)  # AI の出力は含まない
-    assert [
-        mine[x["entry_id"]]["kind"] for x in (fever38, fever379, too_sick, proxy)
-    ] == [
-        "answers",
-        "answers",
-        "too_sick",
-        "mixed",
+    skill = load_regimen_skill("FOLFOX", client.app.state.settings.skills_dir)
+    notices = [
+        notices_for(EntryCreate.model_validate(body), skill) for body in TODAY_BODIES
     ]
-    assert mine[proxy["entry_id"]]["by_proxy"] is True
-    assert mine[proxy["entry_id"]]["free_text"] == PROXY_TEXT
-    assert {e["record_date"] for e in mine.values()} == {"2026-11-09"}
-    for entry in history:
-        for a in entry["answers"]:
-            assert a["question_text"] == texts[a["question_key"]]
-    temps = [a["temperature"] for a in mine[fever38["entry_id"]]["answers"]]
-    assert 38.0 in temps
-
-
-def test_patient_cannot_read_other_patient(client: TestClient) -> None:
-    register(client, DEMO_PID)
-    other = sorted(SYNTHETIC_IDS - {DEMO_PID})[0]
-    assert client.get(f"/api/patient/{other}/entries").status_code == 403
-    assert client.get(f"/api/patient/{other}/questions").status_code == 403
-
-
-# ---------------------------------------------------------------------------
-# (4)〜(8) 受付 → AI の結果つきレポート → D6・D5 → 印刷済み
-# ---------------------------------------------------------------------------
+    assert notices == [["fixed_rule.fever_38"], [], [], []]
+    fever38, _fever379, too_sick, proxy = record_today(client)
+    with db_conn(client.app) as conn:
+        saved = {e.id: e for e in db.list_entries(conn, DEMO_PID)}
+    assert len(saved) == 40 + 4
+    assert saved[fever38].kind == "answers" and saved[too_sick].kind == "too_sick"
+    assert saved[proxy].kind == "mixed" and saved[proxy].by_proxy is True
+    assert saved[proxy].free_text == PROXY_TEXT
+    assert str(saved[proxy].record_date) == "2026-11-09"
 
 
 def _visit_demo(client: TestClient, reception_no: str = DEMO_RECEPTION) -> Any:
@@ -290,10 +253,6 @@ def _ai_markers(runner: Any) -> tuple[set[str], set[str]]:
     return terms, words
 
 
-def _without_visits(view: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in view["entries"].items() if k != "visits"}
-
-
 def _check_patient_view_unchanged(
     client: TestClient, before: dict[str, Any], runner: Any
 ) -> None:
@@ -302,11 +261,11 @@ def _check_patient_view_unchanged(
     受付で増えるのは受診日（visits）の1件だけで、日付と受付の時刻しか持たない。
     """
     after = _patient_view(client)
-    visits = after["entries"].pop("visits")
-    assert before["entries"]["visits"] == []
+    visits = after["visit-days"]["visits"]
+    assert before["visit-days"]["visits"] == []
     assert [set(v) for v in visits] == [{"visit_date", "received_at"}]
     assert visits[0]["visit_date"] == "2026-11-09"
-    assert after == {**before, "entries": _without_visits(before)}  # 生成で変わらない
+    assert after["questions"] == before["questions"]  # 生成で変わらない
     terms, words = _ai_markers(runner)
     plain = json.dumps(before, ensure_ascii=False)
     ai_only = {t for t in terms | words if t not in plain}
@@ -334,8 +293,10 @@ def test_visit_report_d6_d5_and_printed(client: TestClient) -> None:
     _check_events(client, visit["id"])
     _check_doctor_auth(client, visit["id"], html)
     _check_printed(client, visit["id"])
-    # 印刷済みでも生の記録と受診日は残る
+    # 印刷済みでも、受付で受け取っていない既存の記録と受診日は残る
     assert _patient_view(client) == received
+    with db_conn(client.app) as conn:
+        assert len(db.list_entries(conn, DEMO_PID)) == 40 + 4
 
 
 def _check_doctor_auth(client: TestClient, visit_id: int, html: str) -> None:
@@ -575,14 +536,12 @@ def _next_day_entry(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None
     texts = {q["key"]: q["text"] for q in body["questions"]}
     assert texts[NEW_QUESTION_KEY] == NEW_QUESTION_TEXT
     answers = _answers(stomatitis="present", **{NEW_QUESTION_KEY: "present"})
-    _post_entry(client, {"answers": answers})
-    latest = _history(client)[-1]
-    assert latest["skill_version"] == "regimen-folfox@2"
-    by_key = {a["question_key"]: a for a in latest["answers"]}
-    assert by_key[NEW_QUESTION_KEY]["question_text"] == NEW_QUESTION_TEXT
-    older = _history(client)[-2]
-    assert older["skill_version"] == "regimen-folfox@1"
-    assert all(a["question_text"] is not None for a in older["answers"])
+    record_entry(client, DEMO_PID, {"answers": answers})
+    with db_conn(client.app) as conn:
+        older, latest = db.list_entries(conn, DEMO_PID)[-2:]
+    assert latest.skill_version == "regimen-folfox@2"
+    assert NEW_QUESTION_KEY in [a.question_key for a in latest.answers]
+    assert older.skill_version == "regimen-folfox@1"
 
 
 def test_skill_change_updates_next_day_questions_and_grid(

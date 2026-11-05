@@ -1,7 +1,8 @@
 """日付の印（record_marks。plan-device-records §4.4）。
 
-- 記録を書く全ての経路（add_entry・add_entry_once・seed_patient）が同じトランザクションで印も書く
-- 取り消しでその日の記録が無くなれば印も消す（残っていれば残す）
+- 記録を書く経路（add_entry・seed_patient）が同じトランザクションで印も書く
+- 記録のときに印だけを付けられ、取り消しで消せる（add_record_mark・undo_record_mark）
+- D1 の最後の記録日は印から出す（last_record_dates）
 - 既存の entries から印を作る移行は何度流してもよく、前の DB でも起動で印ができる
 """
 
@@ -15,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from tsutae import db
-from tsutae.config import JST
+from tsutae.config import JST, now
 from tsutae.db.connection import SCHEMA_PATH
 from tsutae.schemas import Entry, EntryCreate
 
@@ -59,14 +60,6 @@ def test_later_entry_moves_last_marked_at_forward(conn: sqlite3.Connection) -> N
     ]
 
 
-def test_add_entry_once_writes_a_mark_only_once(conn: sqlite3.Connection) -> None:
-    window = timedelta(seconds=120)
-    first = db.add_entry_once(conn, PID, FREE, AT, SKILL, window)
-    again = db.add_entry_once(conn, PID, FREE, AT + timedelta(seconds=5), SKILL, window)
-    assert first.id == again.id
-    assert _marks(conn) == [(PID, "2026-11-09", AT.isoformat(timespec="microseconds"))]
-
-
 def test_seed_patient_writes_marks(conn: sqlite3.Connection) -> None:
     entry = Entry(
         id=1,
@@ -93,45 +86,56 @@ def test_marked_patients_is_for_one_day(conn: sqlite3.Connection) -> None:
     assert db.marked_patients(conn, date(2026, 11, 7)) == set()
 
 
-def test_undo_clears_the_mark_when_nothing_is_left(conn: sqlite3.Connection) -> None:
-    saved = db.add_entry(conn, PID, TOO_SICK, AT, SKILL)
-    assert db.undo_too_sick_entry(conn, PID, saved.id, AT) == "deleted"
+def test_add_record_mark_writes_only_a_mark(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT)
+    assert _marks(conn) == [(PID, "2026-11-09", AT.isoformat(timespec="microseconds"))]
+    assert db.list_entries(conn, PID) == []
+
+
+def test_undo_clears_the_mark(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
     assert _marks(conn) == []
 
 
-def test_undo_keeps_the_mark_when_another_entry_is_left(
-    conn: sqlite3.Connection,
-) -> None:
-    kept = AT - timedelta(hours=2)
-    db.add_entry(conn, PID, FREE, kept, SKILL)
-    saved = db.add_entry(conn, PID, TOO_SICK, AT, SKILL)
-    assert db.undo_too_sick_entry(conn, PID, saved.id, AT) == "deleted"
-    assert _marks(conn) == [
-        (PID, "2026-11-09", kept.isoformat(timespec="microseconds"))
-    ]
+def test_undo_without_clear_keeps_the_mark(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=False)
+    assert len(_marks(conn)) == 1
 
 
-def test_undo_refused_leaves_the_mark(conn: sqlite3.Connection) -> None:
-    saved = db.add_entry(conn, PID, TOO_SICK, AT, SKILL)
-    refused = db.undo_too_sick_entry(conn, PID, saved.id, AT + timedelta(minutes=1))
-    assert refused == "not_undoable"
+def test_undo_keeps_a_later_mark(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT)
+    db.add_record_mark(conn, PID, AT + timedelta(minutes=1))
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
+    assert len(_marks(conn)) == 1
+
+
+def test_undo_refused_after_a_visit_leaves_the_mark(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT)
+    expires = now() + timedelta(hours=24)
+    db.create_visit(conn, PID, "A-1", AT.date(), expires, None)
+    earlier = min(AT, now() - timedelta(seconds=1))
+    assert not db.undo_record_mark(conn, PID, earlier, clear_mark=True)
     assert len(_marks(conn)) == 1
 
 
 def test_undo_only_touches_its_own_day_and_patient(conn: sqlite3.Connection) -> None:
-    db.add_entry(conn, PID, FREE, AT - timedelta(days=1), SKILL)
-    db.add_entry(conn, OTHER, FREE, AT, SKILL)
-    saved = db.add_entry(conn, PID, TOO_SICK, AT, SKILL)
-    assert db.undo_too_sick_entry(conn, PID, saved.id, AT) == "deleted"
+    db.add_record_mark(conn, PID, AT - timedelta(days=1))
+    db.add_record_mark(conn, OTHER, AT)
+    db.add_record_mark(conn, PID, AT)
+    assert db.undo_record_mark(conn, PID, AT, clear_mark=True)
     assert [(m[0], m[1]) for m in _marks(conn)] == [
         (PID, "2026-11-08"),
         (OTHER, "2026-11-09"),
     ]
 
 
-# ---------------------------------------------------------------------------
-# 既存の entries から印を作る移行
-# ---------------------------------------------------------------------------
+def test_last_record_dates_come_from_marks(conn: sqlite3.Connection) -> None:
+    db.add_record_mark(conn, PID, AT - timedelta(days=2))
+    db.add_record_mark(conn, PID, AT)
+    assert db.last_record_dates(conn) == {PID: AT.date()}
+    assert db.list_entries(conn, PID) == []
 
 
 def _old_db(path: Path) -> sqlite3.Connection:

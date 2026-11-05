@@ -179,9 +179,7 @@ def test_patient_api_is_not_checked(client: TestClient) -> None:
     pid = add_patient(client.app, courses=C1)
     assert register(client, pid).status_code == 200
     headers = {"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}
-    r = client.post(
-        f"/api/patient/{pid}/entries", json={"too_sick": True}, headers=headers
-    )
+    r = client.post(f"/api/patient/{pid}/record-marks", headers=headers)
     assert r.status_code == 200
     r = client.post("/api/visit", json={"reception_no": "A-1"}, headers=headers)
     assert r.status_code == 200

@@ -668,25 +668,27 @@ def test_gone_answer_from_the_service_removes_the_device(tmp_path: Path) -> None
 
 
 # ---------------------------------------------------------------------------
-# 印と POST /entries
+# 印と POST /record-marks
 # ---------------------------------------------------------------------------
 
 
-def test_post_entries_writes_a_mark(client: TestClient) -> None:
+def test_record_mark_writes_a_mark(client: TestClient) -> None:
     pid = _ready(client)
-    r = client.post(f"/api/patient/{pid}/entries", json={"too_sick": True})
+    r = client.post(f"/api/patient/{pid}/record-marks")
     assert r.status_code == 200
+    day = date.fromisoformat(r.json()["record_date"])
     with db_conn(client.app) as conn:
-        today = db.list_entries(conn, pid)[0].record_date
-        assert pid in db.marked_patients(conn, today)
+        assert pid in db.marked_patients(conn, day)
 
 
-def test_undo_entry_clears_the_mark(client: TestClient) -> None:
+def test_undo_clears_the_mark(client: TestClient) -> None:
     pid = _ready(client)
-    saved = client.post(f"/api/patient/{pid}/entries", json={"too_sick": True}).json()
-    with db_conn(client.app) as conn:
-        today = db.list_entries(conn, pid)[0].record_date
-    undo = client.post(f"/api/patient/{pid}/entries/{saved['entry_id']}/undo")
+    mark = client.post(f"/api/patient/{pid}/record-marks").json()
+    undo = client.post(
+        f"/api/patient/{pid}/record-marks/undo",
+        json={"recorded_at": mark["recorded_at"], "clear_mark": True},
+    )
     assert undo.status_code == 200
+    day = date.fromisoformat(mark["record_date"])
     with db_conn(client.app) as conn:
-        assert pid not in db.marked_patients(conn, today)
+        assert pid not in db.marked_patients(conn, day)

@@ -45,7 +45,14 @@ from fastapi import FastAPI
 from starlette.types import ASGIApp
 
 from tsutae import db
-from tsutae.api import orphans, patient, patient_push, visit
+from tsutae.api import (
+    orphans,
+    patient,
+    patient_demo,
+    patient_device,
+    patient_push,
+    visit,
+)
 from tsutae.api.body_limit import BodyLimit
 from tsutae.api.deps import install_error_handlers
 from tsutae.api.error_guard import SuppressServerErrors
@@ -265,6 +272,8 @@ def create_app(
     app.add_middleware(BodyLimit, path="/api/visit", max_bytes=VISIT_BODY_MAX_BYTES)
     app.include_router(patient.router)
     app.include_router(patient_push.router)
+    app.include_router(patient_device.router)
+    app.include_router(patient_demo.router)
     app.include_router(visit.router)
     app.state.optional_routers = tuple(
         name for name in OPTIONAL_ROUTERS if _include_optional(app, name)

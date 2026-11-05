@@ -1,7 +1,9 @@
 """日付の印（record_marks）。「その日に記録があった」ことだけを持つ。中身は持たない。
 
-通知を書いた人に送らないため（plan-device-records §4.4）。記録の行を入れるときに同じ
-トランザクションで印も書く（`insert_entry_rows`）ので、どの経路で記録を入れても印が付く。
+通知を書いた人に送らないため（plan-device-records §4.4）と、D1 の「最後の記録日」のため
+（§5.7）。記録はスマホに置くので、記録のときにサーバーが付ける（`add_record_mark`）。seed と
+`add_entry` は行と同じトランザクションで書く（`insert_entry_rows`）。受付で受け取った記録は
+印を書かない・消さない（`repo_received`）。
 """
 
 from __future__ import annotations
@@ -10,12 +12,14 @@ import sqlite3
 from datetime import date, datetime
 
 from tsutae.config import to_jst_date
-from tsutae.db.connection import date_to_db, dt_to_db, write_transaction
+from tsutae.db.connection import date_from_db, date_to_db, dt_to_db, write_transaction
 
 __all__ = [
+    "add_record_mark",
     "backfill_record_marks",
-    "clear_mark_if_no_entries",
+    "last_record_dates",
     "marked_patients",
+    "undo_record_mark",
     "upsert_mark_row",
 ]
 
@@ -31,28 +35,45 @@ def upsert_mark_row(conn: sqlite3.Connection, pid: str, at: datetime) -> None:
     )
 
 
-def clear_mark_if_no_entries(
-    conn: sqlite3.Connection, pid: str, record_date: str
-) -> None:
-    """記録を消した後に呼ぶ。その日の記録が残っていなければ印を消し、残っていれば
-    last_marked_at を残りの最後の時刻に戻す。呼び出し側で write_transaction を開いておく。
+def add_record_mark(conn: sqlite3.Connection, pid: str, at: datetime) -> None:
+    """at の日の印を付ける（記録のとき。サーバーの時計で）。"""
+    with write_transaction(conn):
+        upsert_mark_row(conn, pid, at)
+
+
+def undo_record_mark(
+    conn: sqlite3.Connection, pid: str, recorded_at: datetime, *, clear_mark: bool
+) -> bool:
+    """recorded_at の記録の取り消し。その後に受付があれば何も変えずに False。
+
+    clear_mark なら recorded_at の日の印を消す。ただし recorded_at より後に印が付いていれば
+    （別の端末が後から書いた）残す。調べるのと消すのを1つの write_transaction で行う。
+    時刻の窓は呼び出し側が見る。日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する
     """
-    row = conn.execute(
-        "SELECT MAX(recorded_at) AS last FROM entries"
-        " WHERE patient_id = ? AND record_date = ?",
-        (pid, record_date),
-    ).fetchone()
-    if row["last"] is None:
-        conn.execute(
-            "DELETE FROM record_marks WHERE patient_id = ? AND record_date = ?",
-            (pid, record_date),
-        )
-        return
-    conn.execute(
-        "UPDATE record_marks SET last_marked_at = ?"
-        " WHERE patient_id = ? AND record_date = ?",
-        (row["last"], pid, record_date),
-    )
+    at = dt_to_db(recorded_at)
+    with write_transaction(conn):
+        visited = conn.execute(
+            "SELECT 1 FROM visits WHERE patient_id = ? AND created_at >= ? LIMIT 1",
+            (pid, at),
+        ).fetchone()
+        if visited is not None:
+            return False
+        if clear_mark:
+            conn.execute(
+                "DELETE FROM record_marks WHERE patient_id = ? AND record_date = ?"
+                " AND last_marked_at <= ?",
+                (pid, date_to_db(to_jst_date(recorded_at)), at),
+            )
+    return True
+
+
+def last_record_dates(conn: sqlite3.Connection) -> dict[str, date]:
+    """患者ごとの最後の記録日（印の日付の最大）。印の無い患者は含まない。"""
+    rows = conn.execute(
+        "SELECT patient_id, MAX(record_date) AS last FROM record_marks"
+        " GROUP BY patient_id"
+    ).fetchall()
+    return {r["patient_id"]: date_from_db(r["last"]) for r in rows}
 
 
 def marked_patients(conn: sqlite3.Connection, day: date) -> set[str]:

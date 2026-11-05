@@ -22,11 +22,8 @@ from tsutae.db.repo_doctor_masks import (
 )
 from tsutae.db.repo_entries import (
     add_entry,
-    add_entry_once,
     get_entry,
-    last_record_dates,
     list_entries,
-    undo_too_sick_entry,
 )
 from tsutae.db.repo_logs import add_pipeline_log, list_pipeline_logs
 from tsutae.db.repo_patients import (
@@ -62,7 +59,13 @@ from tsutae.db.repo_question_library import (
     seed_question_library,
 )
 from tsutae.db.repo_received import ReceivedEntry
-from tsutae.db.repo_record_marks import backfill_record_marks, marked_patients
+from tsutae.db.repo_record_marks import (
+    add_record_mark,
+    backfill_record_marks,
+    last_record_dates,
+    marked_patients,
+    undo_record_mark,
+)
 from tsutae.db.repo_seed import seed_patient
 from tsutae.db.repo_skills import (
     create_skill_change,
@@ -103,9 +106,9 @@ __all__ = [
     "VisitClosedError",
     "VisitGeneratingError",
     "add_entry",
-    "add_entry_once",
     "add_library_question",
     "add_pipeline_log",
+    "add_record_mark",
     "backfill_record_marks",
     "begin_regeneration",
     "claim_push_send",
@@ -157,7 +160,7 @@ __all__ = [
     "seed_patient",
     "seed_question_library",
     "set_visit_status",
-    "undo_too_sick_entry",
+    "undo_record_mark",
     "update_skill_change",
     "upsert_course",
     "upsert_push_subscription",

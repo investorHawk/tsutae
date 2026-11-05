@@ -3,7 +3,8 @@
 - 患者 API（`tsutae/api/patient.py`）は pipeline・report・変換結果（get_timeline・
   get_report）・skillchange・D4 レジメンの下書き（tsutae.regimen・repo_regimen_drafts。
   チャットの文面を持つ。v1.1）を import しない
-- 患者側の API（`patient.py`・`visit.py`・`fixed_rules.py`）は変換結果の読み書き
+- 患者側の API（`patient.py`・`patient_device.py`・`patient_demo.py`・`skill_questions.py`・
+  `visit.py`・`visit_entries.py`・`fixed_rules.py`）は変換結果の読み書き
   （`db.get_report` 等の属性参照・名前・`getattr` の文字列・reports/timelines・
   regimen_drafts を引く SQL）を使わない（`from tsutae import db` 経由の抜け道を塞ぐ）
 - 実際の患者 API の応答（spec §18）: AI の出力（用語・引用・レポート）と医師向けの
@@ -42,7 +43,16 @@ FORBIDDEN_MODULES = (
 FORBIDDEN_NAMES = frozenset({"get_timeline", "get_report", "skillchange"})
 # 患者側の API。visit.py は生成を起こすため pipeline.service の import は許す
 PATIENT_SIDE = tuple(
-    PACKAGE_ROOT / "api" / name for name in ("patient.py", "visit.py", "fixed_rules.py")
+    PACKAGE_ROOT / "api" / name
+    for name in (
+        "patient.py",
+        "patient_device.py",
+        "patient_demo.py",
+        "skill_questions.py",
+        "visit.py",
+        "visit_entries.py",
+        "fixed_rules.py",
+    )
 )
 PUSH_MODULES = (
     PACKAGE_ROOT / "api" / "patient_push.py",
@@ -223,8 +233,11 @@ def test_patient_side_api_does_not_touch_results(path: Path) -> None:
     assert result_references(path) == []
 
 
-def test_fixed_rules_does_not_import_results_or_pipeline() -> None:
-    assert forbidden_imports(PATIENT_SIDE[2]) == []
+@pytest.mark.parametrize(
+    "path", [p for p in PATIENT_SIDE if p.name != "visit.py"], ids=lambda p: p.name
+)
+def test_patient_modules_do_not_import_results_or_pipeline(path: Path) -> None:
+    assert forbidden_imports(path) == []
 
 
 @pytest.mark.parametrize("path", PUSH_MODULES, ids=lambda p: p.name)
@@ -483,19 +496,34 @@ def _patient_responses(client: Any, pid: str, other: str) -> list[Any]:
     """患者が叩く経路を一通り（成功と失敗）呼んだ応答。"""
     from push_helpers import ENDPOINT, subscription_body
 
+    base = f"/api/patient/{pid}"
     fever = {"question_key": "fever", "value": "measured", "temperature": 38.4}
-    entry = {"answers": [fever], "free_text": "夜に熱っぽかった"}
+    entry = {
+        "client_entry_id": "demo-9001",
+        "recorded_at": "2026-11-09T20:00:00.000000+09:00",
+        "record_date": "2026-11-09",
+        "kind": "mixed",
+        "by_proxy": False,
+        "skill_version": "regimen-folfox@1",
+        "answers": [fever],
+        "free_text": "夜に熱っぽかった",
+    }
+    mark = client.post(f"{base}/record-marks")
+    undo = {"recorded_at": mark.json()["recorded_at"], "clear_mark": False}
     return [
+        mark,
+        client.post(f"{base}/record-marks/undo", json=undo),
+        client.post(f"{base}/record-marks/undo", json={"recorded_at": "x"}),
+        client.get(f"{base}/visit-window"),
+        client.get(f"{base}/visit-days"),
+        client.get(f"{base}/demo-config"),
+        client.get(f"{base}/demo-entries"),
         client.post("/api/patient/register", json={"pid": pid}),
         client.post("/api/patient/register", json={"pid": "P-ZZZZ9999"}),
         client.get("/api/patient/strings"),
         client.get(f"/api/patient/{pid}/questions"),
-        client.get(f"/api/patient/{pid}/entries"),
-        client.post(f"/api/patient/{pid}/entries", json=entry),
-        client.post(f"/api/patient/{pid}/entries", json={"answers": "x"}),
         client.get(f"/api/patient/{other}/questions"),
-        client.get(f"/api/patient/{other}/entries"),
-        client.post(f"/api/patient/{pid}/entries/999999/undo"),
+        client.get(f"/api/patient/{other}/visit-days"),
         client.get("/api/patient/push-config"),
         client.put(f"/api/patient/{pid}/push-subscription", json={"endpoint": "x"}),
         client.put(f"/api/patient/{pid}/push-subscription", json=subscription_body()),
@@ -505,8 +533,9 @@ def _patient_responses(client: Any, pid: str, other: str) -> list[Any]:
             f"/api/patient/{pid}/push-subscription",
             json={"endpoint": ENDPOINT},
         ),
-        client.post("/api/visit", json={"reception_no": "A-024"}),
+        client.post("/api/visit", json={"reception_no": "A-024", "entries": [entry]}),
         client.post("/api/visit", json={"reception_no": ""}),
+        client.post(f"{base}/unregister", json={"endpoint": None}),
     ]
 
 

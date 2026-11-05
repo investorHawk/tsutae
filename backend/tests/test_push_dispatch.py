@@ -117,13 +117,9 @@ def test_undo_brings_the_notification_back(
     settings: Settings, conn: sqlite3.Connection
 ) -> None:
     _subscribe(conn)
-    entry = db.add_entry(
-        conn, PID, EntryCreate(too_sick=True), AT - timedelta(hours=1), SKILL
-    )
-    assert (
-        db.undo_too_sick_entry(conn, PID, entry.id, AT - timedelta(hours=1))
-        == "deleted"
-    )
+    marked_at = AT - timedelta(hours=1)
+    db.add_record_mark(conn, PID, marked_at)
+    assert db.undo_record_mark(conn, PID, marked_at, clear_mark=True)
     sender = FakePushSender()
     assert send_due_once(settings, sender, AT) == PushCounts(sent=1)
 

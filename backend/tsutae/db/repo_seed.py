@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Sequence
+from datetime import datetime
 
 from tsutae.db.connection import to_jst, write_transaction
 from tsutae.db.repo_entries import insert_entry_rows, validate_skill_version
@@ -19,6 +20,7 @@ from tsutae.db.repo_patients import (
     upsert_course_row,
     validate_new_patient,
 )
+from tsutae.db.repo_record_marks import upsert_mark_row
 from tsutae.schemas import BUILTIN_REGIMENS, Course, Entry, EntryCreate
 
 
@@ -65,8 +67,11 @@ def seed_patient(
     regimen: str,
     courses: Sequence[Course],
     entries: Sequence[Entry],
+    marks: Sequence[datetime] = (),
 ) -> bool:
     """まだいなければ患者・コース・記録を入れて True。
+
+    marks は記録を入れずに付ける日付の印の時刻（スマホ保存の撮影用。§5.10）。
 
     記録は渡した順に入れ、DB が id を振る（`Entry.id` と `record_date` は使わない。
     record_date は recorded_at から作り直す）。既にいる患者なら何も書かずに False。
@@ -83,4 +88,6 @@ def seed_patient(
             insert_entry_rows(
                 conn, patient_id, entry, item.recorded_at, item.skill_version
             )
+        for at in marks:
+            upsert_mark_row(conn, patient_id, to_jst(at))
     return True

@@ -36,6 +36,14 @@ export interface PatientApiReplies {
   pushUnsubscribe?: (body: unknown) => Reply;
   /** POST push-test */
   pushTest?: (body: unknown) => Reply;
+  /** GET visit-window */
+  visitWindow?: () => Reply;
+  /** POST unregister */
+  unregister?: (body: unknown) => Reply;
+  /** GET demo-config */
+  demoConfig?: () => Reply;
+  /** GET demo-entries */
+  demoEntries?: () => Reply;
 }
 
 const DEFAULTS: Required<PatientApiReplies> = {
@@ -54,6 +62,10 @@ const DEFAULTS: Required<PatientApiReplies> = {
     }),
   pushUnsubscribe: () => jsonResponse({ ok: true }),
   pushTest: () => jsonResponse({ ok: true }),
+  visitWindow: () => jsonResponse(apiFixture("patient_visit_window").body),
+  unregister: () => jsonResponse({ ok: true }),
+  demoConfig: () => jsonResponse(apiFixture("patient_demo_config_other").body),
+  demoEntries: () => jsonResponse(apiFixture("patient_demo_entries").body),
 };
 
 function bodyOf(init?: RequestInit): unknown {
@@ -97,6 +109,18 @@ export function mockPatientApi(replies: PatientApiReplies = {}): FetchMock {
     }
     if (method === "POST" && url === `${base}/push-test`) {
       return r.pushTest(bodyOf(init));
+    }
+    if (method === "GET" && url === `${base}/visit-window`) {
+      return r.visitWindow();
+    }
+    if (method === "POST" && url === `${base}/unregister`) {
+      return r.unregister(bodyOf(init));
+    }
+    if (method === "GET" && url === `${base}/demo-config`) {
+      return r.demoConfig();
+    }
+    if (method === "GET" && url === `${base}/demo-entries`) {
+      return r.demoEntries();
     }
     return jsonResponse({ error: "not_found" }, 404);
   });

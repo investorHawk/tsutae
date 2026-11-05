@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   base64UrlToBytes,
   clearDeliveredNotifications,
+  currentSubscription,
   findSubscription,
   isPushSupported,
   subscribeDevice,
@@ -126,6 +127,28 @@ describe("findSubscription", () => {
     const sub = fakeSubscription(null);
     installWorker(fakeRegistration(sub));
     await expect(findSubscription(KEY)).resolves.toBe(sub);
+  });
+});
+
+describe("currentSubscription", () => {
+  it("未対応の端末では null（Service Worker に触らない）", async () => {
+    await expect(currentSubscription()).resolves.toBeNull();
+  });
+
+  it("登録が無ければ null で、Service Worker を登録しない", async () => {
+    const worker = installWorker(fakeRegistration());
+    vi.stubGlobal("PushManager", class {});
+    vi.stubGlobal("Notification", {});
+    await expect(currentSubscription()).resolves.toBeNull();
+    expect(worker.register).not.toHaveBeenCalled();
+  });
+
+  it("鍵を問わず、この端末の登録を返す（鍵を作り直す前の登録も消すため）", async () => {
+    const existing = fakeSubscription(bytes(4, 5, 6));
+    installWorker(fakeRegistration(existing));
+    vi.stubGlobal("PushManager", class {});
+    vi.stubGlobal("Notification", {});
+    await expect(currentSubscription()).resolves.toBe(existing);
   });
 });
 

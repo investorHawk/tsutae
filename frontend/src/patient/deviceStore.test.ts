@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DeviceEntry } from "../api/types";
 import {
+  deleteDeviceEntries,
   deleteDeviceEntry,
   deviceEntriesOn,
   listDeviceEntries,
@@ -39,6 +40,26 @@ function ids(entries: readonly DeviceEntry[]): string[] {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("deleteDeviceEntries", () => {
+  it("その患者の記録を全て消し、他の患者の記録は残す", async () => {
+    await saveDeviceEntry(entry("a"));
+    await saveDeviceEntry(entry("b", { record_date: "2026-10-31" }));
+    await saveDeviceEntry(entry("other", { pid: OTHER }));
+    await deleteDeviceEntries(PID);
+    await expect(listDeviceEntries(PID)).resolves.toEqual([]);
+    expect(ids(await listDeviceEntries(OTHER))).toEqual(["other"]);
+  });
+
+  it("記録が無くても失敗しない", async () => {
+    await expect(deleteDeviceEntries(PID)).resolves.toBeUndefined();
+  });
+
+  it("開けなければ例外で返す", async () => {
+    vi.stubGlobal("indexedDB", undefined);
+    await expect(deleteDeviceEntries(PID)).rejects.toBeDefined();
+  });
 });
 
 describe("saveDeviceEntry と listDeviceEntries", () => {

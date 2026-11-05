@@ -68,11 +68,16 @@ export async function saveDeviceEntry(entry: DeviceEntry): Promise<void> {
   tryPersist();
 }
 
+/** 配列のキーは短い方が先、文字列より配列が後なので、[pid] 〜 [pid, []] がその患者の全て。 */
+function pidRange(pid: string): IDBKeyRange {
+  return IDBKeyRange.bound([pid], [pid, []]);
+}
+
 /** その患者の記録（記録日の順）。 */
 export function listDeviceEntries(pid: string): Promise<DeviceEntry[]> {
-  // 配列のキーは短い方が先、文字列より配列が後なので、[pid] 〜 [pid, []] がその患者の全て
-  const range = IDBKeyRange.bound([pid], [pid, []]);
-  return inStore("readonly", (store) => store.index(BY_PID_DATE).getAll(range));
+  return inStore("readonly", (store) =>
+    store.index(BY_PID_DATE).getAll(pidRange(pid)),
+  );
 }
 
 /** その患者のその日の記録。 */
@@ -99,5 +104,19 @@ export async function deleteDeviceEntry(
       }
     };
     return found;
+  });
+}
+
+/** その患者の記録を全て消す（設定の「このスマホの登録と記録を消す」）。他の患者の記録は残す。 */
+export async function deleteDeviceEntries(pid: string): Promise<void> {
+  await inStore("readwrite", (store) => {
+    const cursor = store.index(BY_PID_DATE).openCursor(pidRange(pid));
+    cursor.onsuccess = () => {
+      if (cursor.result) {
+        cursor.result.delete();
+        cursor.result.continue();
+      }
+    };
+    return cursor;
   });
 }

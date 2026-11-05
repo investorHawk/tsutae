@@ -60,6 +60,18 @@ export async function findSubscription(
   return subscription && usesKey(subscription, publicKey) ? subscription : null;
 }
 
+/**
+ * この端末の登録（鍵は見ない。無ければ null）。消すときに、鍵を作り直す前の登録も消すため。
+ * 未対応の端末は null。Service Worker は登録しない。
+ */
+export async function currentSubscription(): Promise<PushSubscription | null> {
+  if (!isPushSupported()) {
+    return null;
+  }
+  const registration = await navigator.serviceWorker.getRegistration();
+  return (await registration?.pushManager.getSubscription()) ?? null;
+}
+
 /** この端末にまだこの endpoint の登録があるか（鍵は見ない）。 */
 export async function isStillSubscribed(endpoint: string): Promise<boolean> {
   const registration = await navigator.serviceWorker.getRegistration();

@@ -475,7 +475,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - D1 の最後の記録日は `record_marks` から出す。D2 の記録の一覧はそのまま（受付の間だけ行がある）
 - `fixed_rules.notices_for` は Python の側の判定で、画面のコードと同じ表（`frontend/src/test/fixtures/fixed_rule_cases.json`）で確かめる
 
-## 13. スマホ保存の frontend（PR B。`docs/plan-device-records.md` §5.1〜§5.4）
+## 13. スマホ保存の frontend（PR B。`docs/plan-device-records.md` §5.1〜§5.5・§5.8〜§5.10）
 
 | ファイル | 中身 |
 |---|---|
@@ -485,5 +485,11 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `api/patientDevice.ts` | §12 の経路の呼び出しと応答の検査。`POST /api/visit` の `entries` は `api/patient.ts` の `submitVisit` |
 | `components/patient/TodayForm.tsx` | `client_entry_id` を入力の開始時に作り、押し直しても同じ（「追加で記録する」・取り消しの後で作り直す）。印か保存が失敗したら入力を残して `error.generic`。保存できたら `onSaved`（バッジと表示中の通知を消す） |
 | `components/patient/HistoryList.tsx` | P2。端末の記録と `GET visit-days` を読み、`historyRows` で並べる |
+| `patient/visitEntries.ts` | P3（§5.5）。`sendVisit`（`GET visit-window` → 端末の記録を読む → 範囲内だけ `POST /api/visit`）、`toVisitEntry`（`pid` と質問の文の写しを外す）。記録を読めなければ例外で返し、空のまま送らない |
+| `patient/standalone.ts` | §5.8 の判定の純関数。`needsHomeScreenGuide`（iPhone・iPad で、`navigator.standalone` でも `display-mode: standalone` でもない）、`suggestsHomeScreen`（Android のブラウザ）、`readDisplayEnv` |
+| `layouts/PatientLayout.tsx`・`components/patient/AddToHomeGuide.tsx` | 判定が真なら、どの患者の経路でも案内だけを出す。ページも通知の処理も動かさず、API は定型文の GET だけ。URL の `pid` は形が正しいときだけ大きく見せ、保存も登録もしない。医師の経路はこの外枠を通らない |
+| `components/patient/PatientNav.tsx` | 下の4つのタブ。幅は文字の長さで分ける（`patient.css`。幅 360px 以上で全て1行） |
+| `components/patient/DeviceReset.tsx`・`resetDevice.ts` | §5.9。画面の中の2段階の確認の後、送り直しの PUT を待ち、`POST unregister` → 通知の登録の解除 → 端末の記録 → 仮名ID の順に消す。1つが失敗しても次へ進み、残れば知らせて押し直せる |
+| `components/patient/DemoEntries.tsx` | §5.10。`GET demo-config` が真のときだけ出す。`GET demo-entries` を端末に保存する（同じ ID なので増えない） |
 
 テストは dev 依存の `fake-indexeddb` を `src/test/setup.ts` で入れ、テストごとに空の DB から始める。

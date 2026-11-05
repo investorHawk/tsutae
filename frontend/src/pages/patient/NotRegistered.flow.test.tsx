@@ -297,7 +297,7 @@ describe("Visit: 401 while sending", () => {
     );
     await userEvent.click(button("visit.submit"));
     await expectPanel();
-    await enterNumber(OTHER_PID);
+    await enterNumber(PID);
 
     expect(await screen.findByText(s("register.done"))).toBeInTheDocument();
     expect(reloadPage).not.toHaveBeenCalled();
@@ -308,5 +308,29 @@ describe("Visit: 401 while sending", () => {
     expect(await screen.findByText(s("visit.done"))).toBeInTheDocument();
     expect(callsTo(fetchMock, "POST", "/api/visit")).toHaveLength(2);
     expect(screen.queryByText(s("register.done"))).toBeNull();
+  });
+
+  it("another number: the next send asks the range of the new number, not the old one", async () => {
+    const fetchMock = mockPatientApi({
+      visit: () => jsonResponse({ error: "not_logged_in" }, 401),
+    });
+    renderPatient(ROUTES, "/visit");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: s("visit.reception_label") }),
+      "A-023",
+    );
+    await userEvent.click(button("visit.submit"));
+    await expectPanel();
+    await enterNumber(OTHER_PID);
+    await screen.findByText(s("register.done"));
+    await userEvent.click(button("visit.submit"));
+    await waitFor(() =>
+      expect(
+        callsTo(fetchMock, "GET", `/api/patient/${OTHER_PID}/visit-window`),
+      ).toHaveLength(1),
+    );
+    expect(
+      callsTo(fetchMock, "GET", `/api/patient/${PID}/visit-window`),
+    ).toHaveLength(1);
   });
 });

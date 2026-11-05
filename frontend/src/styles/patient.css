@@ -422,6 +422,38 @@
   color: var(--p-muted);
 }
 
+/* ホーム画面に追加の案内（iPhone のブラウザ）。番号はアプリで入れ直すので大きく見せる */
+.patient-app .p-guide-steps {
+  padding-left: 1.5em;
+  margin: 0 0 20px;
+}
+
+.patient-app .p-guide-steps li {
+  margin-bottom: 12px;
+}
+
+.patient-app .p-guide-number {
+  padding: 16px;
+  margin: 0 0 20px;
+  text-align: center;
+  border: 3px solid var(--p-primary);
+  border-radius: 12px;
+}
+
+.patient-app .p-guide-number-label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.patient-app .p-guide-number-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* 入力の補足（押せない理由・入力例）。押せないボタン・入力欄の直前に出す */
 .patient-app .p-hint {
   margin: 0 0 8px;
@@ -720,16 +752,18 @@
   bottom: 0;
   left: 0;
   z-index: 10;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--p-bg);
   border-top: 2px solid var(--p-border);
 }
 
+/* 4つのタブは文字の長さに合わせて幅を分ける。等分だと「これまでの記録」が3行に折れる。
+   幅 360px 以上で全て1行に入り（patientCss.test.ts で計算）、より狭ければ2行に折れる */
 .patient-app .p-nav-tabs {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 8px;
+  grid-auto-columns: auto;
+  gap: 4px;
   max-width: 560px;
   margin: 0 auto;
 }
@@ -740,7 +774,7 @@
   align-items: center;
   justify-content: center;
   min-height: var(--p-tap);
-  padding: 4px;
+  padding: 4px 2px;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.3;

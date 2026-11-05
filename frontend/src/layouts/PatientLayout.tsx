@@ -1,8 +1,15 @@
+import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import AddToHomeGuide from "../components/patient/AddToHomeGuide";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { ErrorMessage } from "../components/patient/Messages";
 import { GENERIC_ERROR_KEY } from "../components/patient/patientApi";
 import { useResendSubscription } from "../components/patient/pushResend";
+import {
+  needsHomeScreenGuide,
+  readDisplayEnv,
+  suggestsHomeScreen,
+} from "../patient/standalone";
 import { useClearNotifications } from "../patient/useClearNotifications";
 import {
   PatientStringsProvider,
@@ -19,12 +26,11 @@ function isRegister(pathname: string): boolean {
 }
 
 /**
- * 全ての患者画面の下に出す「症例は全て架空」の注記（登録画面は本文に出すので除く）。
+ * 全ての患者画面の下に出す「症例は全て架空」の注記。
  * 本文（patient-main）の外にあるので、同じ幅と左右の余白の枠（patient-footer）に入れる。
  */
-function SyntheticNotice({ pathname }: { pathname: string }) {
+function SyntheticNotice() {
   const { t } = usePatientStrings();
-  if (isRegister(pathname)) return null;
   return (
     <div className="patient-footer">
       <p className="p-synthetic">{t("app.notice_synthetic")}</p>
@@ -32,30 +38,73 @@ function SyntheticNotice({ pathname }: { pathname: string }) {
   );
 }
 
+/** Android のブラウザにだけ、ホーム画面への追加を勧める1行（§5.8）。 */
+function HomeScreenSuggestion() {
+  const { t } = usePatientStrings();
+  return <p className="p-hint">{t("guide.suggest")}</p>;
+}
+
+/**
+ * アプリを開いたらバッジと表示中の通知を消し、オンの端末の登録を送り直す（医師の画面はこの
+ * 外枠を通らない）。定型文を待たずに始める（設定の画面は、この送り直しを待って状態を読む）。
+ */
+function DeviceUpkeep() {
+  useClearNotifications();
+  useResendSubscription();
+  return null;
+}
+
 /**
  * 下のタブ（PatientNav。画面の下に固定）のある画面は patient-app--with-nav で
  * 下をあける（本文の最後がタブに隠れないように）。
- * アプリを開いたらバッジと表示中の通知を消し、オンの端末の登録を送り直す（医師の画面はこの
- * 外枠を通らない）。
  */
-export default function PatientLayout() {
+function PatientScreens({ suggestHome }: { suggestHome: boolean }) {
   const { pathname } = useLocation();
   const withNav = !isRegister(pathname);
-  useClearNotifications();
-  useResendSubscription();
   return (
-    <PatientStringsProvider>
-      <div className={`patient-app${withNav ? " patient-app--with-nav" : ""}`}>
-        <main className="patient-main">
-          <ErrorBoundary
-            resetKey={pathname}
-            fallback={<ErrorMessage messageKey={GENERIC_ERROR_KEY} />}
-          >
-            <Outlet />
-          </ErrorBoundary>
-        </main>
-        <SyntheticNotice pathname={pathname} />
-      </div>
-    </PatientStringsProvider>
+    <div className={`patient-app${withNav ? " patient-app--with-nav" : ""}`}>
+      <main className="patient-main">
+        {suggestHome && <HomeScreenSuggestion />}
+        <ErrorBoundary
+          resetKey={pathname}
+          fallback={<ErrorMessage messageKey={GENERIC_ERROR_KEY} />}
+        >
+          <Outlet />
+        </ErrorBoundary>
+      </main>
+      {/* 登録画面は本文に出す */}
+      {!isRegister(pathname) && <SyntheticNotice />}
+    </div>
+  );
+}
+
+/** iPhone のブラウザの画面（案内だけ。記録も API の呼び出しも通知の処理もしない）。 */
+function GuideScreen() {
+  return (
+    <div className="patient-app">
+      <main className="patient-main">
+        <AddToHomeGuide />
+      </main>
+      <SyntheticNotice />
+    </div>
+  );
+}
+
+export default function PatientLayout() {
+  const [env] = useState(readDisplayEnv);
+  if (needsHomeScreenGuide(env)) {
+    return (
+      <PatientStringsProvider>
+        <GuideScreen />
+      </PatientStringsProvider>
+    );
+  }
+  return (
+    <>
+      <DeviceUpkeep />
+      <PatientStringsProvider>
+        <PatientScreens suggestHome={suggestsHomeScreen(env)} />
+      </PatientStringsProvider>
+    </>
   );
 }

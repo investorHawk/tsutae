@@ -104,14 +104,15 @@ describe("Settings: screen", () => {
 });
 
 describe("Settings: states that cannot use notifications", () => {
-  it("unsupported: the reason and the next step, and no request", () => {
+  it("unsupported: the reason and the next step, and no push request", () => {
     const fetchMock = mockPatientApi();
     renderSettings();
     expect(screen.getByText(s("notify.unsupported"))).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: s("notify.turn_on") }),
     ).not.toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(callsTo(fetchMock, "GET", "/api/patient/push-config")).toEqual([]);
+    expect(putCalls(fetchMock)).toEqual([]);
   });
 
   it("no key on the server: the reason and no buttons", async () => {

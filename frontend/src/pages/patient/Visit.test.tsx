@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
-import { PID, s } from "./testing/fixtures";
+import { savedInputs, seedDevice } from "./testing/device";
+import { ENTRIES, PID, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Visit from "./Visit";
 
 const ROUTES = [{ path: "/visit", element: <Visit /> }];
+const WINDOW_URL = `/api/patient/${PID}/visit-window`;
 
 // 患者画面のテストは文字列リテラルに ASCII 以外を書かない約束なので、コードポイントから作る
 const EMOJI = String.fromCodePoint(0x1f600);
@@ -94,7 +96,7 @@ describe("Visit (P3)", () => {
     await userEvent.click(submit());
     await screen.findByText(s("visit.done"));
     expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([
-      { reception_no: text },
+      { reception_no: text, entries: [] },
     ]);
   });
 
@@ -106,7 +108,7 @@ describe("Visit (P3)", () => {
     const done = await screen.findByText(s("visit.done"));
     expect(done.textContent).toBe(s("visit.done"));
     expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([
-      { reception_no: "A-023" },
+      { reception_no: "A-023", entries: [] },
     ]);
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
@@ -117,6 +119,12 @@ describe("Visit (P3)", () => {
     expect(
       within(nav).getByRole("link", { name: s("nav.history") }),
     ).toHaveAttribute("href", "/history");
+    expect(
+      within(nav).getByRole("link", { name: s("nav.visit") }),
+    ).toHaveAttribute("href", "/visit");
+    expect(
+      within(nav).getByRole("link", { name: s("nav.settings") }),
+    ).toHaveAttribute("href", "/settings");
   });
 
   it("409 no_course: visit.no_course and the form stays", async () => {
@@ -131,14 +139,24 @@ describe("Visit (P3)", () => {
     expect(field()).toHaveValue("A-023");
   });
 
-  it("uses the cookie only (works without a saved pid)", async () => {
+  it("without a saved pid: the number form and no request", async () => {
     clearPid();
     const fetchMock = mockPatientApi();
     renderPatient(ROUTES, "/visit");
+    expect(screen.getByText(s("error.not_registered"))).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await userEvent.type(
+      screen.getByRole("textbox", { name: s("register.number_label") }),
+      PID,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: s("register.number_submit") }),
+    );
+    expect(await screen.findByText(s("register.done"))).toBeInTheDocument();
     await userEvent.type(field(), "A-023");
     await userEvent.click(submit());
     await screen.findByText(s("visit.done"));
-    expect(callsTo(fetchMock, "POST", "/api/visit")).toHaveLength(1);
+    expect(callsTo(fetchMock, "GET", WINDOW_URL)).toHaveLength(1);
   });
 
   it("401/403: error.not_registered", async () => {
@@ -173,4 +191,132 @@ describe("Visit (P3)", () => {
     await userEvent.click(submit());
     expect(await screen.findByText(s("visit.invalid"))).toBeInTheDocument();
   });
+});
+
+describe("Visit: records on this phone", () => {
+  /** ENTRIES は 10-29・10-31・11-02。範囲で 10-29 を外す。 */
+  const WINDOW = { start: "2026-10-30", end: "2026-11-09" };
+
+  async function send() {
+    await userEvent.type(field(), "A-023");
+    await userEvent.click(submit());
+  }
+
+  it("sends only the records in the window, without the pid and the question text", async () => {
+    await seedDevice(ENTRIES);
+    const fetchMock = mockPatientApi({
+      visitWindow: () => jsonResponse(WINDOW),
+    });
+    renderPatient(ROUTES, "/visit");
+    await send();
+    await screen.findByText(s("visit.done"));
+    const [body] = callsTo(fetchMock, "POST", "/api/visit") as [
+      { reception_no: string; entries: Record<string, unknown>[] },
+    ];
+    expect(body.reception_no).toBe("A-023");
+    expect(body.entries.map((e) => e.client_entry_id)).toEqual([
+      ENTRIES[1]!.client_entry_id,
+      ENTRIES[2]!.client_entry_id,
+    ]);
+    expect(body.entries[0]).not.toHaveProperty("pid");
+    expect(body.entries[0]!.answers).toEqual([
+      { question_key: "diarrhea", value: "present", temperature: null },
+      { question_key: "fever", value: "measured", temperature: 37.9 },
+    ]);
+  });
+
+  it("does not send the records of another patient", async () => {
+    await seedDevice([{ ...ENTRIES[1]!, pid: "P-EVAL0001" }]);
+    const fetchMock = mockPatientApi();
+    renderPatient(ROUTES, "/visit");
+    await send();
+    await screen.findByText(s("visit.done"));
+    expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([
+      { reception_no: "A-023", entries: [] },
+    ]);
+  });
+
+  it("keeps the records on the phone after sending", async () => {
+    await seedDevice(ENTRIES);
+    mockPatientApi();
+    renderPatient(ROUTES, "/visit");
+    await send();
+    await screen.findByText(s("visit.done"));
+    await expect(savedInputs()).resolves.toHaveLength(ENTRIES.length);
+  });
+
+  it("no course from visit-window: visit.no_course and nothing sent", async () => {
+    const fetchMock = mockPatientApi({
+      visitWindow: () => jsonResponse({ error: "no_course" }, 409),
+    });
+    renderPatient(ROUTES, "/visit");
+    await send();
+    expect(await screen.findByText(s("visit.no_course"))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([]);
+  });
+
+  it("visit-window 403: the number form, then sends with the new number", async () => {
+    let registered = false;
+    const fetchMock = mockPatientApi({
+      visitWindow: () =>
+        registered
+          ? jsonResponse(WINDOW)
+          : jsonResponse({ error: "not_registered" }, 403),
+      register: () => {
+        registered = true;
+        return jsonResponse({ ok: true });
+      },
+    });
+    renderPatient(ROUTES, "/visit");
+    await send();
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: s("register.number_label") }),
+      PID,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: s("register.number_submit") }),
+    );
+    expect(await screen.findByText(s("register.done"))).toBeInTheDocument();
+    expect(field()).toHaveValue("A-023");
+    await userEvent.click(submit());
+    await screen.findByText(s("visit.done"));
+    expect(callsTo(fetchMock, "POST", "/api/visit")).toHaveLength(1);
+  });
+
+  it("visit-window failure: error.generic, nothing sent, the number stays", async () => {
+    const fetchMock = mockPatientApi({
+      visitWindow: () => jsonResponse({ error: "boom" }, 500),
+    });
+    renderPatient(ROUTES, "/visit");
+    await send();
+    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([]);
+    expect(field()).toHaveValue("A-023");
+  });
+
+  it("cannot read the records: error.generic and never sends an empty list", async () => {
+    const fetchMock = mockPatientApi();
+    vi.stubGlobal("indexedDB", undefined);
+    renderPatient(ROUTES, "/visit");
+    await send();
+    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([]);
+  });
+
+  it.each([
+    ["422", 422, "invalid_input"],
+    ["413", 413, "body_too_large"],
+  ])(
+    "the server refuses the records (%s): visit.records_rejected, not the number message",
+    async (_label, status, error) => {
+      mockPatientApi({ visit: () => jsonResponse({ error }, status) });
+      renderPatient(ROUTES, "/visit");
+      await send();
+      expect(
+        await screen.findByText(s("visit.records_rejected")),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(s("visit.invalid"))).toBeNull();
+      expect(field()).toHaveValue("A-023");
+    },
+  );
 });

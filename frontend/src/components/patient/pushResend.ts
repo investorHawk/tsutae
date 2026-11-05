@@ -84,7 +84,12 @@ export function resendSubscription(): Promise<void> {
  * 保存の途中でタブを移って戻っても、新しい時刻を出す）。
  */
 export function settledPushState(): Promise<PushState> {
-  return latest.then(savesSettled).then(loadPushState);
+  return pushWritesSettled().then(loadPushState);
+}
+
+/** 送り直しと時刻の保存が全て終わるのを待つ。失敗しない。 */
+export function pushWritesSettled(): Promise<unknown> {
+  return latest.then(savesSettled);
 }
 
 /** アプリを開いたとき・戻ってきたときに送り直す（戻る間に DB が新しくなることがある）。 */

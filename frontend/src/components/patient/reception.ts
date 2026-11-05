@@ -1,3 +1,5 @@
+import { PYTHON_SPACE } from "../../patient/freeText";
+
 /**
  * 受付番号（P3）。バックエンド（docs/architecture.md §8b api/visit.py）と同じ検査で、NFKC の
  * 後に前後の空白を落とし、1〜32 字（Python と同じく code point で数える）で、制御文字・書式文字
@@ -7,10 +9,7 @@
  */
 export const RECEPTION_NO_MAX = 32;
 
-/** Python の str.strip が落とす空白（JS の trim とは U+FEFF と U+001C〜1F・U+0085 が違う）。 */
-const SPACE =
-  "\\t-\\r\\x1c-\\x20\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
-const EDGE_SPACE = new RegExp(`^[${SPACE}]+|[${SPACE}]+$`, "g");
+const EDGE_SPACE = new RegExp(`^[${PYTHON_SPACE}]+|[${PYTHON_SPACE}]+$`, "g");
 const CONTROL_OR_FORMAT = /[\p{Cc}\p{Cf}]/u;
 
 export function normalizeReceptionNo(input: string): string | null {

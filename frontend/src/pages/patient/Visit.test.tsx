@@ -2,11 +2,12 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DeviceEntry } from "../../api/types";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
 import { savedInputs, seedDevice } from "./testing/device";
-import { ENTRIES, PID, s } from "./testing/fixtures";
+import { ENTRIES, NEXT_LINE, PID, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Visit from "./Visit";
 
@@ -253,6 +254,29 @@ describe("Visit: records on this phone", () => {
     await screen.findByText(s("visit.done"));
     expect(callsTo(fetchMock, "POST", "/api/visit")).toEqual([
       { reception_no: "A-023", entries: [] },
+    ]);
+  });
+
+  it("a saved record the reception would refuse does not stop the others", async () => {
+    const refused: DeviceEntry = {
+      ...ENTRIES[2]!,
+      client_entry_id: "refused",
+      kind: "free_text",
+      answers: [],
+      free_text: NEXT_LINE,
+    };
+    await seedDevice([ENTRIES[1]!, refused]);
+    const fetchMock = mockPatientApi({
+      visitWindow: () => jsonResponse(WINDOW),
+    });
+    renderPatient(ROUTES, "/visit");
+    await send();
+    await screen.findByText(s("visit.done"));
+    const [body] = callsTo(fetchMock, "POST", "/api/visit") as [
+      { entries: Record<string, unknown>[] },
+    ];
+    expect(body.entries.map((e) => e.client_entry_id)).toEqual([
+      ENTRIES[1]!.client_entry_id,
     ]);
   });
 

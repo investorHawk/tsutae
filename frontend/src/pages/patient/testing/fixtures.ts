@@ -136,3 +136,8 @@ export const ENTRIES: readonly DeviceEntry[] = [
 export const VISITS: readonly PatientVisitDay[] = [
   { visit_date: "2026-10-30", received_at: "2026-10-30T09:20:00+09:00" },
 ];
+
+/** JS の trim は残すが受付は断る文字（貼り付けでしか入らない）。表は free_text_cases.json。 */
+export const NEXT_LINE = "\u0085";
+export const FILE_SEPARATOR = "\u001c";
+export const LONE_SURROGATE = "\ud83d";

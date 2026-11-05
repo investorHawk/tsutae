@@ -12,7 +12,15 @@ import { jsonResponse } from "../../test/fetchMock";
 import History from "./History";
 import { MARK, callsTo, mockPatientApi } from "./testing/api";
 import { seedDevice } from "./testing/device";
-import { ENTRIES, PID, questionText, s } from "./testing/fixtures";
+import {
+  ENTRIES,
+  FILE_SEPARATOR,
+  LONE_SURROGATE,
+  NEXT_LINE,
+  PID,
+  questionText,
+  s,
+} from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Today from "./Today";
 
@@ -229,6 +237,50 @@ describe("Today: when recording fails", () => {
     await screen.findByText(s("today.saved"));
     const ids = (await listDeviceEntries(PID)).map((e) => e.client_entry_id);
     expect(new Set(ids).size).toBe(2);
+  });
+});
+
+/** 受付で断られる自由記載を保存しない（1件で受診の全体が 422 になる）。貼り付けでしか入らない文字。 */
+describe("Today: free text the reception would refuse", () => {
+  async function paste(text: string) {
+    const box = await screen.findByRole("textbox", {
+      name: s("today.free_text_label"),
+    });
+    await userEvent.click(box);
+    await userEvent.paste(text);
+  }
+
+  it.each([NEXT_LINE, FILE_SEPARATOR, LONE_SURROGATE])(
+    "only %j: cannot be recorded, and no mark is sent",
+    async (text) => {
+      const fetchMock = mockPatientApi();
+      renderToday();
+      await paste(text);
+      expect(button("today.submit")).toBeDisabled();
+      expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
+      await expect(listDeviceEntries(PID)).resolves.toEqual([]);
+    },
+  );
+
+  it("with an answer: saved as answers only", async () => {
+    mockPatientApi();
+    renderToday();
+    await choose("diarrhea", "answer.hard");
+    await paste(NEXT_LINE);
+    await userEvent.click(button("today.submit"));
+    await screen.findByText(s("today.saved"));
+    const [saved] = await listDeviceEntries(PID);
+    expect(saved).toMatchObject({ kind: "answers", free_text: null });
+  });
+
+  it("saves the text without those characters at the edges", async () => {
+    mockPatientApi();
+    renderToday();
+    await paste(`${NEXT_LINE}${FREE_TEXT}${FILE_SEPARATOR}`);
+    await userEvent.click(button("today.submit"));
+    await screen.findByText(s("today.saved"));
+    const [saved] = await listDeviceEntries(PID);
+    expect(saved).toMatchObject({ kind: "free_text", free_text: FREE_TEXT });
   });
 });
 

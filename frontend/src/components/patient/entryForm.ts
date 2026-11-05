@@ -14,6 +14,7 @@ import {
   TEMPERATURE_MIN,
   THREE_LEVEL_VALUES,
 } from "../../api/types";
+import { cleanFreeText } from "../../patient/freeText";
 
 export { TEMPERATURE_MAX, TEMPERATURE_MIN };
 /**
@@ -168,7 +169,8 @@ export function unansweredCount(
 
 export function hasInput(state: EntryFormState): boolean {
   return (
-    Object.keys(state.answers).length > 0 || state.freeText.trim().length > 0
+    Object.keys(state.answers).length > 0 ||
+    cleanFreeText(state.freeText).length > 0
   );
 }
 
@@ -188,7 +190,7 @@ export function buildEntry(
     }
     answers.push({ question_key: question.key, value, temperature });
   }
-  const freeText = state.freeText.trim();
+  const freeText = cleanFreeText(state.freeText);
   if ([...freeText].length > FREE_TEXT_MAX) {
     return { ok: false, reason: "free_text_too_long" };
   }

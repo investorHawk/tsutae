@@ -486,7 +486,8 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `api/patientDevice.ts` | §12 の経路の呼び出しと応答の検査。`POST /api/visit` の `entries` は `api/patient.ts` の `submitVisit` |
 | `components/patient/TodayForm.tsx` | `client_entry_id` を入力の開始時に作り、押し直しても同じ（「追加で記録する」・取り消しの後で作り直す）。印か保存が失敗したら入力を残して `error.generic`。保存できたら `onSaved`（バッジと表示中の通知を消す） |
 | `components/patient/HistoryList.tsx` | P2。端末の記録と `GET visit-days` を読み、`historyRows` で並べる |
-| `patient/visitEntries.ts` | P3（§5.5）。`sendVisit`（`GET visit-window` → 端末の記録を読む → 範囲内だけ `POST /api/visit`）、`toVisitEntry`（`pid` と質問の文の写しを外す）。記録を読めなければ例外で返し、空のまま送らない |
+| `patient/visitEntries.ts` | P3（§5.5）。`sendVisit`（`GET visit-window` → 端末の記録を読む → 範囲内だけ `POST /api/visit`）、`toVisitEntry`（`pid` と質問の文の写しを外す）。記録を読めなければ例外で返し、空のまま送らない。受付が断る自由記載は送る前に直し、中身が無くなる記録は送らない（`patient/freeText.ts`） |
+| `patient/freeText.ts` | `cleanFreeText`: 片割れのサロゲートと、前後の空白（Python の `str.strip` の一覧と U+FEFF）を落とす。`entryForm.ts`（入力ありの判定・`buildEntry`）と送る前に使う。同じ表 `test/fixtures/free_text_cases.json` を backend の `test_free_text_cases.py` も読み、画面が保存する形を受付が受け取ることを確かめる |
 | `patient/standalone.ts` | §5.8 の判定の純関数。`needsHomeScreenGuide`（iPhone・iPad で、`navigator.standalone` でも `display-mode: standalone` でもない）、`suggestsHomeScreen`（Android のブラウザ）、`readDisplayEnv` |
 | `layouts/PatientLayout.tsx`・`components/patient/AddToHomeGuide.tsx` | 判定が真なら、どの患者の経路でも案内だけを出す。ページも通知の処理も動かさず、API は定型文の GET だけ。URL の `pid` は形が正しいときだけ大きく見せ、保存も登録もしない。アプリ内ブラウザでは Safari で開き直す文を手順の前に出す（いつも出す）。医師の経路はこの外枠を通らない |
 | `components/patient/PatientNav.tsx` | 下の4つのタブ。幅は文字の長さで分ける（`patient.css`。幅 360px 以上で全て1行） |

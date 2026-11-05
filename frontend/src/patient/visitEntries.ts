@@ -10,6 +10,7 @@ import type {
   VisitWindowResponse,
 } from "../api/types";
 import { listDeviceEntries } from "./deviceStore";
+import { cleanFreeText } from "./freeText";
 
 export function toVisitEntry(entry: DeviceEntry): VisitEntry {
   const { pid: _pid, answers, ...rest } = entry;
@@ -23,6 +24,23 @@ export function toVisitEntry(entry: DeviceEntry): VisitEntry {
   };
 }
 
+/**
+ * 受付が断る自由記載を直す。今は保存の前に直すが、前の版で端末に入った記録が残っていると、その1件の
+ * せいで受診の全体が断られる。直すと中身が無くなる記録は null（送らない。紙は「届いていない」になる）。
+ */
+function sendable(entry: DeviceEntry): DeviceEntry | null {
+  if (entry.free_text === null) {
+    return entry;
+  }
+  const text = cleanFreeText(entry.free_text);
+  if (text.length > 0) {
+    return { ...entry, free_text: text };
+  }
+  return entry.answers.length > 0
+    ? { ...entry, kind: "answers", free_text: null }
+    : null;
+}
+
 /** 範囲（両端を含む）の記録を受付の形にする。日付は YYYY-MM-DD なので文字列で比べる。 */
 export function entriesInWindow(
   entries: readonly DeviceEntry[],
@@ -30,6 +48,7 @@ export function entriesInWindow(
 ): VisitEntry[] {
   return entries
     .filter((e) => window.start <= e.record_date && e.record_date <= window.end)
+    .flatMap((e) => sendable(e) ?? [])
     .map(toVisitEntry);
 }
 

@@ -76,4 +76,64 @@ describe("entriesInWindow", () => {
   it("nothing in the window: an empty list", () => {
     expect(entriesInWindow([entry("old", "2026-01-01")], WINDOW)).toEqual([]);
   });
+
+  /** この修正の前に保存された記録。受付が断るので、1件で受診の全体が送れなくなる。 */
+  describe("a record the server would refuse", () => {
+    const ANSWER = {
+      question_key: "diarrhea",
+      value: "present",
+      temperature: null,
+      question_text: "copy",
+    } as const;
+    const DAY = "2026-11-01";
+
+    function freeOnly(id: string, text: string): DeviceEntry {
+      return { ...entry(id, DAY), kind: "free_text", free_text: text };
+    }
+
+    function mixed(id: string, text: string): DeviceEntry {
+      return {
+        ...entry(id, DAY),
+        kind: "mixed",
+        answers: [ANSWER],
+        free_text: text,
+      };
+    }
+
+    it("free text of only spaces is left out, and the others are still sent", () => {
+      const sent = entriesInWindow(
+        [freeOnly("x85", "\u0085"), entry("good", DAY)],
+        WINDOW,
+      );
+      expect(sent.map((e) => e.client_entry_id)).toEqual(["good"]);
+    });
+
+    it("with answers: only the answers are sent, as kind answers", () => {
+      const [sent] = entriesInWindow([mixed("a", "\u001c")], WINDOW);
+      expect(sent).toMatchObject({
+        client_entry_id: "a",
+        kind: "answers",
+        free_text: null,
+      });
+      expect(sent?.answers).toHaveLength(1);
+    });
+
+    it("cleans the text and keeps the kind when text is left", () => {
+      const sent = entriesInWindow(
+        [freeOnly("a", "\u0085だるい\ud83d"), mixed("b", "夜 熱\u001f")],
+        WINDOW,
+      );
+      expect(sent.map((e) => [e.kind, e.free_text])).toEqual([
+        ["free_text", "だるい"],
+        ["mixed", "夜 熱"],
+      ]);
+    });
+
+    it("does not change the entries it is given", () => {
+      const device = [mixed("a", "\u001c")];
+      const before = structuredClone(device);
+      entriesInWindow(device, WINDOW);
+      expect(device).toEqual(before);
+    });
+  });
 });

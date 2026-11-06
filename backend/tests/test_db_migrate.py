@@ -277,3 +277,13 @@ def test_foreign_key_violation_rolls_back(tmp_db_path: Path) -> None:
     assert _dump(conn, "parents") == [("p1", "A"), ("p2", "B")]
     assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
     assert not conn.in_transaction
+
+
+def test_architecture_lists_every_migrated_table() -> None:
+    """障害を調べる人が読む一覧と、実際の移行の対象を揃える。"""
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "docs/architecture.md").read_text(encoding="utf-8")
+    (line,) = [row for row in text.splitlines() if row.startswith("- **DB の移行")]
+    targets = line[line.index("対象は") :]
+    missing = [m.table for m in MIGRATIONS if f"`{m.table}`" not in targets]
+    assert missing == []

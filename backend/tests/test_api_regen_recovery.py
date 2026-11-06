@@ -3,7 +3,9 @@
 Claude は呼ばない。
 
 - 起動時・周期の回収は Claude を呼ばず全ての記録を読むので、自動の回数を使わない
-- 変換し直しが failed で終わっても、前のレポートは D3 から開けて、印刷済みにできる
+- 変換し直しが failed で終わっても、前のレポートは D3 から開けて、印刷済みにできる。その
+  印刷で、紙に載っていない新しい記録も消え、その日はもう送り直せない
+- 同じ受付で順番を待つ行は、最後のログが新しいので周期の回収に奪われない
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from typing import Any
 
 import pytest
 from api_helpers import add_patient, api_client, db_conn, login_doctor, register
+from e2e_scripts import InterruptingRunner
 from fastapi.testclient import TestClient
 from pipeline_fakes import FakeRunner
 from test_api_second_device import (
@@ -28,6 +31,7 @@ from test_api_second_device import (
     _add_from_other_phone,
     _events,
     _generating_visit,
+    _once,
     _only_visit,
     _post,
     _received,
@@ -35,10 +39,13 @@ from test_api_second_device import (
     _text,
     _too_sick,
     _use,
+    _visit_of,
 )
 
 from tsutae import db
 from tsutae.api import orphans, visit
+from tsutae.config import now
+from tsutae.db.connection import dt_to_db
 from tsutae.pipeline import service
 
 
@@ -153,6 +160,32 @@ def test_record_arriving_during_recovery_is_read_without_using_a_run(
     assert [e["decision"] for e in logged] == ["added_records"]
 
 
+def test_row_waiting_its_turn_is_not_taken_by_the_stale_recovery(
+    client: TestClient, pid: str
+) -> None:
+    """同じ受付の生成は1行ずつ回る。順番を待つ別の番号の行も、受付のログで動きが新しくなる。"""
+    assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
+    assert _post(client, [_text(UUID_A, TEXT_A)], no="A-999").status_code == 200
+    stale_after = orphans.stale_after_for(client.app.state.settings)
+    with db_conn(client.app) as conn:
+        conn.execute(
+            "UPDATE pipeline_logs SET ts = ?",
+            (dt_to_db(now() - stale_after * 2),),
+        )
+        conn.commit()
+    seen: list[list[int]] = []
+
+    def look() -> None:
+        with db_conn(client.app) as conn:
+            seen.append(orphans.find_stale(conn, now(), stale_after))
+            waiting = db.get_visit(conn, _visit_of(client, "A-999")["id"])
+        assert waiting["status"] == "generating"
+
+    _use(client, InterruptingRunner(FakeRunner(), _once(look)))
+    assert _post(client, [_text(UUID_B, TEXT_B)]).status_code == 200
+    assert seen == [[]]
+
+
 def _break_prepare(monkeypatch: pytest.MonkeyPatch) -> None:
     def broken(*args: Any) -> None:
         raise ValueError("入力を作れない")
@@ -172,6 +205,29 @@ def test_failed_regeneration_leaves_the_previous_report_usable_from_d3(
     assert (row["status"], row["has_report"]) == ("failed", True)
     assert client.get(f"/api/doctor/visits/{row['id']}/report").status_code == 200
     assert client.post(f"/api/doctor/visits/{row['id']}/printed").status_code == 200
+    with db_conn(client.app) as conn:
+        assert db.list_entries(conn, pid) == []
+
+
+def test_printing_the_previous_report_loses_the_new_record_for_that_day(
+    client: TestClient, pid: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """紙は前のレポートのまま。新しい記録はサーバーから消え、その日はもう送り直せない。"""
+    assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
+    vid = _row(client)["id"]
+    url = f"/api/doctor/visits/{vid}/report"
+    paper = client.get(url).text
+    _break_prepare(monkeypatch)
+    assert _post(client, [_text(UUID_B, TEXT_B)]).status_code == 200
+    assert client.get(url).text == paper
+    assert TEXT_B not in paper
+
+    assert client.post(f"/api/doctor/visits/{vid}/printed").status_code == 200
+    with db_conn(client.app) as conn:
+        assert db.list_entries(conn, pid) == []
+    again = _post(client, [_text(UUID_B, TEXT_B)])
+    assert again.status_code == 409
+    assert again.json()["error"] == "already_printed"
     with db_conn(client.app) as conn:
         assert db.list_entries(conn, pid) == []
 

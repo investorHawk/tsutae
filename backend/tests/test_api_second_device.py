@@ -296,6 +296,26 @@ def test_wrong_number_logs_the_regeneration_only_on_the_row_that_ran_again(
     assert "regenerate_requested" not in [e["event"] for e in _events(client, second)]
 
 
+def test_new_record_on_an_existing_number_logs_every_row_that_runs_again(
+    client: TestClient, pid: str
+) -> None:
+    """既存の番号へ送ると別の番号の開いた行も動く。動く行は全て同じログを持つ（§6）。"""
+    assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
+    assert _post(client, [_text(UUID_A, TEXT_A)], no="A-999").status_code == 200
+    first = _visit_of(client, "A-023")["id"]
+    second = _visit_of(client, "A-999")["id"]
+    for vid in (first, second):
+        assert "regenerate_requested" not in [e["event"] for e in _events(client, vid)]
+
+    assert _post(client, [_text(UUID_B, TEXT_B)]).status_code == 200
+
+    for vid in (first, second):
+        logged = [
+            e for e in _events(client, vid) if e["event"] == "regenerate_requested"
+        ]
+        assert [e["decision"] for e in logged] == ["added_records"]
+
+
 def test_wrong_number_while_the_first_is_generating_runs_it_once_more(
     client: TestClient, pid: str
 ) -> None:

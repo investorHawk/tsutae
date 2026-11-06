@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Funnel に出す `vite preview` の決まり（docs/decisions.md）。
+ * Tailscale Serve に出す `vite preview` の決まり（docs/decisions.md）。
  * ポートは開かない: listen を止め、preview の middleware を直接呼ぶ。読むのは合成のファイルだけ。
  * Vite を上げてこの決まりが変わったら落ちるように、実物の preview で確かめる。
  */

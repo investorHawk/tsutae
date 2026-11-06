@@ -8,11 +8,11 @@
    - D4 レジメンは `! .venv/bin/python scripts/run_demo_regimen.py --json` で一度通す（本物の Claude で FOLFIRI＋BV を新しいレジメンとしてチャットで作る。一時の DB と Skill の写しの上で行い、本体の Skill と data/ の DB は変えない。`--adopt` を付けると写しの上で採用まで流す。往復ごとの秒・費用・拒否の回数が表で出て、`docs/eval/demo-regimen-*.json|md` に残る）
    - レポートの形式（一文の D4）は `! .venv/bin/python scripts/run_demo_skill_change.py` で一度通す（本体の SKILL.md は変えない。差分は `docs/eval/demo-skill-change-*.diff`）
 2. 撮影用の DB を新しく作る（既存の DB は消さない）: `.venv/bin/python scripts/seed_demo.py --db data/demo-take1.db --device-records`。患者・コース・日付の印だけが入り、記録は入らない（`make seed` の DB は記録もサーバーにあるので、見本を送ると受付で二重に数える。撮影には使わない）
-3. 起動: `TSUTAE_DB=data/demo-take1.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 make dev-api` と `make dev-web`（スマホで撮るなら README の「スマホで試す」）。`TSUTAE_DEMO_TOOLS=1` が無いと見本のボタンが出ない。**開発サーバーは Funnel に出さない**（`.env` まで読まれる）。Funnel を使う間は `make dev-web` を止め、README の Funnel の手順（`npm run build` と `vite preview`）で起動する
+3. 起動: `TSUTAE_DB=data/demo-take1.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 make dev-api` と `make dev-web`（スマホで撮るなら README の「スマホで試す」）。`TSUTAE_DEMO_TOOLS=1` が無いと見本のボタンが出ない。**開発サーバーは Serve に出さない**（`.env` まで読まれる）。Serve を使う間は `make dev-web` を止め、README の Serve の手順（`npm run build` と `vite preview`）で起動する。iPhone の VPN をオンにしておく（撮影中はステータスバーに VPN の印が出る）
 4. ブラウザの拡大率・ウィンドウの大きさを決める。医師画面は院内PCの想定で横長、患者画面はスマホ幅。**iPhone の Safari では「ホーム画面に追加」の案内だけが出て記録できないので、iPhone の患者画面はホーム画面のアプリで撮る**（URL が変わると別のアプリになるので、撮影で使う URL で追加する）
 5. 見本を入れる: 患者画面で番号 `P-DEMO0001` を入れて登録 → 設定の「撮影用の見本」→「見本の記録を入れる」→「見本の記録を入れました。」→ これまでの記録に並ぶことを確かめる（押し直しても増えない。見本には今日 11/9 より前の合成データの記録が入る）。**入れ忘れて受付すると、紙に「記録が届いていない日」が並ぶ**（印は DB にあり、記録が届かないため）
 6. 撮り直すとき: 新しい DB を作る（`--db data/demo-take2.db`）→ `TSUTAE_DB` を変えて dev-api を起動し直す → 設定の「このスマホの登録と記録を消す」（「次へ」→「はい、消す」）→ 番号を入れて登録し直す → 見本を入れる。既存の DB は消さない。D4 の採用を撮った後は「注意」の Skill の写しも作り直す
-7. 通知のカット（場面 2 の頭）は**他の場面より先に撮る**。通知が失敗しても他の場面は撮れる。iPhone の実機で、HTTPS（README の Tailscale Funnel の手順）と通知の鍵が要る。試送は日付の印・送る期間・時刻を見ないので、どの日付でも届く。HTTPS が使えなければこのカットを外す（`docs/plan-device-records.md` §10）
+7. 通知のカット（場面 2 の頭）は**他の場面より先に撮る**。通知が失敗しても他の場面は撮れる。iPhone の実機で、HTTPS（README の Tailscale Serve の手順）と通知の鍵が要る。試送は日付の印・送る期間・時刻を見ないので、どの日付でも届く。HTTPS が使えなければこのカットを外す（`docs/plan-device-records.md` §10）
 
 ## 流れ
 | # | 場面 | 画面 | 見せること | 目安 |

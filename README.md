@@ -9,7 +9,7 @@
 | 項目 | 値 |
 |---|---|
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
-| テスト件数 | 7134件 通過 / 全7134件（backend 4574/4574、frontend 2560/2560。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
+| テスト件数 | 7138件 通過 / 全7138件（backend 4578/4578、frontend 2560/2560。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 2回実測（`docs/eval/2026-11-04.md`・`2026-11-04-2.md`、合成2人・4コース・出来事61件）。2回目: 日付 93.4%、用語 75.4%、食い違い 再現率 100%・適合率 100%、改善中→なし 0件（9件中）、否定→あり 0件（18件中）、引用 100%。失敗 15 件のうち 11 件は「異常感覚」と「錯感覚」の当て分け（正解ラベルの臨床レビュー待ち） |
 | 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で5回。記録をスマホに移す前の形）。**本物の Claude**: Agent SDK のスモーク7項目が全て OK、デモ患者の変換が1回で成功（ready・AI変換なしでない・H2 の拒否0回、2026-11-04）。一文で頼む D4（当時は regimen-folfox に質問を足す書き換え。今はレポートの形式だけ）の本物の書き換えも1回で成功（pending・差分 2 行追加・H3 の拒否0回・約 0.10 ドル、2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`）。新しい D4 レジメン（チャットで作る）も FOLFIRI＋BV で2回通した（どちらも1往復・未入力0・ツール3回・拒否0・H4 の拒否0、一時の写しの上で採用まで。32.8 秒・約 0.12 ドルと 36.0 秒・約 0.13 ドル、2026-11-05。`docs/eval/demo-regimen-20261105-0857.json`・`demo-regimen-20261105-2025.json`）。レジメンの画面のブラウザでの通しは未実施。毎日の通知・スマホ保存・受診タブは自動テストまでで、実機とブラウザの通しは未確認 |
 
@@ -135,9 +135,9 @@ make dev-web                                                                    
     DOCTOR_PASSWORD=<デモ用のパスワード> make dev-api
   (cd frontend && npx vite --host 0.0.0.0)
   ```
-  開発サーバーを同じ Wi-Fi に開くので、Wi-Fi の中の人には `.env` まで読める（下の Funnel の注意と同じ穴）。自宅など信頼できる Wi-Fi でだけ使い、終わったら止める
-- 毎日の通知を試す（HTTPS が要る。同じ Wi-Fi の `http://` では通知を使えない。Tailscale Funnel の固定 URL を使う）:
-  1. Tailscale のアプリを入れてログインし、管理画面で HTTPS と Funnel を許可する。コマンドと画面は導入時に確かめる（この手順はまだ実機で通していない）。URL が変わると、ホーム画面アプリ・通知の登録が別物になるので、Quick Tunnel は使わない
+  開発サーバーを同じ Wi-Fi に開くので、Wi-Fi の中の人には `.env` まで読める（下の Serve の注意と同じ穴）。自宅など信頼できる Wi-Fi でだけ使い、終わったら止める
+- 毎日の通知を試す（HTTPS が要る。同じ Wi-Fi の `http://` では通知を使えない。Tailscale Serve の固定 URL を使う。外には公開しない）:
+  1. Mac と iPhone の両方に Tailscale のアプリを入れ、同じアカウントでログインする。iPhone の VPN はオンにしておく。初回に HTTPS の許可を求められたら許可する。コマンドと画面は導入時に確かめる（この手順はまだ実機で通していない）。URL が変わると、ホーム画面アプリ・通知の登録が別物になるので、Quick Tunnel は使わない
   2. 通知の鍵（VAPID）を作り、出た3行を `.env` に書く（コミットしない）。`TSUTAE_VAPID_SUBJECT` は自分の連絡先（`mailto:` か `https://`）に直す
      ```bash
      .venv/bin/python scripts/gen_vapid.py   # 標準出力に出すだけで、ファイルには書かない
@@ -148,18 +148,19 @@ make dev-web                                                                    
      ```bash
      TSUTAE_DB=data/device.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=https://<Mac 名>.<tailnet>.ts.net make dev-api
      (cd frontend && npm run build && npx vite preview --host 127.0.0.1 --port 5173 --strictPort)
-     tailscale funnel --bg 5173   # preview が動いてから開く
+     tailscale serve --bg 5173   # preview が動いてから開く。自分の Tailscale の端末だけに届く
      caffeinate -dims   # 通知の時刻に Mac を眠らせない
      ```
-  5. iPhone の Safari で URL を開く → ホーム画面に追加 → アプリで番号を入れる → 設定で「お知らせをオンにする」→「試しに通知を送る」（10 秒後に届く）。確かめる項目は `docs/plan-device-records.md` §9
+  5. iPhone の VPN をオンにして Safari で URL を開く → ホーム画面に追加 → アプリで番号を入れる → 設定で「お知らせをオンにする」→「試しに通知を送る」（10 秒後に届く）。確かめる項目は `docs/plan-device-records.md` §9
 
   - **`TSUTAE_TODAY=2026-11-09` を付ける**。seed はデモ患者の未来の日付にも印を付けるので（`--device-records` でも同じ）、`P-DEMO0001` には 11/7・11/8 の日付の印がある。実際の日付で動かすと、この2日は記録していなくても毎日の通知が届かず、ログにも何も出ない（判定は仕様どおり。試送は印を見ないので届く）。11/9 には印が無く、20:00 の登録で届くことを一時 DB で確かめた（11/6・11/9〜11/15 は送り、11/7・11/8 は送らない）。送った後や記録した後は、その日はもう届かない。サーバーを起動し直すと日付が 11/9 に戻るので、続けて確かめるときは `TSUTAE_TODAY=2026-11-10` のように次の日にする（seed のままなら 11/15 まで印は無い）
-  - **Funnel に出すのは `vite preview` だけ。開発サーバーは出さない**（`npx vite`・`make dev-web`）。今の Vite 5.4.8 の開発サーバーは `/@fs/<絶対パス>?import&raw??` で `server.fs` の検査を抜けるので、インターネットから `.env`（API キー・署名の鍵・VAPID の秘密鍵）や DB を読まれる。`--bg` の Funnel は残り続けるので、出したまま開発サーバーを起動しない。preview は `dist/` の中だけを返す（`frontend/src/previewServing.test.ts` で確かめている。Funnel 越しは未確認）。画面を直したら `npm run build` からやり直す
-  - 開けるのは 5173 だけでよい（`/api` は preview が 8000 へ渡す。`server.proxy` を引き継ぐ）。`--host 127.0.0.1` は、この Mac では `localhost` が先に `::1` になり、Funnel の転送先（127.0.0.1 の見込み）に届かないおそれがあるため。同じ Wi-Fi には開かない
+  - **Serve に出すのは `vite preview` だけ。開発サーバーは出さない**（`npx vite`・`make dev-web`）。今の Vite 5.4.8 の開発サーバーは `/@fs/<絶対パス>?import&raw??` で `server.fs` の検査を抜けるので、Tailscale の端末から `.env`（API キー・署名の鍵・VAPID の秘密鍵）や DB を読める。`--bg` の Serve は残り続けるので、出したまま開発サーバーを起動しない。preview は `dist/` の中だけを返す（`frontend/src/previewServing.test.ts` で確かめている。Serve 越しは未確認）。画面を直したら `npm run build` からやり直す
+  - 開けるのは 5173 だけでよい（`/api` は preview が 8000 へ渡す。`server.proxy` を引き継ぐ）。`--host 127.0.0.1` は、この Mac では `localhost` が先に `::1` になり、Serve の転送先（127.0.0.1 の見込み）に届かないおそれがあるため。同じ Wi-Fi には開かない
   - Vite 5.4.8 に `allowedHosts` の検査は無い。上げるときは `preview.allowedHosts` に `.ts.net` を足す（`docs/decisions.md`）
   - `TSUTAE_PUBLIC_BASE_URL` が https になると Cookie に `Secure` が付く。医師画面は同じ URL か localhost で開く（ログインできなければ同じ URL で）
   - `http://<Mac の IP>:5173` で追加したホーム画面アプリは別のオリジンなので、追加し直す
-  - Funnel は外から届くので、撮影の前後以外は止める（`tailscale funnel reset`。導入時に確かめる）
+  - Funnel は使わない。全世界に公開され、公開リポジトリに載る `P-DEMO0001` で受付を送られると Claude の費用がかかる。Serve でも撮影の前後以外は止める（`tailscale serve reset`。導入時に確かめる）
+  - iPhone の VPN がオフだと、アプリを開いても通知を押しても画面が開かない。撮影中はステータスバーに VPN の印が出る
 - ホーム画面に置く: iPhone は Safari の共有メニューの「ホーム画面に追加」、Android は Chrome のメニューの「ホーム画面に追加」。アイコンから全画面で開く。iPhone はホーム画面のアプリと Safari で Cookie・localStorage・記録の保存先が別なので、Safari（ホーム画面の外）では全ての患者画面で追加の案内だけを出し、記録させない。アプリの初回は「このスマホは登録されていません」の画面で番号を入れて登録する（番号は医師画面の登録用QRの隣の「登録の番号」。デモ患者は `P-DEMO0001`）。番号の入力は iPhone の実機で確認済み。Android は実機で未確認で、全画面になるには HTTPS が要る見込み
 - 患者: `http://127.0.0.1:5173/register?pid=P-DEMO0001`（デモ患者。受付番号は例えば `A-023`。PC のブラウザなら案内は出ない）
 - 医師: `http://127.0.0.1:5173/doctor/login`（パスワードは `DOCTOR_PASSWORD`、既定 `demo-doctor`）
@@ -198,7 +199,7 @@ make dev-web                                                                    
 - 伏せ字の見逃し（`backend/tsutae/masking/__init__.py` に一覧）: 番地の無い住所、敬称の付かない名前（「孫の蓮が来た」）・英語の敬称。1字の名＋さん・くん・ちゃん（「翔さん」「孫の蓮くん」「葵ちゃん」）は二次で拾い、送らない（続柄の1字は許可語で通す）
 - 患者の登録用 QR は仮名ID を載せる。実運用では1回限りの高エントロピーの登録トークンにすべき
 - 医師画面はデモ用の単一パスワード（失敗が続くと 429。発行済みの Cookie はログアウト後も12時間は有効）。既定の鍵・パスワードのまま localhost 以外で起動しようとすると止まる
-- 試行回数の上限はプロセスの中だけで数える。プロキシの後ろに置くときは、信用するプロキシが X-Forwarded-For を上書きする前提（`make dev-api` は `--no-proxy-headers`）。Funnel で開くと Vite を通るので、全ての端末が1つのクライアントとして数えられる
+- 試行回数の上限はプロセスの中だけで数える。プロキシの後ろに置くときは、信用するプロキシが X-Forwarded-For を上書きする前提（`make dev-api` は `--no-proxy-headers`）。Serve で開くと Vite を通るので、全ての端末が1つのクライアントとして数えられる
 - 患者画面の直書き検査は「日本語の文字列リテラル」と「JSX の英字テキスト」を見る。変数を経由した英字は検査の外
 - D5 は数秒ごとのポーリング（SSE ではない）
 - 生成に失敗した受診に同じ受付番号で、新しい記録なしで受付し直しても、作り直さない（医師画面の「失敗」から変換ログを見る。AI変換なしのレポートは起動時の回収か失敗時の処理で作られる）

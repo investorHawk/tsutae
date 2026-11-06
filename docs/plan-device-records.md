@@ -40,21 +40,22 @@
 
 ## 3. 前提の環境（先生の作業）
 
-### HTTPS: Tailscale Funnel
+### HTTPS: Tailscale Serve
 
 - 固定 URL `https://<Mac 名>.<tailnet>.ts.net` を使う。URL が変わるとホーム画面アプリ・通知の登録・端末の記録が別物になるので、Quick Tunnel は使わない
-- iPhone 側の設定は要らない。アプリには URL が出ないので、動画でも見えない。公開リポジトリに実際の URL は書かない
-- 外から届くので、撮影の前後以外は止める。`DOCTOR_PASSWORD` と `TSUTAE_SECRET` は既定値にしない（`settings_check.py` が止める）
+- 自分の Tailscale の端末だけに届く。iPhone にも Tailscale を入れて同じアカウントでログインし、VPN をオンにする。通知は Apple の経路で届くので、公開は要らない（実機で確かめる）
+- アプリには URL が出ないので、動画でも見えない。ステータスバーの VPN の印は見える。公開リポジトリに実際の URL は書かない
+- Funnel は使わない（全世界に公開され、公開リポジトリに載るデモ患者の番号で受付を送られると Claude の費用がかかる。`docs/decisions.md`）。Serve でも撮影の前後以外は止める。`DOCTOR_PASSWORD` と `TSUTAE_SECRET` は既定値にしない（`settings_check.py` が止める）
 
 ```bash
-# Tailscale のアプリを入れてログインし、管理画面で HTTPS と Funnel を許可する（コマンドは導入時に確かめる）
+# Mac と iPhone に Tailscale のアプリを入れてログインし、HTTPS を許可する（コマンドは導入時に確かめる）
 TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=https://<Mac 名>.<tailnet>.ts.net make dev-api   # 鍵・パスワードも渡す
 (cd frontend && npm run build && npx vite preview --host 127.0.0.1 --port 5173 --strictPort)
-tailscale funnel --bg 5173   # preview が動いてから開く
+tailscale serve --bg 5173   # preview が動いてから開く
 caffeinate -dims   # 通知の時刻に Mac を眠らせない
 ```
 
-- **Funnel に出すのは `vite preview` だけ。開発サーバーは出さない**。今の Vite 5.4.8 の開発サーバーは `/@fs/<絶対パス>?import&raw??` で `server.fs` の検査を抜け、インターネットから `.env` や DB を読まれる。preview は `dist/` の中だけを返し、`/api` は `server.proxy` を引き継いで 8000 へ渡す（`frontend/src/previewServing.test.ts`）。画面を直したら `npm run build` からやり直す
+- **Serve に出すのは `vite preview` だけ。開発サーバーは出さない**。今の Vite 5.4.8 の開発サーバーは `/@fs/<絶対パス>?import&raw??` で `server.fs` の検査を抜け、Tailscale の端末から `.env` や DB を読める。preview は `dist/` の中だけを返し、`/api` は `server.proxy` を引き継いで 8000 へ渡す（`frontend/src/previewServing.test.ts`）。画面を直したら `npm run build` からやり直す
 - 今の Vite 5.4.8 に `allowedHosts` の検査は無い（`node_modules` で確認）。上げるときは `preview.allowedHosts` に `.ts.net` を足す
 - `public_base_url` が https になると Cookie に `Secure` が付く。医師画面は同じ URL か localhost で開く
 - 今の `http://192.168.1.9:5173` のホーム画面アプリは別のオリジンなので、追加し直す
@@ -272,7 +273,7 @@ TDD で進める。Claude API は呼ばない。
 
 ### 実機（先生の iPhone）
 
-**PR A**: Funnel で開く → 追加 → 番号 → オン → 試送がロック画面に届く → 押すと `/today` → バッジが付いて消える → 指定した時刻に届く → 記録した日は届かない → オフで届かない
+**PR A**: Serve で開く（iPhone の VPN をオン）→ 追加 → 番号 → オン → 試送がロック画面に届く → 押すと `/today` → バッジが付いて消える → 指定した時刻に届く → 記録した日は届かない → オフで届かない
 
 毎日の送信は `TSUTAE_TODAY=2026-11-09` で動かして確かめる（または日付の印の無い患者で）。`make seed` の `P-DEMO0001` には 11/7・11/8 の印があり、実際の日付で動かすとこの2日は記録していなくても届かない（試送は印を見ないので届く）。「指定した時刻に届く」の後は同じ日にもう届かないので（§4.1）、「記録した日は届かない」は次の日で確かめる。サーバーを起動し直すと日付が戻るので、そのときは `TSUTAE_TODAY=2026-11-10` にする。
 

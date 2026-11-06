@@ -154,10 +154,10 @@ async def _generate_once(
         _fail_if_generating(conn, visit_id)
 
 
-def _take_next_round(conn: sqlite3.Connection, visit_id: int) -> bool:
+def _take_next_round(conn: sqlite3.Connection, visit_id: int, counted: bool) -> bool:
     """生成中に記録が増えていて、自動の回数が残っていれば次の回を始めて True。"""
     try:
-        taken = db.take_regen_pending(conn, visit_id)
+        taken = db.take_regen_pending(conn, visit_id, counted=counted)
     except sqlite3.Error as exc:
         _log.warning("visit %s: 次の回を始められない: %s", visit_id, type(exc).__name__)
         _fail_if_generating(conn, visit_id)
@@ -168,11 +168,16 @@ def _take_next_round(conn: sqlite3.Connection, visit_id: int) -> bool:
 
 
 async def run_generation(
-    settings: Settings, runner_factory: Callable[[], Any], visit_id: int
+    settings: Settings,
+    runner_factory: Callable[[], Any],
+    visit_id: int,
+    *,
+    counted: bool = True,
 ) -> None:
     """バックグラウンドで生成を回す（自分の接続を開いて閉じる）。
 
     生成中に記録が増えていれば、もう1回回す。何件増えても1回で、回数には上限がある。
+    counted=False は次の回を自動の回数に数えない（Claude を呼ばない回収。`api.orphans`）。
     """
     try:
         conn = db.connect(settings.db_path)
@@ -181,7 +186,7 @@ async def run_generation(
         return
     try:
         await _generate_once(conn, settings, runner_factory, visit_id)
-        while _take_next_round(conn, visit_id):
+        while _take_next_round(conn, visit_id, counted):
             await _generate_once(conn, settings, runner_factory, visit_id)
     finally:
         conn.close()

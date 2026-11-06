@@ -490,7 +490,7 @@ def test_db_error_on_taking_does_not_leave_generating(
     vid = _generating_visit(client, pid)
     assert _post(client, [_too_sick(UUID_B)]).status_code == 200
 
-    def broken(conn: sqlite3.Connection, visit_id: int) -> bool:
+    def broken(conn: sqlite3.Connection, visit_id: int, **kw: Any) -> bool:
         raise sqlite3.OperationalError("database is locked")
 
     monkeypatch.setattr(db, "take_regen_pending", broken)

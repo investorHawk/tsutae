@@ -313,7 +313,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 医師 API の状態を変える POST（login 以外。logout を含む）は `require_same_origin`: `Sec-Fetch-Site` が cross-site/same-site、または `Origin` が「要求の Host の origin」とも `public_base_url` の origin とも違えば 403 `cross_origin`（どちらのヘッダも無ければ通す）。リバースプロキシが Host を書き換える構成では `public_base_url` を正しく設定する。frontend を別のサブドメインに置く構成は使えない
 - 送り直しの重複防止: 記録の押し直しは端末の同じ ID で置き換わる。受付の送り直しは `client_entry_id` で二重にならない。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、新しい記録が無ければ生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）。新しい記録があるときは §12 の2台目のスマホのとおり変換し直す
 
-- `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
+- `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診と、医師の伏せ字か追加の記録（`regen_pending`）がある ready の受診（下の「条件の追加」の行）だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
 
 ### UI の見直しで足した経路（2026-11-04 午後、修正ボード）
 | 経路 | 応答 |
@@ -475,6 +475,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - 同じ患者の同じ ID は入れない
 - 2台目のスマホ（PR C。仕様書 §6）: その患者に新しい記録が1件以上入ると、その日の開いた受診を番号を問わず、`create_visit_once` が同じトランザクションで動かす（`begin_added_records_on_open_visits`。変換は患者の全ての記録を読むので、番号を間違えて2行あっても、どちらも全ての記録で変換する）。ready・failed で自動の回数（`REGEN_AUTO_MAX` = 3）が残っていれば generating に戻して `regen_count` を足し、API が生成を起動する（前のレポートは残る）。生成中か回数を使い切っていれば `regen_pending` を立てるだけ。新しい記録が無ければ何も変えない。別の日の受診は動かさない。同じ受付で複数の受診を動かすときは、1件ずつ順に生成する
 - 生成の終わり（`save_visit_result`）: `regen_pending` があり回数が残っていれば、結果は保存して状態は generating のままにする（`hold_for_regeneration`）。ready を一瞬でも見せないので、前のレポートでの印刷が割り込めない（`mark_printed(refuse_generating=True)` が 409 `generating`）。`run_generation` が `take_regen_pending` で印を下ろして次の回を回す。何件増えても1回。failed で終わった回も同じ。使い切っていれば ready のまま印が残り、D3 に「追加の記録あり」、医師の「AI でもう一度変換」（`begin_regeneration`）で下りる
+- 起動時・周期の回収（`api.orphans`）は Claude を呼ばず全ての記録を読むので、自動の回数を使わない。それまでの `regen_pending` は先に下ろし（`clear_regen_pending`）、回収の最中に届いた分は `regen_count` を足さずにもう1回読む（`run_generation(counted=False)`）
 - 自動で変換し直すときのログは `regenerate_requested`（decision `added_records`。医師が押したときは decision なし。文面なし）
 - 今日の印刷済みの受診: `create_visit_once` は最初に書き込みのロックを取り（`BEGIN IMMEDIATE`）、その患者に `visit_date` が今日で printed の受診があれば `VisitAlreadyPrintedError`（何も保存しない）→ 409 `already_printed`（`visit.already_printed`）。印刷と追加はどちらかが先になり、受け取った記録が前のレポートの印刷で消えることはない。ただし回数を使い切った後の「追加の記録あり」は、医師が見たうえでそのまま印刷でき、その記録も一緒に消える
 - `doctor_masks` は `entries.id` で引く。統合はある行を変えない（新しい ID だけを足す）ので、変換し直しても同じ記録に効く

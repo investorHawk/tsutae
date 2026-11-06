@@ -448,6 +448,49 @@ def test_take_does_nothing_without_pending(conn: sqlite3.Connection) -> None:
     assert _state(conn, vid) == ("generating", False, 0)
 
 
+def test_uncounted_take_starts_the_next_run_without_using_a_run(
+    conn: sqlite3.Connection,
+) -> None:
+    """Claude を呼ばない回収の周回は、費用の歯止めの枠を使わない。"""
+    vid = _send(conn, UUID_A).visit_id
+    _send(conn, UUID_B)
+    _save_result(conn, vid)
+    assert _state(conn, vid) == ("generating", True, 0)
+    assert db.take_regen_pending(conn, vid, counted=False) is True
+    assert _state(conn, vid) == ("generating", False, 0)
+    assert db.take_regen_pending(conn, vid, counted=False) is False
+
+
+def test_uncounted_take_leaves_the_mark_at_the_limit(
+    conn: sqlite3.Connection,
+) -> None:
+    vid = _send(conn, UUID_A).visit_id
+    conn.execute(
+        "UPDATE visits SET regen_count = ? WHERE id = ?", (REGEN_AUTO_MAX, vid)
+    )
+    conn.commit()
+    _send(conn, UUID_B)
+    assert db.take_regen_pending(conn, vid, counted=False) is False
+    assert _state(conn, vid) == ("generating", True, REGEN_AUTO_MAX)
+
+
+def test_clear_pending_touches_only_a_generating_visit(
+    conn: sqlite3.Connection,
+) -> None:
+    vid = _send(conn, UUID_A).visit_id
+    _send(conn, UUID_B)
+    assert _state(conn, vid) == ("generating", True, 0)
+    db.clear_regen_pending(conn, vid)
+    assert _state(conn, vid) == ("generating", False, 0)
+
+    conn.execute(
+        "UPDATE visits SET status = 'ready', regen_pending = 1 WHERE id = ?", (vid,)
+    )
+    conn.commit()
+    db.clear_regen_pending(conn, vid)
+    assert _state(conn, vid) == ("ready", True, 0)
+
+
 def test_take_does_not_reopen_a_printed_visit(conn: sqlite3.Connection) -> None:
     vid = _send(conn, UUID_A).visit_id
     _send(conn, UUID_B)

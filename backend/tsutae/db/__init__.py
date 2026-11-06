@@ -80,7 +80,11 @@ from tsutae.db.repo_skills import (
     save_skill_version,
     update_skill_change,
 )
-from tsutae.db.repo_visit_regen import REGEN_AUTO_MAX, take_regen_pending
+from tsutae.db.repo_visit_regen import (
+    REGEN_AUTO_MAX,
+    clear_regen_pending,
+    take_regen_pending,
+)
 from tsutae.db.repo_visits import (
     VisitReceipt,
     begin_regeneration,
@@ -119,6 +123,7 @@ __all__ = [
     "backfill_record_marks",
     "begin_regeneration",
     "claim_push_send",
+    "clear_regen_pending",
     "connect",
     "create_patient",
     "create_skill_change",

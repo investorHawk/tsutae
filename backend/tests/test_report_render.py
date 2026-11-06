@@ -65,7 +65,10 @@ def test_no_severity_words(which: str, demo_html: str, fallback_html: str) -> No
 def test_synthetic_banner_and_sources(demo_html: str, fallback_html: str) -> None:
     for html in (demo_html, fallback_html):
         assert "症例は全て合成" in html
-        assert "有害事象共通用語規準 v5.0 日本語訳JCOG版より引用" in html
+        assert (
+            "用語名はこのアプリの用語の一覧から AI が当てはめた候補で、医師が確定する。"
+            in html
+        )
         assert "凡例" in html
 
 

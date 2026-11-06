@@ -1,9 +1,0 @@
-{
-  "method": "GET",
-  "path": "/api/patient/P-DEMO0001/entries",
-  "request": null,
-  "status": 401,
-  "body": {
-    "error": "not_logged_in"
-  }
-}

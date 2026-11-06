@@ -51,6 +51,12 @@ from api_helpers import (  # noqa: E402
     seed_synthetic,
     set_patient_cookie,
 )
+from dump_api_device import (  # noqa: E402
+    demo_tools_flow,
+    record_mark_flow,
+    too_many_visits_flow,
+)
+from dump_api_push import push_flow  # noqa: E402
 from dump_api_regimen import regimen_drafts_flow  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -114,9 +120,17 @@ JSON_ROUTES = frozenset(
         ("POST", "/api/patient/register"),
         ("GET", "/api/patient/strings"),
         ("GET", "/api/patient/{}/questions"),
-        ("POST", "/api/patient/{}/entries"),
-        ("GET", "/api/patient/{}/entries"),
-        ("POST", "/api/patient/{}/entries/{}/undo"),
+        ("POST", "/api/patient/{}/record-marks"),
+        ("POST", "/api/patient/{}/record-marks/undo"),
+        ("GET", "/api/patient/{}/visit-window"),
+        ("GET", "/api/patient/{}/visit-days"),
+        ("POST", "/api/patient/{}/unregister"),
+        ("GET", "/api/patient/{}/demo-config"),
+        ("GET", "/api/patient/{}/demo-entries"),
+        ("GET", "/api/patient/push-config"),
+        ("PUT", "/api/patient/{}/push-subscription"),
+        ("DELETE", "/api/patient/{}/push-subscription"),
+        ("POST", "/api/patient/{}/push-test"),
         ("POST", "/api/visit"),
         ("POST", "/api/doctor/login"),
         ("POST", "/api/doctor/logout"),
@@ -171,7 +185,7 @@ class DumpError(RuntimeError):
 
 
 def route_template(path: str) -> str:
-    """`/api/patient/P-DEMO0001/entries` → `/api/patient/{}/entries`（id・Skill 名も `{}`）。"""
+    """`/api/patient/P-DEMO0001/visit-days` → `/api/patient/{}/visit-days`（id・Skill 名も `{}`）。"""
     named = _LIBRARY_SEGMENT.sub("/{}", _SKILL_SEGMENT.sub("/{}", path))
     return _INT_SEGMENT.sub("/{}", _PID_SEGMENT.sub("/{}", named))
 
@@ -404,66 +418,32 @@ def _patient_flow(rec: Recorder) -> None:
         f"/api/patient/{EVAL_A}/questions",
         expect=403,
     )
-    # 受付（変換はバックグラウンド。TestClient は応答の前に済ませる）
+    # 受付（変換はバックグラウンド。TestClient は応答の前に済ませる）。記録つきの受付を先にする。
+    # 後にすると変換し直しになり（plan-device-records §6）、変換ログの fixture が2回分になる
+    record_mark_flow(rec, DEMO, EVAL_A, FIXED_NOW, f"{REGIMEN_SKILL}@1")
     rec.call("visit", "POST", "/api/visit", {"reception_no": "A-023"})
     rec.call("visit_invalid", "POST", "/api/visit", {"reception_no": "   "}, expect=422)
-    entry = {
-        "by_proxy": False,
-        "answers": [
-            {"question_key": "fever", "value": "measured", "temperature": 38.2},
-            {"question_key": "diarrhea", "value": "present", "temperature": None},
-        ],
-        "free_text": None,
-    }
-    saved = rec.call(
-        "patient_entry_create", "POST", f"/api/patient/{DEMO}/entries", entry
-    )
-    bad = {"answers": [{"question_key": "unknown_question", "value": "none"}]}
-    rec.call(
-        "patient_entry_create_invalid",
-        "POST",
-        f"/api/patient/{DEMO}/entries",
-        bad,
-        expect=422,
-    )
-    rec.call("patient_entries", "GET", f"/api/patient/{DEMO}/entries")
-    _undo_flow(rec, saved["entry_id"])
+    too_many_visits_flow(rec)
+    push_flow(rec, DEMO)
     with rec.without_cookies():
         rec.call(
-            "patient_entries_not_logged_in",
+            "patient_visit_days_not_logged_in",
             "GET",
-            f"/api/patient/{DEMO}/entries",
+            f"/api/patient/{DEMO}/visit-days",
             expect=401,
         )
+    demo_tools_flow(rec, DEMO, EVAL_A)
     set_patient_cookie(rec.client, NO_COURSE)
     rec.call(
         "visit_no_course", "POST", "/api/visit", {"reception_no": "B-7"}, expect=409
     )
-    set_patient_cookie(rec.client, DEMO)
-
-
-def _undo_flow(rec: Recorder, answers_entry_id: int) -> None:
-    """取り消し（P2-5）。回答の記録は 409、受付の無い評価A の「つらくて書けない」は消せる。
-
-    デモ患者は受付済みなので、取り消しは評価A で試す。消した id は次の記録で使い直される
-    （AUTOINCREMENT なし）ので、後の fixture の id は変わらない。
-    """
     rec.call(
-        "patient_entry_undo_not_undoable",
-        "POST",
-        f"/api/patient/{DEMO}/entries/{answers_entry_id}/undo",
+        "patient_visit_window_no_course",
+        "GET",
+        f"/api/patient/{NO_COURSE}/visit-window",
         expect=409,
     )
-    with rec.without_cookies():
-        set_patient_cookie(rec.client, EVAL_A)
-        created = rec.client.post(
-            f"/api/patient/{EVAL_A}/entries", json={"too_sick": True}
-        )
-        if created.status_code != 200:
-            raise DumpError(f"too_sick の記録: status {created.status_code}")
-        path = f"/api/patient/{EVAL_A}/entries/{created.json()['entry_id']}/undo"
-        rec.call("patient_entry_undo", "POST", path)
-        rec.call("patient_entry_undo_not_found", "POST", path, expect=404)
+    set_patient_cookie(rec.client, DEMO)
 
 
 def _add_open_visits(app: FastAPI) -> tuple[int, int]:
@@ -533,6 +513,14 @@ def _visit_flow(rec: Recorder) -> None:
         expect=404,
     )
     _check_printed_report(rec, ready)
+    # 今日の印刷済みの受診があれば、どの番号でも断る（plan-device-records §6）
+    rec.call(
+        "visit_already_printed",
+        "POST",
+        "/api/visit",
+        {"reception_no": "A-999"},
+        expect=409,
+    )
     rec.call(
         "doctor_masks_save_closed",
         "POST",
@@ -820,6 +808,7 @@ def build_dump(work_dir: Path) -> Dump:
             work_dir,
             skills_dir=home / ".claude" / "skills",
             public_base_url=PUBLIC_BASE_URL,
+            demo_tools=True,
         )
         app = make_app(
             work_dir, runner=_demo_runner(), editor=ScriptedEditor(), settings=settings

@@ -105,7 +105,7 @@ def _base_patient() -> dict[str, Any]:
 
 
 def _base_labels() -> dict[str, Any]:
-    numb = "末梢性感覚ニューロパチー"
+    numb = "末梢神経障害"
     return {
         "patient_id": PID,
         "labels": [
@@ -187,7 +187,7 @@ def _base_labels() -> dict[str, Any]:
                         "2026-09-17",
                         3,
                         2,
-                        "口腔粘膜炎",
+                        "口内炎",
                         "absent",
                         "口内炎はできていない",
                         "stomatitis",
@@ -219,7 +219,7 @@ def _base_labels() -> dict[str, Any]:
                         "2026-09-17",
                         3,
                         2,
-                        "口腔内痛",
+                        "口腔痛",
                         "present",
                         "ポンプを外した日から口の中が痛い",
                         "stomatitis",
@@ -350,7 +350,7 @@ def test_load_terms_reads_terms() -> None:
 
 
 def test_load_terms_rejects_broken_file(tmp_path: Path) -> None:
-    path = _write(tmp_path / "terms.json", {"source": "x", "terms": [{"en": "a"}]})
+    path = _write(tmp_path / "terms.json", {"terms": [{"question_key": "a"}]})
     with pytest.raises(ValueError):
         synthetic.load_terms(path)
 
@@ -743,7 +743,7 @@ def test_folfox_answer_types_match_skill_md() -> None:
 def test_term_question_keys_from_terms() -> None:
     mapping = synthetic.term_question_keys(synthetic.load_terms())
     assert mapping["下痢"] == "diarrhea"
-    assert mapping["末梢性感覚ニューロパチー"] == "numbness"
+    assert mapping["末梢神経障害"] == "numbness"
     assert mapping["倦怠感"] is None
     with pytest.raises(ValueError):
         synthetic.term_question_keys([{"term": "下痢", "question_key": 1}])
@@ -755,9 +755,9 @@ def test_term_question_keys_from_terms() -> None:
         ("倦怠感", "fatigue", {"unknown_question_key", "term_question_key_mismatch"}),
         ("倦怠感", None, set()),
         # FOLFOX に手足症候群の質問は無いので question_key は None
-        ("手掌・足底発赤知覚不全症候群", None, set()),
+        ("手足症候群", None, set()),
         (
-            "手掌・足底発赤知覚不全症候群",
+            "手足症候群",
             "hand_foot",
             {"unknown_question_key", "term_question_key_mismatch"},
         ),

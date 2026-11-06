@@ -11,7 +11,8 @@ import { clearPid, loadPid, savePid } from "../../patient/pid";
 import { reloadPage } from "../../patient/reload";
 import { jsonResponse } from "../../test/fetchMock";
 import History from "./History";
-import { callsTo, mockPatientApi } from "./testing/api";
+import { MARK, callsTo, mockPatientApi } from "./testing/api";
+import { savedInputs } from "./testing/device";
 import { PID, questionText, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Today from "./Today";
@@ -20,7 +21,7 @@ import Visit from "./Visit";
 vi.mock("../../patient/reload", () => ({ reloadPage: vi.fn() }));
 
 const OTHER_PID = "P-OTHER001";
-const ENTRIES_URL = `/api/patient/${PID}/entries`;
+const MARK_URL = `/api/patient/${PID}/record-marks`;
 const REGISTER_URL = "/api/patient/register";
 const ROUTES = [
   { path: "/today", element: <Today /> },
@@ -88,9 +89,9 @@ describe("401/403 while loading: the number field, then a reload", () => {
     await waitFor(() => expect(reloadPage).toHaveBeenCalledTimes(1));
   });
 
-  it("History: entries 401", async () => {
+  it("History: visit-days 401", async () => {
     mockPatientApi({
-      entries: () => jsonResponse({ error: "not_logged_in" }, 401),
+      visitDays: () => jsonResponse({ error: "not_logged_in" }, 401),
     });
     renderPatient(ROUTES, "/history");
     await expectPanel();
@@ -104,9 +105,9 @@ describe("Today: 401 while sending", () => {
   function apiWithExpiredCookie() {
     let registered = false;
     return mockPatientApi({
-      createEntry: () =>
+      recordMark: () =>
         registered
-          ? jsonResponse({ entry_id: 7, notices: [] })
+          ? jsonResponse(MARK)
           : jsonResponse({ error: "not_logged_in" }, 401),
       register: () => {
         registered = true;
@@ -145,13 +146,18 @@ describe("Today: 401 while sending", () => {
     expect(
       within(group).getByRole("button", { name: s("answer.present") }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(1);
 
     await userEvent.click(button("today.submit"));
     expect(await screen.findByText(s("today.saved"))).toBeInTheDocument();
-    const posts = callsTo(fetchMock, "POST", ENTRIES_URL);
-    expect(posts).toHaveLength(2);
-    expect(posts[1]).toEqual(posts[0]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(2);
+    expect(await savedInputs()).toEqual([
+      {
+        by_proxy: false,
+        answers: [{ question_key: "diarrhea", value: "present" }],
+        free_text: "kept text",
+      },
+    ]);
   });
 
   it("another number: reloads and does not send the input", async () => {
@@ -163,14 +169,16 @@ describe("Today: 401 while sending", () => {
 
     await waitFor(() => expect(reloadPage).toHaveBeenCalledTimes(1));
     expect(loadPid()).toBe(OTHER_PID);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(1);
+    expect(await savedInputs()).toEqual([]);
+    expect(await savedInputs(OTHER_PID)).toEqual([]);
     expect(callsTo(fetchMock, "POST", REGISTER_URL)).toHaveLength(1);
   });
 
   it("a wrong number: stays on the panel and the input is still kept", async () => {
     let tried = false;
     mockPatientApi({
-      createEntry: () => jsonResponse({ error: "not_logged_in" }, 401),
+      recordMark: () => jsonResponse({ error: "not_logged_in" }, 401),
       register: () => {
         const reply = tried
           ? jsonResponse({ ok: true })
@@ -207,18 +215,17 @@ describe("Today: 401 while sending", () => {
     await expectPanel();
     await enterNumber(PID);
     await screen.findByText(s("register.done"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(1);
     expect(button("today.too_sick_button")).toBeEnabled();
   });
 });
 
 describe("Today: 401 when undoing too_sick", () => {
-  const UNDO_URL = `${ENTRIES_URL}/41/undo`;
+  const UNDO_URL = `${MARK_URL}/undo`;
 
   function apiWithExpiredUndo() {
     let registered = false;
     return mockPatientApi({
-      createEntry: () => jsonResponse({ entry_id: 41, notices: [] }),
       undo: () =>
         registered
           ? jsonResponse({ ok: true })
@@ -265,6 +272,8 @@ describe("Today: 401 when undoing too_sick", () => {
     await enterNumber(OTHER_PID);
     await waitFor(() => expect(reloadPage).toHaveBeenCalledTimes(1));
     expect(callsTo(fetchMock, "POST", UNDO_URL)).toHaveLength(1);
+    // The record of this number stays on the device
+    expect(await savedInputs()).toHaveLength(1);
   });
 });
 
@@ -288,7 +297,7 @@ describe("Visit: 401 while sending", () => {
     );
     await userEvent.click(button("visit.submit"));
     await expectPanel();
-    await enterNumber(OTHER_PID);
+    await enterNumber(PID);
 
     expect(await screen.findByText(s("register.done"))).toBeInTheDocument();
     expect(reloadPage).not.toHaveBeenCalled();
@@ -299,5 +308,29 @@ describe("Visit: 401 while sending", () => {
     expect(await screen.findByText(s("visit.done"))).toBeInTheDocument();
     expect(callsTo(fetchMock, "POST", "/api/visit")).toHaveLength(2);
     expect(screen.queryByText(s("register.done"))).toBeNull();
+  });
+
+  it("another number: the next send asks the range of the new number, not the old one", async () => {
+    const fetchMock = mockPatientApi({
+      visit: () => jsonResponse({ error: "not_logged_in" }, 401),
+    });
+    renderPatient(ROUTES, "/visit");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: s("visit.reception_label") }),
+      "A-023",
+    );
+    await userEvent.click(button("visit.submit"));
+    await expectPanel();
+    await enterNumber(OTHER_PID);
+    await screen.findByText(s("register.done"));
+    await userEvent.click(button("visit.submit"));
+    await waitFor(() =>
+      expect(
+        callsTo(fetchMock, "GET", `/api/patient/${OTHER_PID}/visit-window`),
+      ).toHaveLength(1),
+    );
+    expect(
+      callsTo(fetchMock, "GET", `/api/patient/${PID}/visit-window`),
+    ).toHaveLength(1);
   });
 });

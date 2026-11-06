@@ -30,6 +30,9 @@ function visit(patch: Partial<VisitSummary>): VisitSummary {
     created_at: "2026-11-09T09:40:00+09:00",
     expires_at: "2026-11-10T09:40:00+09:00",
     unprocessed_count: 0,
+    regen_pending: false,
+    regen_count: 0,
+    has_report: patch.status === undefined || patch.status === "ready",
     ...patch,
   };
 }
@@ -219,5 +222,187 @@ describe("Visits: AI でもう一度変換", () => {
         /^\/doctor\/login$/,
       ),
     );
+  });
+});
+
+describe("Visits: 記録が追加された受診", () => {
+  const PENDING = "追加の記録あり";
+  const REBUILT = "記録が追加され、作り直しました";
+
+  it("作り直した ready の行に札を出す（先に開いたレポートは古いまま）", async () => {
+    mockApi({
+      [LIST]: {
+        visits: [
+          visit({ regen_count: 1 }),
+          visit({ id: 13, reception_no: "A-024" }),
+        ],
+      },
+    });
+    renderVisits();
+    await screen.findByText("A-024");
+    expect(within(rowOf("A-023")).getByText(REBUILT)).toBeInTheDocument();
+    expect(within(rowOf("A-024")).queryByText(REBUILT)).toBeNull();
+    expect(within(rowOf("A-023")).queryByText(PENDING)).toBeNull();
+    expect(
+      within(rowOf("A-023")).queryByRole("button", { name: LABEL }),
+    ).toBeNull();
+  });
+
+  it("生成中の行には札を出さず、印刷もできない", async () => {
+    mockApi({
+      [LIST]: {
+        visits: [
+          visit({ status: "generating", regen_count: 1, regen_pending: true }),
+        ],
+      },
+    });
+    renderVisits();
+    await screen.findByText("A-023");
+    const row = within(rowOf("A-023"));
+    expect(row.getByText("生成中")).toBeInTheDocument();
+    expect(row.queryByText(REBUILT)).toBeNull();
+    expect(row.queryByText(PENDING)).toBeNull();
+    expect(row.queryByRole("button", { name: "印刷" })).toBeNull();
+    expect(row.queryByRole("button", { name: "印刷済みにする" })).toBeNull();
+    expect(row.queryByRole("button", { name: LABEL })).toBeNull();
+  });
+
+  it("失敗の行には「作り直しました」を出さない", async () => {
+    mockApi({
+      [LIST]: { visits: [visit({ status: "failed", regen_count: 1 })] },
+    });
+    renderVisits();
+    await screen.findByText("A-023");
+    expect(within(rowOf("A-023")).queryByText(REBUILT)).toBeNull();
+  });
+
+  describe("変換し直しが失敗して前のレポートが残っている行", () => {
+    const PRINTED_12 = "POST /api/doctor/visits/12/printed";
+    const REGEN_12 = "POST /api/doctor/visits/12/regenerate";
+    const failedWithReport = () =>
+      visit({ status: "failed", regen_count: 1, has_report: true });
+
+    it("前のレポートを開けて、印刷でき、作り直せる", async () => {
+      mockApi({ [LIST]: { visits: [failedWithReport()] } });
+      renderVisits();
+      await screen.findByText("A-023");
+      const row = within(rowOf("A-023"));
+      expect(row.getByText(/作り直せませんでした/)).toBeInTheDocument();
+      expect(row.getByText(/新しい記録が入っていない/)).toBeInTheDocument();
+      expect(row.queryByText("レポートを作れませんでした")).toBeNull();
+      expect(row.getByRole("button", { name: "印刷" })).toBeEnabled();
+      expect(row.getByRole("button", { name: "印刷済みにする" })).toBeEnabled();
+      expect(row.getByRole("link", { name: "レポートを開く" })).toHaveAttribute(
+        "href",
+        "/api/doctor/visits/12/report",
+      );
+      expect(buttonIn("A-023")).toBeEnabled();
+    });
+
+    it("印刷済みにできる", async () => {
+      const fetchMock = mockApi({
+        [LIST]: { visits: [failedWithReport()] },
+        [PRINTED_12]: { ok: true },
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      const row = within(rowOf("A-023"));
+      await user().click(row.getByRole("button", { name: "印刷済みにする" }));
+      await user().click(
+        row.getByRole("button", { name: "削除する（印刷済み）" }),
+      );
+      await waitFor(() => expect(countOf(fetchMock, PRINTED_12)).toBe(1));
+    });
+
+    it("依頼している間は印刷も印刷済みも押せない（前のレポートで印刷済みにしない）", async () => {
+      const pending = deferred<Response>();
+      const fetchMock = mockApi({
+        [LIST]: { visits: [failedWithReport()] },
+        [REGEN_12]: () => pending.promise,
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      await user().click(buttonIn("A-023"));
+      const row = within(rowOf("A-023"));
+      expect(row.getByRole("button", { name: "変換を依頼中…" })).toBeDisabled();
+      expect(row.getByRole("button", { name: "印刷" })).toBeDisabled();
+      expect(
+        row.getByRole("button", { name: "印刷済みにする" }),
+      ).toBeDisabled();
+      await act(async () => {
+        pending.resolve(jsonResponse({ ok: true }));
+      });
+      await waitFor(() => expect(countOf(fetchMock, LIST)).toBe(2));
+    });
+
+    it("印刷済みの確認を開いたまま依頼しても、削除の確定は押せない", async () => {
+      const pending = deferred<Response>();
+      const fetchMock = mockApi({
+        [LIST]: { visits: [failedWithReport()] },
+        [REGEN_12]: () => pending.promise,
+        [PRINTED_12]: { ok: true },
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      const u = user();
+      const row = within(rowOf("A-023"));
+      await u.click(row.getByRole("button", { name: "印刷済みにする" }));
+      await u.click(buttonIn("A-023"));
+      const confirm = row.getByRole("button", {
+        name: "削除する（印刷済み）",
+      });
+      expect(confirm).toBeDisabled();
+      await u.click(confirm);
+      expect(countOf(fetchMock, PRINTED_12)).toBe(0);
+      await act(async () => {
+        pending.resolve(jsonResponse({ ok: true }));
+      });
+      await waitFor(() => expect(countOf(fetchMock, LIST)).toBe(2));
+    });
+
+    it("レポートが無い失敗の行には出さない", async () => {
+      mockApi({
+        [LIST]: { visits: [visit({ status: "failed", has_report: false })] },
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      const row = within(rowOf("A-023"));
+      expect(row.getByText("レポートを作れませんでした")).toBeInTheDocument();
+      expect(row.queryByRole("button", { name: "印刷" })).toBeNull();
+      expect(row.queryByRole("button", { name: "印刷済みにする" })).toBeNull();
+      expect(row.queryByRole("link", { name: "レポートを開く" })).toBeNull();
+      expect(buttonIn("A-023")).toBeEnabled();
+    });
+  });
+
+  it("追加の記録がある AI の結果の ready にも「AI でもう一度変換」を出し、押せる", async () => {
+    const REGEN_12 = "POST /api/doctor/visits/12/regenerate";
+    const fetchMock = mockApi({
+      [LIST]: {
+        visits: [visit({ regen_count: 3, regen_pending: true })],
+      },
+      [REGEN_12]: { ok: true },
+    });
+    renderVisits();
+    await screen.findByText("A-023");
+    const row = within(rowOf("A-023"));
+    expect(row.getByText(PENDING)).toBeInTheDocument();
+    expect(row.getByRole("button", { name: "印刷" })).toBeEnabled();
+    await user().click(buttonIn("A-023"));
+    await waitFor(() => expect(countOf(fetchMock, REGEN_12)).toBe(1));
+  });
+
+  it("失敗の行でも追加の記録を知らせる", async () => {
+    mockApi({
+      [LIST]: {
+        visits: [
+          visit({ status: "failed", regen_count: 3, regen_pending: true }),
+        ],
+      },
+    });
+    renderVisits();
+    await screen.findByText("A-023");
+    expect(within(rowOf("A-023")).getByText(PENDING)).toBeInTheDocument();
+    expect(buttonIn("A-023")).toBeEnabled();
   });
 });

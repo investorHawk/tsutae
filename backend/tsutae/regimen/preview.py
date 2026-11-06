@@ -68,7 +68,7 @@ _FIELD_LABELS = {
     "times_per_day": "内服の回数",
     "start_note": "飲み始め",
     "phrases": "患者の言い方",
-    "ctcae_terms": "CTCAE の用語",
+    "ctcae_terms": "用語",
     "question_key": "対応する質問",
     "key": "key",
     "label": "短い名前",

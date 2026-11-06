@@ -1,0 +1,48 @@
+[
+  {
+    "name": "38.0 で案内する",
+    "too_sick": false,
+    "answers": [
+      { "question_key": "fever", "value": "measured", "temperature": 38.0 }
+    ],
+    "notices": ["fixed_rule.fever_38"]
+  },
+  {
+    "name": "39.2 で案内する",
+    "too_sick": false,
+    "answers": [
+      { "question_key": "fever", "value": "measured", "temperature": 39.2 }
+    ],
+    "notices": ["fixed_rule.fever_38"]
+  },
+  {
+    "name": "37.9 では案内しない",
+    "too_sick": false,
+    "answers": [
+      { "question_key": "fever", "value": "measured", "temperature": 37.9 }
+    ],
+    "notices": []
+  },
+  {
+    "name": "測っていなければ案内しない",
+    "too_sick": false,
+    "answers": [
+      { "question_key": "fever", "value": "not_measured", "temperature": null }
+    ],
+    "notices": []
+  },
+  {
+    "name": "体温の回答が無ければ案内しない",
+    "too_sick": false,
+    "answers": [
+      { "question_key": "diarrhea", "value": "hard", "temperature": null }
+    ],
+    "notices": []
+  },
+  {
+    "name": "つらくて書けないは案内しない",
+    "too_sick": true,
+    "answers": [],
+    "notices": []
+  }
+]

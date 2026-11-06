@@ -12,13 +12,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
+import { savedInputs } from "./testing/device";
 import { PID, questionText, s } from "./testing/fixtures";
 import { renderPatient, type InitialEntry } from "./testing/render";
 import Today from "./Today";
 
-const ENTRIES_URL = `/api/patient/${PID}/entries`;
-const ENTRY_ID = 41;
-const UNDO_URL = `${ENTRIES_URL}/${ENTRY_ID}/undo`;
+const MARK_URL = `/api/patient/${PID}/record-marks`;
+const UNDO_URL = `${MARK_URL}/undo`;
 
 function renderToday(initial: InitialEntry = "/today") {
   return renderPatient([{ path: "/today", element: <Today /> }], initial);
@@ -33,10 +33,6 @@ async function choose(key: string, answerKey: string) {
 
 function button(key: string) {
   return screen.getByRole("button", { name: s(key) });
-}
-
-function savedReply() {
-  return jsonResponse({ entry_id: ENTRY_ID, notices: [] });
 }
 
 function summary(): HTMLElement {
@@ -75,7 +71,7 @@ describe("Today: why the submit button is disabled (P2-2)", () => {
 
 describe("Today: after saving (P2-3, P2-4)", () => {
   it("register.done is removed once something is recorded", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday({ pathname: "/today", state: { registered: true } });
     expect(screen.getByText(s("register.done"))).toBeInTheDocument();
     await choose("diarrhea", "answer.present");
@@ -85,7 +81,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
   });
 
   it("shows what was recorded in the same answer table as the history", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("numbness", "answer.hard");
     await choose("diarrhea", "answer.present");
@@ -129,7 +125,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
   });
 
   it("the title is a small heading apart from the table", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("diarrhea", "answer.present");
     await userEvent.click(button("today.submit"));
@@ -143,7 +139,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
   });
 
   it("with the proxy toggle: history.proxy is shown above the table", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("diarrhea", "answer.present");
     await userEvent.click(
@@ -157,7 +153,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
   });
 
   it("all none: the table shows the none row", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("diarrhea", "answer.none");
     await userEvent.click(button("today.submit"));
@@ -170,7 +166,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
   });
 
   it("normal records have no undo button", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("diarrhea", "answer.present");
     await userEvent.click(button("today.submit"));
@@ -179,7 +175,7 @@ describe("Today: after saving (P2-3, P2-4)", () => {
   });
 
   it("today.add_more starts a new empty record on the same page", async () => {
-    const fetchMock = mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("diarrhea", "answer.present");
     await userEvent.click(button("today.submit"));
@@ -198,18 +194,23 @@ describe("Today: after saving (P2-3, P2-4)", () => {
     await choose("numbness", "answer.hard");
     await userEvent.click(button("today.submit"));
     await screen.findByText(s("today.saved"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
-      {
-        by_proxy: false,
-        answers: [{ question_key: "diarrhea", value: "present" }],
-        free_text: null,
-      },
-      {
-        by_proxy: false,
-        answers: [{ question_key: "numbness", value: "hard" }],
-        free_text: null,
-      },
-    ]);
+    // The second record has its own id (the order within a day is not fixed)
+    const saved = await savedInputs();
+    expect(saved).toHaveLength(2);
+    expect(saved).toEqual(
+      expect.arrayContaining([
+        {
+          by_proxy: false,
+          answers: [{ question_key: "diarrhea", value: "present" }],
+          free_text: null,
+        },
+        {
+          by_proxy: false,
+          answers: [{ question_key: "numbness", value: "hard" }],
+          free_text: null,
+        },
+      ]),
+    );
   });
 });
 
@@ -221,7 +222,7 @@ describe("Today: undo too_sick (P2-5)", () => {
   }
 
   it("too_sick is recorded and can be undone", async () => {
-    const fetchMock = mockPatientApi({ createEntry: savedReply });
+    const fetchMock = mockPatientApi();
     renderToday();
     await recordTooSick();
     expect(summary()).toHaveTextContent(s("history.too_sick"));
@@ -236,7 +237,7 @@ describe("Today: undo too_sick (P2-5)", () => {
   });
 
   it("the input before too_sick is kept after undoing", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("diarrhea", "answer.present");
     await userEvent.click(button("today.too_sick_button"));
@@ -251,7 +252,7 @@ describe("Today: undo too_sick (P2-5)", () => {
   });
 
   it("a kept 'measured' answer does not take the focus after undoing", async () => {
-    mockPatientApi({ createEntry: savedReply });
+    mockPatientApi();
     renderToday();
     await choose("fever", "answer.measured");
     const before = screen.getByRole("textbox", {
@@ -272,7 +273,6 @@ describe("Today: undo too_sick (P2-5)", () => {
 
   it("409 not_undoable: today.undo_failed and no undo button", async () => {
     mockPatientApi({
-      createEntry: savedReply,
       undo: () => jsonResponse({ error: "not_undoable" }, 409),
     });
     renderToday();
@@ -285,7 +285,6 @@ describe("Today: undo too_sick (P2-5)", () => {
 
   it("network failure: error.generic, the undo button stays for a retry", async () => {
     const fetchMock = mockPatientApi({
-      createEntry: savedReply,
       undo: () => jsonResponse({ error: "internal_error" }, 500),
     });
     renderToday();
@@ -301,7 +300,6 @@ describe("Today: undo too_sick (P2-5)", () => {
 
   it("while undoing, the undo button is disabled", async () => {
     mockPatientApi({
-      createEntry: savedReply,
       undo: () => new Promise<Response>(() => {}),
     });
     renderToday();

@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { isApiError } from "../../api/http";
-import { createEntry, getQuestions } from "../../api/patient";
+import { getQuestions } from "../../api/patient";
 import type { EntryCreate, Question } from "../../api/types";
+import { noticesFor } from "../../patient/fixedRules";
+import { newClientEntryId, recordEntry } from "../../patient/recordEntry";
 import { reloadPage } from "../../patient/reload";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import {
@@ -13,7 +14,6 @@ import {
   type EntryFormState,
   type TemperatureProblem,
 } from "./entryForm";
-import { summarySourceOf } from "./entrySummary";
 import FreeTextField from "./FreeTextField";
 import { LoadFailed, Loading } from "./LoadStatus";
 import { DoneMessage, ErrorMessage } from "./Messages";
@@ -41,7 +41,7 @@ const UNDONE_KEY = "today.undone";
 /** 送るときに未登録と分かり、番号を入れて続きに戻った */
 const REGISTERED_KEY = "register.done";
 
-/** 自由記載が長すぎる（送る前の検査と、サーバーの 422 free_text_too_long）。 */
+/** 自由記載が長すぎる（保存する前の検査）。 */
 const FREE_TEXT_TOO_LONG_KEY = "today.free_text_too_long";
 
 const NO_QUESTIONS: readonly Question[] = [];
@@ -49,7 +49,11 @@ const NO_ERRORS: ReadonlyMap<string, TemperatureProblem> = new Map();
 
 /**
  * 今日の記録（P1）の本体。段階0「つらくて書けない」→ 段階1 クローズ質問 → 段階2 自由記載。
- * 送るのは答えたものだけ。空なら送らない。送信後は notices の定型文をそのまま出す。
+ * 保存するのは答えたものだけ。空なら保存しない。サーバーへ送るのは日付の印だけで、記録は
+ * スマホに置く（plan-device-records §5.2。順序は patient/recordEntry.ts）。
+ * 固定規則の案内は画面のコードで判定し、定型文をそのまま出す。
+ * client_entry_id は入力の開始時に作り、押し直しても同じ（失敗しても1件にしかならない）。
+ * 印を送った ID は覚えておく。同じ ID でもう一度送れば押し直しで、取り消しのときに伝える。
  * 「つらくて書けない」は必ず確認してから送る。何も入れていなければ3秒で自動で送り、
  * 入れた内容があれば、それを捨てることを確かめてから（「はい」を押した時だけ）送る。
  * 記録した後は TodayDone（要約・取り消し・追加で記録する）。記録できたら onSaved を呼ぶ。
@@ -79,6 +83,8 @@ export default function TodayForm({
   const confirm = useTooSickConfirm(hasInput(form));
   const [focusRound, setFocusRound] = useState(0);
   const [infoKey, setInfoKey] = useState<string | null>(null);
+  const [clientEntryId, setClientEntryId] = useState(newClientEntryId);
+  const markedId = useRef<string | null>(null);
 
   const today = loaded.status === "ready" ? loaded.data.today : null;
   useEffect(() => {
@@ -116,6 +122,7 @@ export default function TodayForm({
   }
 
   function startOver() {
+    setClientEntryId(newClientEntryId());
     setForm(EMPTY_FORM);
     setError(null);
     setTemperatureTried(false);
@@ -125,18 +132,14 @@ export default function TodayForm({
   }
 
   function undone() {
+    setClientEntryId(newClientEntryId());
     setInfoKey(UNDONE_KEY);
     setPhase({ name: "editing" });
   }
 
   if (phase.name === "done") {
     return (
-      <TodayDone
-        pid={pid}
-        saved={phase.saved}
-        onUndone={undone}
-        onAddMore={startOver}
-      />
+      <TodayDone saved={phase.saved} onUndone={undone} onAddMore={startOver} />
     );
   }
 
@@ -145,27 +148,28 @@ export default function TodayForm({
     setError(null);
     setInfoKey(null);
     try {
-      const res = await createEntry(pid, entry);
-      const saved: SavedRecord = {
-        entryId: res.entry_id,
-        messageKey: doneKey,
-        notices: res.notices,
-        source: summarySourceOf(entry, questions),
-        byProxy: entry.by_proxy === true,
-        undoable: entry.too_sick === true,
-      };
-      setPhase({ name: "done", saved });
+      // 質問集を読む前に「つらくて書けない」を押したら、ここで読む（記録に版が要る）
+      const context =
+        loaded.status === "ready" ? loaded.data : await getQuestions(pid);
+      const retried = markedId.current === clientEntryId;
+      markedId.current = clientEntryId;
+      const saved = await recordEntry(pid, clientEntryId, entry, context);
+      setPhase({
+        name: "done",
+        saved: {
+          entry: saved,
+          messageKey: doneKey,
+          notices: noticesFor(entry, context.fixed_rules),
+          retried,
+        },
+      });
       onSaved?.();
     } catch (err) {
       if (isNotRegistered(err)) {
         setPhase({ name: "not_registered" });
         return;
       }
-      const tooLong = isApiError(err) && err.code === "free_text_too_long";
-      setError({
-        key: tooLong ? FREE_TEXT_TOO_LONG_KEY : GENERIC_ERROR_KEY,
-        at: from,
-      });
+      setError({ key: GENERIC_ERROR_KEY, at: from });
       setPhase({ name: "editing" });
     }
   }

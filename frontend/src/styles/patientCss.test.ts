@@ -9,12 +9,19 @@ interface Fs {
 }
 
 let css = "";
+let strings: Record<string, string> = {};
 
 beforeAll(async () => {
   // vitest は CSS の import を（?raw でも）空にするので、node の fs で直接読む。
   // tsconfig の types に node が無いため、型は必要な分だけ書く
   const fs = (await import(/* @vite-ignore */ `node:${"fs"}`)) as Fs;
   css = fs.readFileSync(new URL("./patient.css", import.meta.url), "utf8");
+  strings = JSON.parse(
+    fs.readFileSync(
+      new URL("../../../backend/tsutae/patient_strings.json", import.meta.url),
+      "utf8",
+    ),
+  ) as Record<string, string>;
 });
 
 /** selector の規則の本文（最初の1つ）。無ければ空文字。 */
@@ -99,6 +106,39 @@ describe("patient.css", () => {
     expect(ruleOf('.patient-app .p-nav a[aria-current="page"]')).toMatch(
       /background:/,
     );
+  });
+
+  it("下の4つのタブは文字の長さで幅を分け、スマホ幅で1行に入り、折れても --p-nav-h に収まる", () => {
+    const tabs = ruleOf(".patient-app .p-nav-tabs");
+    expect(tabs).toMatch(/grid-auto-flow:\s*column/);
+    expect(tabs).toMatch(/grid-auto-columns:\s*auto/);
+    expect(tabs).toMatch(/gap:\s*4px/);
+    const link = ruleOf(".patient-app .p-nav a");
+    expect(link).toMatch(/min-height:\s*var\(--p-tap\)/);
+    expect(link).toMatch(/line-height:\s*1\.3/);
+    expect(link).toMatch(/padding:\s*4px 2px/);
+    expect(link).toMatch(/font-size:\s*18px/);
+    expect(ruleOf(".patient-app .p-nav")).toMatch(/padding:\s*10px 8px/);
+    // 文字 18px ＋ 左右の余白 4px と枠 4px のタブ4つ ＋ 間 4px×3 ＋ 外の余白 8px×2
+    const labels = ["nav.today", "nav.history", "nav.visit", "nav.settings"];
+    const chars = labels.reduce((sum, key) => sum + strings[key]!.length, 0);
+    expect(chars * 18 + 4 * (4 + 4) + 3 * 4 + 2 * 8).toBeLessThanOrEqual(360);
+    // 2行（18px × 1.3 × 2）＋ 余白 8px ＋ 枠 4px ＋ タブの上下 20px ＋ 上の線 2px
+    const height = /--p-nav-h:\s*(\d+)px/.exec(css)?.[1];
+    expect(Number(height)).toBeGreaterThanOrEqual(
+      18 * 1.3 * 2 + 8 + 4 + 20 + 2,
+    );
+  });
+
+  it("お知らせの案内の帯は押しやすく（56px 以上）、読みやすい（4.5:1 以上）", () => {
+    const banner = ruleOf(".patient-app .p-notify-banner");
+    expect(banner).toMatch(/min-height:\s*var\(--p-tap\)/);
+    expect(banner).toMatch(/color:\s*var\(--p-primary\)/);
+    expect(banner).toMatch(/background:\s*var\(--p-tag-present-bg\)/);
+    expect(banner).toMatch(/text-decoration:\s*none/);
+    expect(
+      contrast(varOf("--p-primary"), varOf("--p-tag-present-bg")),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it("PC-2: タブのある画面は、最後がタブに隠れないよう下をあける", () => {

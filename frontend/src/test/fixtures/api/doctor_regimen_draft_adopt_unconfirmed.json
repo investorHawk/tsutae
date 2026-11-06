@@ -2,7 +2,7 @@
   "method": "POST",
   "path": "/api/doctor/regimen-drafts/1/adopt",
   "request": {
-    "confirm_token": "d17c0f85f2070d4a95b0bda118de091e507d44cc13ebf4874f50b92b416452d5",
+    "confirm_token": "dde6f5abe81c8603b3b975a19157f675b4c9508279ca9e9e1ce0f7683d0c3f73",
     "ai_values_confirmed": false
   },
   "status": 409,

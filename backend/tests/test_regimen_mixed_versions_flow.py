@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from api_helpers import api_client, db_conn, login_doctor, register
+from api_helpers import api_client, db_conn, login_doctor, record_entry, register
 from e2e_scripts import grid_row, live_prepared, post_visit, report_html
 from fastapi.testclient import TestClient
 from pipeline_fakes import FakeRunner, standard_steps
@@ -103,10 +103,7 @@ def _record(client: TestClient, pid: str, version: str, text: str) -> None:
         if q["answer_type"] == "three_level"
     ]
     answers.append({"question_key": "fever", "value": "not_measured"})
-    r = client.post(
-        f"/api/patient/{pid}/entries", json={"answers": answers, "free_text": text}
-    )
-    assert r.status_code == 200, r.text
+    record_entry(client, pid, {"answers": answers, "free_text": text})
 
 
 def _event(no: int, d: str, day: int, key: str | None) -> dict[str, Any]:

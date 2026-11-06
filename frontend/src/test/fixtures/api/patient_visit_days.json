@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "path": "/api/patient/P-DEMO0001/visit-days",
+  "request": null,
+  "status": 200,
+  "body": {
+    "visits": [
+      {
+        "visit_date": "2026-11-09",
+        "received_at": "2026-11-09T10:00:00+09:00"
+      }
+    ]
+  }
+}

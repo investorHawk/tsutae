@@ -6,6 +6,7 @@ import {
   GENERIC_ERROR_KEY,
   registerErrorKeyOf,
 } from "../../components/patient/patientApi";
+import { resendSubscription } from "../../components/patient/pushResend";
 import { isValidPid, loadPid, restorePid, savePid } from "../../patient/pid";
 import { usePatientStrings } from "../../strings/PatientStrings";
 
@@ -48,6 +49,8 @@ export default function Register() {
     setErrorKey(null);
     try {
       await registerPatient(pid);
+      // この端末の通知が前の患者の判定で動き続けないよう、今の番号の登録にする
+      void resendSubscription();
       navigate("/today", { replace: true, state: { registered: true } });
     } catch (err) {
       restorePid(previous);

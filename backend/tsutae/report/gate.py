@@ -3,7 +3,7 @@
 PreparedInput は変換パイプラインが作る。レポートはそれを信じず、渡された記録・
 コース・Skill と突き合わせ、合わなければ ReportBuildError にする（紙に出さない）。
 
-- 患者: courses・entries・引数の patient_id が同じ患者
+- 患者: courses・entries・日付の印（record_marks）・引数の patient_id が同じ患者
 - 日程: 受診日の今コース・レジメン・日程が courses と Skill から作り直したものと同じ
 - Skill: regimen / report の版と質問集・用語の対応（term_keys）が、渡された Skill と
   完全に一致する
@@ -44,6 +44,7 @@ from tsutae.schemas import (
     MaskedEntry,
     PreparedInput,
     Question,
+    RecordMark,
     RegimenSkill,
     ReportFormatSkill,
 )
@@ -62,12 +63,16 @@ class CheckedInputs:
 
 
 def _check_patient(
-    patient_id: str, courses: Sequence[Course], entries: Sequence[Entry]
+    patient_id: str,
+    courses: Sequence[Course],
+    entries: Sequence[Entry],
+    record_marks: Sequence[RecordMark],
 ) -> None:
-    found = {c.patient_id for c in courses} | {e.patient_id for e in entries}
+    found = {x.patient_id for x in (*courses, *entries, *record_marks)}
     if found - {patient_id}:
         raise ReportBuildError(
-            "patient_mismatch", "courses・entries に別の患者のものが混ざっている"
+            "patient_mismatch",
+            "courses・entries・record_marks に別の患者のものが混ざっている",
         )
 
 
@@ -266,12 +271,13 @@ def check_inputs(
     prepared: PreparedInput,
     questions_by_version: Mapping[str, Sequence[Question]],
     doctor_masks: Mapping[int, DoctorMask] = _NO_MASKS,
+    record_marks: Sequence[RecordMark] = (),
 ) -> CheckedInputs:
     """入力の対応を確かめる。courses の矛盾は CourseValidationError（course.py）。
 
     doctor_masks は変換の入力（prepare_input）に渡したものと同じ対応表。
     """
-    _check_patient(patient_id, courses, entries)
+    _check_patient(patient_id, courses, entries, record_marks)
     ordered = tuple(course_mod.validate_courses(courses))
     by_id = _entries_by_id(entries)
     _check_schedule(prepared, ordered, regimen_skill, visit_date)

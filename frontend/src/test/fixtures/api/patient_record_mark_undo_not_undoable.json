@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-DEMO0001/record-marks/undo",
+  "request": {
+    "recorded_at": "2026-11-09T10:00:00.000000+09:00",
+    "clear_mark": true
+  },
+  "status": 409,
+  "body": {
+    "error": "not_undoable"
+  }
+}

@@ -7,13 +7,13 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
-import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
+import { savedInputs } from "./testing/device";
 import { PID, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Today from "./Today";
 
-const ENTRIES_URL = `/api/patient/${PID}/entries`;
+const MARK_URL = `/api/patient/${PID}/record-marks`;
 // 患者画面のテストは文字列リテラルに ASCII 以外を書かない約束なので、コードポイントから作る
 const EMOJI = String.fromCodePoint(0x1f600);
 
@@ -50,15 +50,15 @@ describe("Today (P1): free text length", () => {
     expect(box).not.toHaveAttribute("maxlength");
   });
 
-  it("2000 emoji (4000 UTF-16 units) are sent as is", async () => {
-    const fetchMock = mockPatientApi();
+  it("2000 emoji (4000 UTF-16 units) are saved as is", async () => {
+    mockPatientApi();
     renderPatient([{ path: "/today", element: <Today /> }], "/today");
     const text = EMOJI.repeat(2000);
     const box = await pasteFreeText(text);
     expect(box).toHaveValue(text);
     await userEvent.click(submitButton());
     await screen.findByText(s("today.saved"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+    expect(await savedInputs()).toEqual([
       { by_proxy: false, answers: [], free_text: text },
     ]);
   });
@@ -74,21 +74,7 @@ describe("Today (P1): free text length", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(s("error.generic"))).toBeNull();
     expect(box).toHaveValue(text);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
     expect(screen.queryByText(s("today.saved"))).toBeNull();
-  });
-
-  it("server 422 free_text_too_long: today.free_text_too_long, input kept", async () => {
-    mockPatientApi({
-      createEntry: () => jsonResponse({ error: "free_text_too_long" }, 422),
-    });
-    renderPatient([{ path: "/today", element: <Today /> }], "/today");
-    const box = await pasteFreeText("abc");
-    await userEvent.click(submitButton());
-    expect(
-      await screen.findByText(s("today.free_text_too_long")),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(s("error.generic"))).toBeNull();
-    expect(box).toHaveValue("abc");
   });
 });

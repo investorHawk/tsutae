@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -64,6 +64,12 @@ class Settings:
     # 1往復の max_turns・max_budget_usd（T94）
     regimen_max_turns: int = 12
     regimen_max_budget_usd: float = 1.0
+    # 通知の鍵（VAPID）。無ければ通知を「使えない」にする（起動は止めない）
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = field(default=None, repr=False)
+    vapid_subject: str | None = None
+    # 撮影用の見本（plan-device-records §5.10）。`TSUTAE_DEMO_TOOLS=1` のときだけ True
+    demo_tools: bool = False
 
     @property
     def regimen_recover_after_s(self) -> float:
@@ -95,6 +101,10 @@ def get_settings() -> Settings:
         regimen_max_budget_usd=float(
             os.environ.get("TSUTAE_REGIMEN_MAX_BUDGET_USD", "1.0")
         ),
+        vapid_public_key=os.environ.get("TSUTAE_VAPID_PUBLIC_KEY"),
+        vapid_private_key=os.environ.get("TSUTAE_VAPID_PRIVATE_KEY"),
+        vapid_subject=os.environ.get("TSUTAE_VAPID_SUBJECT"),
+        demo_tools=os.environ.get("TSUTAE_DEMO_TOOLS") == "1",
     )
 
 

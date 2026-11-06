@@ -12,6 +12,7 @@ import Unprocessed from "./pages/doctor/Unprocessed";
 import Visits from "./pages/doctor/Visits";
 import History from "./pages/patient/History";
 import Register from "./pages/patient/Register";
+import PatientSettings from "./pages/patient/Settings";
 import Today from "./pages/patient/Today";
 import Visit from "./pages/patient/Visit";
 
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/today" element={<Today />} />
         <Route path="/history" element={<History />} />
         <Route path="/visit" element={<Visit />} />
+        <Route path="/settings" element={<PatientSettings />} />
       </Route>
 
       <Route path="/doctor" element={<DoctorLayout />}>

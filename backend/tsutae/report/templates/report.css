@@ -160,6 +160,12 @@ table.fields {
   font-weight: bold;
 }
 
+/* 日が並ぶと折り返すので、塊にせず本文の幅で流す */
+.att-not_received .att-title {
+  display: inline;
+  min-width: 0;
+}
+
 .att-day {
   display: inline-block;
   min-width: 11mm;

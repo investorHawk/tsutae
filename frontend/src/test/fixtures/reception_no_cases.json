@@ -1,0 +1,76 @@
+[
+  { "name": "そのまま", "input": "A-023", "expected": "A-023" },
+  { "name": "小文字は変えない", "input": "a-023", "expected": "a-023" },
+  {
+    "name": "全角は半角に",
+    "input": "Ａ－０２３",
+    "expected": "A-023"
+  },
+  {
+    "name": "全角の空白を前後から落とす",
+    "input": "　A-023 ",
+    "expected": "A-023"
+  },
+  {
+    "name": "ハイフンの類は揃えない",
+    "input": "A‐023",
+    "expected": "A‐023"
+  },
+  {
+    "name": "日本語と途中の空白は通す",
+    "input": "受付 12",
+    "expected": "受付 12"
+  },
+  {
+    "name": "絵文字は通す",
+    "input": "😀",
+    "expected": "😀"
+  },
+  {
+    "name": "32 字は通す",
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+    "name": "33 字は断る",
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "expected": null
+  },
+  { "name": "空は断る", "input": "", "expected": null },
+  { "name": "空白だけは断る", "input": "   ", "expected": null },
+  { "name": "全角の空白だけは断る", "input": "　", "expected": null },
+  { "name": "NUL を含むと断る", "input": "A\u0000B", "expected": null },
+  { "name": "途中の改行は断る", "input": "A\nB", "expected": null },
+  { "name": "途中の U+200B は断る", "input": "A​B", "expected": null },
+  {
+    "name": "貼り付けで付いた末尾の U+200B は断る",
+    "input": "A-023​",
+    "expected": null
+  },
+  {
+    "name": "ZWJ を含む絵文字は断る",
+    "input": "👨‍👩",
+    "expected": null
+  },
+  {
+    "name": "U+FEFF は前後の空白として落とさず断る",
+    "input": "﻿A-023",
+    "expected": null
+  },
+  {
+    "name": "前後の U+0085 は空白として落とす",
+    "input": "A-023\u0085",
+    "expected": "A-023"
+  },
+  {
+    "name": "前後の U+001C は空白として落とす",
+    "input": "\u001cA-023",
+    "expected": "A-023"
+  },
+  {
+    "name": "前後の U+2028 は空白として落とす",
+    "input": " A-023",
+    "expected": "A-023"
+  },
+  { "name": "途中の U+0085 は断る", "input": "A\u0085B", "expected": null }
+]

@@ -1,6 +1,5 @@
 import { useId, useState, type FormEvent } from "react";
 import { isApiError } from "../../api/http";
-import { submitVisit } from "../../api/patient";
 import { DoneMessage, ErrorMessage } from "../../components/patient/Messages";
 import NotRegistered from "../../components/patient/NotRegistered";
 import PatientNav from "../../components/patient/PatientNav";
@@ -9,6 +8,8 @@ import {
   isNotRegistered,
 } from "../../components/patient/patientApi";
 import { normalizeReceptionNo } from "../../components/patient/reception";
+import { loadPid } from "../../patient/pid";
+import { sendVisit } from "../../patient/visitEntries";
 import { usePatientStrings } from "../../strings/PatientStrings";
 
 type Phase = "editing" | "sending" | "done" | "not_registered";
@@ -16,43 +17,66 @@ type Phase = "editing" | "sending" | "done" | "not_registered";
 const INVALID_KEY = "visit.invalid";
 /** 今コースが無い（409 no_course）。受付で声をかけてもらう。 */
 const NO_COURSE_KEY = "visit.no_course";
+/** その患者の今日の受診が印刷済み（409 already_printed）。記録は端末に残る（§6）。 */
+const ALREADY_PRINTED_KEY = "visit.already_printed";
+/** 今日の開いた受診が上限に達した（409 too_many_visits）。記録は端末に残る。 */
+const TOO_MANY_KEY = "visit.too_many";
 const REGISTERED_KEY = "register.done";
+/** 受付番号は送る前にサーバーと同じ検査をしているので、422・413 は記録が断られたとき（§5.5）。 */
+const RECORDS_REJECTED_KEY = "visit.records_rejected";
 
 function errorKeyOf(err: unknown): string {
-  if (isApiError(err) && (err.status === 400 || err.status === 422)) {
+  if (isApiError(err) && err.status === 400) {
     return INVALID_KEY;
+  }
+  if (isApiError(err) && (err.status === 422 || err.status === 413)) {
+    return RECORDS_REJECTED_KEY;
   }
   if (isApiError(err) && err.status === 409 && err.code === "no_course") {
     return NO_COURSE_KEY;
+  }
+  if (isApiError(err) && err.status === 409 && err.code === "already_printed") {
+    return ALREADY_PRINTED_KEY;
+  }
+  if (isApiError(err) && err.status === 409 && err.code === "too_many_visits") {
+    return TOO_MANY_KEY;
   }
   return GENERIC_ERROR_KEY;
 }
 
 /**
- * P3 受診時（/visit。院内QRで開く）。送ると何が起きるか（visit.about）と番号の例
- * （visit.example）を出し、受付番号を送り、届いたら visit.done だけを出す。
- * 患者は Cookie で識別される（経路に仮名ID を入れない）。
+ * P3 受診（/visit。下の受診タブ）。送ると何が起きるか（visit.about）と番号の例
+ * （visit.example）を出し、受付番号と範囲内の端末の記録を送り（§5.5）、届いたら visit.done
+ * だけを出す。送る範囲を聞くのに仮名ID が要るので、無ければ番号の入力欄を出す。
  * native の maxLength は UTF-16 単位で数え貼り付けを黙って切るので付けない。
  * 長さは送る前に normalizeReceptionNo（code point で 1〜32 字）で検査する。
  * 送って 401/403 なら番号の入力欄を出す。登録できたら受付番号を残したまま送る前に戻す
- * （この画面は Cookie だけで送るので、読み直さなくても送り直せる）。
+ * （登録した番号で送り直すので、読み直さない）。
  */
 export default function Visit() {
   const { t } = usePatientStrings();
   const inputId = useId();
   const exampleId = useId();
+  const [pid, setPid] = useState(loadPid);
   const [text, setText] = useState("");
-  const [phase, setPhase] = useState<Phase>("editing");
+  const [phase, setPhase] = useState<Phase>(
+    pid === null ? "not_registered" : "editing",
+  );
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
 
-  function resumeAfterRegister() {
+  function resumeAfterRegister(newPid: string) {
+    setPid(newPid);
     setRegistered(true);
     setPhase("editing");
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (pid === null) {
+      setPhase("not_registered");
+      return;
+    }
     const receptionNo = normalizeReceptionNo(text);
     if (receptionNo === null) {
       setErrorKey(INVALID_KEY);
@@ -62,7 +86,7 @@ export default function Visit() {
     setErrorKey(null);
     setRegistered(false);
     try {
-      await submitVisit(receptionNo);
+      await sendVisit(pid, receptionNo);
       setPhase("done");
     } catch (err) {
       if (isNotRegistered(err)) {

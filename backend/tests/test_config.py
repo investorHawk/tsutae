@@ -73,3 +73,23 @@ def test_regimen_chat_limits_default_and_env(monkeypatch) -> None:
     settings = config.get_settings()
     assert (settings.regimen_max_turns, settings.regimen_max_budget_usd) == (5, 0.3)
     assert settings.regimen_recover_after_s == 60.0
+
+
+def test_vapid_settings_come_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in ("PUBLIC", "PRIVATE"):
+        monkeypatch.delenv(f"TSUTAE_VAPID_{name}_KEY", raising=False)
+    monkeypatch.delenv("TSUTAE_VAPID_SUBJECT", raising=False)
+    settings = config.get_settings()
+    assert settings.vapid_public_key is None
+    assert settings.vapid_private_key is None
+    assert settings.vapid_subject is None
+    monkeypatch.setenv("TSUTAE_VAPID_PUBLIC_KEY", "pub")
+    monkeypatch.setenv("TSUTAE_VAPID_PRIVATE_KEY", "vapid-private-value")
+    monkeypatch.setenv("TSUTAE_VAPID_SUBJECT", "mailto:a@example.com")
+    settings = config.get_settings()
+    assert settings.vapid_public_key == "pub"
+    assert settings.vapid_private_key == "vapid-private-value"
+    assert settings.vapid_subject == "mailto:a@example.com"
+    assert "vapid-private-value" not in repr(settings)

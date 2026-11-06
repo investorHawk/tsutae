@@ -11,20 +11,16 @@ from pathlib import Path
 
 import pytest
 from api_helpers import (
-    add_entry,
     add_patient,
     api_client,
-    db_conn,
     register,
     set_patient_cookie,
 )
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from tsutae import db
 from tsutae.api import deps
 from tsutae.config import PACKAGE_ROOT, PATIENT_STRINGS_PATH, jst_datetime
-from tsutae.schemas import ClosedAnswer, EntryCreate
 
 C1 = [(1, date(2026, 10, 27))]
 SENTINEL = "磯鷲架空太郎のひみつの文"
@@ -41,12 +37,6 @@ def pid(client: TestClient) -> str:
     patient_id = add_patient(client.app, courses=C1)
     assert register(client, patient_id).status_code == 200
     return patient_id
-
-
-def _fever(t: float) -> dict:
-    return {
-        "answers": [{"question_key": "fever", "value": "measured", "temperature": t}]
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -94,13 +84,13 @@ def test_no_cookie_is_401(client: TestClient) -> None:
     patient_id = add_patient(client.app, courses=C1)
     for method, path in (
         ("get", f"/api/patient/{patient_id}/questions"),
-        ("get", f"/api/patient/{patient_id}/entries"),
+        ("get", f"/api/patient/{patient_id}/visit-days"),
+        ("get", f"/api/patient/{patient_id}/visit-window"),
     ):
         r = getattr(client, method)(path)
         assert r.status_code == 401
         assert r.json() == {"error": "not_logged_in"}
-    r = client.post(f"/api/patient/{patient_id}/entries", json={"too_sick": True})
-    assert r.status_code == 401
+    assert client.post(f"/api/patient/{patient_id}/record-marks").status_code == 401
 
 
 def test_malformed_cookie_is_401(client: TestClient) -> None:
@@ -112,14 +102,11 @@ def test_malformed_cookie_is_401(client: TestClient) -> None:
 
 def test_cookie_and_path_mismatch_is_403(client: TestClient, pid: str) -> None:
     other = add_patient(client.app, courses=C1)
-    for path in (f"/api/patient/{other}/questions", f"/api/patient/{other}/entries"):
+    for path in (f"/api/patient/{other}/questions", f"/api/patient/{other}/visit-days"):
         r = client.get(path)
         assert r.status_code == 403
         assert r.json() == {"error": "forbidden"}
-    r = client.post(f"/api/patient/{other}/entries", json={"too_sick": True})
-    assert r.status_code == 403
-    with db_conn(client.app) as conn:
-        assert db.list_entries(conn, other) == []
+    assert client.post(f"/api/patient/{other}/record-marks").status_code == 403
 
 
 def test_unknown_patient_with_matching_cookie_is_404(client: TestClient) -> None:
@@ -142,7 +129,7 @@ def test_questions_folfox(client: TestClient, pid: str) -> None:
     keys = [q["key"] for q in body["questions"]]
     assert keys == ["numbness", "diarrhea", "stomatitis", "nausea_appetite", "fever"]
     assert set(body["questions"][0]) == {"key", "text", "answer_type"}
-    assert set(body) == {"skill_version", "questions", "today"}
+    assert set(body) == {"skill_version", "questions", "fixed_rules", "today"}
 
 
 def test_questions_has_the_server_today(
@@ -161,244 +148,6 @@ def test_questions_capox(client: TestClient) -> None:
     body = client.get(f"/api/patient/{patient_id}/questions").json()
     assert body["skill_version"].startswith("regimen-capox@")
     assert "hand_foot" in [q["key"] for q in body["questions"]]
-
-
-# ---------------------------------------------------------------------------
-# 記録の保存
-# ---------------------------------------------------------------------------
-
-
-def test_post_entry_saves_with_current_skill_version(
-    client: TestClient, pid: str
-) -> None:
-    body = {
-        "by_proxy": True,
-        "answers": [{"question_key": "diarrhea", "value": "present"}],
-        "free_text": "  朝から少しおなかがゆるい  ",
-    }
-    r = client.post(f"/api/patient/{pid}/entries", json=body)
-    assert r.status_code == 200
-    out = r.json()
-    assert out["notices"] == []
-    with db_conn(client.app) as conn:
-        saved = db.get_entry(conn, out["entry_id"])
-    assert saved is not None
-    assert saved.patient_id == pid
-    assert saved.skill_version == "regimen-folfox@1"
-    assert saved.kind == "mixed"
-    assert saved.by_proxy is True
-    assert saved.free_text == "朝から少しおなかがゆるい"
-    assert saved.record_date == date(2026, 11, 9)
-
-
-def test_post_entry_38_0_gives_fever_notice(client: TestClient, pid: str) -> None:
-    r = client.post(f"/api/patient/{pid}/entries", json=_fever(38.0))
-    assert r.status_code == 200
-    assert r.json()["notices"] == ["fixed_rule.fever_38"]
-
-
-def test_post_entry_37_9_gives_no_notice(client: TestClient, pid: str) -> None:
-    r = client.post(f"/api/patient/{pid}/entries", json=_fever(37.9))
-    assert r.status_code == 200
-    assert r.json()["notices"] == []
-
-
-def test_post_too_sick(client: TestClient, pid: str) -> None:
-    r = client.post(f"/api/patient/{pid}/entries", json={"too_sick": True})
-    assert r.status_code == 200
-    with db_conn(client.app) as conn:
-        assert db.get_entry(conn, r.json()["entry_id"]).kind == "too_sick"
-
-
-@pytest.mark.parametrize(
-    "body",
-    [
-        {},
-        {"free_text": "   "},
-        {"too_sick": True, "free_text": SENTINEL},
-        {"free_text": SENTINEL, "unexpected": 1},
-        {"free_text": SENTINEL, "answers": [{"question_key": "fever"}]},
-        {"answers": [{"question_key": "fever", "value": "measured"}]},
-        {
-            "answers": [
-                {"question_key": "fever", "value": "measured", "temperature": 50}
-            ]
-        },
-        {"answers": [{"question_key": "diarrhea", "value": "none", "temperature": 37}]},
-        {
-            "answers": [
-                {"question_key": "diarrhea", "value": "none"},
-                {"question_key": "diarrhea", "value": "hard"},
-            ]
-        },
-        # Skill に照らした検査
-        {"answers": [{"question_key": "hand_foot", "value": "present"}]},
-        {
-            "answers": [{"question_key": "fever", "value": "hard"}],
-            "free_text": SENTINEL,
-        },
-        {"answers": [{"question_key": "numbness", "value": "not_measured"}]},
-        {
-            "answers": [
-                {"question_key": "numbness", "value": "measured", "temperature": 37.0}
-            ]
-        },
-    ],
-)
-def test_invalid_entry_is_422_without_echo(
-    client: TestClient, pid: str, body: dict
-) -> None:
-    r = client.post(f"/api/patient/{pid}/entries", json=body)
-    assert r.status_code == 422
-    assert r.json() == {"error": "invalid_input"}
-    assert SENTINEL not in r.text
-    with db_conn(client.app) as conn:
-        assert db.list_entries(conn, pid) == []
-
-
-def test_malformed_json_is_422(client: TestClient, pid: str) -> None:
-    r = client.post(
-        f"/api/patient/{pid}/entries",
-        content=b'{"free_text": "' + SENTINEL.encode() + b'"',
-        headers={"content-type": "application/json"},
-    )
-    assert r.status_code == 422
-    assert r.json() == {"error": "invalid_input"}
-    assert SENTINEL not in r.text
-
-
-# ---------------------------------------------------------------------------
-# 記録の一覧
-# ---------------------------------------------------------------------------
-
-
-def test_get_entries_with_question_text(client: TestClient, pid: str) -> None:
-    client.post(
-        f"/api/patient/{pid}/entries",
-        json={
-            "answers": [
-                {"question_key": "diarrhea", "value": "hard"},
-                {"question_key": "fever", "value": "not_measured"},
-            ],
-            "free_text": "下痢が続いた",
-        },
-    )
-    client.post(f"/api/patient/{pid}/entries", json={"too_sick": True})
-    r = client.get(f"/api/patient/{pid}/entries")
-    assert r.status_code == 200
-    entries = r.json()["entries"]
-    assert len(entries) == 2
-    first = entries[0]
-    assert set(first) == {
-        "id",
-        "recorded_at",
-        "record_date",
-        "kind",
-        "by_proxy",
-        "skill_version",
-        "answers",
-        "free_text",
-    }
-    assert first["kind"] == "mixed"
-    assert first["record_date"] == "2026-11-09"
-    assert first["recorded_at"].endswith("+09:00")
-    assert first["skill_version"] == "regimen-folfox@1"
-    assert first["free_text"] == "下痢が続いた"
-    by_key = {a["question_key"]: a for a in first["answers"]}
-    assert by_key["diarrhea"] == {
-        "question_key": "diarrhea",
-        "value": "hard",
-        "temperature": None,
-        "question_text": "下痢はありましたか",
-    }
-    assert by_key["fever"]["question_text"] == "熱を測りましたか"
-    assert entries[1]["kind"] == "too_sick"
-    assert entries[1]["answers"] == []
-    assert entries[1]["free_text"] is None
-
-
-def test_get_entries_unknown_version_gives_null_text(
-    client: TestClient, pid: str
-) -> None:
-    entry = EntryCreate(
-        answers=[ClosedAnswer(question_key="numbness", value="present")]
-    )
-    add_entry(client.app, pid, entry, skill_version="regimen-folfox@99")
-    add_entry(client.app, pid, entry, skill_version="report-format-default@1")
-    entries = client.get(f"/api/patient/{pid}/entries").json()["entries"]
-    assert [e["answers"][0]["question_text"] for e in entries] == [None, None]
-    assert entries[0]["skill_version"] == "regimen-folfox@99"
-
-
-def test_get_entries_only_own(client: TestClient, pid: str) -> None:
-    other = add_patient(client.app, courses=C1)
-    add_entry(client.app, other, EntryCreate(free_text="ほかの人の記録"))
-    client.post(f"/api/patient/{pid}/entries", json={"free_text": "自分の記録"})
-    entries = client.get(f"/api/patient/{pid}/entries").json()["entries"]
-    assert [e["free_text"] for e in entries] == ["自分の記録"]
-
-
-def _visit_row(client: TestClient, pid: str, no: str, visit_date: date, at: str) -> int:
-    """受診を作り、受診日と受付の時刻を書き換える（時計に頼らず並びを決める）。"""
-    expires = jst_datetime(date(2026, 11, 10), 9, 0)
-    with db_conn(client.app) as conn:
-        vid = db.create_visit(conn, pid, no, visit_date, expires, 1)
-        with conn:
-            conn.execute(
-                "UPDATE visits SET visit_date = ?, created_at = ? WHERE id = ?",
-                (visit_date.isoformat(), at, vid),
-            )
-    return vid
-
-
-def test_get_entries_without_visits_gives_empty_list(
-    client: TestClient, pid: str
-) -> None:
-    r = client.get(f"/api/patient/{pid}/entries")
-    assert r.status_code == 200
-    assert r.json() == {"entries": [], "visits": []}
-
-
-def test_get_entries_has_visit_days_with_only_date_and_time(
-    client: TestClient, pid: str
-) -> None:
-    """受診日は日付と受付の時刻だけ（受付番号・状態・id・レポートは返さない）。新しい順。"""
-    old = _visit_row(
-        client, pid, "A-001", date(2026, 10, 27), "2026-10-27T09:05:00.000000+09:00"
-    )
-    new = _visit_row(
-        client, pid, "A-002", date(2026, 11, 9), "2026-11-09T09:40:00.000000+09:00"
-    )
-    with db_conn(client.app) as conn:
-        db.set_visit_status(conn, old, "failed")
-        db.set_visit_status(conn, new, "ready")
-    r = client.get(f"/api/patient/{pid}/entries")
-    assert r.status_code == 200
-    body = r.json()
-    assert set(body) == {"entries", "visits"}
-    assert body["visits"] == [
-        {"visit_date": "2026-11-09", "received_at": "2026-11-09T09:40:00+09:00"},
-        {"visit_date": "2026-10-27", "received_at": "2026-10-27T09:05:00+09:00"},
-    ]
-    for leaked in ("A-001", "A-002", "failed", "ready", "reception_no", "status"):
-        assert leaked not in r.text
-
-
-def test_get_entries_visit_after_post_visit(client: TestClient, pid: str) -> None:
-    """QR の受付（POST /api/visit）をした日が受診日になる（生成の状態を問わない）。"""
-    assert client.post("/api/visit", json={"reception_no": "A-023"}).is_success
-    (visit,) = client.get(f"/api/patient/{pid}/entries").json()["visits"]
-    assert visit["visit_date"] == "2026-11-09"
-    assert visit["received_at"].startswith("2026-11-09T")
-    assert visit["received_at"].endswith("+09:00")
-
-
-def test_get_entries_visits_only_own(client: TestClient, pid: str) -> None:
-    other = add_patient(client.app, courses=C1)
-    _visit_row(
-        client, other, "B-001", date(2026, 11, 9), "2026-11-09T09:00:00.000000+09:00"
-    )
-    assert client.get(f"/api/patient/{pid}/entries").json()["visits"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -720,12 +469,3 @@ def test_doctor_route_check_finds_unprotected_route(
         sys.modules.pop("tsutae_fake_doctor_router", None)
     assert len(bad) == 4
     assert all("/api/doctor/visits/{visit_id}/printed -> 200" in b for b in bad)
-
-
-def test_too_long_free_text_has_its_own_code(client: TestClient, pid: str) -> None:
-    # 患者画面が「2000字までに」と案内できるよう、長すぎる自由記載だけは専用のコード
-    for text in ("あ" * 2001, SENTINEL * 200):
-        r = client.post(f"/api/patient/{pid}/entries", json={"free_text": text})
-        assert r.status_code == 422
-        assert r.json() == {"error": "free_text_too_long"}
-        assert text[:50] not in r.text

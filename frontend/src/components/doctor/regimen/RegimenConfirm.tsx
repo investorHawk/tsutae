@@ -112,7 +112,7 @@ export default function RegimenConfirm({
             </div>
           ) : (
             <p className="rf-ok">
-              検査に通りました（必須の項目・CTCAE の用語・質問の
+              検査に通りました（必須の項目・用語・質問の
               key・個人を特定しうる表現の検査）
             </p>
           )}

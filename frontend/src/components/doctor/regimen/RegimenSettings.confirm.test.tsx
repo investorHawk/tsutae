@@ -87,7 +87,7 @@ describe("D4 レジメン: 確認の画面の一覧", () => {
     expect(within(rows[0]).getByText("副作用 · 下痢")).toBeInTheDocument();
     expect(
       within(rows[0]).getByText(
-        "患者の言い方: 下痢、お腹がゆるい／CTCAE の用語: 下痢／対応する質問: 下痢",
+        "患者の言い方: 下痢、お腹がゆるい／用語: 下痢／対応する質問: 下痢",
       ),
     ).toBeInTheDocument();
     // 同じ名前の副作用と質問をボタンの名前でも見分ける

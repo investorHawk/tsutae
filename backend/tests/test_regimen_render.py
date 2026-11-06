@@ -171,8 +171,7 @@ def test_folfiri_has_pump_rows_like_folfox() -> None:
 def test_term_keys_are_only_the_differences_from_the_global_map() -> None:
     meta, _ = parse_skill_md(render_regimen_skill(extra_form("ram_wptx"), 1))
     assert meta["term_keys"] == {
-        "末梢性感覚ニューロパチー": "neuropathy",
-        "錯感覚": "neuropathy",
+        "末梢神経障害": "neuropathy",
         "疲労": "fatigue",
         "倦怠感": "fatigue",
         "鼻出血": "bleeding",

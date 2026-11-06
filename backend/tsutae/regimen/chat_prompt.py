@@ -6,7 +6,7 @@
 - 今のフォーム（JSON。行は ref `drugs.1` で示し、row_id・prose は入れない。row_id は
   H1 の id_like に掛かる形があるため。chat_handles）
 - 欄の出どころ（先生が直接入れた欄・AI が入れた欄）と、まだ入っていない必須の欄
-- 部品集（key・短い名前・文）と CTCAE の用語の一覧（ctcae_terms.json の用語名）
+- 部品集（key・短い名前・文）と用語の一覧（ctcae_terms.json の用語名）
 - 直近の会話（`HISTORY_ROWS` 行。先生の文・Claude の返答・聞いた問い。欄の id は出さない）。
   聞いた問いの選択肢は「」で囲んでつなぐ（`ask_line`。空白・「/」は H1 の long_digits の
   区切りなので、数字の選択肢 7・14・21・28 が1つの数字の並びになる）。描いた行が H1 に
@@ -119,7 +119,7 @@ _PROMPT_TEMPLATE = """\
 ## 質問の部品集（from_library で選べる。key: 短い名前「文」）
 {library}
 
-## CTCAE の用語の一覧（side_effects の ctcae_terms はこの中の語だけ）
+## 用語の一覧（side_effects の ctcae_terms はこの中の語だけ）
 {terms}
 
 ## 直近の会話
@@ -137,7 +137,7 @@ _PROMPT_TEMPLATE = """\
 
 @lru_cache(maxsize=1)
 def term_names() -> tuple[str, ...]:
-    """CTCAE の用語名（ctcae_terms.json の並び）。"""
+    """用語名（ctcae_terms.json の並び）。"""
     return tuple(item["term"] for item in load_terms())
 
 

@@ -55,7 +55,7 @@ export const LANE_LABELS: Readonly<
   "term-mapper": {
     title: "用語の担当",
     code: "term-mapper",
-    description: "症状を CTCAE v5.0 JCOG版の用語名に当てはめる",
+    description: "症状を用語の一覧の用語名に当てはめる",
   },
   "contradiction-finder": {
     title: "食い違いの担当",
@@ -90,7 +90,7 @@ export const RUN_TITLES: Readonly<Record<string, string>> = {
   visit_failed: "レポートを作れなかった",
   visit_closed: "印刷済み・期限切れ（何もしない）",
   orphan_recovered: "再起動で止まった受診を回収",
-  regenerate_requested: "医師が AI でもう一度変換を依頼",
+  regenerate_requested: "もう一度変換を依頼（医師の操作か、記録の追加）",
   // 未処理の記載（D6）を医師が伏せ字にして変換し直す
   doctor_mask_saved: "医師が未処理の記載を伏せ字にして保存",
   doctor_mask_confirmed: "医師が「個人を特定する語は無い」と確かめた",
@@ -105,6 +105,7 @@ const HOOK_EVENT_TITLES: Readonly<Record<string, string>> = {
 };
 
 const DECISION_LABELS: ReadonlyArray<[RegExp, string, Tone]> = [
+  [/^added_records$/, "記録の追加", "neutral"],
   [/^(deny|denied)\b/i, "拒否", "deny"],
   [/^block/i, "遮断", "deny"],
   [/^reject/i, "差し戻し", "deny"],

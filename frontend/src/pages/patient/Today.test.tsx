@@ -7,7 +7,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
-import { callsTo, mockPatientApi } from "./testing/api";
+import { MARK, callsTo, mockPatientApi } from "./testing/api";
+import { savedInputs } from "./testing/device";
 import {
   PID,
   QUESTIONS,
@@ -19,7 +20,7 @@ import { renderPatient, type InitialEntry } from "./testing/render";
 import History from "./History";
 import Today from "./Today";
 
-const ENTRIES_URL = `/api/patient/${PID}/entries`;
+const MARK_URL = `/api/patient/${PID}/record-marks`;
 const FREE_TEXT = "free text sample";
 
 const ROUTES = [
@@ -136,15 +137,13 @@ describe("Today (P1): the proxy toggle", () => {
 
 describe("Today (P1): stage 0 too_sick", () => {
   it("press, then yes: sends {too_sick, by_proxy:false} and finishes", async () => {
-    const fetchMock = mockPatientApi();
+    mockPatientApi();
     renderToday();
     await recordTooSick();
     expect(
       await screen.findByText(s("today.too_sick_done")),
     ).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
-      { too_sick: true, by_proxy: false },
-    ]);
+    expect(await savedInputs()).toEqual([{ too_sick: true, by_proxy: false }]);
     // 記録した後は「取り消す」と「追加で記録する」だけ（P2-4・P2-5。取り消す前の確認は無い）
     expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
       s("today.undo"),
@@ -154,8 +153,13 @@ describe("Today (P1): stage 0 too_sick", () => {
   });
 
   it("works before the questions arrive and with the proxy toggle", async () => {
-    const fetchMock = mockPatientApi({
-      questions: () => new Promise<Response>(() => {}),
+    // The first read never comes back; pressing the button reads them again
+    let reads = 0;
+    mockPatientApi({
+      questions: () =>
+        reads++ === 0
+          ? new Promise<Response>(() => {})
+          : jsonResponse(QUESTIONS_RESPONSE),
     });
     renderToday();
     await userEvent.click(
@@ -163,9 +167,7 @@ describe("Today (P1): stage 0 too_sick", () => {
     );
     await recordTooSick();
     await screen.findByText(s("today.too_sick_done"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
-      { too_sick: true, by_proxy: true },
-    ]);
+    expect(await savedInputs()).toEqual([{ too_sick: true, by_proxy: true }]);
   });
 });
 
@@ -209,11 +211,11 @@ describe("Today (P1): stage 1-2 questions and free text", () => {
       screen.getByRole("checkbox", { name: s("today.proxy_toggle") }),
     );
     expect(submitButton()).toBeDisabled();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 
   it("sends only the answered questions as EntryCreate", async () => {
-    const fetchMock = mockPatientApi();
+    mockPatientApi();
     renderToday();
     await choose("numbness", "answer.none");
     await choose("diarrhea", "answer.hard");
@@ -227,7 +229,7 @@ describe("Today (P1): stage 1-2 questions and free text", () => {
     );
     await userEvent.click(submitButton());
     expect(await screen.findByText(s("today.saved"))).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+    expect(await savedInputs()).toEqual([
       {
         by_proxy: true,
         answers: [
@@ -241,7 +243,7 @@ describe("Today (P1): stage 1-2 questions and free text", () => {
   });
 
   it("free text only is sent with empty answers", async () => {
-    const fetchMock = mockPatientApi();
+    mockPatientApi();
     renderToday();
     await userEvent.type(
       await screen.findByRole("textbox", { name: s("today.free_text_label") }),
@@ -249,7 +251,7 @@ describe("Today (P1): stage 1-2 questions and free text", () => {
     );
     await userEvent.click(submitButton());
     await screen.findByText(s("today.saved"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+    expect(await savedInputs()).toEqual([
       { by_proxy: false, answers: [], free_text: FREE_TEXT },
     ]);
   });
@@ -342,7 +344,7 @@ describe("Today (P1): temperature", () => {
       expect(screen.getByText(s(key))).toBeInTheDocument();
       expect(input).toHaveAttribute("aria-invalid", "true");
     }
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
     await userEvent.clear(input);
     await userEvent.type(input, "36.8");
     expect(screen.queryByText(s("temperature.invalid"))).toBeNull();
@@ -350,12 +352,12 @@ describe("Today (P1): temperature", () => {
   });
 
   it("not measured sends without temperature", async () => {
-    const fetchMock = mockPatientApi();
+    mockPatientApi();
     renderToday();
     await choose("fever", "answer.not_measured");
     await userEvent.click(submitButton());
     await screen.findByText(s("today.saved"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+    expect(await savedInputs()).toEqual([
       {
         by_proxy: false,
         answers: [{ question_key: "fever", value: "not_measured" }],
@@ -365,10 +367,7 @@ describe("Today (P1): temperature", () => {
   });
 
   it("38.2 is sent and the fever notice is shown verbatim", async () => {
-    const fetchMock = mockPatientApi({
-      createEntry: () =>
-        jsonResponse({ entry_id: 5, notices: ["fixed_rule.fever_38"] }),
-    });
+    mockPatientApi();
     renderToday();
     await choose("fever", "answer.measured");
     await userEvent.type(
@@ -380,7 +379,7 @@ describe("Today (P1): temperature", () => {
     expect(notice.textContent).toBe(s("fixed_rule.fever_38"));
     expect(notice).toHaveClass("p-notice");
     expect(screen.getByText(s("today.saved"))).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+    expect(await savedInputs()).toEqual([
       {
         by_proxy: false,
         answers: [
@@ -418,6 +417,7 @@ describe("Today (P1): two temperature questions", () => {
         jsonResponse({
           skill_version: "regimen-folfox@2",
           questions: [...QUESTIONS, EVENING],
+          fixed_rules: QUESTIONS_RESPONSE.fixed_rules,
           today: QUESTIONS_RESPONSE.today,
         }),
     });
@@ -434,7 +434,7 @@ describe("Today (P1): two temperature questions", () => {
   }
 
   it("each question has its own field and value", async () => {
-    const fetchMock = mockTwoFevers();
+    mockTwoFevers();
     renderToday();
     const morning = await measure(questionText("fever"));
     const evening = await measure(EVENING.text);
@@ -444,7 +444,7 @@ describe("Today (P1): two temperature questions", () => {
     expect(morning).toHaveValue("38.2");
     await userEvent.click(submitButton());
     await screen.findByText(s("today.saved"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
+    expect(await savedInputs()).toEqual([
       {
         by_proxy: false,
         answers: [
@@ -470,7 +470,7 @@ describe("Today (P1): two temperature questions", () => {
     expect(morning).toHaveAttribute("aria-invalid", "false");
     expect(evening).toHaveAttribute("aria-invalid", "true");
     expect(screen.getAllByText(s("temperature.invalid"))).toHaveLength(1);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 });
 
@@ -478,10 +478,8 @@ describe("Today (P1): errors and starting over", () => {
   it("POST 500: error.generic and the form stays for a retry", async () => {
     let fail = true;
     const fetchMock = mockPatientApi({
-      createEntry: () =>
-        fail
-          ? jsonResponse({ error: "boom" }, 500)
-          : jsonResponse({ entry_id: 2, notices: [] }),
+      recordMark: () =>
+        fail ? jsonResponse({ error: "boom" }, 500) : jsonResponse(MARK),
     });
     renderToday();
     await choose("diarrhea", "answer.present");
@@ -490,12 +488,12 @@ describe("Today (P1): errors and starting over", () => {
     fail = false;
     await userEvent.click(submitButton());
     await screen.findByText(s("today.saved"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(2);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(2);
   });
 
   it("POST 401: error.not_registered with the number field, not the form", async () => {
     mockPatientApi({
-      createEntry: () => jsonResponse({ error: "not_registered" }, 401),
+      recordMark: () => jsonResponse({ error: "not_registered" }, 401),
     });
     renderToday();
     await recordTooSick();
@@ -510,9 +508,13 @@ describe("Today (P1): errors and starting over", () => {
     ).toBeNull();
   });
 
-  it("questions 500: common.load_failed, too_sick still works", async () => {
+  it("questions 500 once: common.load_failed, too_sick reads them again and works", async () => {
+    let reads = 0;
     const fetchMock = mockPatientApi({
-      questions: () => jsonResponse({ error: "boom" }, 500),
+      questions: () =>
+        reads++ === 0
+          ? jsonResponse({ error: "boom" }, 500)
+          : jsonResponse(QUESTIONS_RESPONSE),
     });
     renderToday();
     expect(
@@ -520,7 +522,20 @@ describe("Today (P1): errors and starting over", () => {
     ).toBeInTheDocument();
     await recordTooSick();
     await screen.findByText(s("today.too_sick_done"));
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(1);
+    expect(await savedInputs()).toEqual([{ too_sick: true, by_proxy: false }]);
+  });
+
+  it("questions keep failing: too_sick shows error.generic and marks nothing", async () => {
+    const fetchMock = mockPatientApi({
+      questions: () => jsonResponse({ error: "boom" }, 500),
+    });
+    renderToday();
+    await screen.findByText(s("common.load_failed"));
+    await recordTooSick();
+    expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
+    expect(await savedInputs()).toEqual([]);
   });
 
   it("after saving, the today link starts a new record", async () => {

@@ -51,12 +51,14 @@ _SEGMENT_TITLE_MM = 4.5
 _LEGEND_MM = 13.0
 _SECTION_MM = 8.0
 _QUOTE_CHARS_PER_LINE = 46
+_NOT_RECEIVED_CHARS_PER_LINE = 46  # 英数字が多いので実際はもっと入る。少なめに見積もる
 # 引用より前の欄で 1 枚目の残りがこれ未満なら強制で改ページしない（見積もりが外れて
 # 前の欄が 2 枚目にまたがったとき、引用が 3 枚目に飛ぶのを防ぐ）
 _NEAR_FULL_MM = 15.0
 
 # 理由（二次検出・受診前の範囲外など）は紙では断定しない（AttentionItem に理由が無い）
 UNPROCESSED_NOTE = "{n}件（AI に送っていない記載。理由と内容は院内画面で確認）"
+NOT_RECEIVED_LINE = "記録が届いていない日: {days}"
 QUOTES_LIMIT_NOTE = "上限{n}件まで載せた（受診直前の記載を残した。それより前の記載は省いた可能性がある）"
 
 _ENV = Environment(
@@ -92,6 +94,13 @@ def _sections(sections: Sequence[str] | None) -> list[str]:
     return list(dict.fromkeys(chosen))
 
 
+def _breakdown(h: ReportHeader) -> str:
+    text = f"入力なし{h.no_input_days}・つらくて書けない{h.too_sick_days}"
+    if h.not_received_days:
+        return f"{text}・届いていない{h.not_received_days}"
+    return text
+
+
 def _header_view(h: ReportHeader) -> dict[str, Any]:
     return {
         "reception_no": h.reception_no,
@@ -100,7 +109,7 @@ def _header_view(h: ReportHeader) -> dict[str, Any]:
         "course": f"第{h.course_no}コース",
         "period": f"{h.course_start.isoformat()}〜{h.course_end.isoformat()}",
         "records": f"{h.recorded_days}日/{h.total_days}日",
-        "breakdown": f"入力なし{h.no_input_days}・つらくて書けない{h.too_sick_days}",
+        "breakdown": _breakdown(h),
         "delay_note": h.delay_note,
     }
 
@@ -129,12 +138,17 @@ def _too_sick_line(items: Sequence[AttentionItem]) -> dict[str, str]:
     return _line("too_sick", "●", "つらくて書けない", days, detail)
 
 
+def _not_received_line(items: Sequence[AttentionItem]) -> dict[str, str]:
+    days = ", ".join(_day(a.day) for a in items)
+    return _line("not_received", "□", NOT_RECEIVED_LINE.format(days=days), "", "")
+
+
 def _attention_view(
     items: Sequence[AttentionItem],
     questions: Sequence[Question],
     labels: Mapping[str, str] | None = None,
 ) -> list[dict[str, str]]:
-    """食い違い → 発熱 → つらくて書けない（1行にまとめる）→ 未処理 の順。"""
+    """食い違い → 発熱 → つらくて書けない・届いていない（各1行）→ 未処理 の順。"""
     lines = [
         _contradiction_line(a, questions, labels)
         for a in items
@@ -148,6 +162,9 @@ def _attention_view(
     too_sick = [a for a in items if a.kind == "too_sick"]
     if too_sick:
         lines.append(_too_sick_line(too_sick))
+    not_received = [a for a in items if a.kind == "not_received"]
+    if not_received:
+        lines.append(_not_received_line(not_received))
     lines += [
         _line(
             "unprocessed",
@@ -195,6 +212,18 @@ def _quotes_limit_note(
     if max_items is None or max_items <= 0 or len(quotes) < max_items:
         return None
     return QUOTES_LIMIT_NOTE.format(n=max_items)
+
+
+def _attention_lines(lines: Sequence[Mapping[str, str]]) -> int:
+    """要確認の行数。届いていない日の行は日が並ぶと折り返すので、その分も数える。"""
+    return sum(
+        (
+            math.ceil(len(line["title"]) / _NOT_RECEIVED_CHARS_PER_LINE)
+            if line["kind"] == "not_received"
+            else 1
+        )
+        for line in lines
+    )
 
 
 def _quote_lines(quotes: Sequence[QuoteItem]) -> int:
@@ -273,7 +302,7 @@ def render_report_html(
         quotes=_quote_view(data.quotes),
         quotes_limit_note=_quotes_limit_note(data.quotes, quotes_max_items),
         quotes_page_break=_quotes_need_new_page(
-            data, chosen, attention_lines=len(attention), grid=grid
+            data, chosen, attention_lines=_attention_lines(attention), grid=grid
         ),
         report_skill_version=data.report_skill_version,
     )

@@ -39,16 +39,23 @@ import {
   isVisitsResponse,
 } from "./doctorGuards";
 import {
-  isCreateEntryResponse,
+  isDemoConfigResponse,
+  isDemoEntriesResponse,
   isOkTrue as isPatientOk,
-  isPatientEntriesResponse,
+  isPushConfigResponse,
+  isPushSubscriptionResponse,
   isQuestionsResponse,
+  isRecordMarkResponse,
+  isVisitDaysResponse,
   isVisitResponse,
+  isVisitWindowResponse,
 } from "./patientGuards";
 import type { Course } from "./types";
 import { type Item, isRecord } from "./validate";
 
 type Guard = (body: Item) => boolean;
+
+const UTC_TIME = "2026-11-09T01:00:00Z";
 
 const savedCourse: Guard = (body) =>
   isSavedCourse(apiFixture("doctor_course_save").request as Course)(body);
@@ -57,11 +64,23 @@ const savedCourse: Guard = (body) =>
 const GUARDS: Readonly<Record<string, Guard>> = {
   patient_register: isPatientOk,
   patient_questions: isQuestionsResponse,
-  patient_entry_create: isCreateEntryResponse,
-  patient_entries: isPatientEntriesResponse,
-  patient_entry_undo: isPatientOk,
+  patient_record_mark: isRecordMarkResponse,
+  patient_record_mark_undo: isPatientOk,
+  patient_record_mark_undo_retried: isPatientOk,
+  patient_visit_days: isVisitDaysResponse,
+  patient_visit_window: isVisitWindowResponse,
+  patient_unregister: isPatientOk,
+  patient_demo_config: isDemoConfigResponse,
+  patient_demo_config_other: isDemoConfigResponse,
+  patient_demo_entries: isDemoEntriesResponse,
+  patient_push_config: isPushConfigResponse,
+  patient_push_config_unavailable: isPushConfigResponse,
+  patient_push_subscribe: isPushSubscriptionResponse,
+  patient_push_unsubscribe: isPatientOk,
+  patient_push_test: isPatientOk,
   patient_strings: (body) => validatePatientStrings(body) !== null,
   visit: isVisitResponse,
+  visit_with_entries: isVisitResponse,
   doctor_login: isDoctorOk,
   doctor_logout: isDoctorOk,
   doctor_patients: isPatientsResponse,
@@ -141,6 +160,20 @@ type Mutate = (body: any) => void;
 
 /** [fixture, 壊し方の説明, 壊す操作]。壊した本文は guard に拒まれる。 */
 const BROKEN: Array<[string, string, Mutate]> = [
+  // 通知（plan-device-records §4.3）
+  ["patient_push_config", "使えるのに鍵が無い", (b) => (b.public_key = null)],
+  ["patient_push_config", "available が無い", (b) => delete b.available],
+  [
+    "patient_push_config_unavailable",
+    "使えないのに鍵がある",
+    (b) => (b.public_key = "x"),
+  ],
+  [
+    "patient_push_subscribe",
+    "時刻が 30 分刻みでない",
+    (b) => (b.notify_time = "20:15"),
+  ],
+  ["patient_push_subscribe", "時刻が無い", (b) => delete b.notify_time],
   // レジメンの一覧（T95）
   ["doctor_regimens", "regimens が無い", (b) => delete b.regimens],
   ["doctor_regimens", "識別名が小文字", (b) => (b.regimens[0].code = "folfox")],
@@ -328,6 +361,23 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "未処理件数が無い",
     (b) => delete b.visits[0].unprocessed_count,
   ],
+  [
+    "doctor_visits",
+    "regen_pending が無い",
+    (b) => delete b.visits[0].regen_pending,
+  ],
+  [
+    "doctor_visits",
+    "regen_pending が数",
+    (b) => (b.visits[0].regen_pending = 1),
+  ],
+  [
+    "doctor_visits",
+    "regen_count が無い",
+    (b) => delete b.visits[0].regen_count,
+  ],
+  ["doctor_visits", "has_report が無い", (b) => delete b.visits[0].has_report],
+  ["doctor_visits", "has_report が数", (b) => (b.visits[0].has_report = 1)],
   ["doctor_visits", "visits が無い", (b) => delete b.visits],
   // Skill の中身（GET skills/{name}）
   ["doctor_skill", "text が無い", (b) => delete b.text],
@@ -596,34 +646,68 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ],
   ["patient_questions", "skill_version が無い", (b) => delete b.skill_version],
   ["patient_questions", "today が無い", (b) => delete b.today],
-  ["patient_entry_create", "notices に数", (b) => (b.notices = [1])],
-  ["patient_entry_create", "entry_id が無い", (b) => delete b.entry_id],
-  ["patient_entries", "kind が未知", (b) => (b.entries[0].kind = "other")],
+  ["patient_questions", "fixed_rules が無い", (b) => delete b.fixed_rules],
   [
-    "patient_entries",
+    "patient_questions",
+    "規則の閾値が文字列",
+    (b) => (b.fixed_rules[0].threshold_celsius = "38"),
+  ],
+  [
+    "patient_questions",
+    "規則の文のキーが無い",
+    (b) => delete b.fixed_rules[0].patient_string_key,
+  ],
+  [
+    "patient_questions",
+    "規則の質問の key が無い",
+    (b) => delete b.fixed_rules[0].question_key,
+  ],
+  ["patient_record_mark", "record_date が無い", (b) => delete b.record_date],
+  ["patient_record_mark", "recorded_at が無い", (b) => delete b.recorded_at],
+  ["patient_visit_window", "start が無い", (b) => delete b.start],
+  ["patient_visit_window", "end が日時", (b) => (b.end = UTC_TIME)],
+  ["patient_demo_config", "demo_tools が文字列", (b) => (b.demo_tools = "1")],
+  ["patient_demo_entries", "pid が無い", (b) => delete b.entries[0].pid],
+  [
+    "patient_demo_entries",
+    "client_entry_id が無い",
+    (b) => delete b.entries[0].client_entry_id,
+  ],
+  [
+    "patient_demo_entries",
+    "client_entry_id が重複",
+    (b) => (b.entries[1].client_entry_id = b.entries[0].client_entry_id),
+  ],
+  ["patient_demo_entries", "kind が未知", (b) => (b.entries[0].kind = "other")],
+  [
+    "patient_demo_entries",
     "question_text が無い",
-    (b) => delete lastAnswer(b).question_text,
+    (b) => delete b.entries[0].answers[0].question_text,
   ],
   [
-    "patient_entries",
+    "patient_demo_entries",
     "measured なのに体温が null",
-    (b) => (lastEntry(b).answers[0].temperature = null),
+    (b) => (measuredAnswer(b).temperature = null),
   ],
-  ["patient_entries", "free_text が無い", (b) => delete b.entries[0].free_text],
-  ["patient_entries", "visits が無い", (b) => delete b.visits],
-  ["patient_entries", "visits の要素が文字列", (b) => (b.visits = ["x"])],
   [
-    "patient_entries",
+    "patient_demo_entries",
+    "free_text が無い",
+    (b) => delete b.entries[0].free_text,
+  ],
+  ["patient_visit_days", "visits が無い", (b) => delete b.visits],
+  ["patient_visit_days", "visits の要素が文字列", (b) => (b.visits = ["x"])],
+  [
+    "patient_visit_days",
     "visit_date が重複",
     (b) => (b.visits = [b.visits[0], { ...b.visits[0] }]),
   ],
   [
-    "patient_entries",
+    "patient_visit_days",
     "visit_date が無い",
     (b) => delete b.visits[0].visit_date,
   ],
   [
-    "patient_entries",
+    "patient_visit_days",
     "received_at が無い",
     (b) => delete b.visits[0].received_at,
   ],
@@ -631,12 +715,11 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ["patient_strings", "必須の定型文が無い", (b) => delete b["visit.done"]],
 ];
 
-function lastEntry(b: any): any {
-  return b.entries[b.entries.length - 1];
-}
-
-function lastAnswer(b: any): any {
-  return lastEntry(b).answers[0];
+/** 見本の記録のうち、体温を測った最初の回答。 */
+function measuredAnswer(b: any): any {
+  return b.entries
+    .flatMap((e: any) => e.answers)
+    .find((a: any) => a.value === "measured");
 }
 
 describe("壊した fixture は guard に拒まれる", () => {
@@ -649,8 +732,8 @@ describe("壊した fixture は guard に拒まれる", () => {
 });
 
 describe("fixture の前提", () => {
-  it("patient_entries には受診日が1件以上あり、日付と受付の時刻だけを持つ", () => {
-    const body = fixtureBody("patient_entries") as {
+  it("patient_visit_days には受診日が1件以上あり、日付と受付の時刻だけを持つ", () => {
+    const body = fixtureBody("patient_visit_days") as {
       visits: Array<Record<string, unknown>>;
     };
     expect(body.visits.length).toBeGreaterThanOrEqual(1);
@@ -659,12 +742,7 @@ describe("fixture の前提", () => {
     }
   });
 
-  it("patient_entries の最後の記録は measured の体温を持つ（壊す操作の前提）", () => {
-    const body = fixtureBody("patient_entries") as {
-      entries: Array<{ answers: Array<{ value: string }> }>;
-    };
-    expect(body.entries[body.entries.length - 1].answers[0].value).toBe(
-      "measured",
-    );
+  it("patient_demo_entries には measured の体温がある（壊す操作の前提）", () => {
+    expect(measuredAnswer(fixtureBody("patient_demo_entries"))).toBeDefined();
   });
 });

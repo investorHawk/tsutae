@@ -1,0 +1,152 @@
+[
+  {
+    "name": "そのまま",
+    "input": "おなかがゆるい",
+    "expected": "おなかがゆるい",
+    "server_raw": true
+  },
+  {
+    "name": "前後の空白と改行を落とす",
+    "input": "  おなかがゆるい\n",
+    "expected": "おなかがゆるい",
+    "server_raw": true
+  },
+  {
+    "name": "途中の空白と改行は残す",
+    "input": "朝 だるい\n夜 熱",
+    "expected": "朝 だるい\n夜 熱",
+    "server_raw": true
+  },
+  {
+    "name": "空は記録しない",
+    "input": "",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "空白だけは記録しない",
+    "input": " \n\t\u3000",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "U+0085 だけは記録しない",
+    "input": "\u0085",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "U+001C だけは記録しない",
+    "input": "\u001c",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "U+001D だけは記録しない",
+    "input": "\u001d",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "U+001E だけは記録しない",
+    "input": "\u001e",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "U+001F だけは記録しない",
+    "input": "\u001f",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "Python の空白の全てだけは記録しない",
+    "input": "\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000",
+    "expected": null,
+    "server_raw": true
+  },
+  {
+    "name": "前後の U+0085・U+001C を落とす",
+    "input": "\u0085だるい\u001c",
+    "expected": "だるい",
+    "server_raw": true
+  },
+  {
+    "name": "NBSP・U+2028・全角の空白を前後から落とす",
+    "input": "\u00a0\u3000おなか\u2028",
+    "expected": "おなか",
+    "server_raw": true
+  },
+  {
+    "name": "途中の U+0085 は残す",
+    "input": "だる\u0085い",
+    "expected": "だる\u0085い",
+    "server_raw": true
+  },
+  {
+    "name": "U+FEFF だけは記録しない（Python は残すが、画面は空として扱う）",
+    "input": "\ufeff",
+    "expected": null,
+    "server_raw": false
+  },
+  {
+    "name": "U+FEFF と U+0085 が交互でも記録しない",
+    "input": "\ufeff\u0085\ufeff",
+    "expected": null,
+    "server_raw": false
+  },
+  {
+    "name": "前の U+FEFF と U+0085 を落とす",
+    "input": "\ufeff\u0085だるい",
+    "expected": "だるい",
+    "server_raw": false
+  },
+  {
+    "name": "途中の U+FEFF は残す",
+    "input": "だる\ufeffい",
+    "expected": "だる\ufeffい",
+    "server_raw": true
+  },
+  {
+    "name": "書式文字は残す",
+    "input": "だるい\u200b",
+    "expected": "だるい\u200b",
+    "server_raw": true
+  },
+  {
+    "name": "途中の NUL は残す",
+    "input": "だる\u0000い",
+    "expected": "だる\u0000い",
+    "server_raw": true
+  },
+  {
+    "name": "絵文字は残す",
+    "input": "\ud83d\ude00",
+    "expected": "\ud83d\ude00",
+    "server_raw": true
+  },
+  {
+    "name": "片割れのサロゲートは落とす（前半）",
+    "input": "だるい\ud83d",
+    "expected": "だるい",
+    "server_raw": false
+  },
+  {
+    "name": "片割れのサロゲートは落とす（後半）",
+    "input": "\ude00だるい",
+    "expected": "だるい",
+    "server_raw": false
+  },
+  {
+    "name": "片割れのサロゲートだけは記録しない",
+    "input": "\ud83d",
+    "expected": null,
+    "server_raw": false
+  },
+  {
+    "name": "片割れを落とした後の空白も落とす",
+    "input": " \ud83d\u0085",
+    "expected": null,
+    "server_raw": false
+  }
+]

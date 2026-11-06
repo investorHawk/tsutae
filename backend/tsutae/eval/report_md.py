@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 MAX_SUFFIX = 1000
-CTCAE_NOTE = "用語は「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」"
+TERMS_NOTE = "用語はこのアプリの用語の一覧から選ぶ"
 
 
 class CourseScore(Frozen):
@@ -276,7 +276,7 @@ def _notes() -> list[str]:
     return [
         "## 注記",
         "",
-        f"- {CTCAE_NOTE}",
+        f"- {TERMS_NOTE}",
         "- 引用・期待の文は伏せ字後の記載（原文は載せない）。"
         "予測の引用が記載に無いものは「引用」の失敗例に出す",
         "- 指標4の「改善中」は正解ラベルの status が improving の出来事だけを数える。"

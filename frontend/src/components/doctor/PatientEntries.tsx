@@ -11,6 +11,7 @@ const FIXED_COLUMNS = 4;
  * D2 の「記録」の節（D4-1）。直近の記録の経過表: 日付の行 × 症状の列（question_key ごと）。
  * 受付の時刻の位置に受診日の行（緑の線）を入れる（受診は「受診」の節と同じ応答）。
  * 自由記載の原文は出さない（有無だけ。原文は D6 だけ）。はみ出す時は表だけ横に送る。
+ * 記録の中身は受付の間だけサーバーにある（plan-device-records §5.7）。
  */
 export default function PatientEntries({
   entries,
@@ -33,7 +34,9 @@ export default function PatientEntries({
         <ErrorNote code={entries.error} prefix="記録を取れません" />
       ) : null}
       {loaded && items.length === 0 ? (
-        <p className="d-muted">まだ記録はありません</p>
+        <p className="d-muted">
+          記録は患者さんのスマホにあります。受付の後に表示されます
+        </p>
       ) : null}
       {loaded && items.length > 0 ? (
         <p className="d-muted">

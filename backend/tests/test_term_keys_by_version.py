@@ -120,9 +120,9 @@ def test_output_context_uses_version_mapping() -> None:
     keys = OutputContext.from_prepared(prepared).term_keys
     assert keys["倦怠感"] == "fatigue"
     assert keys["疲労"] == "fatigue"
-    assert keys["末梢性感覚ニューロパチー"] == "neuropathy"  # 全体では numbness
+    assert keys["末梢神経障害"] == "neuropathy"  # 全体では numbness
     assert keys["鼻出血"] == "bleeding"
-    assert keys["手掌・足底発赤知覚不全症候群"] is None  # この版の質問に無い
+    assert keys["手足症候群"] is None  # この版の質問に無い
     assert keys["関節痛"] is None
 
 
@@ -135,7 +135,7 @@ def test_term_mapper_list_uses_version_mapping() -> None:
     ].prompt
     assert "- 倦怠感（question_key: null）" in plain
     assert "- 倦怠感（question_key: fatigue）" in mapped
-    assert "- 末梢性感覚ニューロパチー（question_key: neuropathy）" in mapped
+    assert "- 末梢神経障害（question_key: neuropathy）" in mapped
     assert mapped.count("question_key: ") == plain.count("question_key: ")
 
 
@@ -144,13 +144,13 @@ def test_report_keeps_events_of_version_mapping() -> None:
     by_id = {e.id: e for e in entries}
     events = [
         _event("倦怠感", "fatigue", "今日はだるい"),
-        _event("末梢性感覚ニューロパチー", "neuropathy", "手足のしびれ"),
-        _event("手掌・足底発赤知覚不全症候群", None, "手のひらが赤い"),
+        _event("末梢神経障害", "neuropathy", "手足のしびれ"),
+        _event("手足症候群", None, "手のひらが赤い"),
     ]
     dropped = [
         _event("倦怠感", None, "今日はだるい"),  # 全体の対応のまま
-        _event("末梢性感覚ニューロパチー", "numbness", "手足のしびれ"),
-        _event("手掌・足底発赤知覚不全症候群", "hand_foot", "手のひらが赤い"),
+        _event("末梢神経障害", "numbness", "手足のしびれ"),
+        _event("手足症候群", "hand_foot", "手のひらが赤い"),
     ]
     kept = usable_events(Timeline(events=events + dropped), prepared, by_id)
     assert [(e.term, e.question_key) for e in kept] == [
@@ -195,7 +195,7 @@ def test_folfox_hand_foot_event_kept_with_null_key() -> None:
     by_id = {e.id: e for e in entries}
     no, text = next(iter(sorted(prepared.masked_texts.items())))
     entry = by_id[prepared.entry_ids[no]]
-    term = "手掌・足底発赤知覚不全症候群"
+    term = "手足症候群"
 
     def ev(key: str | None) -> TimelineEvent:
         return TimelineEvent(

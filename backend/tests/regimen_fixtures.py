@@ -58,7 +58,7 @@ NEW_QUESTIONS: dict[str, dict[str, str]] = {
 SIDE_EFFECTS: dict[str, dict[str, Any]] = {
     "neuropathy": {
         "phrases": ["手足のしびれ", "指先がピリピリする"],
-        "ctcae_terms": ["末梢性感覚ニューロパチー", "錯感覚"],
+        "ctcae_terms": ["末梢神経障害"],
         "question_key": "neuropathy",
     },
     "diarrhea": {
@@ -68,7 +68,7 @@ SIDE_EFFECTS: dict[str, dict[str, Any]] = {
     },
     "stomatitis": {
         "phrases": ["口内炎", "口の中が痛い"],
-        "ctcae_terms": ["口腔粘膜炎", "口腔内痛"],
+        "ctcae_terms": ["口内炎", "口腔痛"],
         "question_key": "stomatitis",
     },
     "nausea_appetite": {

@@ -1,6 +1,6 @@
 """医師 API の患者まわりの応答の形（D1 の一覧の追加項目・D2 の患者の受診と記録）。
 
-- 患者一覧: last_record_date（最後の記録日）・current_course_no（今日のコース。
+- 患者一覧: last_record_date（最後の記録日。日付の印 record_marks から）・current_course_no（今日のコース。
   `course.current_course` に `config.today()`）・next_visit（今のコースの次回受診予定日。今日より前なら null）。
   無ければ null。コースに矛盾があっても一覧は止めない（その患者は null）
 - 患者の受診: 印刷済み・期限切れも含めて新しい順。受付番号は消えていれば null。

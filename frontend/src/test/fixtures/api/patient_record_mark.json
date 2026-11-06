@@ -1,0 +1,10 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-DEMO0001/record-marks",
+  "request": null,
+  "status": 200,
+  "body": {
+    "record_date": "2026-11-09",
+    "recorded_at": "2026-11-09T10:00:00.000000+09:00"
+  }
+}

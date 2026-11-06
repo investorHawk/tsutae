@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ENTRIES, QUESTIONS } from "../../pages/patient/testing/fixtures";
+import { ENTRIES } from "../../pages/patient/testing/fixtures";
 import { summarizeEntry, summarySourceOf } from "./entrySummary";
 
 describe("summarizeEntry", () => {
@@ -139,7 +139,7 @@ describe("summarizeEntry", () => {
 });
 
 describe("summarySourceOf", () => {
-  it("GET entries の記録から作る（question_text を使う）", () => {
+  it("端末の記録から作る（質問の文の写しを使う）", () => {
     expect(summarySourceOf(ENTRIES[1]!)).toEqual({
       tooSick: false,
       answers: [
@@ -161,46 +161,5 @@ describe("summarySourceOf", () => {
     });
     expect(summarySourceOf(ENTRIES[0]!).tooSick).toBe(true);
     expect(summarySourceOf(ENTRIES[0]!).byProxy).toBe(false);
-  });
-
-  it("送った EntryCreate と質問集から作る（質問文は質問集の文）", () => {
-    const source = summarySourceOf(
-      {
-        by_proxy: false,
-        answers: [
-          { question_key: "fever", value: "measured", temperature: 38.2 },
-          { question_key: "unknown", value: "present" },
-        ],
-        free_text: "x",
-      },
-      QUESTIONS,
-    );
-    expect(source).toEqual({
-      tooSick: false,
-      answers: [
-        {
-          questionKey: "fever",
-          value: "measured",
-          temperature: 38.2,
-          questionText: QUESTIONS[4]!.text,
-        },
-        {
-          questionKey: "unknown",
-          value: "present",
-          temperature: null,
-          questionText: null,
-        },
-      ],
-      freeText: "x",
-      byProxy: false,
-    });
-    expect(
-      summarySourceOf({ too_sick: true, by_proxy: true }, QUESTIONS),
-    ).toEqual({
-      tooSick: true,
-      answers: [],
-      freeText: null,
-      byProxy: true,
-    });
   });
 });

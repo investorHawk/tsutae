@@ -67,7 +67,7 @@ const cameraAt = (stops: Stop[], frame: number): Camera => {
 const currentStop = (stops: Stop[], frame: number): Stop =>
   [...stops].reverse().find((s) => frame >= s.start) ?? stops[0];
 
-/** sample-report.png をパン・ズーム。focus の順に領域へ寄り、Day5 口腔粘膜炎と引用の行に枠 */
+/** sample-report.png をパン・ズーム。focus の順に領域へ寄り、Day5 口内炎と引用の行に枠 */
 export const ReportScene: React.FC<SceneComponentProps> = ({
   scene,
   durationInFrames,

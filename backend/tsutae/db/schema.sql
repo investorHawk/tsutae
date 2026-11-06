@@ -28,11 +28,18 @@ CREATE TABLE IF NOT EXISTS entries (
     record_date TEXT NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('too_sick', 'answers', 'free_text', 'mixed')),
     by_proxy INTEGER NOT NULL DEFAULT 0 CHECK (by_proxy IN (0, 1)),
-    skill_version TEXT NOT NULL
+    skill_version TEXT NOT NULL,
+    client_entry_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_patient_date
     ON entries (patient_id, record_date, recorded_at);
+
+-- 受付で受け取った記録の ID（plan-device-records §5.5）。送り直しで二重にしない。
+-- NULL の行（seed・変換のテストが入れる既存の形）は対象外で、印刷でも消さない
+CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_client_id
+    ON entries (patient_id, client_entry_id)
+    WHERE client_entry_id IS NOT NULL;
 
 -- rowid を残す（WITHOUT ROWID にしない）。回答の挿入順を rowid で引く
 CREATE TABLE IF NOT EXISTS closed_answers (
@@ -52,6 +59,7 @@ CREATE TABLE IF NOT EXISTS free_texts (
 );
 
 -- reception_no は印刷済み・期限切れで NULL にする
+-- regen_pending・regen_count は受付の後に記録が増えた受診の変換し直し（repo_visit_regen）
 CREATE TABLE IF NOT EXISTS visits (
     id INTEGER PRIMARY KEY,
     patient_id TEXT NOT NULL REFERENCES patients (id),
@@ -62,7 +70,9 @@ CREATE TABLE IF NOT EXISTS visits (
         CHECK (status IN ('generating', 'ready', 'printed', 'failed')),
     expires_at TEXT NOT NULL,
     fallback INTEGER NOT NULL DEFAULT 0 CHECK (fallback IN (0, 1)),
-    course_no INTEGER
+    course_no INTEGER,
+    regen_pending INTEGER NOT NULL DEFAULT 0 CHECK (regen_pending IN (0, 1)),
+    regen_count INTEGER NOT NULL DEFAULT 0 CHECK (regen_count >= 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_visits_status_expires ON visits (status, expires_at);
@@ -187,4 +197,44 @@ CREATE TABLE IF NOT EXISTS regimen_forms (
     created_at TEXT NOT NULL,
     PRIMARY KEY (skill_name, version),
     FOREIGN KEY (skill_name, version) REFERENCES skill_versions (skill_name, version)
+);
+
+-- 日付の印（plan-device-records §4.4）。その日に記録があったことだけ。中身・種類は持たない。
+-- 書いた人に通知を送らないために使う。first・last はその日の一番先と一番後の時刻で、取り消しが
+-- 別の端末の印を消さないように見る（同じなら、その日の印は1つだけ）
+CREATE TABLE IF NOT EXISTS record_marks (
+    patient_id TEXT NOT NULL REFERENCES patients (id),
+    record_date TEXT NOT NULL,
+    first_marked_at TEXT NOT NULL,
+    last_marked_at TEXT NOT NULL,
+    PRIMARY KEY (patient_id, record_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_record_marks_date ON record_marks (record_date);
+
+-- 通知の登録（§4.3）。端末（endpoint）ごとに1行。notify_time は JST の HH:MM（30 分刻み）。
+-- last_sent_date で1日1回に抑える
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY,
+    patient_id TEXT NOT NULL REFERENCES patients (id),
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    notify_time TEXT NOT NULL DEFAULT '20:00',
+    last_sent_date TEXT,
+    created_at TEXT NOT NULL
+);
+
+-- 消した登録の「その日は送った」（§4.1 の1日1回）。患者ごとに最後の日付だけ。オンにし直すと
+-- endpoint が変わって行も新しくなるので、新しい行がここから引き継ぐ
+CREATE TABLE IF NOT EXISTS push_removed_sends (
+    patient_id TEXT PRIMARY KEY REFERENCES patients (id),
+    last_sent_date TEXT NOT NULL
+);
+
+-- 送信先が 404・410 を返した endpoint。端末はそれを知らずに送り直すので、ここで断って伝える
+-- （行を戻すと、次の送信でまた消えて、画面はオンのまま届かない）。30 日で忘れる
+CREATE TABLE IF NOT EXISTS push_gone_endpoints (
+    endpoint TEXT PRIMARY KEY,
+    gone_at TEXT NOT NULL
 );

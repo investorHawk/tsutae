@@ -64,6 +64,12 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | regimen_forms（v1.1） | skill_name, version INT, form_json TEXT（正規化した `RegimenForm`）, created_at, PK(skill_name, version), FK(skill_name, version) → skill_versions — D4 で採用した版のフォーム（採用と同じトランザクション）。FOLFOX/CAPOX@1 はリポジトリの `regimen_forms/*.json` |
 | regimen_drafts（v1.1） | id PK, regimen TEXT NULL（識別名。新規は決まるまで NULL）, base_version INT NULL（新規は NULL）, status CHECK(open/working/adopted/discarded), generation INT, form_json, sources_json, chat_json（院内だけ。採用・破棄で `[]`）, adopted_version NULL, created_at, updated_at, working_since NULL（CHECK: working のときだけ）, closed_at NULL。部分 UNIQUE(regimen) WHERE open/working（1レジメンに開いた下書きは1つ） |
 | question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
+| entries.client_entry_id | 受付で受け取った記録の端末の ID。`(patient_id, client_entry_id)` の部分一意索引（NULL の既存の行は対象外）。`migrate_db` が前の DB に足す（§12） |
+| visits.regen_pending・regen_count | 受付の後に記録が増えた受診の変換し直し（§12）。regen_pending は変換に入っていない記録がある印（0/1）、regen_count は自動で変換し直した回数。`migrate_db` が前の DB に足す |
+| record_marks（通知） | patient_id FK, record_date, first_marked_at, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない**。時刻はその日の一番先と一番後だけで、取り消しが別の端末の印を消さないように見る。`migrate_db` が前の DB に足す（§12） |
+| push_subscriptions（通知） | id INTEGER PK, patient_id FK, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00'（JST の HH:MM）, last_sent_date NULL, created_at |
+| push_removed_sends（通知） | patient_id PK FK, last_sent_date — 消した登録の送信日（患者ごとに最後の日付だけ）。新しい行が引き継ぐので、オフにしてオンにしても1日1回まで |
+| push_gone_endpoints（通知） | endpoint PK, gone_at — 送信先が 404・410 を返した endpoint。PUT で断る（410）。30 日で忘れる |
 
 `skill_versions` は「その日の記録に使った質問集」を後から引くためのスナップショット（未設問「−−」の表示に使う）。起動時に現在の SKILL.md が未登録なら登録する。
 
@@ -149,7 +155,7 @@ fixed_rules:
 - 自由記載は全体で約60件。**全ての自由記載に正解ラベル**（暦日・Day・用語・status・食い違い・引用）。難ケース4種（`contradiction` / `mild_improving` / `relative_time` / `negation`）をそれぞれ複数件。相対時間は「点滴の次の日から」「先週木曜まで」「ポンプを外した日」を必ず含む
 - `source_quote` は**一次置換後**の自由記載に部分一致すること（テストで検査）
 - 回想（recalled）は「出来事の暦日が記録日より前」なら true（相対時間で日付を戻した場合も含む）
-- 用語は `backend/tsutae/data/ctcae_terms.json`: `[{"term": "下痢", "en": "Diarrhea", "question_key": "diarrhea"}, …]`（CTCAE v5.0 日本語訳 JCOG 版の有害事象名を約30語。出典「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」をファイル内 `source` に）。ラベルの term はこの一覧から選ぶ
+- 用語は `backend/tsutae/data/ctcae_terms.json`: `[{"term": "下痢", "question_key": "diarrhea"}, …]`（このアプリの用語の一覧。32語）。ラベルの term はこの一覧から選ぶ
 
 ## 7. 変換パイプライン（W2-pipeline、`tsutae.pipeline`）
 
@@ -198,18 +204,19 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 
 | ファイル | 中身 |
 |---|---|
-| `build.py` | `build_report_data(*, reception_no, patient_id, regimen_skill, report_skill, courses, entries, visit_date, prepared, result: ConversionResult, questions_by_version: dict[str, list[Question]]) -> ReportData`。**決定的**（同じ入力なら同じ出力）。下の規則 |
+| `build.py` | `build_report_data(*, reception_no, patient_id, regimen_skill, report_skill, courses, entries, visit_date, prepared, result: ConversionResult, questions_by_version: dict[str, list[Question]], record_marks: Sequence[RecordMark] = ()) -> ReportData`。**決定的**（同じ入力なら同じ出力）。下の規則 |
 | `render.py` + `templates/report.html.j2` + `templates/report.css` | `render_report_html(data: ReportData, *, questions: list[Question]) -> str`。Jinja2（autoescape）。下の描画規則 |
 
 組み立ての規則:
-- header: 記録日数＝記録（too_sick を含む）のある日数、入力なし＝記録の無い日数、つらくて書けない＝too_sick の日数（今コースの Day1〜min(最終日, visit_date)）。延期注記は `course.delay_note`。`fallback` は `result.fallback`
-- attention（この順）: 食い違い（timeline.contradictions）／`fever_attention_celsius` 以上の体温（今コース）／つらくて書けない（今コース。前コースの同じ Day も too_sick なら `previous_course_same_day=True`）／未処理の記録（count のみ）
+- header: 記録日数＝記録（too_sick を含む）のある日数、届いていない＝日付の印（`record_marks`）があって記録の無い日数、入力なし＝記録も印も無い日数、つらくて書けない＝too_sick の日数（今コースの Day1〜min(最終日, visit_date)）。延期注記は `course.delay_note`。`fallback` は `result.fallback`
+- attention（この順）: 食い違い（timeline.contradictions）／`fever_attention_celsius` 以上の体温（今コース）／つらくて書けない（今コース。前コースの同じ Day も too_sick なら `previous_course_same_day=True`）／届いていない日（今コース。紙は `記録が届いていない日: Day5, Day6` の1行）／未処理の記録（count のみ）
+- 届いていない日（plan-device-records §5.6）: 同じ日に記録が1件でもあれば届いた扱い（日付の単位）。経過表のセルは no_input（空白）のまま。`record_marks` は `prepare_input` に渡さないので Claude には送らない（テストで固定）。AI 変換なしでも出る
 - grid: 今コースの行（質問ごと）＋体温行（`show_temperature_row`）＋ `show_previous_course` なら前コースの行（**クローズ回答のみ**、AI の結果を使わない）。セル state: その日の記録の回答＝none/present/hard、記録が無い＝no_input、その日の記録の skill_version の質問集にその質問が無い＝not_asked、too_sick だけの日＝too_sick。同じ日に複数の回答があれば重い方（hard > present > none）。free_text_mark は今コースの events（status が present か improving、question_key 一致、event の date のその Day）、recalled_mark はその event が recalled。列: by_proxy の記録がある日は「代」、too_sick の日は斜線
 - per_symptom: `result.picks.per_symptom`（無ければ空）
 - quotes: 伏せ字後の自由記載（`prepared.masked_texts`）を Day 順に、`quotes_max_items` まで。未処理の記録は載せない
 - フォールバック（`result.timeline is None`）: free_text_mark なし・食い違いなし・per_symptom 空。経過表と引用は同じ
 
-描画の規則: A4 一枚・モノクロ（`@page { size: A4; margin: 10mm }`、`@media print`）。セル: なし=薄い「−」、ある=網掛け、つらい=濃い網掛け、入力なし=空白、未設問=「−−」、つらくて書けない=列全体の斜線、○・「回」・列頭「代」、凡例を欄外に固定。冒頭に「症例は全て合成」、fallback なら「AI変換なし」。用語の欄外に「有害事象共通用語規準 v5.0 日本語訳JCOG版より引用」。low_confidence_threshold 未満の per_symptom は「？」。**Grade・軽症・中等症・重症・重篤などの語を出さない**（テストで検査）。引用が多く溢れる場合は引用欄を2枚目に回す（`page-break-before`）
+描画の規則: A4 一枚・モノクロ（`@page { size: A4; margin: 10mm }`、`@media print`）。セル: なし=薄い「−」、ある=網掛け、つらい=濃い網掛け、入力なし=空白、未設問=「−−」、つらくて書けない=列全体の斜線、○・「回」・列頭「代」、凡例を欄外に固定。冒頭に「症例は全て合成」、fallback なら「AI変換なし」。用語の欄外に「用語名はこのアプリの用語の一覧から AI が当てはめた候補で、医師が確定する」。low_confidence_threshold 未満の per_symptom は「？」。**Grade・軽症・中等症・重症・重篤などの語を出さない**（テストで検査）。引用が多く溢れる場合は引用欄を2枚目に回す（`page-break-before`）。届いていない日の行が折り返す分も見積もりに入れる
 
 ## 7c. 評価（W2-eval、`tsutae.eval`）
 
@@ -232,10 +239,10 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|---|
 | `POST /api/patient/register` | `{pid}` | `{ok: true}` + Cookie。未知の pid は 404 `{"error":"unknown_patient"}` |
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
-| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない） |
-| `POST /api/patient/{pid}/entries` | `EntryCreate` | `{entry_id, notices: string[]}`（notices は patient_strings のキー。例 `["fixed_rule.fever_38"]`） |
-| `GET /api/patient/{pid}/entries` | — | `{entries: [{id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}], visits: [{visit_date, received_at}]}`（自分の記録のみ。AI の出力は含まない。`question_text` はその記録の skill_version の質問集の文で、見つからなければ null。フロントは null のとき `history.previous_question` を出す。`visits` は下の「UI の見直しで足した経路」） |
-| `POST /api/visit` | `{reception_no}`（Cookie で患者識別） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |
+| `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], fixed_rules: [{question_key, threshold_celsius, patient_string_key}], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない。`fixed_rules` は画面のコードで比べる規則で、体温はサーバーに送らない） |
+| `POST /api/visit` | `{reception_no, entries?}`（Cookie で患者識別。`entries` は §12） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド。今日の印刷済みの受診があれば 409 `already_printed`、その日の開いた受診が5件あるのに新しい番号なら 409 `too_many_visits`（§12） |
+
+記録の経路（`POST`・`GET /{pid}/entries`、`POST /{pid}/entries/{id}/undo`）は外した。記録はスマホに置く（§12）。
 
 - Cookie の pid と経路の `{pid}` が違えば 403。患者 API のモジュールは `reports`・`timelines`・pipeline を import しない（アーキテクチャテスト）
 - 患者画面に出る文字列は `patient_strings.json` と、医師が承認した Skill の質問文だけ
@@ -245,9 +252,9 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|
 | `POST /api/doctor/login` / `POST /api/doctor/logout` | `{ok}` |
 | `GET /api/doctor/patients` | `{patients: [{id, regimen, created_at, register_url}]}` |
-| `POST /api/doctor/patients {regimen}` | `{id, register_url}`（register_url = `{public_base_url}/register?pid=<id>`、QR はフロントで描く） |
+| `POST /api/doctor/patients {regimen}` | `{id, register_url}`（register_url = `{public_base_url}/register?pid=<id>`、登録用 QR はフロントで描く。QR はアプリを入れる入口で、受診の受付には使わない。受付は受診タブ `/visit`） |
 | `GET /api/doctor/patients/{pid}/courses` / `POST /api/doctor/courses`（`Course`） | `{courses: Course[]}` / `Course` |
-| `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count}]}` |
+| `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count, regen_pending, regen_count, has_report}]}`。`has_report` は `GET .../report` が返せるか（生成中は false。変換し直しが failed でも前のレポートが残っていれば true） |
 | `GET /api/doctor/visits/{id}/report` | `text/html`（A4 印刷用） |
 | `POST /api/doctor/visits/{id}/printed` | `{ok}`（レポート・変換結果・受付番号を削除） |
 | `GET /api/doctor/visits/{id}/unprocessed` | `{entries: [{entry_id, record_date, reason, text}]}`（D6。原文。紙には載せない） |
@@ -274,12 +281,13 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 |---|---|---|
 | `api/app.py` | W3-api | `create_app(settings: Settings \| None = None, *, runner_factory=None, skill_editor=None) -> FastAPI`。`app.state` に settings・runner_factory（既定は `SdkRunner`）・skill_editor（既定は `SdkSkillEditor`）。起動時に `init_db`・`ensure_skill_versions`・`purge_expired`。`backend/tsutae/api/__main__.py` は不要（`uvicorn tsutae.api.app:app`、`app = create_app()` は遅延でよい） |
 | `api/deps.py` | W3-api | 接続はリクエストごと（`Depends` で開いて閉じる）。患者 Cookie `tsutae_pid`（値は `pid + "." + base64url(HMAC-SHA256(secret_key, "patient:" + pid))`。2026-11-04 変更。署名が無い・違えば 401。登録 API はクライアントごとに失敗10回/10分を超えると 429 `too_many_attempts`）、医師 Cookie `tsutae_doctor`（値は発行時刻＋HMAC-SHA256(secret_key)。12時間で失効。標準ライブラリの `hmac` で作る）。どちらも HttpOnly・SameSite=Lax。エラーは `{"error": code}`（401 `not_logged_in`・403 `forbidden`・404 `not_found`・422 `invalid_input`）。`RequestValidationError` も `{"error":"invalid_input"}` に変える（入力の文面を返さない。自由記載が長すぎるときだけ `free_text_too_long`。2026-11-04） |
-| `api/patient.py` | W3-api | §8 の患者 API。**`tsutae.pipeline`・`tsutae.report`・`get_timeline`・`get_report` を import しない**。質問集は `skills.load_regimen_skill`、記録の `question_text` は `db.get_skill_version` の `questions_json` から引く。notices は `api/fixed_rules.py` の純関数 `notices_for(entry: EntryCreate, skill: RegimenSkill) -> list[str]`（体温 ≥ threshold で `patient_string_key`。コードの比較だけ） |
-| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字（大文字化・ハイフンの統一はしない）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。自由記載が長すぎるときの患者向けキーは `today.free_text_too_long`。今コースが無ければ 409 `{"error":"no_course"}` |
+| `api/patient.py` | W3-api | §8 の患者 API。**`tsutae.pipeline`・`tsutae.report`・`get_timeline`・`get_report` を import しない**。質問集は `skills.load_regimen_skill`。記録の本文を受ける経路は無い（§12）。38.0℃ の案内は画面のコード（§13 の `patient/fixedRules.ts`）が出し、`api/fixed_rules.py` の純関数 `notices_for(entry: EntryCreate, skill: RegimenSkill) -> list[str]`（体温 ≥ threshold で `patient_string_key`。コードの比較だけ）は同じ表で確かめる Python の側の判定 |
+| `api/visit.py` | W3-api | `POST /api/visit`: Cookie の患者で visit を作る（`expires_at = now + report_ttl_hours`、course_no は今コース、status=generating）→ `BackgroundTasks` で新しい接続を開き `generate_visit_report` を呼ぶ。受付番号は NFKC → 前後の空白除去だけで正規化し 1〜32 字で、制御文字・書式文字（Cc・Cf）を含むものは断る（大文字化・ハイフンの統一はしない。画面の `normalizeReceptionNo` と同じ表 `frontend/src/test/fixtures/reception_no_cases.json` で確かめる）。approve の応答 `new_version` は必須（reject は `{ok: true}` のみ）。本文の `entries` の検査と保存は §12。自由記載の長さは端末が保存の前に確かめる（`today.free_text_too_long`）。今コースが無ければ 409 `{"error":"no_course"}` |
 | `api/doctor.py` | W3-doctor | §8 の医師 API（skill-changes 以外）。`GET /visits` と `GET /visits/{id}/report` の前に `purge_expired`。レポートは `HTMLResponse` に `Cache-Control: no-store` と `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:`。`POST /courses` は保存前に `validate_courses`（既存＋新規）。events は `{status, events}`（ポーリング） |
 | `api/doctor_skills.py` | W3-doctor | `GET /api/doctor/skills`・`POST/GET /api/doctor/skill-changes`・approve・reject。`tsutae.skillchange` を呼ぶ |
 | `skillchange/`（`editor.py` `service.py` `diff.py`） | W3-skillchange | 下の 9b |
 | `scripts/seed_demo.py` | W3-api | `python scripts/seed_demo.py [--db PATH]`: 合成3人（`tsutae.dataset`）とコース・記録を入れ、`ensure_skill_versions`。既にいる患者は飛ばす（**DB を消さない**） |
+| `api/patient_push.py` `push/*.py` `db/repo_push.py` `db/repo_record_marks.py` | 通知（PR A） | 毎日の通知（`docs/plan-device-records.md` §4）。判定は純関数 `push/decide.py`、本文は `push/payload.py`（`patient_strings.json` の固定文だけ）、送信は `app.state.push_sender`（既定は `push/sender.py` の `WebPushSender`、鍵が無ければ None）、周期は `api/app.py` の `_push_loop`。**`reports`・`timelines`・`regimen_drafts` を読まない** |
 | `tests/test_api_*.py` `tests/test_architecture.py` | 各担当 | `fastapi.testclient.TestClient`。runner は `pipeline_fakes.FakeRunner`、editor は偽物。アーキテクチャテストは `ast` で `api/patient.py` の import を検査 |
 
 ### W3 後の決定（2026-11-04）
@@ -303,16 +311,14 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 - 医師画面の「印刷」は、同じオリジンの非表示 iframe にレポートを読み込んで親から `print()` を呼ぶ（レポートの CSP は script を止めるため）。失敗したら「レポートを開く」から ⌘P
 
 - 医師 API の状態を変える POST（login 以外。logout を含む）は `require_same_origin`: `Sec-Fetch-Site` が cross-site/same-site、または `Origin` が「要求の Host の origin」とも `public_base_url` の origin とも違えば 403 `cross_origin`（どちらのヘッダも無ければ通す）。リバースプロキシが Host を書き換える構成では `public_base_url` を正しく設定する。frontend を別のサブドメインに置く構成は使えない
-- 送り直しの重複防止: 同じ患者・同じ内容の記録が120秒以内にあれば新しく作らずその記録を返す（`db.add_entry_once`）。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）
+- 送り直しの重複防止: 記録の押し直しは端末の同じ ID で置き換わる。受付の送り直しは `client_entry_id` で二重にならない。同じ患者・同じ日・同じ受付番号で期限内の受診があれば作らず、新しい記録が無ければ生成も起動しない（`db.create_visit_once`。生成に失敗した受診でも作り直さない）。新しい記録があるときは §12 の2台目のスマホのとおり変換し直す
 
-- `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
+- `POST /api/doctor/visits/{id}/regenerate`（本文なし、`{ok}`）: 受付番号が残っていて期限内の、failed または ready かつ fallback=True の受診と、医師の伏せ字か追加の記録（`regen_pending`）がある ready の受診（下の「条件の追加」の行）だけを generating に戻して生成をやり直す（`db.begin_regeneration` の条件付き UPDATE。それ以外は 409 `not_regenerable`、無ければ 404）。ログ `regenerate_requested`。D3 の該当行に「AI でもう一度変換」。生成中（やり直しの最中を含む）はレポートを返さず（404）、印刷済みにもしない（409 `generating`）
 
 ### UI の見直しで足した経路（2026-11-04 午後、修正ボード）
 | 経路 | 応答 |
 |---|---|
-| `POST /api/patient/{pid}/entries/{entry_id}/undo` | `{ok: true}`。本人の「つらくて書けない」の記録で、作ってから10分以内（`UNDO_WINDOW`）・その後に受付が無いものだけ消す（`db.undo_too_sick_entry`）。他人の記録・無い記録は 404 `not_found`、条件に合わなければ 409 `not_undoable`（P2-5） |
 | `GET /api/doctor/patients`（追加項目） | 各患者に `last_record_date`・`current_course_no`（`config.today()` の今コース）・`next_visit`（今コースの次回受診予定日。今日より前なら null）。無ければ null（D3-2） |
-| `GET /api/patient/{pid}/entries`（追加項目） | `visits: [{visit_date, received_at}]`: 本人の受診日（受付のあった日。状態・印刷済み・期限切れを問わない）と、その日の最初の受付の時刻（+09:00）を新しい順。1日1件（`db.list_visit_days`）。受付番号・状態・id・レポート・未処理の件数は返さない。P2 は受付の時刻の位置に「受診日 11月9日（月）」の区切り（`history.visit_day`）を入れる（受付と同じ時刻の記録は受付の前とみなす） |
 | `GET /api/doctor/patients/{pid}/visits` | その患者の受診を新しい順（印刷済み・期限切れも）。受付番号は消えていれば null、`report_available` は開ける ready か（D4-1） |
 | `GET /api/doctor/patients/{pid}/entries` | 直近30件と総数。クローズ回答はコードのまま、自由記載は有無（`has_free_text`）だけで原文は返さない（D4-1） |
 | `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | 各記録に `marks: [{start, end}]`（原文の中の疑われた語の位置、code point）。原文の中で見つからない区間には付けない（D7-2） |
@@ -336,13 +342,13 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | — | 各記録に `doctor_mask: {spans: [{start, end}], confirmed_clear} \| null`（保存済みの医師の伏せ字。許す区間は返さない） |
 | `POST /api/doctor/visits/{id}/masks/check` | `{entry_id, spans: [{start, end}]}` | `{entry_id, masked_text, suspects: [{start, end, rule}], reason, sendable, confirmable}`。保存しない。masked_text は送られる文（区間を `[伏せ字]` にしてから正規化・一次）、suspects はその文の位置（start の順。規則が違えば重なりうる）。confirmable は疑いが残り、全ての位置が分かり、仮名ID・受付番号（known_identifier）でない。区間の誤り 422 `invalid_spans`、今の未処理（timeline の unprocessed）にも保存済みの伏せ字にも無い記録は 404 `unknown_entry`、印刷済み・期限切れは 404 |
 | `POST /api/doctor/visits/{id}/masks` | `{entries: [{entry_id, send, spans, confirmed_clear}]}`（1〜200件、同じ記録は1回） | `{ok: true, sendable}`（保存した記録のうち変換で送られる件数）。send=true は保存（置き換え）、false は削除。confirmed_clear で確かめて送れない記録は 422 `not_confirmable`。印刷済み・期限切れは 409 `visit_closed`、生成中は 409 `generating`。ログ `doctor_mask_saved`・`doctor_mask_confirmed`・`doctor_mask_removed`（decision `entry:<entries.id>`） |
-| `POST /api/doctor/visits/{id}/regenerate`（条件の追加） | — | 開いている ready で医師の伏せ字が1件以上あれば、AI の結果でもやり直せる（`db.begin_regeneration` の1つの条件付き UPDATE。二重に押しても1回だけ） |
+| `POST /api/doctor/visits/{id}/regenerate`（条件の追加） | — | 開いている ready で医師の伏せ字が1件以上あるか、追加の記録（`regen_pending`）があれば、AI の結果でもやり直せる（`db.begin_regeneration` の1つの条件付き UPDATE。二重に押しても1回だけ。`regen_pending` は下ろし、`regen_count` は数えない） |
 
 - 順序: 生の原文に医師の区間を当てて `[伏せ字]` → 仮名ID・受付番号の照合（当てた後の文で）→ `check_text`（正規化 → 一次 → 二次）→ 依頼文の形（JSON）での二次。`pipeline.inputs.mask_entry_text` が正本で、`prepare_input(doctor_masks=...)` と `report.gate.check_inputs(doctor_masks=...)`（`build_report_data` 経由）の両方が使う（`service._gather` が `db.list_doctor_masks` を読み、両方に同じものを渡す）。H2 は伏せた後の文（masked_texts）と照合する
 - 確かめて送る（confirmed_clear）: 保存の時にサーバーが「伏せた後にまだ疑われている区間」を `allowed`（伏せた後の文の位置）として記録する（`pipeline.manual_review.confirmed_mask`）。変換では、その記録のその区間に完全に含まれる検出だけを許し、許した部分文字列を `PreparedInput.allowed_suspects` に入れる。H1（`make_h1(..., allowed=...)`）と convert のコードの段（`masking.manual.detect_in_prompt`）は依頼文全体でその語（JSON の形に直したもの）の出現に完全に含まれる検出だけを無視する（ログ `hook_h1_confirmed`、decision `confirmed:<数>`）。**許す一覧が空なら H1 は今と同じ**。gate は allowed_suspects も記録から作り直して照合する
 - `[伏せ字]さん`・`[伏せ字]先生` などの伏せた後の文は二次に掛からない（`tests/test_masking_manual.py`。検出側は変えていない）
 - 変換の入力のログ: 医師の伏せ字を使って送った記録があれば `doctor_masks_applied`（`sent:N`）、確かめて許した記録があれば `doctor_confirmed_sent`（`sent:M`）。無ければ何も足さない
-- 保持: `doctor_masks` は印刷済み・期限切れでレポートと同じトランザクションで消す（`_erase_results`。purge は doctor_masks だけが残った受診も消す）。生の記録（entries・free_texts）は変えない（spec 13.3）
+- 保持: `doctor_masks` は印刷済み・期限切れでレポートと同じトランザクションで消す（`_erase_results`。purge は doctor_masks だけが残った受診も消す）。D6 の伏せ字は生の記録（entries・free_texts）を書き換えない。受付で受け取った行は §12 のとおり消す
 - 画面（D6）: 記録ごとに「送らない（未処理のまま）」（初め）／「送る（伏せて）」。送る記録は疑われた区間（marks）を初めから伏せ、黒い「伏せ字」の印（button）を押すと戻す。ほかの所は選んで「伏せ字にする」（伏せた区間と重なる・隣り合う選択は1つにまとめる）。「伏せ字を確かめる」で送られる文とまだ疑われる語を出し、確かめて送れるならチェックを出す。下の「伏せ字を保存して AI で変換し直す」で保存 → regenerate → 変換ログへ（送れる記録が0件なら変換しない）。「確かめたらこの画面から印刷」の欄は残す
 
 ### 9b. Skill の書き換え（W3-skillchange、`tsutae.skillchange`）
@@ -369,16 +375,16 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - **逆向き**: 既存の版を開くとき `form_from_skill(name, version)`。FOLFOX/CAPOX@1 は上の JSON、D4 で採用した版は `regimen_forms`（SKILL.md を読み戻して解析はしない）
 - **用語と質問の対応**: `term_keys_for(skill_version)` = `ctcae_terms.json` の全体の対応 ＋ その版の `term_keys`。`checks.py`（OutputContext）・`report/validate.py` は、記録ごとに（Entry.skill_version）その版の対応を使う（`PreparedInput.entry_versions`・`other_versions`）。term-mapper の用語の一覧は入力の版の対応のまま（Claude に送る JSON と評価済みの依頼文を変えない）で、版の混ざる受診で違う key を付けた出来事は checks が差し戻す。FOLFOX/CAPOX@1 は `term_keys` が無いので今と同じ
 - **下書き（T93）**: `regimen_drafts`。状態 `open → working（1往復の間）→ open`、`adopted`・`discarded` で閉じる。既存の版から作った下書きは同じ regimen に open/working が1つ。新規は code が決まるまで regimen NULL。`working` の間の PATCH・preview・adopt・discard は 409。往復ごとに `generation` を上げ、結果は世代が同じときだけ反映する。`working` のまま上限を過ぎた行は open に戻し、会話に失敗の行を残す
-- **1往復（T94）**: `RegimenChat` プロトコル `async turn(draft: TurnInput, text) -> TurnResult`（`tsutae.regimen.chat_types`）。`SdkRegimenChat`（`chat_sdk`）は `query()`（cwd は空の一時ディレクトリ・`setting_sources=[]`・`--no-session-persistence`・`env=NO_CLAUDE_MD_ENV`・`max_turns`=`regimen_max_turns`（既定 12）・`max_budget_usd`=`regimen_max_budget_usd`（既定 1.0）・`permission_mode="dontAsk"`・`allowed_tools` は `mcp__tsutae_regimen__{set_fields,ask,propose_questions}` だけ・`disallowed_tools` は 9b の一覧＋Read/Edit/Write＋ToolSearch＋使わない組み込みツール（pipeline と同じ）・hooks は H1 と H4（サブエージェント無し））。HTTP は応答まで待つ（上限 `regimen_turn_timeout_s`、既定 90 秒。読み出しの回復は上限＋15 秒の `regimen_recover_after_s`）。本体は `chat_turn.run_turn`: 入力の文と依頼文の全体に `detect_identifiers`（掛かれば Claude を呼ばず 422 h1_blocked。issues に掛かった場所 text / prompt と規則の名前だけ。保存しない）→ `begin_working`（generation を上げる。読んだ時と form_json・sources_json が同じときだけ。違えば 409 conflict）→ `asyncio.wait_for(chat.turn)` → 結果の検査し直し（validate_form・識別名・体温・prose）→ 返答の文と ask に H1（掛かれば固定の文・ask を落とす）→ `finish_turn`（working かつ同じ generation のときだけ。当たらなければ捨てる）。時間切れ・例外は `fail_turn`（先生の文と失敗の行だけを足して open。`chat_fail`）。begin_working の後で外に抜ける例外（取り消し・結果の書き込みの DB の失敗など）も、できる範囲で `fail_turn`（reason は cancelled か internal_error）してから投げ直す（`rescue`。working のまま残さない）。**依頼文とツールでは行を row_id でなく ref（`drugs.1`・`drugs.1.days`）で指す**（`chat_handles`。row_id の `q-fever`・`d-fu-pump` は H1 の id_like に掛かるため。Claude が足す行の row_id はサーバーが `drug1`・`effect1`・`question1` と振る）。依頼文（`chat_prompt`、文字列の定数）: 今のフォーム（ref つきの JSON。prose は入れない）・出どころ（先生が入れた欄・AI が入れた欄）・まだ入っていない必須の欄・欄の決まり・部品集・CTCAE の用語の一覧・直近の会話（8行。欄の id は出さない。聞いた問いの選択肢は「」で囲んでつなぐ（空白・「/」は long_digits の区切り）。描いて H1 に掛かる行は固定の文に置き換える）・規則（先生の文に無い値は source=standard／分からなければ ask で1問ずつ選択肢つき／薬の量は持たない／先生が入れた欄は overwrite_requested が無ければ変えない／体温の質問は外せない／§5 の質問の目安）。ツール（`chat_tools`・`chat_propose`）は DB に書かず `ChatSession` に当てる: 入力は pydantic（`chat_args`）、値は `edit.apply_patch`（出どころ doctor_text で当て、standard の欄を付け替える）。拒否は is_error で「ref: 理由（コード）」を返して直させる。`ask` は欄の ref（か節の名前）・問い・選択肢 2〜4 で1往復に1問（次の依頼文に入る形 `ask_line` にも H1）。`propose_questions` は部品集の key か新しい3択の質問（部品集の key・予約語・重複を拒否。source=standard の提案は基本・薬・注意する症状の必須の欄がそろうまで not_ready）。会話の行（`chat_rows`）: 先生 `{role:doctor,text,generation,at}`、Claude `{role:assistant,text,changed:[欄の id],ask,proposed,reply_hidden,generation,at}`、失敗 `{role:system,kind:turn_failed,reason,generation,at}`。会話の文面は `regimen_drafts.chat_json` だけに置き、`PipelineLogger(conn, "regimen_chat", draft_id)` には `h1_check`・`turn_start`・`regimen_tool`（ツール名と accept / reject:<コード>）・Hook（H1・H4）・`turn_end`（秒・トークン・費用）・`turn_counts`（呼んだ数・拒否の数・ターン数・変えた欄の数。SDK の jsonschema が handler の前に止めた呼び出しは数えない）・`reply_hidden`・`turn_discarded`・`turn_failed`・`internal_error`（例外の型名だけ）だけ。起動時は `recover_abandoned_turns`（working を全て open に）を `recover_interrupted_adoptions` の前に呼ぶ。`REGIMEN_ALLOWED_TOOLS`・disallowed・H4 の許可一覧は値でテストに固定し、`decisions.md` に記録
+- **1往復（T94）**: `RegimenChat` プロトコル `async turn(draft: TurnInput, text) -> TurnResult`（`tsutae.regimen.chat_types`）。`SdkRegimenChat`（`chat_sdk`）は `query()`（cwd は空の一時ディレクトリ・`setting_sources=[]`・`--no-session-persistence`・`env=NO_CLAUDE_MD_ENV`・`max_turns`=`regimen_max_turns`（既定 12）・`max_budget_usd`=`regimen_max_budget_usd`（既定 1.0）・`permission_mode="dontAsk"`・`allowed_tools` は `mcp__tsutae_regimen__{set_fields,ask,propose_questions}` だけ・`disallowed_tools` は 9b の一覧＋Read/Edit/Write＋ToolSearch＋使わない組み込みツール（pipeline と同じ）・hooks は H1 と H4（サブエージェント無し））。HTTP は応答まで待つ（上限 `regimen_turn_timeout_s`、既定 90 秒。読み出しの回復は上限＋15 秒の `regimen_recover_after_s`）。本体は `chat_turn.run_turn`: 入力の文と依頼文の全体に `detect_identifiers`（掛かれば Claude を呼ばず 422 h1_blocked。issues に掛かった場所 text / prompt と規則の名前だけ。保存しない）→ `begin_working`（generation を上げる。読んだ時と form_json・sources_json が同じときだけ。違えば 409 conflict）→ `asyncio.wait_for(chat.turn)` → 結果の検査し直し（validate_form・識別名・体温・prose）→ 返答の文と ask に H1（掛かれば固定の文・ask を落とす）→ `finish_turn`（working かつ同じ generation のときだけ。当たらなければ捨てる）。時間切れ・例外は `fail_turn`（先生の文と失敗の行だけを足して open。`chat_fail`）。begin_working の後で外に抜ける例外（取り消し・結果の書き込みの DB の失敗など）も、できる範囲で `fail_turn`（reason は cancelled か internal_error）してから投げ直す（`rescue`。working のまま残さない）。**依頼文とツールでは行を row_id でなく ref（`drugs.1`・`drugs.1.days`）で指す**（`chat_handles`。row_id の `q-fever`・`d-fu-pump` は H1 の id_like に掛かるため。Claude が足す行の row_id はサーバーが `drug1`・`effect1`・`question1` と振る）。依頼文（`chat_prompt`、文字列の定数）: 今のフォーム（ref つきの JSON。prose は入れない）・出どころ（先生が入れた欄・AI が入れた欄）・まだ入っていない必須の欄・欄の決まり・部品集・用語の一覧・直近の会話（8行。欄の id は出さない。聞いた問いの選択肢は「」で囲んでつなぐ（空白・「/」は long_digits の区切り）。描いて H1 に掛かる行は固定の文に置き換える）・規則（先生の文に無い値は source=standard／分からなければ ask で1問ずつ選択肢つき／薬の量は持たない／先生が入れた欄は overwrite_requested が無ければ変えない／体温の質問は外せない／§5 の質問の目安）。ツール（`chat_tools`・`chat_propose`）は DB に書かず `ChatSession` に当てる: 入力は pydantic（`chat_args`）、値は `edit.apply_patch`（出どころ doctor_text で当て、standard の欄を付け替える）。拒否は is_error で「ref: 理由（コード）」を返して直させる。`ask` は欄の ref（か節の名前）・問い・選択肢 2〜4 で1往復に1問（次の依頼文に入る形 `ask_line` にも H1）。`propose_questions` は部品集の key か新しい3択の質問（部品集の key・予約語・重複を拒否。source=standard の提案は基本・薬・注意する症状の必須の欄がそろうまで not_ready）。会話の行（`chat_rows`）: 先生 `{role:doctor,text,generation,at}`、Claude `{role:assistant,text,changed:[欄の id],ask,proposed,reply_hidden,generation,at}`、失敗 `{role:system,kind:turn_failed,reason,generation,at}`。会話の文面は `regimen_drafts.chat_json` だけに置き、`PipelineLogger(conn, "regimen_chat", draft_id)` には `h1_check`・`turn_start`・`regimen_tool`（ツール名と accept / reject:<コード>）・Hook（H1・H4）・`turn_end`（秒・トークン・費用）・`turn_counts`（呼んだ数・拒否の数・ターン数・変えた欄の数。SDK の jsonschema が handler の前に止めた呼び出しは数えない）・`reply_hidden`・`turn_discarded`・`turn_failed`・`internal_error`（例外の型名だけ）だけ。起動時は `recover_abandoned_turns`（working を全て open に）を `recover_interrupted_adoptions` の前に呼ぶ。`REGIMEN_ALLOWED_TOOLS`・disallowed・H4 の許可一覧は値でテストに固定し、`decisions.md` に記録
 - **確認と採用（T93）**: `preview(draft)` は AI の値の一覧・SKILL.md（新規は全文、既存は unified diff）・患者の見本・検査結果と `confirm_token`（正規化した form_json＋sources_json＋base_version のハッシュ）を返す。`adopt(conn, draft_id, confirm_token, ai_values_confirmed, *, skills_home, timeout_s)`（`tsutae.regimen.adopt`）は必須・描画・バリデータ・token の照合・stale・「患者のいるレジメンで日数・Day・抜去日を変えていない」をやり直す。新規は `regimen-<code>/` を排他で作り（既にあれば 409 `code_taken`）SKILL.md を原子的に置いて版1、既存は版 N+1（`base_version` が今と違えば `stale`）。`skill_versions` と `regimen_forms` を同じトランザクションで書く。新しい質問を `question_library` に入れる。採用・破棄で `chat_json` の文面を消す。患者のいるレジメンの日程は、書き込みのトランザクションの中（最初の INSERT の後）でもう一度確かめる。書き順は「ファイルが先・DB が後」なので、SKILL.md を置いた後・commit の前にプロセスが落ちた場合は、起動時（`ensure_skill_versions` の後）に `recover_interrupted_adoptions`（`tsutae.regimen.recover`）が、開いた下書きを描いた文と登録された版の文がバイトで一致するときだけ `regimen_forms`・部品集・adopted を補う（一致しなければ警告だけ）。新規で SKILL.md の無いフォルダ（一時ファイルだけ）が残っていれば消す
-- **DB の移行（T93 で仕組み、T94・T95 で使う）**: `migrate_db(conn)` を `init_db` の中で schema.sql の前に呼ぶ。`sqlite_master` の CREATE 文を見て、古い CHECK があるときだけ SQLite の「12-step generalized ALTER TABLE」で表を作り直す（トランザクションの外で `PRAGMA foreign_keys=OFF` → `BEGIN IMMEDIATE` → 新しい表 → 全行を写す → DROP → RENAME → 索引を作り直す → `PRAGMA foreign_key_check` が空でなければ ROLLBACK → COMMIT → finally で `foreign_keys=ON`）。対象は `pipeline_logs`（run_kind に regimen_chat。T94 より前に要る）と `patients`（regimen の CHECK を外す。T95）。何度呼んでもよく、行数と中身が変わらないことをテストで確かめる
+- **DB の移行（T93 で仕組み、T94・T95 で使う）**: `migrate_db(conn)` を `init_db` の中で schema.sql の前に呼ぶ。`sqlite_master` の CREATE 文を見て、古い CHECK があるときだけ SQLite の「12-step generalized ALTER TABLE」で表を作り直す（トランザクションの外で `PRAGMA foreign_keys=OFF` → `BEGIN IMMEDIATE` → 新しい表 → 全行を写す → DROP → RENAME → 索引を作り直す → `PRAGMA foreign_key_check` が空でなければ ROLLBACK → COMMIT → finally で `foreign_keys=ON`）。対象は `pipeline_logs`（run_kind に regimen_chat。T94 より前に要る）と `patients`（regimen の CHECK を外す。T95）と `entries`（`client_entry_id` を足す）と `record_marks`（`first_marked_at` を足す。前の行は `last_marked_at` を写す）と `visits`（`regen_pending`・`regen_count` を足す。§12）。何度呼んでもよく、行数と中身が変わらないことをテストで確かめる
 - **レジメンの一覧（T95）**: `list_regimens(skills_dir)`（`tsutae.skills.catalog`）は skills_dir 直下の `regimen-*/SKILL.md` を検査して読み、識別名・Skill 名・版・表示名（`display_name`、無ければ識別名）を返す（FOLFOX・CAPOX を先に、ほかは識別名の順。壊れた SKILL.md は載せず警告だけ）。全ての `regimen-*` で名前は `regimen-` + 識別名の小文字（違えば `regimen_mismatch`。loader の検査）。`schemas.Regimen` は識別名の書式の `str`（合成データの `SyntheticPatient.regimen` と seed は FOLFOX/CAPOX のまま）。`GET /api/doctor/regimens` が一覧のうち `skill_versions` に版のあるものを返し（新規の採用はファイルが先・DB が後なので、その途中では選べない）、`POST /patients` はそれに無い識別名を 422 `invalid_input`。`patients.regimen` の CHECK は `migrate_db` で外す（rowid も写す）。記録の版の解決（`pipeline.versions` の `questions_by_version`・`regimen_skills_by_version`）は skill_versions にある全ての `regimen-*` を引く。用語の対応を記録ごとに引くため、`PreparedInput` は記録の版（`entry_versions`）と入力の版と違う版の材料（`other_versions`: term_keys と質問の key）を持つ（Claude に送る JSON の外。gate が記録・版の質問集と照合する）。term-mapper の一覧は入力の版の対応のまま（記録に版を持たせると依頼文が変わる）で、版の混ざる受診で古い版の記録を新しい質問につなげた出来事は checks が期待の key つきで差し戻す。紙の短い名前は既知の6問は `SHORT_LABELS`、それ以外は今の版の form の label（`regimen.labels`。form の無い版は質問文）。医師画面（D2）の記録の回答には記録の版の label（`question_label`）を付け、画面は既知の6問の表を先に使う。紙のヘッダは表示名（`ReportHeader.regimen_label`。FOLFOX/CAPOX は None で識別名）
 - **旧 D4 の制限（T95）**: `request_change`（と `POST /skill-changes`）は `regimen-*` を行を作らずに 400 `use_regimen_editor`（editor を呼ばない）。T95 より前に作られた pending の `regimen-*` の変更は、`approve_change` が承認せず failed（`use_regimen_editor`）にする（本体・skill_versions は変えない。却下はできる）。テスト・`run_demo_skill_change.py` の既定（偽の editor は引用の最大件数を 30 → 20）・API の fixture は `report-format-default` に移した。既存の版に質問を足す結合テスト（test_e2e_flow の (10)）は D4 レジメンの API（下書き → 直接編集 → 確認 → 採用）で版2を作る
 
 ## 9. フロント（W1 骨組み → W4 画面）
 - React 18 + Vite 5 + TypeScript + react-router 6。vitest + Testing Library（jsdom）。Prettier（2 スペース、セミコロンあり）
 - 開発時は Vite の proxy で `/api` → `http://127.0.0.1:8000`（uvicorn の既定の待ち受け。macOS では localhost が ::1 に解決され届かないため）
-- ルート: 患者 `/register` `/today` `/history` `/visit`、医師 `/doctor/login` `/doctor`（印刷待ち） `/doctor/patients` `/doctor/patients/:pid` `/doctor/settings` `/doctor/pipeline/:visitId` `/doctor/unprocessed/:visitId`
+- ルート: 患者 `/register` `/today` `/history` `/visit` `/settings`、医師 `/doctor/login` `/doctor`（印刷待ち） `/doctor/patients` `/doctor/patients/:pid` `/doctor/settings` `/doctor/pipeline/:visitId` `/doctor/unprocessed/:visitId`
   - `/doctor/settings`（D4。v1.1・T96）は画面の中のタブで2つに分ける（経路は1つのまま）: 「レジメン」＝左のフォーム＋右のチャット（`components/doctor/regimen/`。タブを開くと `POST /regimen-drafts {skill}` で版 N+1 の下書き、「＋ 新しいレジメン」は `{from: "new"}`。確認 → 採用 → 登録済み）／「レポートの形式（一文で頼む）」＝旧 D4 の一文 → 差分 → 承認（`pages/doctor/ReportFormatSettings.tsx`。選べるのは `report-format-*` だけ、初めは `report-format-default`）。一度開いた種類は描いたまま `hidden` で隠す（往復の最中に種類を替えても下書きの画面を失わない）
 - 患者画面の文字列は `usePatientStrings().t(key)` からのみ出す（直書きしない。テストで検査）。質問文は API の `questions[].text`
 - 型は `src/api/types.ts`（schemas.py の API に出る部分を写す）、呼び出しは `src/api/patient.ts` `src/api/doctor.ts`
@@ -386,3 +392,116 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 
 ## 10. 時計・デモ
 - `TSUTAE_TODAY=2026-11-09` でデモの「今日」を固定。`scripts/seed_demo.py` が合成データを DB に入れる（W3）
+- 撮影と通しは `scripts/seed_demo.py --device-records`（患者・コース・日付の印だけ）の新しい DB で動かし、`TSUTAE_DEMO_TOOLS=1` でデモ患者の設定に出る「見本の記録を入れる」から端末へ記録を入れる（§12・§13。手順は `docs/demo-script.md`）。`make seed` の既定の動きは、テスト・`run_demo_visit.py`・評価のために変えない
+
+## 11. 毎日の通知（PR A。`docs/plan-device-records.md` §3・§4）
+
+決まり（回数・文・送る期間）は仕様書 §4.1。ここには実装の形だけを書く。
+
+| ファイル | 中身 |
+|---|---|
+| `push/decide.py` | 純関数。`decide_send(at, *, notify_time, last_sent_date, marked_today, last_day1, cycle_days) -> Decision`（`due`・`sent_today`・`before_time`・`window_passed`・`marked`・`no_course`・`period_over`）。`SEND_WINDOW` は 10 分、`GRACE_DAYS` は 14。日付と時刻は JST で見る |
+| `push/payload.py` | `notification_payload() -> str`（JSON: title・body・url・badge）。**引数を取らない**。文は `patient_strings.json` の `notify.title`・`notify.body` |
+| `push/sender.py` | `PushSender` プロトコル `sender(target, payload)`、本物は `WebPushSender`（pywebpush。TTL 3600 秒・タイムアウト 10 秒）。送信先のエラーは `PushSendError(status_code)`。`load_vapid(settings) -> VapidConfig \| None` |
+| `push/dispatch.py` | `send_due_once(settings, sender, at=None) -> PushCounts`（全ての登録を判定して送る。1件の失敗で止めない）、`send_test_once(settings, sender, subscription_id)`（試送。印・期間・時刻を見ず、`last_sent_date` も使わない）。送れなかったときのログは型名と状態コード（`push.send_failed error_type=... status=...`）、試送の結果は `push.test_done result=...`。仮名ID・endpoint は出さない |
+| `api/patient_push.py` | 下の4経路。`PushTestLimiter`（プロセス内の dict。登録ごとに1分に1回、患者ごとに1分に登録の上限の回数まで）、`is_push_service_url`、`send_test_later` |
+| `api/app.py` | `_install_push`（`app.state.push_sender`・`push_public_key`・`push_test_limiter`・`push_test_delay_s`）、`_push_loop`（`PUSH_INTERVAL_S` = 60 秒ごとに `asyncio.to_thread(send_due_once, ...)`。`_purge_loop` と同じく lifespan の中。`--workers 1` が前提）。`create_app(push_sender=...)` で偽物に差し替える |
+| `db/repo_record_marks.py` | `add_record_mark`・`undo_record_mark`（§12）、`upsert_mark_row`（`insert_entry_rows` の中でも呼ぶので、seed と `add_entry` は行と同じトランザクションで印が付く）、`marked_patients`、`last_record_dates`（D1）、`backfill_record_marks`（`init_db` のたび。今ある印は変えない。受付で受け取った行は数えない） |
+| `db/repo_push.py` | `upsert_push_subscription`（endpoint で一意。同じ患者なら `last_sent_date` を保ち、別の患者の番号で登録し直したら行をその患者に移し、その患者の消した登録の送信日を引き継ぐ。1人の患者の行は `MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT` = 5 までで、超えたら今の endpoint 以外の古い行を消す。消す行の送信日も残す）、`claim_push_send`・`release_push_send`、削除と読み出し |
+| `scripts/gen_vapid.py` | 鍵を標準出力に出すだけ。ファイルに書かない |
+
+| 経路 | 入力 | 出力 |
+|---|---|---|
+| `GET /api/patient/push-config` | — | `{available, public_key}`（使えないときは `false`・`null`） |
+| `PUT /api/patient/{pid}/push-subscription` | `{endpoint, keys: {p256dh, auth}, notify_time}`（notify_time は 30 分刻み。省くと 20:00） | `{ok: true, notify_time}`。鍵が無ければ 503 `push_unavailable`、形が違えば 422、送信先に消された endpoint は 410 `push_subscription_gone` |
+| `DELETE /api/patient/{pid}/push-subscription` | `{endpoint}` | `{ok: true}`（無くても 200） |
+| `POST /api/patient/{pid}/push-test` | `{endpoint}` | `{ok: true}`。応答の後に 10 秒待って1通送る。その患者の登録に無ければ 404 `not_found`、1分以内の2回目と、患者ごとの1分の上限を超えたときは 429 `push_test_too_soon`、鍵が無ければ 503 `push_unavailable` |
+
+- **送る順**: 判定 → `claim_push_send`（先に今日の分を取る）→ 送る → 送れなければ `release_push_send` で戻す（窓の 10 分の間は次の周期でやり直す）→ 404・410 は今日の分を戻してから登録を消し、endpoint を `push_gone_endpoints` に覚える。応答の前にタイムアウトしたときだけ二重に届く余地がある
+- **鍵**: `TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（`mailto:` か `https://`）。全て無ければ警告なしで使えない。欠け（`missing`）・subject の誤り（`bad_subject`）・読めない鍵（例外の型名）・組でない（`key_mismatch`）は警告に理由のコードだけを出して使えない。どれも起動は止めない
+- **入力の検査**: endpoint は既知の送信サービスの https だけ（`fcm.googleapis.com`・`*.push.apple.com`・`*.push.services.mozilla.com`・`*.notify.windows.com`。ポートは 443、ユーザー情報は不可）。`\` を受けず、ホストは英数字・`.`・`-` だけで、送信に使う urllib3 の読み方でも同じホストになること。本物の送信はリダイレクトを追わない。p256dh は 65 バイトの P-256 の点、auth は 16 バイト
+- **ログ**: 件数と例外の型名、送信先が返した状態コードだけ。仮名ID・endpoint・例外の文面を出さない。件数（`push.done`）と試送の結果（`push.test_done`）も WARNING で出す（uvicorn の既定で INFO は残らない）
+- **守ること**: 通知のモジュールは `reports`・`timelines`・`regimen_drafts` を読まない。本文は全ての患者で同じ（`tests/test_architecture.py`）
+
+**フロント**
+
+| ファイル | 中身 |
+|---|---|
+| `frontend/public/sw.js` | 通知専用。`push` は `waitUntil` の中で必ず `showNotification`（本文が読めなければタイトルだけ。**送るかどうかはサーバーが決め、端末で握りつぶさない**）。`notificationclick` は `/today` を開く（開いている患者の画面を使い、`/doctor` と別のタブで開いたレポート `/api/doctor/...` は動かさない。すでに `/today` なら移動せず、`tsutae.open-today` の知らせを送って手前に出す）。**`fetch` のハンドラを書かない**（`homeScreen.test.ts`） |
+| `api/patientPush.ts` | 4経路の呼び出し。応答は形を検査する。endpoint は本文で送る |
+| `patient/pushDevice.ts` | 端末の API の包み。Service Worker の登録は `subscribeDevice`（設定でオンにしたとき）だけ |
+| `components/patient/pushStatus.ts` | 純関数 `pushStatusOf`（`unsupported`・`no_key`・`denied`・`on`・`off`）と選べる時刻 |
+| `components/patient/pushState.ts`・`pushActions.ts`・`usePushSettings.ts` | 状態を読む／端末とサーバーの登録を揃える／画面の状態。許可を求めるのはボタンの onClick の最初だけ |
+| `components/patient/pushResend.ts` | オンの端末の登録を送り直す。アプリを開いたとき・戻ってきたとき（`PatientLayout`）と番号を登録したとき（P0・番号の入力欄）。送る時刻は順番が来たときの端末の時刻。410 なら端末でも解除し、設定の画面へ知らせる（`onSubscriptionDropped`。画面がまだ無ければ次に開いたときに1回だけ）。設定と案内の帯は、送り直しと時刻の保存が終わってから状態を読む |
+| `components/patient/NotifySettings.tsx`・`pages/patient/Settings.tsx` | P5（`/settings`）。文言は全て `patient_strings.json` |
+| `components/patient/NotifyBanner.tsx` | オフでオンにできるときだけ、今日の記録の欄の下に出す案内の帯 |
+| `patient/notifyTime.ts` | 設定に出す時刻の写し（localStorage の `tsutae.notify_time`）。正本はサーバー。写しは PUT が受け入れられた時刻で書く（`pushActions.saveSubscription` が PUT を1本ずつ順に送る） |
+| `components/patient/useNewDayCheck.ts` | 開いたまま日付が変わった今日の記録に気づく。戻ったとき（`visibilitychange`）と通知を押したとき（`sw.js` の知らせ）に `GET /questions` を読み、画面の今日とサーバーの今日が違うときだけ `pages/patient/Today.tsx` が読み直す。同じ日は完了の画面も書きかけも残す |
+| `patient/useClearNotifications.ts` | アプリを開いたとき・戻ってきたときに、バッジと表示中の通知を消す（`PatientLayout`） |
+
+**動かす環境**: 通知には HTTPS が要る。手順は `README.md` の「動かし方」（Tailscale Serve → `vite preview` の 5173 → `/api` は 8000 へ。開発サーバーは出さない）。実機の確認は未実施（仕様書 §9）。
+
+## 12. スマホ保存の backend（PR B。`docs/plan-device-records.md` §5）
+
+決まりは仕様書 §5。ここには実装の形だけを書く。記録の中身はスマホに置き、受付のときだけサーバーへ届く。変換は今までどおり `entries` を読む。
+
+| ファイル | 中身 |
+|---|---|
+| `api/patient_device.py` | 下の表の印・範囲・受診日・登録の解除。本文に記録の中身の欄を持たない |
+| `api/patient_demo.py` | 撮影の見本（`TSUTAE_DEMO_TOOLS=1`。`Settings.demo_tools`） |
+| `api/visit_entries.py` | 受付の記録の本文（`VisitEntryIn`）と検査（`received_entries`）、送る範囲（`visit_window_of`） |
+| `api/skill_questions.py` | `version_questions`（その版の質問集） |
+| `api/body_limit.py` | `BodyLimit`。`POST /api/visit` の本文を読みながら数え、5MB を超えたら 413 `body_too_large` |
+| `db/repo_received.py` | `ReceivedEntry`、`insert_received_rows`（ある ID は飛ばす）、`erase_received_rows`（開いた受診が他に無ければ消す）。呼び出し側のトランザクションの中で動く |
+| `db/repo_visits.py` | `create_visit_once(..., entries) -> VisitReceipt` で受診と記録を同じトランザクションに。`mark_printed`・`purge_expired` が同じトランザクションで受け取った記録を消す |
+| `db/repo_visit_regen.py` | 2台目のスマホ（§6）: `begin_added_records_on_open_visits`（記録の保存と同じトランザクション）、`hold_for_regeneration`（結果の保存と同じトランザクション）、`take_regen_pending`（生成の終わり）、`clear_regen_pending`（回収の前） |
+| `scripts/seed_demo.py --device-records` | 患者・コース・日付の印だけを入れる。既定の動きは変えない |
+
+| 経路 | 入力 | 出力 |
+|---|---|---|
+| `POST /api/patient/{pid}/record-marks` | なし | `{record_date, recorded_at}`（サーバーの時計。ミリ秒に揃える） |
+| `POST /api/patient/{pid}/record-marks/undo` | `{recorded_at, clear_mark, retried?}`（`recorded_at` は印の応答の値。`retried` は端末が同じ記録を押し直して保存したときだけ true） | `{ok: true}`。`recorded_at` から 10 分を過ぎた・先の時刻・その後に受付がある・その記録を受付で受け取っている（同じ受付番号の送り直しを含む）→ 409 `not_undoable`。`clear_mark` なら `recorded_at` の日の印を消す（他の時刻の印があれば、先に付いたものも後から付いたものも残す。`retried` のときだけ、10 分以内の先の印はこの記録の1回目として一緒に消す）。何度呼んでもよい |
+| `GET /api/patient/{pid}/visit-window` | — | `{start, end}`（前コースの Day1〜今日。前コースが無ければ今コースの Day1）。今コースが無ければ 409 `no_course` |
+| `GET /api/patient/{pid}/visit-days` | — | `{visits: [{visit_date, received_at}]}`（新しい順。受付番号・状態は返さない） |
+| `POST /api/patient/{pid}/unregister` | `{endpoint}`（string か null） | `{ok: true}` + Cookie を消す。その登録を消す。`record_marks` は消さない |
+| `GET /api/patient/{pid}/demo-config` | — | `{demo_tools}`（環境変数があり、デモ患者のときだけ true） |
+| `GET /api/patient/{pid}/demo-entries` | — | `{entries: 端末の形}`（今日までの合成データ。ID は `demo-<seq>`）。それ以外は 404 |
+
+**端末の形**（`demo-entries`・IndexedDB）: `{pid, client_entry_id, recorded_at, record_date, kind, by_proxy, skill_version, answers: [{question_key, value, temperature, question_text}], free_text}`
+
+**受付で送る形**（`POST /api/visit` の `entries[]`）: 端末の形から `pid` と `question_text` を外したもの。知らない項目は 422。
+
+- 検査: 500 件まで。ID は小文字の UUID か `demo-<数字>`（同じ本文に同じ ID があれば 422）。`recorded_at` は時差つきで、JST の日付が `record_date` と同じ。`kind` は中身と合う。記録日は範囲内。`skill_version` はこの患者のレジメンの登録済みの版で、回答はその版の質問集に照らす。1件でも不正なら全体を 422 にして受診も作らない。今コースが無ければ 409 `no_course`
+- 同じ患者の同じ ID は入れない
+- 2台目のスマホ（PR C。仕様書 §6）: その患者に新しい記録が1件以上入ると、その日の開いた受診を番号を問わず、`create_visit_once` が同じトランザクションで動かす（`begin_added_records_on_open_visits`。変換は患者の全ての記録を読むので、番号を間違えて2行あっても、どちらも全ての記録で変換する）。ready・failed で自動の回数（`REGEN_AUTO_MAX` = 3）が残っていれば generating に戻して `regen_count` を足し、API が生成を起動する（前のレポートは残る）。生成中か回数を使い切っていれば `regen_pending` を立てるだけ。新しい記録が無ければ何も変えない。別の日の受診は動かさない。同じ受付で複数の受診を動かすときは、1件ずつ順に生成する
+- 生成の終わり（`save_visit_result`）: `regen_pending` があり回数が残っていれば、結果は保存して状態は generating のままにする（`hold_for_regeneration`）。ready を一瞬でも見せないので、前のレポートでの印刷が割り込めない（`mark_printed(refuse_generating=True)` が 409 `generating`）。`run_generation` が `take_regen_pending` で印を下ろして次の回を回す。何件増えても1回。failed で終わった回も同じ。使い切っていれば ready のまま印が残り、D3 に「追加の記録あり」、医師の「AI でもう一度変換」（`begin_regeneration`）で下りる
+- 変換し直しが failed で終わっても前のレポートは残る。D3 の failed の行は `has_report` のとき「作り直せませんでした」の文とともに印刷・印刷済みにする・レポートを開くを出す。この紙に新しい記録は載らない（印刷した後の記録の扱いは下の「今日の印刷済みの受診」）
+- 起動時・周期の回収（`api.orphans`）は Claude を呼ばず全ての記録を読むので、自動の回数を使わない。それまでの `regen_pending` は先に下ろし（`clear_regen_pending`）、回収の最中に届いた分は `regen_count` を足さずにもう1回読む（`run_generation(counted=False)`）
+- 費用の歯止め: 1人の患者が1日に開ける受診は5件まで（`MAX_OPEN_VISITS_PER_DAY`）。`create_visit_once` が同じトランザクションで数え、超える新しい番号は `TooManyOpenVisitsError`（何も保存しない。記録は端末に残る）→ 409 `too_many_visits`（`visit.too_many`）。開いている番号への送信は通す。今日の印刷済みの確認が先。1人の患者の1日の自動の変換は最大 5 ×（1 + 3）= 20 回で止まる。医師が押す分は数えない
+- 自動で変換し直すときのログは `regenerate_requested`（decision `added_records`。医師が押したときは decision なし。文面なし）
+- 今日の印刷済みの受診: `create_visit_once` は最初に書き込みのロックを取り（`BEGIN IMMEDIATE`）、その患者に `visit_date` が今日で printed の受診があれば `VisitAlreadyPrintedError`（何も保存しない）→ 409 `already_printed`（`visit.already_printed`）。印刷と追加はどちらかが先になり、変換し直しの最中は印刷できない（409 `generating`）。ただし受け取った記録が紙に載らないまま消える経路が2つある: (1) 回数を使い切った後の「追加の記録あり」をそのまま印刷したとき、(2) 変換し直しが failed で終わった行（`has_report`）で前のレポートを印刷したとき。どちらも医師が札や文を見たうえで印刷でき、`mark_printed` の `erase_received_rows` が（その患者に開いた受診が他に無ければ）その記録もサーバーから消す。以後その日の送信は 409 `already_printed` なので送り直せない（スマホの記録は残る）
+- `doctor_masks` は `entries.id` で引く。統合はある行を変えない（新しい ID だけを足す）ので、変換し直しても同じ記録に効く
+- 受け取った記録は日付の印を書かない。起動時の `backfill_record_marks` も数えない
+- 印刷済み・期限切れで、その患者に開いた受診（受付番号が残り期限内）が他に無ければ、`client_entry_id` のある行を消す。`client_entry_id` の無い行と日付の印は消さない
+- D1 の最後の記録日は `record_marks` から出す。D2 の記録の一覧はそのまま（受付の間だけ行がある）
+- `fixed_rules.notices_for` は Python の側の判定で、画面のコードと同じ表（`frontend/src/test/fixtures/fixed_rule_cases.json`）で確かめる
+
+## 13. スマホ保存の frontend（PR B。`docs/plan-device-records.md` §5.1〜§5.5・§5.8〜§5.10）
+
+| ファイル | 中身 |
+|---|---|
+| `patient/deviceStore.ts` | IndexedDB の薄い包み（DB `tsutae`、store `entries`、キー `client_entry_id`、索引 `pid_record_date` = `[pid, record_date]`）。読むときは必ず仮名ID で絞る。失敗は例外で返す。接続は操作ごとに開いて閉じ、トランザクションの完了で解決する。起動ごとの最初の保存の後に `navigator.storage.persist()` を1回試す |
+| `patient/recordEntry.ts` | 記録の順序。`recordEntry`（`POST record-marks` → 応答の時刻で端末に保存）、`undoRecord`（同じ日の記録を読む → `record-marks/undo` → 端末から消す）、`toDeviceEntry`（質問の文の写しを持たせる）、`newClientEntryId` |
+| `patient/fixedRules.ts` | `noticesFor(entry, fixed_rules)`。`api/fixed_rules.py` と同じ判定で、同じ表（`src/test/fixtures/fixed_rule_cases.json`）でテストする |
+| `api/patientDevice.ts` | §12 の経路の呼び出しと応答の検査。`POST /api/visit` の `entries` は `api/patient.ts` の `submitVisit` |
+| `components/patient/TodayForm.tsx` | `client_entry_id` を入力の開始時に作り、押し直しても同じ（「追加で記録する」・取り消しの後で作り直す）。印か保存が失敗したら入力を残して `error.generic`。同じ ID で印をもう一度送った記録は、取り消しのときに `retried` を伝える（覚えるのはこの画面の間だけ）。保存できたら `onSaved`（バッジと表示中の通知を消す） |
+| `components/patient/HistoryList.tsx` | P2。端末の記録と `GET visit-days` を読み、`historyRows` で並べる |
+| `patient/visitEntries.ts` | P3（§5.5）。`sendVisit`（`GET visit-window` → 端末の記録を読む → 範囲内だけ `POST /api/visit`）、`toVisitEntry`（`pid` と質問の文の写しを外す）。記録を読めなければ例外で返し、空のまま送らない。受付が断る自由記載は送る前に直し、中身が無くなる記録は送らない（`patient/freeText.ts`） |
+| `patient/freeText.ts` | `cleanFreeText`: 片割れのサロゲートと、前後の空白（Python の `str.strip` の一覧と U+FEFF）を落とす。`entryForm.ts`（入力ありの判定・`buildEntry`）と送る前に使う。同じ表 `test/fixtures/free_text_cases.json` を backend の `test_free_text_cases.py` も読み、画面が保存する形を受付が受け取ることを確かめる |
+| `patient/standalone.ts` | §5.8 の判定の純関数。`needsHomeScreenGuide`（iPhone・iPad で、`navigator.standalone` でも `display-mode: standalone` でもない）、`suggestsHomeScreen`（Android のブラウザ）、`readDisplayEnv` |
+| `layouts/PatientLayout.tsx`・`components/patient/AddToHomeGuide.tsx` | 判定が真なら、どの患者の経路でも案内だけを出す。ページも通知の処理も動かさず、API は定型文の GET だけ。URL の `pid` は形が正しいときだけ大きく見せ、保存も登録もしない。アプリ内ブラウザでは Safari で開き直す文を手順の前に出す（いつも出す）。医師の経路はこの外枠を通らない |
+| `components/patient/PatientNav.tsx` | 下の4つのタブ。幅は文字の長さで分ける（`patient.css`。幅 360px 以上で全て1行） |
+| `components/patient/DeviceReset.tsx`・`resetDevice.ts` | §5.9。画面の中の2段階の確認の後、送り直しの PUT を待ち、`POST unregister` → 通知の登録の解除 → 端末の記録 → 仮名ID の順に消す。1つが失敗しても次へ進み、残れば知らせて押し直せる。押し直しは前の回の endpoint を送る（解除の後は読めないので）。`unregister` の 401・403・404 `unknown_patient` は成功と同じ。消す記録は今の番号の分だけで、文もそう書く |
+| `components/patient/DemoEntries.tsx` | §5.10。`GET demo-config` が真のときだけ出す。`GET demo-entries` を端末に保存する（同じ ID なので増えない） |
+
+テストは dev 依存の `fake-indexeddb` を `src/test/setup.ts` で入れ、テストごとに空の DB から始める。

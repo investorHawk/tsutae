@@ -14,7 +14,9 @@ CREATE 文を見て古い形の表だけを SQLite の「12-step generalized ALT
 8. COMMIT。finally で `PRAGMA foreign_keys = ON`
 
 対象は `MIGRATIONS`（表名・古いかの判定・新しい CREATE 文）。今は pipeline_logs（T93）と
-patients（regimen の CHECK を外す。T95）。新しい CREATE 文は schema.sql
+patients（regimen の CHECK を外す。T95）と entries（client_entry_id を足す。
+plan-device-records §5.5）と record_marks（first_marked_at を足す。§4.4）と visits（regen_pending・
+regen_count を足す。§6）。新しい CREATE 文は schema.sql
 から引く（同じ文を2か所に書かない）。何度呼んでもよい（新しい形なら何もしない）。
 """
 
@@ -86,6 +88,30 @@ def _patients_outdated(sql: str) -> bool:
     return "'FOLFOX'" in sql
 
 
+def _entries_outdated(sql: str) -> bool:
+    return "client_entry_id" not in sql
+
+
+def _record_marks_outdated(sql: str) -> bool:
+    return "first_marked_at" not in sql
+
+
+def _visits_outdated(sql: str) -> bool:
+    return "regen_pending" not in sql
+
+
+def _copy_first_mark(new: str, columns: Sequence[str]) -> str:
+    """前の形は一番後の時刻しか持たないので、それを一番先の時刻にも写す。
+
+    取り消せるのは 10 分以内の印だけなので、移行の前の印の先後が分からなくても困らない。
+    """
+    names = ", ".join(columns)
+    return (
+        f"INSERT INTO {new} ({names}, first_marked_at)"
+        f" SELECT {names}, last_marked_at FROM record_marks"
+    )
+
+
 def _copy_with_rowid(new: str, columns: Sequence[str]) -> str:
     """rowid も写す（主キーが TEXT の表。list_patients は同じ時刻を rowid 順に並べる）。"""
     names = ", ".join(columns)
@@ -105,6 +131,25 @@ MIGRATIONS: tuple[TableMigration, ...] = (
         is_outdated=_patients_outdated,
         create_sql=lambda: schema_create_statement("patients"),
         copy_sql=_copy_with_rowid,
+    ),
+    # スマホ保存: 受付で受け取った記録の ID。closed_answers・free_texts・doctor_masks が参照する
+    TableMigration(
+        table="entries",
+        is_outdated=_entries_outdated,
+        create_sql=lambda: schema_create_statement("entries"),
+    ),
+    # 取り消し: その日の一番先の時刻。先に付いた別の端末の印を消さないため
+    TableMigration(
+        table="record_marks",
+        is_outdated=_record_marks_outdated,
+        create_sql=lambda: schema_create_statement("record_marks"),
+        copy_sql=_copy_first_mark,
+    ),
+    # 2台目のスマホ: 記録が増えた受診の変換し直し。timelines・reports・doctor_masks が参照する
+    TableMigration(
+        table="visits",
+        is_outdated=_visits_outdated,
+        create_sql=lambda: schema_create_statement("visits"),
     ),
 )
 

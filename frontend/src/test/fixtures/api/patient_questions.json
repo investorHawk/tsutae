@@ -32,6 +32,13 @@
         "answer_type": "temperature"
       }
     ],
+    "fixed_rules": [
+      {
+        "question_key": "fever",
+        "threshold_celsius": 38.0,
+        "patient_string_key": "fixed_rule.fever_38"
+      }
+    ],
     "today": "2026-11-09"
   }
 }

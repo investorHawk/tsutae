@@ -15,6 +15,9 @@
   記録日から数える。未処理の記録（prepared.unprocessed。AI 側の値は使わない）は
   載せない。上限で切るときは受診直前の記載を残す（並びは Day 順）
 - 発熱は Skill の体温の質問（answer_type temperature）への「測った」だけを見る
+- 届いていない日（plan-device-records §5.6）: 今コースの範囲の日付の印（record_marks）の
+  うち、記録が1件も無い日。ヘッダと要確認にだけ出し、経過表は空白のまま（入力なしのセル）。
+  「入力なし」には数えない。AI の結果（○回）では届いた扱いにしない
 - 引数は書き換えない。entries・courses の並び順は結果に影響しない
 """
 
@@ -50,6 +53,7 @@ from tsutae.schemas import (
     PreparedInput,
     Question,
     QuoteItem,
+    RecordMark,
     RegimenSkill,
     ReportData,
     ReportFormatSkill,
@@ -67,6 +71,7 @@ class _Context:
     previous: CourseSpan | None  # show_previous_course に関わらず、前コースがあれば
     visit_date: date
     records: Records
+    marked_dates: frozenset[date]  # 日付の印（患者全体。今コースで絞るのは使うとき）
     by_id: Mapping[int, Entry]
     prepared: PreparedInput
     timeline: Timeline | None  # AI 変換なしなら None
@@ -98,6 +103,7 @@ def _context(
     result: ConversionResult,
     questions_by_version: Mapping[str, Sequence[Question]],
     doctor_masks: Mapping[int, DoctorMask],
+    record_marks: Sequence[RecordMark],
 ) -> _Context:
     checked = check_inputs(
         patient_id=patient_id,
@@ -109,6 +115,7 @@ def _context(
         prepared=prepared,
         questions_by_version=questions_by_version,
         doctor_masks=doctor_masks,
+        record_marks=record_marks,
     )
     ordered = checked.courses
     course_no = prepared.input.schedule.course_no
@@ -125,6 +132,7 @@ def _context(
         ),
         visit_date=visit_date,
         records=group_by_date(entries),
+        marked_dates=frozenset(m.record_date for m in record_marks),
         by_id=checked.by_id,
         prepared=prepared,
         timeline=timeline,
@@ -142,6 +150,15 @@ def _current_dates(ctx: _Context) -> list[tuple[int, date]]:
     return [(day, span.date_of(day)) for day in span.days if span.has_cell(day)]
 
 
+def _not_received_days(ctx: _Context) -> list[int]:
+    """今コースで受診日までの、印があって記録が1件も無い日の Day。"""
+    return [
+        day
+        for day, d in _current_dates(ctx)
+        if d in ctx.marked_dates and not ctx.records.get(d)
+    ]
+
+
 def _has_too_sick(records: Records, d: date) -> bool:
     return any(e.kind == "too_sick" for e in records.get(d, ()))
 
@@ -156,6 +173,7 @@ def _header(
     schedule = ctx.current.schedule
     dates = [d for _, d in _current_dates(ctx)]
     recorded = [d for d in dates if ctx.records.get(d)]
+    not_received = len(_not_received_days(ctx))
     return ReportHeader(
         reception_no=reception_no,
         patient_id=patient_id,
@@ -166,8 +184,9 @@ def _header(
         course_end=max([schedule.last_day_date, *dates]),
         recorded_days=len(recorded),
         total_days=len(dates),
-        no_input_days=len(dates) - len(recorded),
+        no_input_days=len(dates) - len(recorded) - not_received,
         too_sick_days=sum(1 for d in dates if _has_too_sick(ctx.records, d)),
+        not_received_days=not_received,
         delay_note=course_mod.delay_note(schedule),
         fallback=ctx.timeline is None,
     )
@@ -243,11 +262,12 @@ def _attention(
     report_skill: ReportFormatSkill,
     unprocessed: set[int],
 ) -> list[AttentionItem]:
-    """食い違い → 発熱 → つらくて書けない → 未処理（件数のみ）の順。"""
+    """食い違い → 発熱 → つらくて書けない → 届いていない → 未処理（件数のみ）の順。"""
     items = [
         *_contradiction_items(ctx),
         *_fever_items(ctx, regimen_skill, report_skill.fever_attention_celsius),
         *_too_sick_items(ctx),
+        *(AttentionItem(kind="not_received", day=d) for d in _not_received_days(ctx)),
     ]
     if unprocessed:
         items.append(AttentionItem(kind="unprocessed", count=len(unprocessed)))
@@ -327,13 +347,15 @@ def build_report_data(
     questions_by_version: Mapping[str, Sequence[Question]],
     doctor_masks: Mapping[int, DoctorMask] | None = None,
     question_labels: Mapping[str, str] | None = None,
+    record_marks: Sequence[RecordMark] = (),
 ) -> ReportData:
     """レポートの中身を組み立てる。
 
     入力が食い違えば ReportBuildError、courses の矛盾は CourseValidationError
     （どちらも ValueError）。doctor_masks は prepare_input に渡した医師の伏せ字
     （entries.id → DoctorMask。無ければ空）。question_labels は今の版の form の
-    質問の短い名前（経過表の行名。既知の6問は SHORT_LABELS が先。v1.1）。
+    質問の短い名前（経過表の行名。既知の6問は SHORT_LABELS が先。v1.1）。record_marks は
+    その患者の日付の印（「届いていない日」だけに使う。変換の入力には渡さない）。
     """
     ctx = _context(
         patient_id=patient_id,
@@ -346,6 +368,7 @@ def build_report_data(
         result=result,
         questions_by_version=questions_by_version,
         doctor_masks=dict(doctor_masks or {}),
+        record_marks=record_marks,
     )
     grid = _grid(
         ctx, regimen_skill, report_skill, questions_by_version, question_labels

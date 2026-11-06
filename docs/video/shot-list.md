@@ -13,6 +13,6 @@
 | F5 `doctor_visits` | 印刷待ち | PC 横（16:9） | 6 | 一覧 → 印刷ボタン → 印刷ダイアログ | DemoA #8 footage（6 秒） | `video/public/footage/F5.mp4` |
 | F6 `printer` | 実機印刷 | カメラ | 6 | プリンタから紙が出る → 手に取る | DemoA #9 footage（6 秒） | `video/public/footage/F6.mp4` |
 | F7 `doctor_pipeline` | D5 変換ログ | PC 横（16:9） | 10 | 任意（案 C の pipeline の背景に薄く敷く。無くても成立） | DemoC #5 pipeline（背景（任意・ループ）） | `video/public/footage/F7.mp4` |
-| F8 `doctor_settings` | D4 レジメン | PC 横（16:9） | 20 | 「設定を変える」の「レジメン」→「＋ 新しいレジメン」→「Claude に伝える」に文を貼って送る → 待ち（早送り可）→ 左のフォームが埋まる →「確認へ進む」→ 確かめた印 →「採用して登録」 | DemoA #11 footage（14 秒）<br>DemoB #8 footage（19 秒）<br>DemoC #8 footage（12 秒） | `video/public/footage/F8.mp4` |
+| F8 `doctor_settings` | D4 レジメン | PC 横（16:9） | 20 | 「設定を変える」の「レジメン」→「＋ 新しいレジメン」→「Claude に伝える」に文を貼って送る → 待ち（早送り可）→ 左のフォームが埋まる →「確認へ進む」→ 確かめた印 →「採用して登録」 | DemoA #11 footage（14 秒）<br>DemoB #8 footage（18 秒）<br>DemoC #8 footage（12 秒） | `video/public/footage/F8.mp4` |
 | F9 `patient_new_question` | 翌日 | スマホ縦（9:16） | 6 | 今日の記録に新しい質問「口の中のことで、食事がとりにくいことはありましたか」が出ている | DemoA #12 footage（6 秒）<br>DemoC #8 footage（6 秒） | `video/public/footage/F9.mp4` |
 | F10 `doctor_report` | レポート画面 | PC 横（16:9） | 10 | 任意（report の場面は画像 sample-report.png で描くので無くてよい） | （どの案でも使わない・任意） | `video/public/footage/F10.mp4` |

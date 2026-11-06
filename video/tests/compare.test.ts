@@ -50,8 +50,8 @@ describe("compareSchedule（棒が伸びる順と事実を出す時刻）", () =
     expect(factsAt).toBeGreaterThanOrEqual(barStarts[1] + barFrames);
   });
 
-  it("案 B の締め（17 秒・最後のカードへは 38%）の切り替えより前に事実が出て 2 秒以上残る", () => {
-    const endAt = Math.round(17 * 30 * 0.38);
+  it("案 B の締め（20 秒・最後のカードへは 38%）の切り替えより前に事実が出て 2 秒以上残る", () => {
+    const endAt = Math.round(20 * 30 * 0.38);
     expect(compareSchedule(2).factsAt + 60).toBeLessThanOrEqual(endAt);
   });
 });

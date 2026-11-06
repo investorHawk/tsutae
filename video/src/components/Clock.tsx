@@ -1,4 +1,7 @@
+import { formatClock } from "../lib/clock";
 import { COLORS, FONT_FAMILY } from "../theme";
+
+export { formatClock };
 
 interface ClockProps {
   /** 経過秒 */
@@ -9,11 +12,6 @@ interface ClockProps {
   color?: string;
   label?: string;
 }
-
-export const formatClock = (seconds: number): string => {
-  const s = Math.max(0, Math.round(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 /** 文字盤: 外のリングが ratio まで進み、針が angle 度を指す */
 const ClockFace: React.FC<{

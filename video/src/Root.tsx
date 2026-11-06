@@ -5,8 +5,10 @@ import { STORYBOARDS } from "./storyboards";
 import { FPS, HEIGHT, WIDTH } from "./theme";
 
 /**
- * 3 案（DemoA / DemoB / DemoC）。長さは構成データの秒数の合計から決める（150 秒 = 4500 フレーム）。
+ * 3 案（DemoA / DemoB / DemoC）。長さは構成データの秒数の合計から決める
+ * （案 A・C は 150 秒 = 4500 フレーム、案 B は 165 秒 = 4950 フレーム）。
  * BGM は sb.bgm が true の案 B だけ（public/audio/bgm.wav があるとき）。
+ * 声は public/voice/ に置いた案 B の場面の分だけ鳴る（Demo.tsx）。
  */
 export const Root: React.FC = () => (
   <>

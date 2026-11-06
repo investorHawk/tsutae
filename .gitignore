@@ -50,6 +50,9 @@ video/public/footage/*.mp4
 video/public/footage/*.mov
 video/public/audio/*.mp3
 video/public/audio/*.wav
+video/public/voice/*.m4a
+video/public/voice/*.mp3
+video/public/voice/*.wav
 video/out/
 video/build/
 video/node_modules/.remotion/

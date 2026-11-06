@@ -8,6 +8,8 @@ export const BGM_VOLUME = {
   fadeInSeconds: 1,
   /** 最後のフェードアウト（秒）。最後のフレームで 0 */
   fadeOutSeconds: 3,
+  /** その案に声（public/voice/）が 1 本でもあるとき、動画全体の音量に掛ける倍率 */
+  underVoice: 0.5,
 } as const;
 
 export type BgmVolumeOptions = typeof BGM_VOLUME;
@@ -32,10 +34,15 @@ const fadeGain = (
 /**
  * frame での BGM の音量。基本 base、冒頭 fadeInSeconds でフェードイン、
  * 最後 fadeOutSeconds でフェードアウトして 0 で終わる。
+ * hasVoice（その案に声が 1 本でもある）なら全体を underVoice 倍に下げる（声の区間ごとには変えない）。
  */
 export const bgmVolumeAt = (
   frame: number,
   totalFrames: number,
   fps: number,
+  hasVoice = false,
   opts: BgmVolumeOptions = BGM_VOLUME,
-): number => opts.base * fadeGain(frame, totalFrames, fps, opts);
+): number => {
+  const level = hasVoice ? opts.base * opts.underVoice : opts.base;
+  return level * fadeGain(frame, totalFrames, fps, opts);
+};

@@ -4,7 +4,7 @@ import { BGM_VOLUME, bgmVolumeAt } from "../src/lib/bgm";
 import { STORYBOARDS } from "../src/storyboards";
 
 const fps = 30;
-const { base, fadeInSeconds, fadeOutSeconds } = BGM_VOLUME;
+const { base, fadeInSeconds, fadeOutSeconds, underVoice } = BGM_VOLUME;
 
 /** 1 フレームあたりの変化の上限（いちばん急なフェードの傾き） */
 const maxStep = base / (Math.min(fadeInSeconds, fadeOutSeconds) * fps);
@@ -15,12 +15,17 @@ describe("BGM の音量の定数", () => {
     expect(base).toBeLessThanOrEqual(1);
   });
 
-  it("基本音量と両端のフェードだけを持つ", () => {
+  it("base・fadeInSeconds・fadeOutSeconds・underVoice を持つ", () => {
     expect(Object.keys(BGM_VOLUME).sort()).toEqual([
       "base",
       "fadeInSeconds",
       "fadeOutSeconds",
+      "underVoice",
     ]);
+  });
+
+  it("声があるときは 0.5 倍に下げる", () => {
+    expect(underVoice).toBe(0.5);
   });
 });
 
@@ -65,6 +70,34 @@ describe("bgmVolumeAt（frame ごとの BGM の音量）", () => {
     for (let f = 0; f < 10; f++) {
       expect(Number.isFinite(bgmVolumeAt(f, 10, fps))).toBe(true);
     }
+  });
+});
+
+describe("声がある案の BGM（bgmVolumeAt の hasVoice）", () => {
+  const total = 600;
+
+  it("声が無ければ今までと同じ値（hasVoice を省いても false でも同じ）", () => {
+    for (const f of [0, 15, 300, total - 50, total - 1]) {
+      expect(bgmVolumeAt(f, total, fps, false)).toBe(
+        bgmVolumeAt(f, total, fps),
+      );
+    }
+  });
+
+  it("声があればどのフレームでも base × underVoice を上限に、声なしの underVoice 倍", () => {
+    for (let f = 0; f < total; f++) {
+      const voiced = bgmVolumeAt(f, total, fps, true);
+      expect(voiced, String(f)).toBeCloseTo(
+        bgmVolumeAt(f, total, fps) * underVoice,
+        12,
+      );
+      expect(voiced, String(f)).toBeLessThanOrEqual(base * underVoice + 1e-12);
+    }
+    expect(bgmVolumeAt(300, total, fps, true)).toBeCloseTo(
+      base * underVoice,
+      10,
+    );
+    expect(bgmVolumeAt(total - 1, total, fps, true)).toBe(0);
   });
 });
 

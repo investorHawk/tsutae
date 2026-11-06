@@ -2,6 +2,7 @@
 
 export type SceneKind =
   | "title"
+  | "intro"
   | "coldopen"
   | "problem"
   | "before"
@@ -12,6 +13,7 @@ export type SceneKind =
   | "hookdemo"
   | "report"
   | "promises"
+  | "whypaper"
   | "closing";
 
 export type FootageId =
@@ -46,6 +48,25 @@ export interface Stat {
   unit?: string;
 }
 
+/** closing: 棒グラフの 1 行（秒に比例した長さの横棒と m:ss の時間） */
+export interface CompareItem {
+  label: string;
+  seconds: number;
+}
+
+/** closing: 時間の棒グラフ（最後の行を紺で強調する） */
+export interface Compare {
+  title: string;
+  items: CompareItem[];
+}
+
+/** closing: 棒グラフの下に出す事実（value を大きく） */
+export interface Fact {
+  label: string;
+  value: string;
+  note?: string;
+}
+
 export interface SceneProps {
   /** footage を複数出す場面の秒配分（footage と同じ長さ・同じ順） */
   split?: number[];
@@ -57,9 +78,23 @@ export interface SceneProps {
   backgroundFootage?: FootageId;
   /** pipeline: 図の下に出す注記 */
   notes?: string[];
-  /** closing: カウントアップする数字 */
+  /** closing: カウントアップする数字（案 A・C） */
   stats?: Stat[];
-  /** title / coldopen: タイトルの下の一文（行ごと） */
+  /** closing: 数字の札の代わりに出す時間の棒グラフ（案 B） */
+  compare?: Compare;
+  /** closing: 棒グラフの下に出す事実（compare と一緒に使う） */
+  facts?: Fact[];
+  /** closing: 最後のカードに出す文（1 つ目は大きく、2 つ目は最後に出す） */
+  messages?: string[];
+  /** intro: 経歴の札（順に出す） */
+  career?: string[];
+  /** intro: career のうち紺で強調する札 */
+  careerFocus?: string;
+  /** whypaper: 電子カルテを変える壁 */
+  barriers?: string[];
+  /** whypaper: 紙にして得られること */
+  gains?: string[];
+  /** title / coldopen / intro: タイトルの下の一文（行ごと） */
   lines?: string[];
   /** title: 小さな札 */
   tag?: string;
@@ -67,6 +102,8 @@ export interface SceneProps {
   bubbles?: Bubble[];
   /** before: 損失 */
   losses?: string[];
+  /** before: 時計が回り切る秒（既定 180）。after: 時計に出す秒（既定 30） */
+  clockSeconds?: number;
   /** after: 光らせる要確認の行（画像の行と同じ順） */
   alerts?: string[];
   /** footage: 右の帯に出す一言（split の区間ごと。null は出さない） */
@@ -86,7 +123,7 @@ export interface Scene {
   title?: string;
   /** 字幕（無ければ narration を字幕にする） */
   caption?: string;
-  /** 字幕の文（音声は入れない） */
+  /** 字幕の文。案 B では先生が読み上げる原稿でもある */
   narration: string;
   /** storyboards.md の「画面に出すもの」（文書の生成用。描画には使わない） */
   screen?: string;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { FOOTAGE, FOOTAGE_IDS } from "../src/footage";
-import { footageFiles, screenFiles } from "../src/footage.generated";
+import {
+  footageFiles,
+  screenFiles,
+  voiceFiles,
+} from "../src/footage.generated";
+import { voiceKeyOf } from "../src/lib/voice";
+import { scenesB } from "../src/storyboards";
 
 describe("撮影リストと manifest", () => {
   it("撮影リストは F1〜F10 の 10 本", () => {
@@ -50,5 +56,15 @@ describe("撮影リストと manifest", () => {
     expect(screenFiles.F4).toHaveLength(2);
     expect(screenFiles.F8).toHaveLength(3);
     expect(screenFiles.F9).toEqual(["screens/F9-1.png"]);
+  });
+
+  it("manifest の声は voice/ の下で、キーが案 B の場面 id の頭のどれか（0 本でもよい）", () => {
+    const keys = scenesB.map((s) => voiceKeyOf(s.id));
+    for (const [key, path] of Object.entries(voiceFiles)) {
+      expect(keys, key).toContain(key);
+      expect(path, key).toMatch(
+        new RegExp(`^voice/${key}([_-][^/]*)?\\.(m4a|mp3|wav)$`, "i"),
+      );
+    }
   });
 });

@@ -1,6 +1,7 @@
 """2台目のスマホ（plan-device-records §6）の API の動き。症例は全て合成。Claude は呼ばない。
 
-- 同じ受付番号に新しい記録が届くと統合して変換し直す（生成中は終わってから1回だけ）
+- 新しい記録が届くと統合して変換し直す（生成中は終わってから1回だけ）。番号を間違えて別の
+  受診ができても、その日の開いた受診はどちらも全ての記録で変換する
 - 新しい記録が無ければ何もしない
 - 自動は1受診3回まで。超えたら記録だけ受け取り、D3 に出し、医師が押せる
 - 今日の印刷済みの受診があれば、どの番号でも 409 already_printed（何も保存しない）
@@ -125,14 +126,22 @@ def _events(client: TestClient, vid: int) -> list[dict[str, Any]]:
         return db.list_pipeline_logs(conn, "visit", vid)
 
 
-def _add_from_other_phone(client: TestClient, pid: str, *items: Any) -> Callable:
-    """生成の途中で、別の端末の受付が届く（別の接続で）。1回目の生成の中でだけ呼ぶ。"""
+def _once(job: Callable[[], None]) -> Callable[[], None]:
+    """生成は何度も回るので、1回目の中でだけ job を呼ぶ。"""
     done: list[bool] = []
 
+    def run() -> None:
+        if not done:
+            done.append(True)
+            job()
+
+    return run
+
+
+def _add_from_other_phone(client: TestClient, pid: str, *items: Any) -> Callable:
+    """生成の途中で、別の端末の受付が届く（別の接続で）。1回目の生成の中でだけ呼ぶ。"""
+
     def add() -> None:
-        if done:
-            return
-        done.append(True)
         with db_conn(client.app) as conn:
             for item in items:
                 receipt = db.create_visit_once(
@@ -146,7 +155,7 @@ def _add_from_other_phone(client: TestClient, pid: str, *items: Any) -> Callable
                 )
                 assert receipt.regenerate is False
 
-    return add
+    return _once(add)
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +232,12 @@ def test_resend_without_new_records_does_nothing(
     ]
 
 
+def _visit_of(client: TestClient, number: str) -> dict[str, Any]:
+    with db_conn(client.app) as conn:
+        (found,) = [v for v in db.list_visits(conn) if v["reception_no"] == number]
+    return found
+
+
 def test_wrong_number_is_a_second_row_and_each_uses_all_records(
     client: TestClient, pid: str
 ) -> None:
@@ -233,9 +248,80 @@ def test_wrong_number_is_a_second_row_and_each_uses_all_records(
     with db_conn(client.app) as conn:
         first, second = db.list_visits(conn)
     assert (first["reception_no"], second["reception_no"]) == ("A-023", "A-999")
-    assert (first["regen_count"], second["regen_count"]) == (0, 0)
+    assert (first["status"], second["status"]) == ("ready", "ready")
+    # 新しい行の1回目と、前の行の変換し直し。前の行だけが回数を使う
+    assert (first["regen_count"], second["regen_count"]) == (1, 0)
+    assert factory.calls == 3
+    assert TEXT_B not in runner.prompts[0]
+    for prompt in runner.prompts[1:]:
+        assert TEXT_A in prompt and TEXT_B in prompt
+
+
+def test_fixing_a_wrong_number_leaves_the_right_row_with_the_record(
+    client: TestClient, pid: str
+) -> None:
+    """番号を間違えた後で直しても、正しい番号の紙に記録が載り、D3 に札が出る。"""
+    assert client.post(f"/api/patient/{pid}/record-marks").status_code == 200
+    factory = _use(client, FakeRunner())
+    assert _post(client, []).status_code == 200
+    vid = _visit_of(client, "A-023")["id"]
+    with db_conn(client.app) as conn:
+        assert db.get_report(conn, vid)[1].header.not_received_days == 1
+
+    assert _post(client, [_too_sick(UUID_B)], no="A-999").status_code == 200
+    with db_conn(client.app) as conn:
+        assert db.get_report(conn, vid)[1].header.not_received_days == 0
+    calls = factory.calls
+
+    r = _post(client, [_too_sick(UUID_B)])
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "message_key": "visit.done"}
+    assert factory.calls == calls
+    rows = client.get("/api/doctor/visits").json()["visits"]
+    assert [(v["reception_no"], v["status"], v["regen_count"]) for v in rows] == [
+        ("A-023", "ready", 1),
+        ("A-999", "ready", 0),
+    ]
+
+
+def test_wrong_number_logs_the_regeneration_only_on_the_row_that_ran_again(
+    client: TestClient, pid: str
+) -> None:
+    assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
+    assert _post(client, [_text(UUID_B, TEXT_B)], no="A-999").status_code == 200
+    first = _visit_of(client, "A-023")["id"]
+    second = _visit_of(client, "A-999")["id"]
+    logged = [e for e in _events(client, first) if e["event"] == "regenerate_requested"]
+    assert [e["decision"] for e in logged] == ["added_records"]
+    assert "regenerate_requested" not in [e["event"] for e in _events(client, second)]
+
+
+def test_wrong_number_while_the_first_is_generating_runs_it_once_more(
+    client: TestClient, pid: str
+) -> None:
+    def add() -> None:
+        with db_conn(client.app) as conn:
+            db.create_visit_once(
+                conn,
+                pid,
+                "A-999",
+                today(),
+                now() + timedelta(hours=24),
+                3,
+                (_received(UUID_B, TEXT_B),),
+            )
+
+    inner = FakeRunner()
+    factory = _use(client, InterruptingRunner(inner, _once(add)))
+    assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
     assert factory.calls == 2
-    assert TEXT_A in runner.prompts[1] and TEXT_B in runner.prompts[1]
+    assert TEXT_B in inner.prompts[1]
+    first = _visit_of(client, "A-023")
+    assert (first["status"], first["regen_pending"], first["regen_count"]) == (
+        "ready",
+        False,
+        1,
+    )
 
 
 def test_regeneration_is_logged_without_text(client: TestClient, pid: str) -> None:
@@ -300,6 +386,10 @@ def test_addition_while_generating_runs_once_more_after_it_ends(
         False,
         1,
     )
+    logged = [
+        e for e in _events(client, only["id"]) if e["event"] == "regenerate_requested"
+    ]
+    assert [e["decision"] for e in logged] == ["added_records"]
 
 
 def test_many_additions_while_generating_run_only_once_more(
@@ -312,6 +402,38 @@ def test_many_additions_while_generating_run_only_once_more(
     assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
     assert factory.calls == 2
     assert _only_visit(client)["regen_count"] == 1
+
+
+def test_additions_in_every_run_stop_at_the_automatic_limit(
+    client: TestClient, pid: str
+) -> None:
+    """どの回の最中に届いても次の回へ回る。費用の歯止めはループの単位で止まる。"""
+    sent: list[str] = []
+
+    def add_a_new_record() -> None:
+        client_id = f"b{len(sent)}111111-1111-4111-8111-111111111111"
+        sent.append(client_id)
+        with db_conn(client.app) as conn:
+            receipt = db.create_visit_once(
+                conn,
+                pid,
+                "A-023",
+                today(),
+                now() + timedelta(hours=24),
+                3,
+                (_received(client_id, TEXT_B),),
+            )
+        assert receipt.regenerate is False
+
+    factory = _use(client, InterruptingRunner(FakeRunner(), add_a_new_record))
+    assert _post(client, [_text(UUID_A, TEXT_A)]).status_code == 200
+    assert factory.calls == 1 + db.REGEN_AUTO_MAX
+    only = _only_visit(client)
+    assert (only["status"], only["regen_pending"], only["regen_count"]) == (
+        "ready",
+        True,
+        db.REGEN_AUTO_MAX,
+    )
 
 
 def _generating_visit(client: TestClient, pid: str) -> int:

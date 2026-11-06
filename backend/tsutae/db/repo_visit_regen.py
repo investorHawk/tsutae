@@ -1,5 +1,9 @@
 """受付の後に記録が増えた受診の変換し直し（plan-device-records §6。2台目のスマホ）。
 
+変換は患者の全ての記録を読むので、新しい記録はその患者のその日の開いた受診の全てに足りない
+（番号を間違えて別の受診ができたときも、どちらも全ての記録で変換する）。だから新しい記録が
+入るたびに、番号を問わずそれらの受診を動かす（`begin_added_records_on_open_visits`）。
+
 visits の2列で表す:
 
 - regen_pending: この受診の変換に入っていない記録がある。生成中に届いたか、自動の回数を
@@ -24,6 +28,7 @@ __all__ = [
     "REGEN_AUTO_MAX",
     "STATUS_GUARD",
     "begin_added_records",
+    "begin_added_records_on_open_visits",
     "hold_for_regeneration",
     "take_regen_pending",
 ]
@@ -66,6 +71,25 @@ def begin_added_records(conn: sqlite3.Connection, vid: int, now_db: str) -> bool
         (vid, now_db),
     )
     return False
+
+
+def begin_added_records_on_open_visits(
+    conn: sqlite3.Connection, pid: str, day: str | None, now_db: str
+) -> tuple[int, ...]:
+    """その患者のその日の開いた受診を全て `begin_added_records` に通す。
+
+    始めた（generating に戻した）受診の id を受付順で返す。write_transaction の内側で、
+    記録の保存と一緒に呼ぶ。別の日の受診は読む範囲も受付も別なので動かさない。
+    """
+    rows = conn.execute(
+        "SELECT id FROM visits WHERE patient_id = ? AND visit_date = ?"
+        + STATUS_GUARD
+        + " ORDER BY id",
+        (pid, day, now_db),
+    ).fetchall()
+    return tuple(
+        int(r["id"]) for r in rows if begin_added_records(conn, int(r["id"]), now_db)
+    )
 
 
 def hold_for_regeneration(conn: sqlite3.Connection, vid: int) -> None:

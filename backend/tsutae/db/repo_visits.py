@@ -22,8 +22,9 @@ visits の行そのものは残す（状態の履歴として）。
 - 印刷済み・期限切れで、その患者に開いた受診が他に無ければ、受付で受け取った記録
   （client_entry_id のある行）も同じトランザクションで消す（`repo_received`）。
   create_visit_once は受診の作成と記録の保存を同じトランザクションで行う
-- 2台目のスマホ（plan-device-records §6）: 同じ番号の受診に新しい記録が届くと変換し直す。
-  その患者に今日の印刷済みの受診があれば、番号を問わず VisitAlreadyPrintedError。
+- 2台目のスマホ（plan-device-records §6）: 新しい記録が届くと、その患者のその日の開いた受診を
+  番号を問わず変換し直す。その患者に今日の印刷済みの受診があれば、番号を問わず
+  VisitAlreadyPrintedError。
   どちらも記録の保存と同じトランザクションで決めるので、印刷と追加はどちらかが先になる
   （`repo_visit_regen`）
 """
@@ -58,7 +59,7 @@ from tsutae.db.repo_received import (
 )
 from tsutae.db.repo_visit_regen import (
     STATUS_GUARD,
-    begin_added_records,
+    begin_added_records_on_open_visits,
     hold_for_regeneration,
 )
 from tsutae.schemas import ReportData, Timeline
@@ -74,14 +75,21 @@ _VISIT_COLUMNS = (
 
 @dataclass(frozen=True)
 class VisitReceipt:
-    """受付の結果。regenerate は記録が増えて変換し直しを始めた（generating に戻した）か。
+    """受付の結果。regenerate は visit_id の受診の変換し直しを始めた（generating に戻した）か。
 
-    created か regenerate なら、呼び出し側が生成を起動する。
+    others は、同じ記録で変換し直しを始めた同じ日の別の番号の受診。呼び出し側は、created なら
+    visit_id の生成を、restarted の受診の変換し直しを起動する。
     """
 
     visit_id: int
     created: bool
     regenerate: bool
+    others: tuple[int, ...] = ()
+
+    @property
+    def restarted(self) -> tuple[int, ...]:
+        """記録が増えて変換し直しを始めた受診（visit_id の受診が先）。"""
+        return ((self.visit_id,) if self.regenerate else ()) + self.others
 
 
 def _validate_status(status: str) -> None:
@@ -143,7 +151,9 @@ def create_visit_once(
     探すのと入れるのを1つの書き込みのトランザクションで行う。期限内は `expires_at > 今`
     （`config.now()`）。印刷済み・期限切れ（受付番号を消した受診）は使わない。
     entries（受付で受け取った記録）も同じトランザクションで入れる。すでにある ID は飛ばす。
-    既存の受診に新しい記録が1件以上入ったら変換し直す（`begin_added_records`）。
+    新しい記録が1件以上入ったら、この日の開いた受診を番号を問わず変換し直す
+    （`begin_added_records_on_open_visits`）。新しく作る受診は最初の生成で全ての記録を読むので
+    動かさない。
     その患者に今日の印刷済みの受診があれば、番号を問わず VisitAlreadyPrintedError（何も
     保存しない。記録は端末に残る）。
     """
@@ -161,17 +171,18 @@ def create_visit_once(
             " AND visit_date = ? AND expires_at > ? ORDER BY id LIMIT 1",
             (pid, cleaned, day, now_db),
         ).fetchone()
+        added = insert_received_rows(conn, pid, entries)
+        started = (
+            begin_added_records_on_open_visits(conn, pid, day, now_db) if added else ()
+        )
         created = row is None
         vid = (
             _insert_visit(conn, pid, cleaned, visit_date, expires_at, course_no)
             if created
             else int(row["id"])
         )
-        added = insert_received_rows(conn, pid, entries)
-        regenerate = (
-            not created and added > 0 and begin_added_records(conn, vid, now_db)
-        )
-    return VisitReceipt(vid, created, regenerate)
+    others = tuple(i for i in started if i != vid)
+    return VisitReceipt(vid, created, vid in started, others)
 
 
 def _printed_on(conn: sqlite3.Connection, pid: str, day: str | None) -> bool:

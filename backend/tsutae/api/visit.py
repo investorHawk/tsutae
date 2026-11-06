@@ -10,8 +10,9 @@
   今日すでにあり、正規化した受付番号が同じなら、新しく作らず同じ応答を返す
   （`db.create_visit_once`）。新しい記録が無ければ生成も起動しない（status は問わない:
   failed でも作り直さない）。受付番号が違えば新しく作る
-- 2台目のスマホ（plan-device-records §6）: 同じ受付番号に新しい記録が1件以上届いたら統合して
-  変換し直す。ready・failed はすぐ、生成中は `run_generation` の終わりに1回だけ。自動は1受診
+- 2台目のスマホ（plan-device-records §6）: 新しい記録が1件以上届いたら統合して、その患者の
+  今日の開いた受診を番号を問わず変換し直す（番号を間違えて2行あっても、どちらも全ての記録で
+  変換する）。ready・failed はすぐ、生成中は `run_generation` の終わりに1回だけ。自動は1受診
   `db.REGEN_AUTO_MAX` 回まで。超えたら記録だけ受け取る（D3 の「追加の記録あり」）。ログは
   `regenerate_requested`（decision `added_records`。文面なし）。その患者に今日の印刷済みの受診が
   あれば、どの番号でも 409 `already_printed`（何も保存しない。記録は端末に残る）
@@ -110,11 +111,12 @@ def create_visit(
         )
     except db.VisitAlreadyPrintedError as exc:
         raise ApiError(409, "already_printed") from exc
-    if receipt.regenerate:
-        _log_added_records(conn, receipt.visit_id)
-    if receipt.created or receipt.regenerate:
+    for visit_id in receipt.restarted:
+        _log_added_records(conn, visit_id)
+    new_visit = (receipt.visit_id,) if receipt.created else ()
+    for visit_id in new_visit + receipt.restarted:
         background.add_task(
-            run_generation, settings, request.app.state.runner_factory, receipt.visit_id
+            run_generation, settings, request.app.state.runner_factory, visit_id
         )
     return {"ok": True, "message_key": "visit.done"}
 

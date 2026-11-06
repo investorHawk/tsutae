@@ -337,6 +337,10 @@ export interface VisitSummary {
   created_at: IsoDateTime;
   expires_at: IsoDateTime;
   unprocessed_count: number;
+  /** この受診の変換に入っていない記録がある（生成中に届いた、自動の回数を使い切った後に届いた） */
+  regen_pending: boolean;
+  /** 記録が増えて自動で変換し直した回数 */
+  regen_count: number;
 }
 
 export interface VisitsResponse {

@@ -10,6 +10,7 @@
 
 from tsutae.db.connection import (
     NotFoundError,
+    VisitAlreadyPrintedError,
     VisitClosedError,
     connect,
     init_db,
@@ -79,7 +80,9 @@ from tsutae.db.repo_skills import (
     save_skill_version,
     update_skill_change,
 )
+from tsutae.db.repo_visit_regen import REGEN_AUTO_MAX, take_regen_pending
 from tsutae.db.repo_visits import (
+    VisitReceipt,
     begin_regeneration,
     create_visit,
     create_visit_once,
@@ -98,13 +101,16 @@ from tsutae.db.repo_visits import (
 
 __all__ = [
     "MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT",
+    "REGEN_AUTO_MAX",
     "NotFoundError",
     "PATIENT_ID_PATTERN",
     "PushSubscription",
     "QuestionConflictError",
     "QuestionInputError",
     "ReceivedEntry",
+    "VisitAlreadyPrintedError",
     "VisitClosedError",
+    "VisitReceipt",
     "VisitGeneratingError",
     "add_entry",
     "add_library_question",
@@ -162,6 +168,7 @@ __all__ = [
     "seed_patient",
     "seed_question_library",
     "set_visit_status",
+    "take_regen_pending",
     "undo_record_mark",
     "update_skill_change",
     "upsert_course",

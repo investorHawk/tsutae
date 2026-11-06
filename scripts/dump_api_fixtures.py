@@ -414,10 +414,11 @@ def _patient_flow(rec: Recorder) -> None:
         f"/api/patient/{EVAL_A}/questions",
         expect=403,
     )
-    # 受付（変換はバックグラウンド。TestClient は応答の前に済ませる）
+    # 受付（変換はバックグラウンド。TestClient は応答の前に済ませる）。記録つきの受付を先にする。
+    # 後にすると変換し直しになり（plan-device-records §6）、変換ログの fixture が2回分になる
+    record_mark_flow(rec, DEMO, EVAL_A, FIXED_NOW, f"{REGIMEN_SKILL}@1")
     rec.call("visit", "POST", "/api/visit", {"reception_no": "A-023"})
     rec.call("visit_invalid", "POST", "/api/visit", {"reception_no": "   "}, expect=422)
-    record_mark_flow(rec, DEMO, EVAL_A, FIXED_NOW, f"{REGIMEN_SKILL}@1")
     push_flow(rec, DEMO)
     with rec.without_cookies():
         rec.call(
@@ -507,6 +508,14 @@ def _visit_flow(rec: Recorder) -> None:
         expect=404,
     )
     _check_printed_report(rec, ready)
+    # 今日の印刷済みの受診があれば、どの番号でも断る（plan-device-records §6）
+    rec.call(
+        "visit_already_printed",
+        "POST",
+        "/api/visit",
+        {"reception_no": "A-999"},
+        expect=409,
+    )
     rec.call(
         "doctor_masks_save_closed",
         "POST",

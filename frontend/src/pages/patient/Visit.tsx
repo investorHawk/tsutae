@@ -17,6 +17,8 @@ type Phase = "editing" | "sending" | "done" | "not_registered";
 const INVALID_KEY = "visit.invalid";
 /** 今コースが無い（409 no_course）。受付で声をかけてもらう。 */
 const NO_COURSE_KEY = "visit.no_course";
+/** その患者の今日の受診が印刷済み（409 already_printed）。記録は端末に残る（§6）。 */
+const ALREADY_PRINTED_KEY = "visit.already_printed";
 const REGISTERED_KEY = "register.done";
 /** 受付番号は送る前にサーバーと同じ検査をしているので、422・413 は記録が断られたとき（§5.5）。 */
 const RECORDS_REJECTED_KEY = "visit.records_rejected";
@@ -30,6 +32,9 @@ function errorKeyOf(err: unknown): string {
   }
   if (isApiError(err) && err.status === 409 && err.code === "no_course") {
     return NO_COURSE_KEY;
+  }
+  if (isApiError(err) && err.status === 409 && err.code === "already_printed") {
+    return ALREADY_PRINTED_KEY;
   }
   return GENERIC_ERROR_KEY;
 }

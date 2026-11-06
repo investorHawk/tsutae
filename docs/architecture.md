@@ -65,6 +65,7 @@ scripts/         smoke_agent_sdk.py（済）、seed_demo.py（W3）
 | regimen_drafts（v1.1） | id PK, regimen TEXT NULL（識別名。新規は決まるまで NULL）, base_version INT NULL（新規は NULL）, status CHECK(open/working/adopted/discarded), generation INT, form_json, sources_json, chat_json（院内だけ。採用・破棄で `[]`）, adopted_version NULL, created_at, updated_at, working_since NULL（CHECK: working のときだけ）, closed_at NULL。部分 UNIQUE(regimen) WHERE open/working（1レジメンに開いた下書きは1つ） |
 | question_library（v1.1） | key TEXT PK, label, text, answer_type CHECK(three_level/temperature), origin CHECK(seed/doctor/adopted), hidden INT, created_at |
 | entries.client_entry_id | 受付で受け取った記録の端末の ID。`(patient_id, client_entry_id)` の部分一意索引（NULL の既存の行は対象外）。`migrate_db` が前の DB に足す（§12） |
+| visits.regen_pending・regen_count | 受付の後に記録が増えた受診の変換し直し（§12）。regen_pending は変換に入っていない記録がある印（0/1）、regen_count は自動で変換し直した回数。`migrate_db` が前の DB に足す |
 | record_marks（通知） | patient_id FK, record_date, first_marked_at, last_marked_at, PK(patient_id, record_date) — 記録があった日付の印。**中身・種類・代理の別を持たない**。時刻はその日の一番先と一番後だけで、取り消しが別の端末の印を消さないように見る。`migrate_db` が前の DB に足す（§12） |
 | push_subscriptions（通知） | id INTEGER PK, patient_id FK, endpoint TEXT UNIQUE, p256dh, auth, notify_time TEXT DEFAULT '20:00'（JST の HH:MM）, last_sent_date NULL, created_at |
 | push_removed_sends（通知） | patient_id PK FK, last_sent_date — 消した登録の送信日（患者ごとに最後の日付だけ）。新しい行が引き継ぐので、オフにしてオンにしても1日1回まで |
@@ -239,7 +240,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `POST /api/patient/register` | `{pid}` | `{ok: true}` + Cookie。未知の pid は 404 `{"error":"unknown_patient"}` |
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
 | `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], fixed_rules: [{question_key, threshold_celsius, patient_string_key}], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない。`fixed_rules` は画面のコードで比べる規則で、体温はサーバーに送らない） |
-| `POST /api/visit` | `{reception_no, entries?}`（Cookie で患者識別。`entries` は §12） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド |
+| `POST /api/visit` | `{reception_no, entries?}`（Cookie で患者識別。`entries` は §12） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド。今日の印刷済みの受診があれば 409 `already_printed`（§12） |
 
 記録の経路（`POST`・`GET /{pid}/entries`、`POST /{pid}/entries/{id}/undo`）は外した。記録はスマホに置く（§12）。
 
@@ -253,7 +254,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `GET /api/doctor/patients` | `{patients: [{id, regimen, created_at, register_url}]}` |
 | `POST /api/doctor/patients {regimen}` | `{id, register_url}`（register_url = `{public_base_url}/register?pid=<id>`、登録用 QR はフロントで描く。QR はアプリを入れる入口で、受診の受付には使わない。受付は受診タブ `/visit`） |
 | `GET /api/doctor/patients/{pid}/courses` / `POST /api/doctor/courses`（`Course`） | `{courses: Course[]}` / `Course` |
-| `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count}]}` |
+| `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count, regen_pending, regen_count}]}` |
 | `GET /api/doctor/visits/{id}/report` | `text/html`（A4 印刷用） |
 | `POST /api/doctor/visits/{id}/printed` | `{ok}`（レポート・変換結果・受付番号を削除） |
 | `GET /api/doctor/visits/{id}/unprocessed` | `{entries: [{entry_id, record_date, reason, text}]}`（D6。原文。紙には載せない） |
@@ -341,7 +342,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `GET /api/doctor/visits/{id}/unprocessed`（追加項目） | — | 各記録に `doctor_mask: {spans: [{start, end}], confirmed_clear} \| null`（保存済みの医師の伏せ字。許す区間は返さない） |
 | `POST /api/doctor/visits/{id}/masks/check` | `{entry_id, spans: [{start, end}]}` | `{entry_id, masked_text, suspects: [{start, end, rule}], reason, sendable, confirmable}`。保存しない。masked_text は送られる文（区間を `[伏せ字]` にしてから正規化・一次）、suspects はその文の位置（start の順。規則が違えば重なりうる）。confirmable は疑いが残り、全ての位置が分かり、仮名ID・受付番号（known_identifier）でない。区間の誤り 422 `invalid_spans`、今の未処理（timeline の unprocessed）にも保存済みの伏せ字にも無い記録は 404 `unknown_entry`、印刷済み・期限切れは 404 |
 | `POST /api/doctor/visits/{id}/masks` | `{entries: [{entry_id, send, spans, confirmed_clear}]}`（1〜200件、同じ記録は1回） | `{ok: true, sendable}`（保存した記録のうち変換で送られる件数）。send=true は保存（置き換え）、false は削除。confirmed_clear で確かめて送れない記録は 422 `not_confirmable`。印刷済み・期限切れは 409 `visit_closed`、生成中は 409 `generating`。ログ `doctor_mask_saved`・`doctor_mask_confirmed`・`doctor_mask_removed`（decision `entry:<entries.id>`） |
-| `POST /api/doctor/visits/{id}/regenerate`（条件の追加） | — | 開いている ready で医師の伏せ字が1件以上あれば、AI の結果でもやり直せる（`db.begin_regeneration` の1つの条件付き UPDATE。二重に押しても1回だけ） |
+| `POST /api/doctor/visits/{id}/regenerate`（条件の追加） | — | 開いている ready で医師の伏せ字が1件以上あるか、追加の記録（`regen_pending`）があれば、AI の結果でもやり直せる（`db.begin_regeneration` の1つの条件付き UPDATE。二重に押しても1回だけ。`regen_pending` は下ろし、`regen_count` は数えない） |
 
 - 順序: 生の原文に医師の区間を当てて `[伏せ字]` → 仮名ID・受付番号の照合（当てた後の文で）→ `check_text`（正規化 → 一次 → 二次）→ 依頼文の形（JSON）での二次。`pipeline.inputs.mask_entry_text` が正本で、`prepare_input(doctor_masks=...)` と `report.gate.check_inputs(doctor_masks=...)`（`build_report_data` 経由）の両方が使う（`service._gather` が `db.list_doctor_masks` を読み、両方に同じものを渡す）。H2 は伏せた後の文（masked_texts）と照合する
 - 確かめて送る（confirmed_clear）: 保存の時にサーバーが「伏せた後にまだ疑われている区間」を `allowed`（伏せた後の文の位置）として記録する（`pipeline.manual_review.confirmed_mask`）。変換では、その記録のその区間に完全に含まれる検出だけを許し、許した部分文字列を `PreparedInput.allowed_suspects` に入れる。H1（`make_h1(..., allowed=...)`）と convert のコードの段（`masking.manual.detect_in_prompt`）は依頼文全体でその語（JSON の形に直したもの）の出現に完全に含まれる検出だけを無視する（ログ `hook_h1_confirmed`、decision `confirmed:<数>`）。**許す一覧が空なら H1 は今と同じ**。gate は allowed_suspects も記録から作り直して照合する
@@ -452,7 +453,8 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `api/skill_questions.py` | `version_questions`（その版の質問集） |
 | `api/body_limit.py` | `BodyLimit`。`POST /api/visit` の本文を読みながら数え、5MB を超えたら 413 `body_too_large` |
 | `db/repo_received.py` | `ReceivedEntry`、`insert_received_rows`（ある ID は飛ばす）、`erase_received_rows`（開いた受診が他に無ければ消す）。呼び出し側のトランザクションの中で動く |
-| `db/repo_visits.py` | `create_visit_once(..., entries)` で受診と記録を同じトランザクションに。`mark_printed`・`purge_expired` が同じトランザクションで受け取った記録を消す |
+| `db/repo_visits.py` | `create_visit_once(..., entries) -> VisitReceipt` で受診と記録を同じトランザクションに。`mark_printed`・`purge_expired` が同じトランザクションで受け取った記録を消す |
+| `db/repo_visit_regen.py` | 2台目のスマホ（§6）: `begin_added_records`（記録の保存と同じトランザクション）、`hold_for_regeneration`（結果の保存と同じトランザクション）、`take_regen_pending`（生成の終わり） |
 | `scripts/seed_demo.py --device-records` | 患者・コース・日付の印だけを入れる。既定の動きは変えない |
 
 | 経路 | 入力 | 出力 |
@@ -470,7 +472,12 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 **受付で送る形**（`POST /api/visit` の `entries[]`）: 端末の形から `pid` と `question_text` を外したもの。知らない項目は 422。
 
 - 検査: 500 件まで。ID は小文字の UUID か `demo-<数字>`（同じ本文に同じ ID があれば 422）。`recorded_at` は時差つきで、JST の日付が `record_date` と同じ。`kind` は中身と合う。記録日は範囲内。`skill_version` はこの患者のレジメンの登録済みの版で、回答はその版の質問集に照らす。1件でも不正なら全体を 422 にして受診も作らない。今コースが無ければ 409 `no_course`
-- 同じ患者の同じ ID は入れない。送り直しで新しい ID の記録が増えても変換はし直さない（PR C の範囲）
+- 同じ患者の同じ ID は入れない
+- 2台目のスマホ（PR C。仕様書 §6）: 同じ番号の受診に新しい記録が1件以上入ると、`create_visit_once` が同じトランザクションで決める。ready・failed で自動の回数（`REGEN_AUTO_MAX` = 3）が残っていれば generating に戻して `regen_count` を足し、API が生成を起動する（前のレポートは残る）。生成中か回数を使い切っていれば `regen_pending` を立てるだけ。新しい記録が無ければ何も変えない
+- 生成の終わり（`save_visit_result`）: `regen_pending` があり回数が残っていれば、結果は保存して状態は generating のままにする（`hold_for_regeneration`）。ready を一瞬でも見せないので、前のレポートでの印刷が割り込めない（`mark_printed(refuse_generating=True)` が 409 `generating`）。`run_generation` が `take_regen_pending` で印を下ろして次の回を回す。何件増えても1回。failed で終わった回も同じ。使い切っていれば ready のまま印が残り、D3 に「追加の記録あり」、医師の「AI でもう一度変換」（`begin_regeneration`）で下りる
+- 自動で変換し直すときのログは `regenerate_requested`（decision `added_records`。医師が押したときは decision なし。文面なし）
+- 今日の印刷済みの受診: `create_visit_once` は最初に書き込みのロックを取り（`BEGIN IMMEDIATE`）、その患者に `visit_date` が今日で printed の受診があれば `VisitAlreadyPrintedError`（何も保存しない）→ 409 `already_printed`（`visit.already_printed`）。印刷と追加はどちらかが先になり、受け取った記録が前のレポートの印刷で消えることはない。ただし回数を使い切った後の「追加の記録あり」は、医師が見たうえでそのまま印刷でき、その記録も一緒に消える
+- `doctor_masks` は `entries.id` で引く。統合はある行を変えない（新しい ID だけを足す）ので、変換し直しても同じ記録に効く
 - 受け取った記録は日付の印を書かない。起動時の `backfill_record_marks` も数えない
 - 印刷済み・期限切れで、その患者に開いた受診（受付番号が残り期限内）が他に無ければ、`client_entry_id` のある行を消す。`client_entry_id` の無い行と日付の印は消さない
 - D1 の最後の記録日は `record_marks` から出す。D2 の記録の一覧はそのまま（受付の間だけ行がある）

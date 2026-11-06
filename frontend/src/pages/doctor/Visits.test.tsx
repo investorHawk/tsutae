@@ -19,6 +19,8 @@ function visit(patch: Partial<VisitSummary>): VisitSummary {
     created_at: "2026-11-09T09:40:00+09:00",
     expires_at: "2026-11-10T09:40:00+09:00",
     unprocessed_count: 0,
+    regen_pending: false,
+    regen_count: 0,
     ...patch,
   };
 }

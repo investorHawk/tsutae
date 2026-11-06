@@ -60,7 +60,8 @@ def _open_visit(
     expires_at: datetime | None = None,
 ) -> tuple[int, bool]:
     expires = expires_at or now() + timedelta(hours=24)
-    return db.create_visit_once(conn, pid, reception_no, DAY, expires, 1, entries)
+    receipt = db.create_visit_once(conn, pid, reception_no, DAY, expires, 1, entries)
+    return receipt.visit_id, receipt.created
 
 
 def _client_ids(conn: sqlite3.Connection, pid: str = PID) -> list[str | None]:

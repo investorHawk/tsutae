@@ -37,16 +37,17 @@ class ReceivedEntry:
 
 def insert_received_rows(
     conn: sqlite3.Connection, pid: str, entries: Sequence[ReceivedEntry]
-) -> None:
-    """まだ無い ID の記録を入れる。"""
+) -> int:
+    """まだ無い ID の記録を入れ、入れた件数を返す。"""
     if not entries:
-        return
+        return 0
     rows = conn.execute(
         "SELECT client_entry_id FROM entries"
         " WHERE patient_id = ? AND client_entry_id IS NOT NULL",
         (pid,),
     ).fetchall()
     known = {r["client_entry_id"] for r in rows}
+    added = 0
     for item in entries:
         if item.client_entry_id in known:
             continue
@@ -59,6 +60,8 @@ def insert_received_rows(
             item.skill_version,
             item.client_entry_id,
         )
+        added += 1
+    return added
 
 
 def erase_received_rows(conn: sqlite3.Connection, pid: str, now_db: str) -> None:

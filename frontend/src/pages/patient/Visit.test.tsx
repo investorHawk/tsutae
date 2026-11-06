@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DeviceEntry } from "../../api/types";
 import { clearPid, savePid } from "../../patient/pid";
+import { fixtureBody } from "../../test/apiFixtures";
 import { jsonResponse } from "../../test/fetchMock";
 import { callsTo, mockPatientApi } from "./testing/api";
 import { savedInputs, seedDevice } from "./testing/device";
@@ -158,6 +159,23 @@ describe("Visit (P3)", () => {
     expect(await screen.findByText(s("visit.no_course"))).toBeInTheDocument();
     expect(screen.queryByText(s("error.generic"))).toBeNull();
     expect(field()).toHaveValue("A-023");
+  });
+
+  it("409 already_printed: visit.already_printed, the form stays and the records stay", async () => {
+    await seedDevice(ENTRIES);
+    mockPatientApi({
+      visit: () => jsonResponse(fixtureBody("visit_already_printed"), 409),
+    });
+    renderPatient(ROUTES, "/visit");
+    await userEvent.type(field(), "A-023");
+    await userEvent.click(submit());
+    expect(
+      await screen.findByText(s("visit.already_printed")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
+    expect(screen.queryByText(s("visit.done"))).toBeNull();
+    expect(field()).toHaveValue("A-023");
+    await expect(savedInputs()).resolves.toHaveLength(ENTRIES.length);
   });
 
   it("without a saved pid: the number form and no request", async () => {

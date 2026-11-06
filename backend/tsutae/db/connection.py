@@ -42,6 +42,10 @@ class VisitClosedError(ValueError):
     """印刷済み・期限切れ（受付番号を消した）受診に、変換結果やレポートを書こうとした。"""
 
 
+class VisitAlreadyPrintedError(ValueError):
+    """その患者に今日の印刷済みの受診があるのに、受付に記録が届いた（何も保存しない）。"""
+
+
 def connect(path: Path) -> sqlite3.Connection:
     """SQLite に接続する。
 

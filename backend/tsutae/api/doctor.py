@@ -29,7 +29,7 @@
   後、本文の検証の前）。本文の無い POST（printed）は frontend が Content-Type を付けない
   ので対象外
 - `POST /visits/{id}/regenerate`（本文なし）: 受付番号が残っていて期限内の failed・
-  ready（fallback=True、または医師の伏せ字が1件以上ある）だけを generating に戻し
+  ready（fallback=True、医師の伏せ字が1件以上ある、または追加の記録がある）だけを generating に戻し
   （`db.begin_regeneration`）、
   `POST /api/visit` と同じ `visit.run_generation` をバックグラウンドで起動する。
   ログ `regenerate_requested`（文面なし）。それ以外（generating・AI の結果で ready・
@@ -76,7 +76,7 @@ from tsutae.api.doctor_records import (
     record_gap,
     visit_header,
 )
-from tsutae.api.visit import run_generation
+from tsutae.api.visit import REGENERATE_EVENT, run_generation
 from tsutae.config import Settings, now, today
 from tsutae.course import CourseValidationError, validate_courses
 from tsutae.pipeline.logs import PipelineLogger
@@ -107,7 +107,6 @@ _EVENT_FIELDS = (
     "duration_ms",
 )
 VisitId = Annotated[int, Path(ge=1, le=2**62)]
-REGENERATE_EVENT = "regenerate_requested"
 RUN_KIND = "visit"
 
 
@@ -310,6 +309,8 @@ def _visit_summary(conn: sqlite3.Connection, visit: dict[str, Any]) -> dict[str,
         "created_at": visit["created_at"].isoformat(),
         "expires_at": visit["expires_at"].isoformat(),
         "unprocessed_count": len(_unprocessed(conn, visit["id"])),
+        "regen_pending": visit["regen_pending"],
+        "regen_count": visit["regen_count"],
     }
 
 
@@ -363,8 +364,8 @@ def regenerate(
     conn: Conn,
     settings: AppSettings,
 ) -> dict[str, bool]:
-    """AI でもう一度変換する（failed・AI 変換なしの ready・医師の伏せ字のある ready。
-    前のレポートは残す）。"""
+    """AI でもう一度変換する（failed・AI 変換なしの ready・医師の伏せ字のある ready・
+    追加の記録のある ready。前のレポートは残す）。"""
     try:
         started = db.begin_regeneration(conn, vid)
     except db.NotFoundError as exc:

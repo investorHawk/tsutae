@@ -81,7 +81,9 @@ export function isVisitSummary(v: Item): boolean {
     isBool(v.fallback) &&
     isIsoDateTime(v.created_at) &&
     isIsoDateTime(v.expires_at) &&
-    isInt(v.unprocessed_count)
+    isInt(v.unprocessed_count) &&
+    isBool(v.regen_pending) &&
+    isInt(v.regen_count)
   );
 }
 

@@ -161,9 +161,10 @@ def test_patient_visits_newest_first_with_printed(client: TestClient) -> None:
     pid = add_patient(client.app, courses=C3)
     other = add_patient(client.app, courses=C3)
     add_entry(client.app, pid, EntryCreate(free_text="おなかがゆるい日が続いた"))
+    # 今日の印刷済みの受診があると次の受付は断られる（§6）ので、2件を受け付けてから印刷する
     first = _visit(client, pid, "A-001")
-    client.post(f"/api/doctor/visits/{first['id']}/printed")
     second = _visit(client, pid, "A-002")
+    client.post(f"/api/doctor/visits/{first['id']}/printed")
     _visit(client, other, "A-003")
     r = client.get(f"/api/doctor/patients/{pid}/visits")
     assert r.status_code == 200

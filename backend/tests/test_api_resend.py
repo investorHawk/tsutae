@@ -1,7 +1,8 @@
 """患者の受付の送り直し（タイムアウトの後）で二重にしないこと。記録の ID は test_api_visit_entries。
 
 - `POST /api/visit`: 同じ患者で、受付番号が残っていて期限内の受診が今日すでにあり、
-  正規化した受付番号が同じなら、新しく作らず生成も起動しない
+  正規化した受付番号が同じなら、新しく作らず、新しい記録が無ければ生成も起動しない
+- 今日の印刷済みの受診があれば、番号を問わず 409（plan-device-records §6。test_api_second_device）
 """
 
 from __future__ import annotations
@@ -82,9 +83,10 @@ def test_printed_visit_is_not_reused(client: TestClient, pid: str) -> None:
     (visit,) = _visits(client)
     with db_conn(client.app) as conn:
         db.mark_printed(conn, visit["id"])
-    assert client.post("/api/visit", json={"reception_no": "A-023"}).status_code == 200
-    assert len(_visits(client)) == 2
-    assert client.app.state.runner_factory.calls == 2
+    r = client.post("/api/visit", json={"reception_no": "A-023"})
+    assert (r.status_code, r.json()) == (409, {"error": "already_printed"})
+    assert len(_visits(client)) == 1
+    assert client.app.state.runner_factory.calls == 1
 
 
 def test_expired_visit_is_not_reused(client: TestClient, pid: str) -> None:
@@ -121,9 +123,7 @@ def test_other_patient_visit_is_not_reused(client: TestClient, pid: str) -> None
 def test_create_visit_once(client: TestClient, pid: str) -> None:
     expires = now() + timedelta(hours=24)
     with db_conn(client.app) as conn:
-        first, created = db.create_visit_once(conn, pid, "A-9", today(), expires, 3)
-        again, created_again = db.create_visit_once(
-            conn, pid, "A-9", today(), expires, 3
-        )
-    assert created is True and created_again is False
-    assert again == first
+        first = db.create_visit_once(conn, pid, "A-9", today(), expires, 3)
+        again = db.create_visit_once(conn, pid, "A-9", today(), expires, 3)
+    assert first.created is True and again.created is False
+    assert again.visit_id == first.visit_id

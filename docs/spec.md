@@ -41,7 +41,7 @@
 | P0 登録 | 院内で渡された登録用QR（仮名ID入りURL）はアプリを入れる入口。iPhone の Safari（ホーム画面の外）では「ホーム画面に追加」の案内だけを出して記録させず、ホーム画面のアプリで番号（仮名ID）を入れて登録する。Android のブラウザは記録を許して追加を勧める（実機で未確認）。パスワードなし | 必須 |
 | P1 今日の記録 | 段階0「今日はつらくて書けない」ボタン → 段階1 クローズ質問（レジメンの Skill の質問。FOLFOX は5問） → 段階2 自由記載。「本人／家族が代わりに」トグル。記録はスマホ（IndexedDB）に保存し、サーバーへ送るのは日付の印だけ（本文なし。日付と時刻はサーバーが返す）。オンライン必須で、圏外では記録できない | 必須 |
 | P2 自分の記録一覧 | スマホの記録を日付順に表示。受診日だけサーバーから読む。編集不可（4.1 の「つらくて書けない」の取り消しだけは例外）。AIのまとめは一切出さない | 必須 |
-| P3 受診時 | アプリの受診タブ。受付番号を入れ、前コースからの記録を送る →「先生に届けました」の定型文のみ | 必須 |
+| P3 受診時 | アプリの受診タブ。受付番号を入れ、前コースからの記録を送る →「先生に届けました」の定型文のみ。家族のスマホも同じ受付番号で送れる。今日の受診が印刷済みなら「すでに先生に届いています。受付でお声がけください」の定型文だけを出す（記録は端末に残る） | 必須 |
 | P4 固定規則の表示 | 38.0℃以上を入力した時に、施設が既に患者に渡している案内文をそのまま表示 | 必須（デモでは触れるだけ） |
 | P5 設定 | 毎日のお知らせ: オン・オフ、時刻（30 分刻み。既定 20:00）、試しに通知を送る。通知を使えないとき（未対応の端末・鍵が無い・許可が拒否された）は理由と次の操作を定型文で出す。「このスマホの登録と記録を消す」（2段階の確認。この端末の通知の登録・Cookie・仮名ID・記録を消す。日付の印は消さない） | 必須 |
 
@@ -52,7 +52,7 @@
 |---|---|---|
 | D1 患者一覧 | 仮名IDの一覧と登録用QRの発行。氏名は扱わない | 必須 |
 | D2 コース登録 | レジメン、各コースの**実投与日**、次回受診予定日。延期があればここで直す | 必須 |
-| D3 印刷待ち | 受付番号つきレポートの状態（生成中／印刷待ち／印刷済み）。印刷ボタン（ブラウザ印刷 → PDF）。「印刷済み」でレポートを削除 | 必須 |
+| D3 印刷待ち | 受付番号つきレポートの状態（生成中／印刷待ち／印刷済み）。印刷ボタン（ブラウザ印刷 → PDF）。「印刷済み」でレポートを削除。記録が届いて変換し直した行に「記録が追加され、作り直しました」、自動の回数を超えて届いた行に「追加の記録あり」（「AI でもう一度変換」を押せる） | 必須 |
 | D4 設定を変える — レジメン | 左にレジメンの Skill をフォームで見せ（基本・投与スケジュール・副作用・患者への質問・補足の指示）、右の Claude とのチャットで作る・直す。新しいレジメンも既存の版の書き換えもここ。Claude は欄の値だけを入れ、迷ったら欄を指して選択肢つきで聞く。**確認の画面で AI が入れた値の一覧・SKILL.md（新規は全文、既存は差分）・患者のスマホの見本を見て医師が採用** → 次の記録から反映（9節。v1.1） | 必須（目玉） |
 | D4 設定を変える — レポートの形式 | 一文を入力 → Agent SDK が report-format の SKILL.md を書き換え → **差分を表示 → 医師が承認**（v1.0 の D4 のまま。レジメンには使わない） | 必須 |
 | D5 パイプライン可視化 | 変換中のサブエージェント3役と Hook の発火ログ | 必須（デモ用） |
@@ -322,7 +322,8 @@ entries(id, patient_id, recorded_at DATETIME, target_date DATE NULL, kind TEXT[t
 closed_answers(entry_id, question_key, value TEXT[none|present|hard|not_measured|measured], temperature REAL NULL)
   -- fever のみ not_measured|measured を使い、measured のとき temperature を必須にする
 free_texts(entry_id, text TEXT)
-visits(id, patient_id, reception_no TEXT, created_at, status TEXT[generating|ready|printed|failed], expires_at)
+visits(id, patient_id, reception_no TEXT, created_at, status TEXT[generating|ready|printed|failed], expires_at, regen_pending BOOL, regen_count INT)
+  -- regen_pending は変換に入っていない記録がある印、regen_count は記録が増えて自動で変換し直した回数（1受診3回まで）。既存 DB は表を作り直して足す
 timelines(visit_id, json TEXT)      -- 印刷済み/TTL で削除
 reports(visit_id, html TEXT)        -- 同上
 doctor_masks(visit_id, entry_id, spans_json, confirmed_clear, allowed_json, created_at)  -- D6 の医師の伏せ字（位置だけ。同上で削除）
@@ -353,7 +354,7 @@ push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_ti
 | `PUT /api/patient/{pid}/push-subscription` | 通知の登録・時刻の変更（endpoint で一意。鍵が無ければ 503） | push_subscriptions |
 | `DELETE /api/patient/{pid}/push-subscription` | この端末の通知を切る（endpoint は本文で受ける） | push_subscriptions |
 | `POST /api/patient/{pid}/push-test` | 試しに送る。10 秒後に同じ文を1回。登録ごとに1分に1回まで。日付の印・送る期間・時刻の条件は見ない | push_subscriptions |
-| `POST /api/visit` | 受診タブから受付番号と範囲内の記録（`entries`）を送る → 検査 → 一時保存 → 変換開始 | visits, entries 系 |
+| `POST /api/visit` | 受診タブから受付番号と範囲内の記録（`entries`）を送る → 検査 → 一時保存 → 変換開始。同じ受付番号に新しい記録があれば統合して変換し直す（生成中は終わってから1回、自動は1受診3回まで）。その患者に今日の印刷済みの受診があれば、どの番号でも 409 `already_printed`（`docs/plan-device-records.md` §6） | visits, entries 系 |
 | `GET /api/doctor/visits` | 印刷待ち一覧 | visits, reports |
 | `GET /api/doctor/visits/{id}/report` | レポート HTML | reports |
 | `POST /api/doctor/visits/{id}/printed` | 印刷済み → 削除 | visits, reports, timelines |
@@ -373,7 +374,7 @@ push_subscriptions(id, patient_id, endpoint TEXT UNIQUE, p256dh, auth, notify_ti
 | `GET /api/doctor/visits/{id}/unprocessed` | D6 の原文・疑われた語の位置・保存済みの医師の伏せ字 | timelines, entries 系, doctor_masks |
 | `POST /api/doctor/visits/{id}/masks/check` | D6 の伏せる区間を当てた後の、送られる文とまだ疑われる語（保存しない） | entries 系, timelines, doctor_masks |
 | `POST /api/doctor/visits/{id}/masks` | D6 の医師の伏せ字・確かめを保存（送らない記録は消す。閉じた受診は 409） | doctor_masks, pipeline_logs |
-| `POST /api/doctor/visits/{id}/regenerate` | AI でもう一度変換（失敗・AI変換なし・医師の伏せ字あり） | visits, doctor_masks |
+| `POST /api/doctor/visits/{id}/regenerate` | AI でもう一度変換（失敗・AI変換なし・医師の伏せ字あり・追加の記録あり） | visits, doctor_masks |
 | `GET /api/doctor/pipeline/{visit_id}/events` | D5 用のログ（SSE） | pipeline_logs |
 
 - `/api/patient/*` は `reports`・`timelines`・`regimen_drafts` を**読まない**（アーキテクチャテストで保証。v1.1 で `regimen_drafts` を足す）。通知の送信の処理も同じ

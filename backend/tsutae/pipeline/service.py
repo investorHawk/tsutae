@@ -19,7 +19,8 @@
    `report_error:<型名>`）
 5. `db.save_visit_result`（timeline（AI 変換なしなら unprocessed だけの Timeline）・
    report・ready と fallback を1つのトランザクションで。印刷済み・期限切れなら何も
-   変えずに VisitClosedError）
+   変えずに VisitClosedError。生成中に記録が増えていれば状態は generating のままで、
+   `visit.run_generation` が次の回を回す。`db.repo_visit_regen`）
 
 - prepare_input までに失敗した（入力が作れない）ときは、フォールバックのレポートも
   作れないので failed。service が run_start・run_end（decision `prepare_error:<型名>`）を書く

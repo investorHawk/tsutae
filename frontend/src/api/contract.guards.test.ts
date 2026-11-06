@@ -361,6 +361,21 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "未処理件数が無い",
     (b) => delete b.visits[0].unprocessed_count,
   ],
+  [
+    "doctor_visits",
+    "regen_pending が無い",
+    (b) => delete b.visits[0].regen_pending,
+  ],
+  [
+    "doctor_visits",
+    "regen_pending が数",
+    (b) => (b.visits[0].regen_pending = 1),
+  ],
+  [
+    "doctor_visits",
+    "regen_count が無い",
+    (b) => delete b.visits[0].regen_count,
+  ],
   ["doctor_visits", "visits が無い", (b) => delete b.visits],
   // Skill の中身（GET skills/{name}）
   ["doctor_skill", "text が無い", (b) => delete b.text],

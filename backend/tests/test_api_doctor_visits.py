@@ -91,6 +91,8 @@ def test_list_visits(client: TestClient) -> None:
         "created_at",
         "expires_at",
         "unprocessed_count",
+        "regen_pending",
+        "regen_count",
     }
     assert item["id"] == visit["id"]
     assert item["reception_no"] == "A-023"

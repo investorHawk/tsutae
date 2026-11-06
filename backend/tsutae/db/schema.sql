@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS free_texts (
 );
 
 -- reception_no は印刷済み・期限切れで NULL にする
+-- regen_pending・regen_count は受付の後に記録が増えた受診の変換し直し（repo_visit_regen）
 CREATE TABLE IF NOT EXISTS visits (
     id INTEGER PRIMARY KEY,
     patient_id TEXT NOT NULL REFERENCES patients (id),
@@ -69,7 +70,9 @@ CREATE TABLE IF NOT EXISTS visits (
         CHECK (status IN ('generating', 'ready', 'printed', 'failed')),
     expires_at TEXT NOT NULL,
     fallback INTEGER NOT NULL DEFAULT 0 CHECK (fallback IN (0, 1)),
-    course_no INTEGER
+    course_no INTEGER,
+    regen_pending INTEGER NOT NULL DEFAULT 0 CHECK (regen_pending IN (0, 1)),
+    regen_count INTEGER NOT NULL DEFAULT 0 CHECK (regen_count >= 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_visits_status_expires ON visits (status, expires_at);

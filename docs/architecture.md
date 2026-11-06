@@ -454,7 +454,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 | `api/body_limit.py` | `BodyLimit`。`POST /api/visit` の本文を読みながら数え、5MB を超えたら 413 `body_too_large` |
 | `db/repo_received.py` | `ReceivedEntry`、`insert_received_rows`（ある ID は飛ばす）、`erase_received_rows`（開いた受診が他に無ければ消す）。呼び出し側のトランザクションの中で動く |
 | `db/repo_visits.py` | `create_visit_once(..., entries) -> VisitReceipt` で受診と記録を同じトランザクションに。`mark_printed`・`purge_expired` が同じトランザクションで受け取った記録を消す |
-| `db/repo_visit_regen.py` | 2台目のスマホ（§6）: `begin_added_records_on_open_visits`（記録の保存と同じトランザクション）、`hold_for_regeneration`（結果の保存と同じトランザクション）、`take_regen_pending`（生成の終わり） |
+| `db/repo_visit_regen.py` | 2台目のスマホ（§6）: `begin_added_records_on_open_visits`（記録の保存と同じトランザクション）、`hold_for_regeneration`（結果の保存と同じトランザクション）、`take_regen_pending`（生成の終わり）、`clear_regen_pending`（回収の前） |
 | `scripts/seed_demo.py --device-records` | 患者・コース・日付の印だけを入れる。既定の動きは変えない |
 
 | 経路 | 入力 | 出力 |

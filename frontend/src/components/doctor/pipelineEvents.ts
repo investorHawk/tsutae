@@ -55,7 +55,7 @@ export const LANE_LABELS: Readonly<
   "term-mapper": {
     title: "用語の担当",
     code: "term-mapper",
-    description: "症状を CTCAE v5.0 JCOG版の用語名に当てはめる",
+    description: "症状を用語の一覧の用語名に当てはめる",
   },
   "contradiction-finder": {
     title: "食い違いの担当",

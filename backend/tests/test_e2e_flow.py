@@ -50,7 +50,6 @@ from pipeline_fakes import RaisingRunner, SlowRunner
 
 from tsutae import db
 from tsutae.api.fixed_rules import notices_for
-from tsutae.config import BACKEND_ROOT
 from tsutae.pipeline.prompt import JSON_FENCE
 from tsutae.pipeline.tools import EMIT_REPORT_TOOL, EMIT_TIMELINE_TOOL
 from tsutae.report.labels import has_severity_word
@@ -211,7 +210,10 @@ def _check_header_and_words(html: str) -> None:
     assert "症例は全て合成" in html
     assert "AI変換なし" not in html
     assert not has_severity_word(html)  # Grade・軽症・重症 等を出さない
-    assert "有害事象共通用語規準 v5.0 日本語訳JCOG版より引用" in html
+    assert (
+        "用語名はこのアプリの用語の一覧から AI が当てはめた候補で、医師が確定する。"
+        in html
+    )
 
 
 def _check_attention(html: str) -> None:
@@ -243,12 +245,11 @@ def _ai_markers(runner: Any) -> tuple[set[str], set[str]]:
     timeline, report = payloads[EMIT_TIMELINE_TOOL], payloads[EMIT_REPORT_TOOL]
     terms = {e["term"] for e in timeline["events"]}
     terms |= {row["term"] for row in report["per_symptom"]}
-    ctcae = json.loads((BACKEND_ROOT / "tsutae/data/ctcae_terms.json").read_text())
     keys = ("source_quote", "free_text_quote", "representative_quote", "term")
     keys += ("contradictions", "per_symptom", "confidence", "recalled", "events")
     keys += ("closed_answer", "timeline", "report", "fallback", "unprocessed")
-    words = {f'"{k}"' for k in keys} | {t["en"] for t in ctcae["terms"]}
-    words |= {"クローズ回答", "食い違い", "AI変換", "症状別", "有害事象共通用語規準"}
+    words = {f'"{k}"' for k in keys}
+    words |= {"クローズ回答", "食い違い", "AI変換", "症状別", "医師が確定する"}
     words |= {"unknown_before_honorific", "Grade"}
     return terms, words
 
@@ -269,7 +270,7 @@ def _check_patient_view_unchanged(
     terms, words = _ai_markers(runner)
     plain = json.dumps(before, ensure_ascii=False)
     ai_only = {t for t in terms | words if t not in plain}
-    assert {"末梢性感覚ニューロパチー", "口腔粘膜炎", '"source_quote"'} <= ai_only
+    assert {"末梢神経障害", '"source_quote"'} <= ai_only
     dumped = json.dumps(after, ensure_ascii=False)
     assert [t for t in sorted(ai_only) if t in dumped] == []
 

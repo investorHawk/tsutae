@@ -52,7 +52,7 @@ DESCRIPTION_TEMPLATE = (
 
 @lru_cache(maxsize=1)
 def known_terms() -> frozenset[str]:
-    """選べる CTCAE 用語（ctcae_terms.json）。"""
+    """選べる用語（ctcae_terms.json）。"""
     return frozenset(item["term"] for item in load_terms())
 
 

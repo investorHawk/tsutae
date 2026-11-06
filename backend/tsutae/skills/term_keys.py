@@ -1,6 +1,6 @@
 """用語 → 質問 key の対応（v1.1。版ごと。architecture 9c「用語と質問の対応」）。
 
-- 全体の対応は ctcae_terms.json（34語。T91〜T97 では変えない）
+- 全体の対応は ctcae_terms.json（32語）
 - 版の対応は RegimenSkill の `term_keys`（全体の対応と違うものだけ。null も上書き）
 - `term_keys_for(版の term_keys)` = 全体 ＋ 版の上書き。FOLFOX/CAPOX@1 は term_keys が
   無いので全体の対応のまま（評価済みの依頼文が変わらない）

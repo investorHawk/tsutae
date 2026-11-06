@@ -36,7 +36,7 @@ function SideEffectRowView({ row }: { row: SideEffectRow }) {
       <td>
         <FieldInput
           fieldId={`${base}.ctcae_terms`}
-          label={`CTCAE の用語（${name}）`}
+          label={`用語（${name}）`}
           hideLabel
           value={formatList(row.ctcae_terms)}
           parse={asList}
@@ -68,7 +68,7 @@ function SideEffectRowView({ row }: { row: SideEffectRow }) {
   );
 }
 
-/** 副作用（注意する症状）: 患者の言い方・CTCAE の用語・対応する質問。 */
+/** 副作用（注意する症状）: 患者の言い方・用語・対応する質問。 */
 export default function SideEffectsSection() {
   const { draft, locked } = useRegimenForm();
   const { addRow, adding } = useRowActions();
@@ -88,8 +88,8 @@ export default function SideEffectsSection() {
       }
     >
       <p className="d-muted rf-hint">
-        言い方・用語は「、」で区切って複数入れられます。用語は CTCAE v5.0
-        JCOG版の一覧にある語だけ（一覧に無い語は欄の下に理由が出ます）。
+        言い方・用語は「、」で区切って複数入れられます。用語は
+        用語の一覧にある語だけ（一覧に無い語は欄の下に理由が出ます）。
       </p>
       {rows.length > 0 ? (
         <div className="rf-table-wrap">
@@ -97,7 +97,7 @@ export default function SideEffectsSection() {
             <thead>
               <tr>
                 <th scope="col">患者の言い方の例</th>
-                <th scope="col">CTCAE の用語</th>
+                <th scope="col">用語</th>
                 <th scope="col">対応する質問</th>
                 <th scope="col">
                   <span className="rf-sr-only">行の操作</span>

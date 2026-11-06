@@ -81,7 +81,7 @@ C2_RECORDS: dict[str, dict[str, Any]] = {
 AI_EVENTS: list[tuple[str, int, str, str, str]] = [
     ("2026-10-15", 3, "倦怠感", "fatigue", "今日はだるい"),
     ("2026-10-21", 9, "鼻出血", "bleeding", "鼻血が出た"),
-    ("2026-10-21", 9, "末梢性感覚ニューロパチー", "neuropathy", "手足のしびれ"),
+    ("2026-10-21", 9, "末梢神経障害", "neuropathy", "手足のしびれ"),
 ]
 
 # 紙に出てはいけない SKILL.md の文（補足の指示・本文の見出し・質問文）

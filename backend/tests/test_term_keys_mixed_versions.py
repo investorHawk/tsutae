@@ -147,7 +147,7 @@ def test_entry_term_keys_follow_record_version() -> None:
     assert entry_term_keys(prepared, 1)["倦怠感"] is None
     assert entry_term_keys(prepared, 2)["倦怠感"] == "fatigue"
     # 版1 の質問に無い key は null（版1 の対応で上書きした neuropathy は残る）
-    assert entry_term_keys(prepared, 1)["末梢性感覚ニューロパチー"] == "neuropathy"
+    assert entry_term_keys(prepared, 1)["末梢神経障害"] == "neuropathy"
 
 
 def test_missing_version_material_maps_every_term_to_null(
@@ -158,7 +158,7 @@ def test_missing_version_material_maps_every_term_to_null(
     prepared = _prepared(with_versions=False)
     assert prepared.other_versions == {V1: VersionTermKeys()}
     keys = entry_term_keys(prepared, 1)
-    assert keys["倦怠感"] is None and keys["末梢性感覚ニューロパチー"] is None
+    assert keys["倦怠感"] is None and keys["末梢神経障害"] is None
     assert all(v is None for v in keys.values())
     assert entry_term_keys(prepared, 2)["倦怠感"] == "fatigue"  # 今の版の記録は今の対応
     warned = [r for r in caplog.records if r.name == "tsutae.pipeline.inputs"]

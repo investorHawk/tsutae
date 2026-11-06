@@ -179,12 +179,12 @@ a{color:#1a4f8b}a:hover{color:#0f3563}
                 </span>
               </div>
               <sc-if value="{{noSe}}" hint-placeholder-val="{{false}}">
-                <p class="empty" style="margin: 0">必須: 症状を1つ以上。用語は CTCAE v5.0 JCOG版の一覧から選びます。</p>
+                <p class="empty" style="margin: 0">必須: 症状を1つ以上。用語は用語の一覧から選びます。</p>
               </sc-if>
               <sc-if value="{{hasSe}}" hint-placeholder-val="{{true}}">
                 <div style="overflow-x: auto">
                   <table class="tbl">
-                    <thead><tr><th scope="col" style="width: 30%">患者の言い方の例</th><th scope="col" style="width: 30%">CTCAE の用語（一覧から選ぶ）</th><th scope="col">対応する質問（下の質問から選ぶ）</th></tr></thead>
+                    <thead><tr><th scope="col" style="width: 30%">患者の言い方の例</th><th scope="col" style="width: 30%">用語（一覧から選ぶ）</th><th scope="col">対応する質問（下の質問から選ぶ）</th></tr></thead>
                     <tbody>
                       <sc-for list="{{se}}" as="r" hint-placeholder-count="5">
                         <tr>
@@ -355,9 +355,9 @@ const FOLFOX = {
     ['フルオロウラシル（46時間）', '持続ポンプ', 'Day1〜3', '', 'Day3 に抜去', 'doc']
   ],
   se: [
-    ['しびれ、冷たいものでピリピリ', '末梢性感覚ニューロパチー', 'しびれ', 'doc'],
+    ['しびれ、冷たいものでピリピリ', '末梢神経障害', 'しびれ', 'doc'],
     ['下痢、お腹がゆるい', '下痢', '下痢', 'doc'],
-    ['口内炎、口の中が痛い', '口腔粘膜炎', '口内炎', 'doc'],
+    ['口内炎、口の中が痛い', '口内炎', '口内炎', 'doc'],
     ['吐き気、食欲がない', '悪心／食欲不振', '吐き気・食欲', 'doc'],
     ['熱が出た', '発熱', '体温', 'doc']
   ],
@@ -374,9 +374,9 @@ const SOX_DRUGS = [
   ['S-1', '内服', 'Day1〜14', '1日2回', '', 'doc']
 ];
 const SOX_SE = [
-  ['しびれ、冷たいものでピリピリ', '末梢性感覚ニューロパチー', 'しびれ', 'ai'],
+  ['しびれ、冷たいものでピリピリ', '末梢神経障害', 'しびれ', 'ai'],
   ['下痢、お腹がゆるい', '下痢', '下痢', 'ai'],
-  ['口内炎、口の中が痛い', '口腔粘膜炎', '口内炎', 'ai'],
+  ['口内炎、口の中が痛い', '口内炎', '口内炎', 'ai'],
   ['吐き気、食欲がない', '悪心／食欲不振', '吐き気・食欲', 'ai'],
   ['涙が止まらない、目がしょぼしょぼ', '流涙', '涙・目', 'ai'],
   ['皮膚や爪が黒っぽくなった', '皮膚色素過剰', '', 'ai']
@@ -523,7 +523,7 @@ class Component extends DCLogic {
     const se = data.se.map((r, i) => {
       const cells = [
         this.field('s' + i + '.say', '患者の言い方の例', [r[0], r[3]], 'se', s),
-        this.field('s' + i + '.term', 'CTCAE の用語', [r[1], r[3]], 'se', s),
+        this.field('s' + i + '.term', '用語', [r[1], r[3]], 'se', s),
         this.field('s' + i + '.q', '対応する質問', [r[2], r[2] ? r[3] : null], 'se', s, { required: false, ph: 'なし' })
       ];
       all.push.apply(all, cells);
@@ -617,7 +617,7 @@ class Component extends DCLogic {
       regName: regName,
       skillHeading: s.from === 7 ? 'SKILL.md の差分（版 1 → 版 2）' : 'SKILL.md（regimen-' + regName.toLowerCase() + '・新規）',
       skillLines: this.skillLines(basic, drugs, se, qs, cycle, s.from === 7, all),
-      checks: ['必須の項目が全てある', 'CTCAE の用語は全て一覧にある', '質問の key が重ならない・依頼文の検査（H1）に掛からない', '今の FOLFOX / CAPOX を同じ描き方で描くと今の SKILL.md と一致する'],
+      checks: ['必須の項目が全てある', '用語は全て一覧にある', '質問の key が重ならない・依頼文の検査（H1）に掛からない', '今の FOLFOX / CAPOX を同じ描き方で描くと今の SKILL.md と一致する'],
       phoneQs: qList,
       doneHeading: s.adoptedFrom === 7 ? 'FOLFOX を版 2 にしました' : 'regimen-' + regName.toLowerCase() + ' 版 1 を登録しました',
       doneItems: s.adoptedFrom === 7

@@ -159,10 +159,17 @@ def test_legend_appears_once_after_segments(html56: str) -> None:
     assert html56.rindex("grid-segment") < html56.index('<div class="legend">')
 
 
-def test_quotes_not_forced_when_grid_nearly_fills_page(html56: str) -> None:
-    # 56 日（3 段）では引用の前の欄で 1 枚目がほぼ埋まる → 強制で改ページしない
+def test_quotes_not_forced_when_grid_nearly_fills_page() -> None:
+    # 56 日（3 段）＋症状別 2 行で引用の前の欄が 1 枚目をほぼ埋める → 強制で改ページしない
     # （見積もりが外れて経過表が 2 枚目にまたがっても、引用を 3 枚目に飛ばさない）
-    assert re.search(r'<section class="quotes">', html56)
+    sample = load_demo_inputs(name="eval_patient_a", visit_date=date(2026, 11, 9))
+    data = build_report_data(**sample.build_kwargs())
+    rows = build_report_data(**load_demo_inputs().build_kwargs()).per_symptom[:2]
+    html = render_report_html(
+        data.model_copy(update={"per_symptom": rows}),
+        questions=list(sample.regimen_skill.questions),
+    )
+    assert re.search(r'<section class="quotes">', html)
 
 
 def test_long_grid_does_not_push_quotes_to_a_third_page() -> None:
@@ -172,7 +179,7 @@ def test_long_grid_does_not_push_quotes_to_a_third_page() -> None:
     data = build_report_data(**sample.build_kwargs())
     demo = load_demo_inputs()
     many = build_report_data(**demo.build_kwargs()).per_symptom
-    assert len(many) == 8
+    assert len(many) == 7
     html = render_report_html(
         data.model_copy(update={"per_symptom": many}),
         questions=list(sample.regimen_skill.questions),

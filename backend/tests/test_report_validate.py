@@ -202,7 +202,7 @@ def test_start_and_confidence_come_from_events(demo: SampleInputs) -> None:
 
 
 def test_recalled_event_confidence_is_used(demo: SampleInputs) -> None:
-    item = _summary("口腔粘膜炎", "おとといの夜から口内炎がいたい", confidence=0.95)
+    item = _summary("口内炎", "おとといの夜から口内炎がいたい", confidence=0.95)
     [s] = _with_picks(demo, [item]).per_symptom
     assert s.confidence == 0.5  # 回想の出来事の値（「？」が付く）
     assert (s.start_date, s.start_day) == (C3_DAY5, 5)
@@ -490,7 +490,7 @@ def test_event_dated_after_its_record_is_dropped(demo: SampleInputs) -> None:
     events = _events_with(
         demo,
         3,
-        "異常感覚",
+        "末梢神経障害",
         date=date(2026, 11, 6),
         day=11,
         term="下痢",
@@ -505,7 +505,7 @@ def test_event_dated_after_its_record_is_dropped(demo: SampleInputs) -> None:
 
 def test_recalled_mark_comes_from_dates_not_ai(demo: SampleInputs) -> None:
     # entry 9（11/02）の口内炎は 10/31 の出来事＝回想。AI が recalled=False でも「回」
-    events = _events_with(demo, 9, "口腔粘膜炎", recalled=False)
+    events = _events_with(demo, 9, "口内炎", recalled=False)
     # entry 7（10/31）の下痢は記録日と同じ日。AI が recalled=True でも「回」は付けない
     events = [
         (
@@ -524,9 +524,9 @@ def test_recalled_mark_comes_from_dates_not_ai(demo: SampleInputs) -> None:
 
 
 def test_recalled_used_for_per_symptom_is_from_dates(demo: SampleInputs) -> None:
-    events = _events_with(demo, 9, "口腔粘膜炎", recalled=False)
+    events = _events_with(demo, 9, "口内炎", recalled=False)
     data = _with_result(demo, events=events)
-    [s] = [s for s in data.per_symptom if s.term == "口腔粘膜炎"]
+    [s] = [s for s in data.per_symptom if s.term == "口内炎"]
     assert (s.start_date, s.start_day) == (C3_DAY5, 5)
 
 

@@ -1,9 +1,13 @@
 """T95: レジメンの2つ固定を外しても、FOLFOX/CAPOX の依頼文が1文字も変わらない。
 
 評価（eval）は合成データの各コースの最終日を受診日として `build_prompt` と3役の
-AgentDefinition（term-mapper の用語の一覧を含む）を使う。その全文の sha256 を T95 の
-前の値で固定する。値が変わったら、評価済みの依頼文が変わったということ（eval の数字が
-ずれうる）なので、直す前に先生に確かめる。
+AgentDefinition（term-mapper の用語の一覧を含む）を使う。その全文の sha256 を固定する。
+値が変わったら、評価済みの依頼文が変わったということ（eval の数字がずれうる）なので、
+直す前に先生に確かめる。
+
+term-mapper と SYSTEM_PROMPT の値は、2026-11-06 の先生の指示（用語の説明の文と用語の
+置き換え）で取り直した。それより前の評価（docs/eval/）はこの依頼文では測っていない。
+build_prompt と他の2役の値は T95 の前に測った値のまま。
 """
 
 from __future__ import annotations
@@ -52,15 +56,15 @@ AGENT_SHA256 = {
         "476f51c9d1a040eae5c352e6a0cf38af292d02ac0ba0cf5ef37317f2712d23ac",
     ),
     "term-mapper": (
-        "35a59a2f8b4915c196f4780c7612cf91324faa8b34211a52f3f4bde11b7b5a58",
-        "ddc8aefc3f0bba75121c2c1db42e70219c047ab8c20e5e8edfdda4ee61aa8b4c",
+        "f09df7ec9e281421275a991c249e5019f92ecbc77a821d951f55421c1d37289c",
+        "5e22a71ac1803dbcbc61e5883a3daa979c5a2283ee94d813bb271610a35a1509",
     ),
     "contradiction-finder": (
         "49af90c71f565c596aa35dcfcefe4b310e7406476cf13a3af8277562e354be7b",
         "3f258f3856f294c2a99f554b0cbc1fdb3cef480fe864a1fb12b3cc28fe4ec504",
     ),
 }
-SYSTEM_SHA256 = "a04615813654646e64f6cc5361482f180416c3431afb35752c3bdc9dc0e21d9c"
+SYSTEM_SHA256 = "1c8bd6e2b8cf3bd1cf14019599421e5d78d43a7be8f890ee67d56ed32ffc6d01"
 
 
 def _sha(text: str) -> str:

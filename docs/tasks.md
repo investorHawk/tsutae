@@ -46,7 +46,7 @@ T03 で確かめる4点:
 | T30 | ✅ カスタムツール `emit_timeline` / `emit_report`（`create_sdk_mcp_server`）とスキーマ検証（spec 7.2） | 不正な JSON を拒否するテスト | T03 | opus ✅ |
 | T31 | ✅ H2: 引用なしの症状記載・原文に部分一致しない引用を `deny` | 捏造引用を含む偽ツール呼び出しで deny されるテスト | T30 | opus ✅ |
 | T32 | ✅ H4: 患者向け経路へ書くツールを `deny`（パイプラインの `allowed_tools` も最小に） | 単体テスト | T30 | opus ✅ |
-| T33 | ✅ サブエージェント3役（date-normalizer / term-mapper / contradiction-finder）の `AgentDefinition` とプロンプト。CTCAE v5.0 JCOG版の用語リスト（数十語、出典表記つき） | 合成データ1件で各役の出力が返る | T12, T30 | opus ✅ |
+| T33 | ✅ サブエージェント3役（date-normalizer / term-mapper / contradiction-finder）の `AgentDefinition` とプロンプト。用語の一覧（数十語） | 合成データ1件で各役の出力が返る | T12, T30 | opus ✅ |
 | T34 | ✅ 統合役と全体の組み立て。受付番号・仮名IDを送らない（通し番号のみ）。`max_turns`・タイムアウト・失敗時フォールバック | **合成データ1件が通り timeline JSON が出る**（11/5 完了条件）。送信内容に受付番号が無いことのテスト | T22, T31, T32, T33 | opus ✅ |
 | T35 | ✅ パイプラインログ（Hook 発火・所要時間・トークン数のみ、文面なし） | ログに自由記載の文字列が含まれないテスト | T34 | opus ✅ |
 | T36 | ✅ フォールバック（AI変換なし）: クローズ経過表＋原文引用だけのレポートデータ | Claude 失敗を模したテストで `fallback: true` のレポートが出る | T10, T11 | opus ✅ |

@@ -1,176 +1,132 @@
 {
-  "source": "有害事象共通用語規準 v5.0 日本語訳JCOG版より引用（非営利利用）",
-  "review_status": "先生の確認待ち（用語名の表記は Claude が記憶から起こしたもの。JCOG 版の原本と照合すること）",
   "note": "Grade は扱わない。question_key はクローズ質問との対応（経過表の ○ に使う）。null は対応する質問なし",
   "terms": [
     {
-      "term": "末梢性感覚ニューロパチー",
-      "en": "Peripheral sensory neuropathy",
-      "question_key": "numbness"
-    },
-    {
-      "term": "錯感覚",
-      "en": "Paresthesia",
-      "question_key": "numbness"
-    },
-    {
-      "term": "異常感覚",
-      "en": "Dysesthesia",
+      "term": "末梢神経障害",
       "question_key": "numbness"
     },
     {
       "term": "下痢",
-      "en": "Diarrhea",
       "question_key": "diarrhea"
     },
     {
-      "term": "口腔粘膜炎",
-      "en": "Mucositis oral",
+      "term": "口内炎",
       "question_key": "stomatitis"
     },
     {
-      "term": "口腔内痛",
-      "en": "Oral pain",
+      "term": "口腔痛",
       "question_key": "stomatitis"
     },
     {
       "term": "悪心",
-      "en": "Nausea",
       "question_key": "nausea_appetite"
     },
     {
       "term": "嘔吐",
-      "en": "Vomiting",
       "question_key": "nausea_appetite"
     },
     {
       "term": "食欲不振",
-      "en": "Anorexia",
       "question_key": "nausea_appetite"
     },
     {
       "term": "発熱",
-      "en": "Fever",
       "question_key": "fever"
     },
     {
-      "term": "手掌・足底発赤知覚不全症候群",
-      "en": "Palmar-plantar erythrodysesthesia syndrome",
+      "term": "手足症候群",
       "question_key": "hand_foot"
     },
     {
       "term": "疲労",
-      "en": "Fatigue",
       "question_key": null
     },
     {
       "term": "倦怠感",
-      "en": "Malaise",
       "question_key": null
     },
     {
       "term": "便秘",
-      "en": "Constipation",
       "question_key": null
     },
     {
       "term": "腹痛",
-      "en": "Abdominal pain",
       "question_key": null
     },
     {
       "term": "腹部膨満",
-      "en": "Bloating",
       "question_key": null
     },
     {
       "term": "消化不良",
-      "en": "Dyspepsia",
       "question_key": null
     },
     {
       "term": "味覚異常",
-      "en": "Dysgeusia",
       "question_key": null
     },
     {
-      "term": "口内乾燥",
-      "en": "Dry mouth",
+      "term": "口腔内乾燥感",
       "question_key": null
     },
     {
       "term": "しゃっくり",
-      "en": "Hiccups",
       "question_key": null
     },
     {
       "term": "体重減少",
-      "en": "Weight loss",
       "question_key": null
     },
     {
-      "term": "脱毛症",
-      "en": "Alopecia",
+      "term": "脱毛",
       "question_key": null
     },
     {
       "term": "皮膚乾燥",
-      "en": "Dry skin",
       "question_key": null
     },
     {
-      "term": "不眠症",
-      "en": "Insomnia",
+      "term": "不眠",
       "question_key": null
     },
     {
       "term": "頭痛",
-      "en": "Headache",
       "question_key": null
     },
     {
-      "term": "浮動性めまい",
-      "en": "Dizziness",
+      "term": "めまい",
       "question_key": null
     },
     {
       "term": "悪寒",
-      "en": "Chills",
       "question_key": null
     },
     {
       "term": "筋肉痛",
-      "en": "Myalgia",
       "question_key": null
     },
     {
       "term": "関節痛",
-      "en": "Arthralgia",
       "question_key": null
     },
     {
       "term": "咳嗽",
-      "en": "Cough",
       "question_key": null
     },
     {
       "term": "呼吸困難",
-      "en": "Dyspnea",
       "question_key": null
     },
     {
       "term": "嗄声",
-      "en": "Hoarseness",
       "question_key": null
     },
     {
       "term": "鼻出血",
-      "en": "Epistaxis",
       "question_key": null
     },
     {
       "term": "注射部位反応",
-      "en": "Injection site reaction",
       "question_key": null
     }
   ]

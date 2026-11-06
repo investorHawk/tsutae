@@ -103,9 +103,12 @@ describe("formatDays", () => {
 
 describe("parseList / formatList（言い方・用語の一覧）", () => {
   it("「、」「,」「/」「改行」で区切り、空を落とす（「・」は区切らない）", () => {
-    expect(
-      parseList("下痢、 お腹がゆるい,,手掌・足底発赤知覚不全症候群／悪心\n"),
-    ).toEqual(["下痢", "お腹がゆるい", "手掌・足底発赤知覚不全症候群", "悪心"]);
+    expect(parseList("下痢、 お腹がゆるい,,手のひら・足の裏／悪心\n")).toEqual([
+      "下痢",
+      "お腹がゆるい",
+      "手のひら・足の裏",
+      "悪心",
+    ]);
     expect(parseList(" ")).toEqual([]);
   });
 

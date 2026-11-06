@@ -62,7 +62,7 @@ def test_render_has_required_notes_and_metrics() -> None:
     assert md.startswith("# 精度評価 2026-11-06")
     assert "症例は全て合成" in md
     assert "合格ラインは置かず実測値と失敗例を出す" in md
-    assert "有害事象共通用語規準 v5.0 日本語訳JCOG版より引用" in md
+    assert "用語はこのアプリの用語の一覧から選ぶ" in md
     assert "claude-opus-5-5" in md and "claude-sonnet-5-5" in md
     assert "75.0%（3/4）" in md and "66.7%（2/3）" in md
     for label in ("日付正規化", "用語", "再現率", "適合率", "absent", "否定", "引用"):

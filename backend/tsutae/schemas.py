@@ -247,7 +247,7 @@ class TimelineEvent(Frozen):
     date: date  # 出来事の暦日（回想なら記録日より前）
     day: int | None
     course_no: int
-    term: str = Field(min_length=1)  # CTCAE v5.0 JCOG版の用語名（Grade は出さない）
+    term: str = Field(min_length=1)  # 用語の一覧の用語名（Grade は出さない）
     question_key: str | None = None  # 対応するクローズ質問（経過表の ○ に使う）
     status: SymptomStatus
     source_quote: str = Field(min_length=1)  # 伏せ字後の原文に部分一致すること（H2）

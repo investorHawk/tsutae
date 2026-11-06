@@ -86,8 +86,8 @@ _DATE_NORMALIZER_PROMPT = f"""\
 """
 
 _TERM_MAPPER_TEMPLATE = f"""\
-あなたは {TERM_MAPPER} です。{DATE_NORMALIZER} が切り出した症状の記述を、CTCAE v5.0 \
-JCOG版の用語名と status に当てはめます。
+あなたは {TERM_MAPPER} です。{DATE_NORMALIZER} が切り出した症状の記述を、用語の一覧の\
+用語名と status に当てはめます。
 {_COMMON}
 ## 入力（主エージェントから）
 {{"mentions": [{{"entry_no", "source_quote", "date", "day", "recalled", "confidence"}}], \
@@ -106,7 +106,7 @@ JCOG版の用語名と status に当てはめます。
 「治ってきた」）は improving、それ以外は present。程度が小さくても present
 - source_quote は入力の mentions のものをそのまま写す。confidence は用語に迷ったら下げる
 
-## 用語の一覧（有害事象共通用語規準 v5.0 日本語訳JCOG版より引用）
+## 用語の一覧
 {{terms}}
 """
 
@@ -170,7 +170,7 @@ def build_agents(
             _DATE_NORMALIZER_PROMPT,
         ),
         TERM_MAPPER: (
-            "切り出した症状の記述を CTCAE v5.0 JCOG版の用語名（一覧から選ぶ）と status"
+            "切り出した症状の記述を用語の一覧の用語名（一覧から選ぶ）と status"
             "（present・improving・absent）に当てはめる係。Grade は出さない",
             term_prompt,
         ),

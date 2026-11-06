@@ -214,29 +214,63 @@ export const BackgroundFootage: React.FC<{ id?: FootageId }> = ({ id }) => {
   );
 };
 
+/** 図の下の注記（1 行・画面の中央。高さは notesLayout の height） */
 export const NoteChip: React.FC<{
   text: string;
   top: number;
+  height: number;
   style: React.CSSProperties;
-}> = ({ text, top, style }) => (
+}> = ({ text, top, height, style }) => (
   <div
     style={{
       position: "absolute",
-      left: 960,
+      left: 0,
+      right: 0,
       top,
-      padding: "10px 26px",
-      borderRadius: 16,
-      background: COLORS.white,
-      border: `4px solid ${COLORS.purple}`,
-      color: COLORS.purple,
-      fontSize: 44,
-      fontWeight: 800,
+      display: "flex",
+      justifyContent: "center",
       ...style,
     }}
   >
-    {text}
+    <div
+      style={{
+        height,
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 28px",
+        borderRadius: 16,
+        background: COLORS.white,
+        border: `4px solid ${COLORS.purple}`,
+        color: COLORS.purple,
+        fontSize: 36,
+        fontWeight: 800,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {text}
+    </div>
   </div>
 );
+
+/** 注記が 2 行以上のとき、図（SDK の枠・矢印・ノード）を上端を軸に縮める。scale 1 なら包まない */
+export const DiagramScale: React.FC<{
+  scale: number;
+  origin: { x: number; y: number };
+  children: React.ReactNode;
+}> = ({ scale, origin, children }) =>
+  scale === 1 ? (
+    <>{children}</>
+  ) : (
+    <AbsoluteFill
+      style={{
+        transform: `scale(${scale})`,
+        transformOrigin: `${origin.x}px ${origin.y}px`,
+      }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
 
 /** いま点灯している Hook の説明（案 C） */
 export const HookBanner: React.FC<{

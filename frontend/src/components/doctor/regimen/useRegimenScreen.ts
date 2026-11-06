@@ -45,7 +45,8 @@ function focusField(fieldId: string): void {
 /**
  * D4 レジメンの画面の状態（タブ・表示の段階・下書き・確認・採用）。
  * 既存のタブを開くと POST /regimen-drafts {skill}（開いた下書きがあればそれ）、
- * 「＋ 新しいレジメン」は新しい下書きを作る。採用・破棄の後はタブの元を読み直す。
+ * 「＋ 新しいレジメン」は新しい下書きを作る。タブを開いた後・採用・破棄の後はタブの元を
+ * 読み直す。
  * Claude の ask は、赤枠の欄（行・節）を直接直せば答えたことにする（answered）。
  */
 export function useRegimenScreen(handleError: (err: unknown) => string) {
@@ -89,6 +90,8 @@ export function useRegimenScreen(handleError: (err: unknown) => string) {
       } else if (tab.kind === "draft") {
         setSelected(tab.key);
         await editor.load(tab.draftId);
+        // 離れた下書きのタブの名前を、往復・直接編集の後の値にする
+        await catalog.reload();
       } else {
         setSelected(NEW_TAB_KEY);
         const opened = await editor.open({ from: "new" });

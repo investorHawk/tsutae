@@ -28,12 +28,21 @@ const sceneLabel = (scene) => {
   return `${scene.kind}（${parts}）`;
 };
 
-const HEADER = (title) =>
+const SUBTITLE_RULE =
+  "「字幕の文」の列（構成データの `narration`）を字幕にする（2 行以内・1 行 25 字前後に自動で区切る）。別の字幕（`caption`）がある場面だけ「字幕」の列に出す。字数は空白を除いて数える。";
+
+/** 声のある案（案 B）は、字幕の文が先生の読み上げる原稿でもある */
+const voiceRule = (sb) =>
+  sb.voice
+    ? `この案は声つき。「字幕の文」は先生が場面ごとに読み上げる原稿でもある。録った声は \`video/public/voice/\` に場面 id の頭（\`b01\`〜\`b${String(sb.scenes.length).padStart(2, "0")}\`）の名前で置くと、場面の頭から 0.3 秒後に鳴る（場面の秒数は変わらない）。${SUBTITLE_RULE}`
+    : `動画に音声のナレーションは入れない（字幕だけ）。${SUBTITLE_RULE}`;
+
+const HEADER = (sb) =>
   [
-    `# 字幕の文 ${title}`,
+    `# 字幕の文 ${sb.title}`,
     "",
     "生成物: `cd video && npm run docs` で `video/src/storyboards/` から書き出す。手で直さず構成データを直す。",
-    "動画に音声のナレーションは入れない。「字幕の文」の列（構成データの `narration`）を字幕にする（2 行以内・1 行 25 字前後に自動で区切る）。別の字幕（`caption`）がある場面だけ「字幕」の列に出す。字数は空白を除いて数える。",
+    voiceRule(sb),
     "",
   ].join("\n");
 
@@ -48,7 +57,7 @@ const narrationDoc = (sb) => {
   const total = sb.scenes.reduce((sum, s) => sum + countChars(s.narration), 0);
   const seconds = sb.scenes.reduce((sum, s) => sum + s.seconds, 0);
   return [
-    HEADER(sb.title),
+    HEADER(sb),
     `合計 ${seconds} 秒・字幕の文 ${total} 字（${(total / seconds).toFixed(1)} 字/秒）。Composition: \`${sb.compositionId}\`。`,
     "",
     "| 時刻 | 秒 | 場面 | 画面に出すもの | 字幕 | 字幕の文 | 字数 |",

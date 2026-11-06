@@ -14,6 +14,7 @@ import {
   RegimenFormContext,
   type RegimenFormContextValue,
 } from "./formContext";
+import { regimenNameOf } from "./regimenName";
 import { regimenTabs } from "./tabList";
 import { useRegimenScreen, type RegimenView } from "./useRegimenScreen";
 import type { RegimenDraft } from "../../../api/regimenTypes";
@@ -21,7 +22,7 @@ import "./regimen.css";
 import "./regimen-panels.css";
 
 function headingOf(draft: RegimenDraft, view: RegimenView): string {
-  const name = draft.form.basic.display_name ?? "新しいレジメン";
+  const name = regimenNameOf(draft.form.basic.display_name);
   const existing = draft.base_version !== null;
   if (view === "confirm") {
     return existing
@@ -52,8 +53,8 @@ export default function RegimenSettings() {
   const { catalog, editor, confirm, view } = screen;
   const draft = editor.draft;
   const tabs = useMemo(
-    () => regimenTabs(catalog.regimens, catalog.drafts),
-    [catalog.regimens, catalog.drafts],
+    () => regimenTabs(catalog.regimens, catalog.drafts, draft),
+    [catalog.regimens, catalog.drafts, draft],
   );
   const working = editor.working;
   // 別の下書きを開いている間（タブの切り替え中）も、今の下書きの操作を止める

@@ -82,10 +82,11 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
   F8: {
     id: "F8",
     slug: "doctor_settings",
-    scene: "D4",
+    scene: "D4 レジメン",
     device: "pc",
-    minSeconds: 18,
-    content: "一文を入力 → 待ち（早送り可）→ 差分 → 承認 → 版が上がる",
+    minSeconds: 20,
+    content:
+      "「設定を変える」の「レジメン」→「＋ 新しいレジメン」→「Claude に伝える」に文を貼って送る → 待ち（早送り可）→ 左のフォームが埋まる →「確認へ進む」→ 確かめた印 →「採用して登録」",
   },
   F9: {
     id: "F9",

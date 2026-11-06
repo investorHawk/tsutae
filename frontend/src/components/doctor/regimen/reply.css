@@ -1,0 +1,43 @@
+/* D4 レジメン: Claude の返答の塊（段落・箇条書き・表）。吹き出しは white-space: pre-wrap。 */
+
+.doctor-app .rf-reply-p,
+.doctor-app .rf-reply-list,
+.doctor-app .rf-reply-table {
+  margin: 0;
+}
+
+.doctor-app .rf-reply-p + *,
+.doctor-app .rf-reply-list + *,
+.doctor-app .rf-reply-table + * {
+  margin-top: 8px;
+}
+
+.doctor-app .rf-reply-list {
+  padding-left: 1.4em;
+}
+
+.doctor-app .rf-reply-list li + li,
+.doctor-app .rf-reply-list .rf-reply-list {
+  margin-top: 2px;
+}
+
+/* 吹き出し（右の列で 400px 前後）からはみ出さないよう、セルの中で折り返す */
+.doctor-app .rf-reply-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.doctor-app .rf-reply-table th,
+.doctor-app .rf-reply-table td {
+  padding: 3px 6px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--d-border);
+}
+
+.doctor-app .rf-reply-table th {
+  font-weight: 700;
+  background: var(--d-surface);
+}

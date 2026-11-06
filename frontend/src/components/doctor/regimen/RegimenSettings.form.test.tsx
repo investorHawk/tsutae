@@ -322,6 +322,8 @@ describe("D4 レジメン: タブ", () => {
       [discardKey(1)]: fixtureBody("doctor_regimen_draft_discard") as object,
     });
     await openDraft();
+    // 開いた時（初めと、下書きのタブを開いた後）に2回読む。捨てた後にもう1回
+    await waitFor(() => expect(countOf(fetchMock, DRAFTS)).toBe(2));
     await userEvent.click(
       screen.getByRole("button", { name: "下書きを捨てる" }),
     );
@@ -331,7 +333,7 @@ describe("D4 レジメン: タブ", () => {
     expect(countOf(fetchMock, discardKey(1))).toBe(1);
     expect(await screen.findByText("下書きを捨てました")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /FOLFIRI＋BV/ })).toBeNull();
-    expect(countOf(fetchMock, DRAFTS)).toBe(2);
+    expect(countOf(fetchMock, DRAFTS)).toBe(3);
   });
 });
 

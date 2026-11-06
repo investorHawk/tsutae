@@ -1,6 +1,7 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { Caption } from "../components/Caption";
 import { Clock } from "../components/Clock";
+import { clockSecondsOf } from "../lib/clock";
 import { fitCamera, lerpCamera, ReportImage } from "../components/ReportImage";
 import { COLORS, FONT_FAMILY } from "../theme";
 import { appear, CLAMP } from "./anim";
@@ -87,7 +88,7 @@ const AlertList: React.FC<{
   </div>
 );
 
-/** 机に A4 = sample-report.png がすっと置かれ、要確認の 3 行が光る。時計 0:30 */
+/** 机に A4 = sample-report.png がすっと置かれ、要確認の 3 行が光る。時計 clockSeconds（既定 0:30。案 B は 0:20） */
 export const AfterScene: React.FC<SceneComponentProps> = ({
   scene,
   durationInFrames,
@@ -101,7 +102,7 @@ export const AfterScene: React.FC<SceneComponentProps> = ({
   const elapsed = interpolate(
     frame,
     [zoomAt, durationInFrames * 0.75],
-    [0, 30],
+    [0, clockSecondsOf("after", scene.props)],
     CLAMP,
   );
   return (

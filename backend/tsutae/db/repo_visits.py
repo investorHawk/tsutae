@@ -27,6 +27,9 @@ visits の行そのものは残す（状態の履歴として）。
   VisitAlreadyPrintedError。
   どちらも記録の保存と同じトランザクションで決めるので、印刷と追加はどちらかが先になる
   （`repo_visit_regen`）
+- 費用の歯止め: 1人の患者が1日に開ける受診は `MAX_OPEN_VISITS_PER_DAY` 件まで。新しい番号が
+  それを超えると TooManyOpenVisitsError（何も保存しない）。自動の変換し直しは1受診3回までなので、
+  1人の患者の1日の変換は「受診の数 × (1 + 3)」回までになる
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ from typing import Any
 from tsutae.config import now as clock_now
 from tsutae.db.connection import (
     NotFoundError,
+    TooManyOpenVisitsError,
     VisitAlreadyPrintedError,
     VisitClosedError,
     date_from_db,
@@ -66,6 +70,8 @@ from tsutae.schemas import ReportData, Timeline
 
 VISIT_STATUSES = ("generating", "ready", "printed", "failed")
 RECEPTION_NO_MAX = 32
+# 番号を間違えて増える分は残し、番号を変えて送り続ける分を止める（1人の患者の1日の費用の歯止め）
+MAX_OPEN_VISITS_PER_DAY = 5
 
 _VISIT_COLUMNS = (
     "id, patient_id, reception_no, visit_date, created_at, status, expires_at,"
@@ -155,7 +161,8 @@ def create_visit_once(
     （`begin_added_records_on_open_visits`）。新しく作る受診は最初の生成で全ての記録を読むので
     動かさない。
     その患者に今日の印刷済みの受診があれば、番号を問わず VisitAlreadyPrintedError（何も
-    保存しない。記録は端末に残る）。
+    保存しない。記録は端末に残る）。新しい受診を作るときに、その日の開いた受診が上限に
+    達していれば TooManyOpenVisitsError（同じく何も保存しない）。
     """
     cleaned = _check_new_visit(conn, pid, reception_no, course_no)
     with write_transaction(conn):
@@ -171,6 +178,10 @@ def create_visit_once(
             " AND visit_date = ? AND expires_at > ? ORDER BY id LIMIT 1",
             (pid, cleaned, day, now_db),
         ).fetchone()
+        if row is None and _open_visits_on(conn, pid, day, now_db) >= (
+            MAX_OPEN_VISITS_PER_DAY
+        ):
+            raise TooManyOpenVisitsError("too many open visits today")
         added = insert_received_rows(conn, pid, entries)
         started = (
             begin_added_records_on_open_visits(conn, pid, day, now_db) if added else ()
@@ -192,6 +203,17 @@ def _printed_on(conn: sqlite3.Connection, pid: str, day: str | None) -> bool:
         (pid, day),
     ).fetchone()
     return row is not None
+
+
+def _open_visits_on(
+    conn: sqlite3.Connection, pid: str, day: str | None, now_db: str
+) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM visits WHERE patient_id = ? AND visit_date = ?"
+        + STATUS_GUARD,
+        (pid, day, now_db),
+    ).fetchone()
+    return int(row["n"])
 
 
 def _check_new_visit(

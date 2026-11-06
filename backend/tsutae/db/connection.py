@@ -46,6 +46,10 @@ class VisitAlreadyPrintedError(ValueError):
     """その患者に今日の印刷済みの受診があるのに、受付に記録が届いた（何も保存しない）。"""
 
 
+class TooManyOpenVisitsError(ValueError):
+    """その患者のその日の開いた受診が上限に達したのに、新しい番号が届いた（何も保存しない）。"""
+
+
 def connect(path: Path) -> sqlite3.Connection:
     """SQLite に接続する。
 

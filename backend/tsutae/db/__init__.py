@@ -10,6 +10,7 @@
 
 from tsutae.db.connection import (
     NotFoundError,
+    TooManyOpenVisitsError,
     VisitAlreadyPrintedError,
     VisitClosedError,
     connect,
@@ -86,6 +87,7 @@ from tsutae.db.repo_visit_regen import (
     take_regen_pending,
 )
 from tsutae.db.repo_visits import (
+    MAX_OPEN_VISITS_PER_DAY,
     VisitReceipt,
     begin_regeneration,
     create_visit,
@@ -106,6 +108,7 @@ from tsutae.db.repo_visits import (
 
 __all__ = [
     "MAX_PUSH_SUBSCRIPTIONS_PER_PATIENT",
+    "MAX_OPEN_VISITS_PER_DAY",
     "REGEN_AUTO_MAX",
     "NotFoundError",
     "PATIENT_ID_PATTERN",
@@ -113,6 +116,7 @@ __all__ = [
     "QuestionConflictError",
     "QuestionInputError",
     "ReceivedEntry",
+    "TooManyOpenVisitsError",
     "VisitAlreadyPrintedError",
     "VisitClosedError",
     "VisitReceipt",

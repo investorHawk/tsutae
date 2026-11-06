@@ -240,7 +240,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `POST /api/patient/register` | `{pid}` | `{ok: true}` + Cookie。未知の pid は 404 `{"error":"unknown_patient"}` |
 | `GET /api/patient/strings` | — | `patient_strings.json` そのもの |
 | `GET /api/patient/{pid}/questions` | — | `{skill_version, questions: Question[], fixed_rules: [{question_key, threshold_celsius, patient_string_key}], today}`（`today` はサーバーの今日 `YYYY-MM-DD`（JST。`config.today()`）。今日の記録の見出しの日付に使い、端末の時計は使わない。`fixed_rules` は画面のコードで比べる規則で、体温はサーバーに送らない） |
-| `POST /api/visit` | `{reception_no, entries?}`（Cookie で患者識別。`entries` は §12） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド。今日の印刷済みの受診があれば 409 `already_printed`（§12） |
+| `POST /api/visit` | `{reception_no, entries?}`（Cookie で患者識別。`entries` は §12） | `{ok: true, message_key: "visit.done"}`。変換はバックグラウンド。今日の印刷済みの受診があれば 409 `already_printed`、その日の開いた受診が5件あるのに新しい番号なら 409 `too_many_visits`（§12） |
 
 記録の経路（`POST`・`GET /{pid}/entries`、`POST /{pid}/entries/{id}/undo`）は外した。記録はスマホに置く（§12）。
 
@@ -477,6 +477,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - 生成の終わり（`save_visit_result`）: `regen_pending` があり回数が残っていれば、結果は保存して状態は generating のままにする（`hold_for_regeneration`）。ready を一瞬でも見せないので、前のレポートでの印刷が割り込めない（`mark_printed(refuse_generating=True)` が 409 `generating`）。`run_generation` が `take_regen_pending` で印を下ろして次の回を回す。何件増えても1回。failed で終わった回も同じ。使い切っていれば ready のまま印が残り、D3 に「追加の記録あり」、医師の「AI でもう一度変換」（`begin_regeneration`）で下りる
 - 変換し直しが failed で終わっても前のレポートは残る。D3 の failed の行は `has_report` のとき「作り直せませんでした」の文とともに印刷・印刷済みにする・レポートを開くを出す
 - 起動時・周期の回収（`api.orphans`）は Claude を呼ばず全ての記録を読むので、自動の回数を使わない。それまでの `regen_pending` は先に下ろし（`clear_regen_pending`）、回収の最中に届いた分は `regen_count` を足さずにもう1回読む（`run_generation(counted=False)`）
+- 費用の歯止め: 1人の患者が1日に開ける受診は5件まで（`MAX_OPEN_VISITS_PER_DAY`）。`create_visit_once` が同じトランザクションで数え、超える新しい番号は `TooManyOpenVisitsError`（何も保存しない。記録は端末に残る）→ 409 `too_many_visits`（`visit.too_many`）。開いている番号への送信は通す。今日の印刷済みの確認が先。1人の患者の1日の自動の変換は最大 5 ×（1 + 3）= 20 回で止まる。医師が押す分は数えない
 - 自動で変換し直すときのログは `regenerate_requested`（decision `added_records`。医師が押したときは decision なし。文面なし）
 - 今日の印刷済みの受診: `create_visit_once` は最初に書き込みのロックを取り（`BEGIN IMMEDIATE`）、その患者に `visit_date` が今日で printed の受診があれば `VisitAlreadyPrintedError`（何も保存しない）→ 409 `already_printed`（`visit.already_printed`）。印刷と追加はどちらかが先になり、受け取った記録が前のレポートの印刷で消えることはない。ただし回数を使い切った後の「追加の記録あり」は、医師が見たうえでそのまま印刷でき、その記録も一緒に消える
 - `doctor_masks` は `entries.id` で引く。統合はある行を変えない（新しい ID だけを足す）ので、変換し直しても同じ記録に効く

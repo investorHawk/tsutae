@@ -51,7 +51,11 @@ from api_helpers import (  # noqa: E402
     seed_synthetic,
     set_patient_cookie,
 )
-from dump_api_device import demo_tools_flow, record_mark_flow  # noqa: E402
+from dump_api_device import (  # noqa: E402
+    demo_tools_flow,
+    record_mark_flow,
+    too_many_visits_flow,
+)
 from dump_api_push import push_flow  # noqa: E402
 from dump_api_regimen import regimen_drafts_flow  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
@@ -419,6 +423,7 @@ def _patient_flow(rec: Recorder) -> None:
     record_mark_flow(rec, DEMO, EVAL_A, FIXED_NOW, f"{REGIMEN_SKILL}@1")
     rec.call("visit", "POST", "/api/visit", {"reception_no": "A-023"})
     rec.call("visit_invalid", "POST", "/api/visit", {"reception_no": "   "}, expect=422)
+    too_many_visits_flow(rec)
     push_flow(rec, DEMO)
     with rec.without_cookies():
         rec.call(

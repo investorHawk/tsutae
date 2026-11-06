@@ -7,10 +7,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from unittest.mock import patch
 
 from api_helpers import db_conn, set_patient_cookie
 
 from tsutae import db
+from tsutae.db import repo_visits
 from tsutae.schemas import EntryCreate
 
 
@@ -95,6 +97,18 @@ def _undo_flow(rec: Any, demo: str, other: str, recorded_at: str) -> None:
             "POST",
             f"/api/patient/{other}/unregister",
             {"endpoint": None},
+        )
+
+
+def too_many_visits_flow(rec: Any) -> None:
+    """上限を1にして新しい番号を送る（断られるので受診は増えず、他の fixture の id は動かない）。"""
+    with patch.object(repo_visits, "MAX_OPEN_VISITS_PER_DAY", 1):
+        rec.call(
+            "visit_too_many",
+            "POST",
+            "/api/visit",
+            {"reception_no": "A-998"},
+            expect=409,
         )
 
 

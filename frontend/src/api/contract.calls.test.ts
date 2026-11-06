@@ -206,6 +206,7 @@ const CALLS: Readonly<Record<string, Call>> = {
   visit_invalid: visit,
   visit_no_course: visit,
   visit_already_printed: visit,
+  visit_too_many: visit,
   visit_with_entries: visit,
   visit_entries_invalid: visit,
   doctor_login: doctorLogin,

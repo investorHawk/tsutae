@@ -16,6 +16,8 @@
   `db.REGEN_AUTO_MAX` 回まで。超えたら記録だけ受け取る（D3 の「追加の記録あり」）。ログは
   `regenerate_requested`（decision `added_records`。文面なし）。その患者に今日の印刷済みの受診が
   あれば、どの番号でも 409 `already_printed`（何も保存しない。記録は端末に残る）
+- 費用の歯止め: 1人の患者が1日に開ける受診は `db.MAX_OPEN_VISITS_PER_DAY` 件まで。超える新しい
+  番号は 409 `too_many_visits`（何も保存しない。開いている番号への送信は通す）
 - 変換は BackgroundTasks で。新しい接続を開き、`app.state.runner_factory()` の runner で
   `tsutae.pipeline.service.generate_visit_report` を呼ぶ（呼ぶときに属性を引くので
   テストで差し替えられる）。例外は外へ出さず（型名だけログ）、生成中のままなら failed
@@ -111,6 +113,8 @@ def create_visit(
         )
     except db.VisitAlreadyPrintedError as exc:
         raise ApiError(409, "already_printed") from exc
+    except db.TooManyOpenVisitsError as exc:
+        raise ApiError(409, "too_many_visits") from exc
     for visit_id in receipt.restarted:
         _log_added_records(conn, visit_id)
     new_visit = (receipt.visit_id,) if receipt.created else ()

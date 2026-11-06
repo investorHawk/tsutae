@@ -178,6 +178,21 @@ describe("Visit (P3)", () => {
     await expect(savedInputs()).resolves.toHaveLength(ENTRIES.length);
   });
 
+  it("409 too_many_visits: visit.too_many, the form stays and the records stay", async () => {
+    await seedDevice(ENTRIES);
+    mockPatientApi({
+      visit: () => jsonResponse(fixtureBody("visit_too_many"), 409),
+    });
+    renderPatient(ROUTES, "/visit");
+    await userEvent.type(field(), "A-023");
+    await userEvent.click(submit());
+    expect(await screen.findByText(s("visit.too_many"))).toBeInTheDocument();
+    expect(screen.queryByText(s("error.generic"))).toBeNull();
+    expect(screen.queryByText(s("visit.done"))).toBeNull();
+    expect(field()).toHaveValue("A-023");
+    await expect(savedInputs()).resolves.toHaveLength(ENTRIES.length);
+  });
+
   it("without a saved pid: the number form and no request", async () => {
     clearPid();
     const fetchMock = mockPatientApi();

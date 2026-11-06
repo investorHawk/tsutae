@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/visit",
+  "request": {
+    "reception_no": "A-998"
+  },
+  "status": 409,
+  "body": {
+    "error": "too_many_visits"
+  }
+}

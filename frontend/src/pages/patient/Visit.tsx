@@ -19,6 +19,8 @@ const INVALID_KEY = "visit.invalid";
 const NO_COURSE_KEY = "visit.no_course";
 /** その患者の今日の受診が印刷済み（409 already_printed）。記録は端末に残る（§6）。 */
 const ALREADY_PRINTED_KEY = "visit.already_printed";
+/** 今日の開いた受診が上限に達した（409 too_many_visits）。記録は端末に残る。 */
+const TOO_MANY_KEY = "visit.too_many";
 const REGISTERED_KEY = "register.done";
 /** 受付番号は送る前にサーバーと同じ検査をしているので、422・413 は記録が断られたとき（§5.5）。 */
 const RECORDS_REJECTED_KEY = "visit.records_rejected";
@@ -35,6 +37,9 @@ function errorKeyOf(err: unknown): string {
   }
   if (isApiError(err) && err.status === 409 && err.code === "already_printed") {
     return ALREADY_PRINTED_KEY;
+  }
+  if (isApiError(err) && err.status === 409 && err.code === "too_many_visits") {
+    return TOO_MANY_KEY;
   }
   return GENERIC_ERROR_KEY;
 }

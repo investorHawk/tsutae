@@ -107,6 +107,41 @@ def _pin_clock(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 1人の患者が1日に開ける受診の数
+# ---------------------------------------------------------------------------
+
+
+def _fill_open_visits(conn: sqlite3.Connection, pid: str = PID) -> None:
+    for n in range(db.MAX_OPEN_VISITS_PER_DAY):
+        _send(conn, pid=pid, reception_no=f"X-{n}")
+
+
+def test_new_number_over_the_open_limit_is_refused_and_saves_nothing(
+    conn: sqlite3.Connection,
+) -> None:
+    _fill_open_visits(conn)
+    with pytest.raises(db.TooManyOpenVisitsError):
+        _send(conn, UUID_A, reception_no="X-OVER")
+    assert _client_ids(conn) == []
+    assert len(db.list_visits(conn)) == db.MAX_OPEN_VISITS_PER_DAY
+    assert conn.in_transaction is False
+
+
+def test_open_number_at_the_limit_is_still_received(conn: sqlite3.Connection) -> None:
+    _fill_open_visits(conn)
+    receipt = _send(conn, UUID_A, reception_no="X-0")
+    assert receipt.created is False
+    assert _client_ids(conn) == [UUID_A]
+
+
+def test_closed_visits_are_not_counted_as_open(conn: sqlite3.Connection) -> None:
+    expired = now() - timedelta(minutes=1)
+    for n in range(db.MAX_OPEN_VISITS_PER_DAY):
+        db.create_visit(conn, PID, f"E-{n}", DAY, expired, 1)
+    assert _send(conn, UUID_A, reception_no="X-NEW").created is True
+
+
+# ---------------------------------------------------------------------------
 # 列と移行
 # ---------------------------------------------------------------------------
 

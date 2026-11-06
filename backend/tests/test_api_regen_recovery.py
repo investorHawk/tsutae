@@ -173,17 +173,18 @@ def test_row_waiting_its_turn_is_not_taken_by_the_stale_recovery(
             (dt_to_db(now() - stale_after * 2),),
         )
         conn.commit()
-    seen: list[list[int]] = []
+    waiting = _visit_of(client, "A-999")["id"]
+    seen: list[tuple[str, list[int]]] = []
 
     def look() -> None:
+        # 生成の中の例外は run_generation が吸うので、ここでは記録だけして外で確かめる
         with db_conn(client.app) as conn:
-            seen.append(orphans.find_stale(conn, now(), stale_after))
-            waiting = db.get_visit(conn, _visit_of(client, "A-999")["id"])
-        assert waiting["status"] == "generating"
+            status = db.get_visit(conn, waiting)["status"]
+            seen.append((status, orphans.find_stale(conn, now(), stale_after)))
 
     _use(client, InterruptingRunner(FakeRunner(), _once(look)))
     assert _post(client, [_text(UUID_B, TEXT_B)]).status_code == 200
-    assert seen == [[]]
+    assert seen == [("generating", [])]
 
 
 def _break_prepare(monkeypatch: pytest.MonkeyPatch) -> None:

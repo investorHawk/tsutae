@@ -311,6 +311,9 @@ def _visit_summary(conn: sqlite3.Connection, visit: dict[str, Any]) -> dict[str,
         "unprocessed_count": len(_unprocessed(conn, visit["id"])),
         "regen_pending": visit["regen_pending"],
         "regen_count": visit["regen_count"],
+        # `GET /visits/{id}/report` が返せるか。変換し直しが失敗しても前のレポートは開ける
+        "has_report": visit["status"] != "generating"
+        and db.has_report(conn, visit["id"]),
     }
 
 

@@ -341,6 +341,8 @@ export interface VisitSummary {
   regen_pending: boolean;
   /** 記録が増えて自動で変換し直した回数 */
   regen_count: number;
+  /** レポートを開ける。変換し直しが失敗した行でも、前のレポートが残っていれば true */
+  has_report: boolean;
 }
 
 export interface VisitsResponse {

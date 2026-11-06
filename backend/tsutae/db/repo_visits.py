@@ -489,6 +489,12 @@ def get_report(conn: sqlite3.Connection, vid: int) -> tuple[str, ReportData] | N
     return row["html"], ReportData.model_validate_json(row["data_json"])
 
 
+def has_report(conn: sqlite3.Connection, vid: int) -> bool:
+    """レポートの行があるか（中身は読まない）。"""
+    row = conn.execute("SELECT 1 FROM reports WHERE visit_id = ?", (vid,)).fetchone()
+    return row is not None
+
+
 def _erase_results(conn: sqlite3.Connection, vid: int) -> None:
     """reports・timelines・医師の伏せ字を消し reception_no を NULL にする。
 

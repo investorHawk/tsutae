@@ -15,7 +15,8 @@
         "expires_at": "2026-11-10T10:00:00+09:00",
         "unprocessed_count": 1,
         "regen_pending": false,
-        "regen_count": 0
+        "regen_count": 0,
+        "has_report": true
       },
       {
         "id": 2,
@@ -27,7 +28,8 @@
         "expires_at": "2026-11-10T10:00:00+09:00",
         "unprocessed_count": 0,
         "regen_pending": false,
-        "regen_count": 0
+        "regen_count": 0,
+        "has_report": false
       },
       {
         "id": 3,
@@ -39,7 +41,8 @@
         "expires_at": "2026-11-10T10:00:00+09:00",
         "unprocessed_count": 0,
         "regen_pending": false,
-        "regen_count": 0
+        "regen_count": 0,
+        "has_report": false
       }
     ]
   }

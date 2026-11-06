@@ -21,6 +21,7 @@ function visit(patch: Partial<VisitSummary>): VisitSummary {
     unprocessed_count: 0,
     regen_pending: false,
     regen_count: 0,
+    has_report: patch.status === undefined || patch.status === "ready",
     ...patch,
   };
 }

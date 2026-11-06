@@ -83,7 +83,8 @@ export function isVisitSummary(v: Item): boolean {
     isIsoDateTime(v.expires_at) &&
     isInt(v.unprocessed_count) &&
     isBool(v.regen_pending) &&
-    isInt(v.regen_count)
+    isInt(v.regen_count) &&
+    isBool(v.has_report)
   );
 }
 

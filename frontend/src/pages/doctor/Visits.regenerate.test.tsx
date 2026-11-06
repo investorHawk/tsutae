@@ -32,6 +32,7 @@ function visit(patch: Partial<VisitSummary>): VisitSummary {
     unprocessed_count: 0,
     regen_pending: false,
     regen_count: 0,
+    has_report: patch.status === undefined || patch.status === "ready",
     ...patch,
   };
 }
@@ -273,6 +274,58 @@ describe("Visits: 記録が追加された受診", () => {
     renderVisits();
     await screen.findByText("A-023");
     expect(within(rowOf("A-023")).queryByText(REBUILT)).toBeNull();
+  });
+
+  describe("変換し直しが失敗して前のレポートが残っている行", () => {
+    const PRINTED_12 = "POST /api/doctor/visits/12/printed";
+    const failedWithReport = () =>
+      visit({ status: "failed", regen_count: 1, has_report: true });
+
+    it("前のレポートを開けて、印刷でき、作り直せる", async () => {
+      mockApi({ [LIST]: { visits: [failedWithReport()] } });
+      renderVisits();
+      await screen.findByText("A-023");
+      const row = within(rowOf("A-023"));
+      expect(row.getByText(/作り直せませんでした/)).toBeInTheDocument();
+      expect(row.getByText(/新しい記録が入っていない/)).toBeInTheDocument();
+      expect(row.queryByText("レポートを作れませんでした")).toBeNull();
+      expect(row.getByRole("button", { name: "印刷" })).toBeEnabled();
+      expect(row.getByRole("button", { name: "印刷済みにする" })).toBeEnabled();
+      expect(row.getByRole("link", { name: "レポートを開く" })).toHaveAttribute(
+        "href",
+        "/api/doctor/visits/12/report",
+      );
+      expect(buttonIn("A-023")).toBeEnabled();
+    });
+
+    it("印刷済みにできる", async () => {
+      const fetchMock = mockApi({
+        [LIST]: { visits: [failedWithReport()] },
+        [PRINTED_12]: { ok: true },
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      const row = within(rowOf("A-023"));
+      await user().click(row.getByRole("button", { name: "印刷済みにする" }));
+      await user().click(
+        row.getByRole("button", { name: "削除する（印刷済み）" }),
+      );
+      await waitFor(() => expect(countOf(fetchMock, PRINTED_12)).toBe(1));
+    });
+
+    it("レポートが無い失敗の行には出さない", async () => {
+      mockApi({
+        [LIST]: { visits: [visit({ status: "failed", has_report: false })] },
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      const row = within(rowOf("A-023"));
+      expect(row.getByText("レポートを作れませんでした")).toBeInTheDocument();
+      expect(row.queryByRole("button", { name: "印刷" })).toBeNull();
+      expect(row.queryByRole("button", { name: "印刷済みにする" })).toBeNull();
+      expect(row.queryByRole("link", { name: "レポートを開く" })).toBeNull();
+      expect(buttonIn("A-023")).toBeEnabled();
+    });
   });
 
   it("追加の記録がある AI の結果の ready にも「AI でもう一度変換」を出し、押せる", async () => {

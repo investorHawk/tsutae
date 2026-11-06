@@ -93,6 +93,7 @@ def test_list_visits(client: TestClient) -> None:
         "unprocessed_count",
         "regen_pending",
         "regen_count",
+        "has_report",
     }
     assert item["id"] == visit["id"]
     assert item["reception_no"] == "A-023"
@@ -100,6 +101,7 @@ def test_list_visits(client: TestClient) -> None:
     assert item["status"] == "ready"
     assert item["fallback"] is True  # 台本なしの FakeRunner
     assert item["unprocessed_count"] == 0
+    assert item["has_report"] is True
     assert item["created_at"].endswith("+09:00")
     assert item["expires_at"].endswith("+09:00")
 

@@ -254,7 +254,7 @@ ClaudeAgentOptions の要点: `cwd=str(SKILLS_HOME)`, `setting_sources=["project
 | `GET /api/doctor/patients` | `{patients: [{id, regimen, created_at, register_url}]}` |
 | `POST /api/doctor/patients {regimen}` | `{id, register_url}`（register_url = `{public_base_url}/register?pid=<id>`、登録用 QR はフロントで描く。QR はアプリを入れる入口で、受診の受付には使わない。受付は受診タブ `/visit`） |
 | `GET /api/doctor/patients/{pid}/courses` / `POST /api/doctor/courses`（`Course`） | `{courses: Course[]}` / `Course` |
-| `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count, regen_pending, regen_count}]}` |
+| `GET /api/doctor/visits` | `{visits: [{id, reception_no, patient_id, status, fallback, created_at, expires_at, unprocessed_count, regen_pending, regen_count, has_report}]}`。`has_report` は `GET .../report` が返せるか（生成中は false。変換し直しが failed でも前のレポートが残っていれば true） |
 | `GET /api/doctor/visits/{id}/report` | `text/html`（A4 印刷用） |
 | `POST /api/doctor/visits/{id}/printed` | `{ok}`（レポート・変換結果・受付番号を削除） |
 | `GET /api/doctor/visits/{id}/unprocessed` | `{entries: [{entry_id, record_date, reason, text}]}`（D6。原文。紙には載せない） |
@@ -475,6 +475,7 @@ Day は `course.course_for_date` のコースの実投与日を Day1 として�
 - 同じ患者の同じ ID は入れない
 - 2台目のスマホ（PR C。仕様書 §6）: その患者に新しい記録が1件以上入ると、その日の開いた受診を番号を問わず、`create_visit_once` が同じトランザクションで動かす（`begin_added_records_on_open_visits`。変換は患者の全ての記録を読むので、番号を間違えて2行あっても、どちらも全ての記録で変換する）。ready・failed で自動の回数（`REGEN_AUTO_MAX` = 3）が残っていれば generating に戻して `regen_count` を足し、API が生成を起動する（前のレポートは残る）。生成中か回数を使い切っていれば `regen_pending` を立てるだけ。新しい記録が無ければ何も変えない。別の日の受診は動かさない。同じ受付で複数の受診を動かすときは、1件ずつ順に生成する
 - 生成の終わり（`save_visit_result`）: `regen_pending` があり回数が残っていれば、結果は保存して状態は generating のままにする（`hold_for_regeneration`）。ready を一瞬でも見せないので、前のレポートでの印刷が割り込めない（`mark_printed(refuse_generating=True)` が 409 `generating`）。`run_generation` が `take_regen_pending` で印を下ろして次の回を回す。何件増えても1回。failed で終わった回も同じ。使い切っていれば ready のまま印が残り、D3 に「追加の記録あり」、医師の「AI でもう一度変換」（`begin_regeneration`）で下りる
+- 変換し直しが failed で終わっても前のレポートは残る。D3 の failed の行は `has_report` のとき「作り直せませんでした」の文とともに印刷・印刷済みにする・レポートを開くを出す
 - 起動時・周期の回収（`api.orphans`）は Claude を呼ばず全ての記録を読むので、自動の回数を使わない。それまでの `regen_pending` は先に下ろし（`clear_regen_pending`）、回収の最中に届いた分は `regen_count` を足さずにもう1回読む（`run_generation(counted=False)`）
 - 自動で変換し直すときのログは `regenerate_requested`（decision `added_records`。医師が押したときは decision なし。文面なし）
 - 今日の印刷済みの受診: `create_visit_once` は最初に書き込みのロックを取り（`BEGIN IMMEDIATE`）、その患者に `visit_date` が今日で printed の受診があれば `VisitAlreadyPrintedError`（何も保存しない）→ 409 `already_printed`（`visit.already_printed`）。印刷と追加はどちらかが先になり、受け取った記録が前のレポートの印刷で消えることはない。ただし回数を使い切った後の「追加の記録あり」は、医師が見たうえでそのまま印刷でき、その記録も一緒に消える

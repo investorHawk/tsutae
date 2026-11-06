@@ -611,6 +611,58 @@ def test_printed_today_is_refused_for_every_number(
     assert "regenerate_requested" not in [e["event"] for e in _events(client, vid)]
 
 
+def _open_two_numbers(client: TestClient) -> dict[str, int]:
+    """番号を間違えて2行できた受診（印刷すると受付番号が消えるので、先に控える）。"""
+    assert _post(client, [_too_sick(UUID_A)], no="A-023").status_code == 200
+    assert _post(client, [], no="A-999").status_code == 200
+    with db_conn(client.app) as conn:
+        return {v["reception_no"]: v["id"] for v in db.list_visits(conn)}
+
+
+@pytest.mark.parametrize(
+    ("printed", "still_open"), [("A-999", "A-023"), ("A-023", "A-999")]
+)
+@pytest.mark.parametrize(
+    "entries",
+    [
+        pytest.param([_text(UUID_B, TEXT_B)], id="new_record"),
+        pytest.param([_too_sick(UUID_A)], id="resent_record"),
+        pytest.param([], id="no_records"),
+    ],
+)
+def test_printed_today_is_refused_for_a_number_still_open(
+    client: TestClient,
+    pid: str,
+    printed: str,
+    still_open: str,
+    entries: list[dict[str, Any]],
+) -> None:
+    """もう片方の行は開いたまま。受け取ると、先に渡した紙に載らない記録が「届いた」になる（§6）。
+
+    開いた行が残るので、受付で受け取った記録は印刷の後も消えない。
+    """
+    ids = _open_two_numbers(client)
+    _print(client, ids[printed])
+    factory = _factory(client)
+    calls = factory.calls
+    row = _row(client)
+    assert row["reception_no"] == still_open
+    assert row["status"] == "ready"
+    events = _events(client, ids[still_open])
+    with db_conn(client.app) as conn:
+        kept = db.list_entries(conn, pid)
+    assert len(kept) == 1
+
+    r = _post(client, entries, no=still_open)
+
+    assert (r.status_code, r.json()) == (409, ALREADY_PRINTED)
+    assert factory.calls == calls
+    assert _row(client) == row
+    assert _events(client, ids[still_open]) == events
+    with db_conn(client.app) as conn:
+        assert db.list_entries(conn, pid) == kept
+
+
 def test_printed_is_refused_without_records_too(client: TestClient, pid: str) -> None:
     """1台の患者も変わる（同じ日の2回目の受診は受付で扱う）。"""
     assert client.post("/api/visit", json={"reception_no": "A-1"}).status_code == 200

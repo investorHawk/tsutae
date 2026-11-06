@@ -376,6 +376,8 @@ const BROKEN: Array<[string, string, Mutate]> = [
     "regen_count が無い",
     (b) => delete b.visits[0].regen_count,
   ],
+  ["doctor_visits", "has_report が無い", (b) => delete b.visits[0].has_report],
+  ["doctor_visits", "has_report が数", (b) => (b.visits[0].has_report = 1)],
   ["doctor_visits", "visits が無い", (b) => delete b.visits],
   // Skill の中身（GET skills/{name}）
   ["doctor_skill", "text が無い", (b) => delete b.text],

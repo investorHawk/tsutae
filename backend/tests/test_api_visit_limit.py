@@ -110,6 +110,8 @@ def test_changing_the_number_again_and_again_has_an_upper_bound_of_runs(
     for n in range(db.REGEN_AUTO_MAX * db.MAX_OPEN_VISITS_PER_DAY):
         assert _post(client, [_too_sick(_uuid(100 + n))], no="X-0").status_code == 200
     assert factory.calls == db.MAX_OPEN_VISITS_PER_DAY * (1 + db.REGEN_AUTO_MAX)
+    # architecture と repo_visits の説明に書いた数字（5 ×（1 + 3））
+    assert factory.calls == 20
 
 
 def test_refused_visit_logs_nothing_on_the_open_rows(

@@ -116,6 +116,12 @@ def _fill_open_visits(conn: sqlite3.Connection, pid: str = PID) -> None:
         _send(conn, pid=pid, reception_no=f"X-{n}")
 
 
+def test_limit_of_open_visits() -> None:
+    """費用の歯止めの値。変えるなら repo_visits の説明と台本の注意の数字も直す。"""
+    assert db.MAX_OPEN_VISITS_PER_DAY == 5
+    assert db.MAX_OPEN_VISITS_PER_DAY * (1 + REGEN_AUTO_MAX) == 20
+
+
 def test_new_number_over_the_open_limit_is_refused_and_saves_nothing(
     conn: sqlite3.Connection,
 ) -> None:
@@ -405,6 +411,24 @@ def test_printed_today_refuses_every_number_and_saves_nothing(
             _send(conn, UUID_B, reception_no=number)
     assert _client_ids(conn) == []
     assert len(db.list_visits(conn)) == visits
+    assert not conn.in_transaction
+
+
+def test_printed_today_refuses_a_number_still_open(conn: sqlite3.Connection) -> None:
+    """番号を間違えて2行できた後、片方を印刷すると、開いたままの番号へ送っても断る（§6）。"""
+    still_open = _send(conn, UUID_A).visit_id
+    _save_result(conn, still_open)
+    printed = _send(conn, reception_no="A-999").visit_id
+    _save_result(conn, printed)
+    assert db.mark_printed(conn, printed)
+    assert _state(conn, still_open) == ("ready", False, 0)
+
+    with pytest.raises(db.VisitAlreadyPrintedError):
+        _send(conn, UUID_B)
+
+    assert _state(conn, still_open) == ("ready", False, 0)
+    # 開いた行が残るので、前の記録は印刷の後も残る。断った記録は入らない
+    assert _client_ids(conn) == [UUID_A]
     assert not conn.in_transaction
 
 

@@ -278,6 +278,7 @@ describe("Visits: 記録が追加された受診", () => {
 
   describe("変換し直しが失敗して前のレポートが残っている行", () => {
     const PRINTED_12 = "POST /api/doctor/visits/12/printed";
+    const REGEN_12 = "POST /api/doctor/visits/12/regenerate";
     const failedWithReport = () =>
       visit({ status: "failed", regen_count: 1, has_report: true });
 
@@ -311,6 +312,52 @@ describe("Visits: 記録が追加された受診", () => {
         row.getByRole("button", { name: "削除する（印刷済み）" }),
       );
       await waitFor(() => expect(countOf(fetchMock, PRINTED_12)).toBe(1));
+    });
+
+    it("依頼している間は印刷も印刷済みも押せない（前のレポートで印刷済みにしない）", async () => {
+      const pending = deferred<Response>();
+      const fetchMock = mockApi({
+        [LIST]: { visits: [failedWithReport()] },
+        [REGEN_12]: () => pending.promise,
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      await user().click(buttonIn("A-023"));
+      const row = within(rowOf("A-023"));
+      expect(row.getByRole("button", { name: "変換を依頼中…" })).toBeDisabled();
+      expect(row.getByRole("button", { name: "印刷" })).toBeDisabled();
+      expect(
+        row.getByRole("button", { name: "印刷済みにする" }),
+      ).toBeDisabled();
+      await act(async () => {
+        pending.resolve(jsonResponse({ ok: true }));
+      });
+      await waitFor(() => expect(countOf(fetchMock, LIST)).toBe(2));
+    });
+
+    it("印刷済みの確認を開いたまま依頼しても、削除の確定は押せない", async () => {
+      const pending = deferred<Response>();
+      const fetchMock = mockApi({
+        [LIST]: { visits: [failedWithReport()] },
+        [REGEN_12]: () => pending.promise,
+        [PRINTED_12]: { ok: true },
+      });
+      renderVisits();
+      await screen.findByText("A-023");
+      const u = user();
+      const row = within(rowOf("A-023"));
+      await u.click(row.getByRole("button", { name: "印刷済みにする" }));
+      await u.click(buttonIn("A-023"));
+      const confirm = row.getByRole("button", {
+        name: "削除する（印刷済み）",
+      });
+      expect(confirm).toBeDisabled();
+      await u.click(confirm);
+      expect(countOf(fetchMock, PRINTED_12)).toBe(0);
+      await act(async () => {
+        pending.resolve(jsonResponse({ ok: true }));
+      });
+      await waitFor(() => expect(countOf(fetchMock, LIST)).toBe(2));
     });
 
     it("レポートが無い失敗の行には出さない", async () => {

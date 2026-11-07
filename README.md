@@ -13,7 +13,7 @@
 > Built with Claude (Code): Japan 2026 提出作品（ソロ、期間中の新規制作。初コミットは 2026-11-03 18:06 JST）。コードは全て Claude Code（Claude Opus）が書き、OpenAI Codex は読み取り専用のレビューにだけ使いました。
 
 ## デモ動画
-[デモ動画を見る（YouTube、2分55秒）](https://youtu.be/UzpKCuJvz3w)
+[デモ動画を見る（YouTube、2分55秒）](https://www.youtube.com/watch?v=33s0qx04mus)
 
 ## 作品概要
 このプロジェクトは、医師が、がん化学療法中の患者の副作用（有害事象）の症状を、短時間で抜けを減らして把握するためのものです。

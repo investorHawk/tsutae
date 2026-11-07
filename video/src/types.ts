@@ -7,6 +7,7 @@ export type SceneKind =
   | "problem"
   | "before"
   | "after"
+  | "notes"
   | "footage"
   | "pipeline"
   | "masking"
@@ -26,7 +27,8 @@ export type FootageId =
   | "F7"
   | "F8"
   | "F9"
-  | "F10";
+  | "F10"
+  | "F11";
 
 export type Variant = "a" | "b" | "c";
 
@@ -106,7 +108,15 @@ export interface SceneProps {
   clockSeconds?: number;
   /** after: 光らせる要確認の行（画像の行と同じ順） */
   alerts?: string[];
-  /** footage: 右の帯に出す一言（split の区間ごと。null は出さない） */
+  /** notes: 書式の違うノートの札 */
+  formatLabel?: string;
+  /** notes: 患者と医師の負担の札（2 つ） */
+  burdens?: string[];
+  /** notes: 最後に紺で強調する文 */
+  answer?: string;
+  /** notes: answer の下に大きく出す名前 */
+  brand?: string;
+  /** footage: 右の帯に出す一言（split の区間ごと。null は出さない。区間より多ければ最後の区間を均等に割って順に出す） */
   callouts?: (string | null)[];
   /** promises */
   dont?: string[];

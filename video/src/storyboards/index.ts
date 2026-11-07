@@ -28,7 +28,7 @@ export const STORYBOARDS: Storyboard[] = [
     variant: "b",
     compositionId: "DemoB",
     title: TITLE_B,
-    seconds: 165,
+    seconds: 175,
     scenes: scenesB,
     bgm: true,
     voice: true,

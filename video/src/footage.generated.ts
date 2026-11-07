@@ -11,6 +11,7 @@ export const screenFiles: Partial<Record<FootageId, string[]>> = {
   F4: ["screens/F4-1.png", "screens/F4-2.png"],
   F8: ["screens/F8-1.png", "screens/F8-2.png", "screens/F8-3.png"],
   F9: ["screens/F9-1.png"],
+  F11: ["screens/F11-1.png"],
 };
 
 /** BGM（public/audio/bgm.wav。scripts/make_bgm.py が書く）。無ければ null */

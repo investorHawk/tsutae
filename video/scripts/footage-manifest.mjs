@@ -15,9 +15,9 @@ const BGM_PATH = "audio/bgm.wav";
 
 const FOOTAGE_RE = /^(F\d{1,2})(?:[_-][^/]*)?\.(mp4|mov)$/i;
 const SCREEN_RE = /^(F\d{1,2})-(\d+)\.png$/i;
-// 声: 案 B の場面 id の頭（b01〜b11）＋任意の名前（b01_intro.m4a）。先生が場面ごとに録って置く
+// 声: 案 B の場面 id の頭（b01〜b12）＋任意の名前（b01_intro.m4a）。先生が場面ごとに録って置く
 const VOICE_RE = /^(b\d{2})(?:[_-][^/]*)?\.(m4a|mp3|wav)$/i;
-const KNOWN_IDS = new Set(Array.from({ length: 10 }, (_, i) => `F${i + 1}`));
+const KNOWN_IDS = new Set(Array.from({ length: 11 }, (_, i) => `F${i + 1}`));
 
 const listDir = (dir) => {
   if (!existsSync(dir)) return [];

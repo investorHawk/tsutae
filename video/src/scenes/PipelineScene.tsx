@@ -54,7 +54,7 @@ const useSchedule = (durationInFrames: number, hooks: HookId[]) => {
   return { frame, startOf, litOf, current, hookStartOf: hookStart };
 };
 
-/** 注記を出す時刻（場面の割合）。1 行目は narration の 2 文目（SDK の文）の頭、以降は少しずつ遅らせる */
+/** 注記を出す時刻（場面の割合）。1 行目は声の「Claude Agent SDK が」の頃、以降は少しずつ遅らせる */
 const noteStartRatio = (i: number): number => 0.42 + i * 0.12;
 
 /** SDK の枠・矢印・ノード（注記が 2 行以上なら縮める） */

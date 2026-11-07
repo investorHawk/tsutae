@@ -134,6 +134,15 @@ describe("index.html", () => {
     expect(fs.existsSync(inPublic("icon.svg"))).toBe(true);
   });
 
+  it("アイコンは文字を使わず、空色の地に紺の目と口の吹き出しで描く", () => {
+    const svg = fs.readFileSync(inPublic("icon.svg"), "utf8");
+    expect(svg).not.toContain("<text");
+    expect(svg).toContain('stop-color="#3aa8f3"');
+    expect(svg).toContain('stop-color="#1484de"');
+    expect(svg).toContain(`fill="${manifest.theme_color}"`);
+    expect(svg).toContain(`stroke="${manifest.theme_color}"`);
+  });
+
   it("Service Worker は開いただけでは登録しない（登録は設定でオンにしたときだけ）", () => {
     expect(indexHtml).not.toContain("serviceWorker");
   });

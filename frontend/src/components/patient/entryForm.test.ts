@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { QUESTIONS } from "../../pages/patient/testing/fixtures";
 import type { Question } from "../../api/types";
+import freeTextCases from "../../test/fixtures/free_text_cases.json";
 import {
   EMPTY_FORM,
   FREE_TEXT_MAX,
@@ -265,6 +266,50 @@ describe("setAnswer", () => {
     expect(first.answers).toEqual({ diarrhea: "present" });
     const cleared = setAnswer(changed, "diarrhea", "hard");
     expect(cleared.answers).toEqual({});
+  });
+});
+
+/**
+ * 受付で断られる自由記載を端末に保存しない（1件で受診の全体が 422 になる）。
+ * 同じ表を backend の test_free_text_cases.py も読み、ここで通した形を受付が受け取ることを見る。
+ */
+describe("backend の EntryCreate・VisitEntryIn と同じ表", () => {
+  it("表は空でなく、前からのずれの文字を含む", () => {
+    const inputs = freeTextCases.map((c) => c.input);
+    expect(inputs).toContain("\u0085");
+    expect(inputs).toContain("\u001c");
+    expect(inputs).toContain("\ud83d");
+  });
+
+  it.each(freeTextCases)("$name: 自由記載だけ", ({ input, expected }) => {
+    const result = buildEntry(QUESTIONS, form({ freeText: input }));
+    expect(result).toEqual(
+      expected === null
+        ? { ok: false, reason: "empty" }
+        : {
+            ok: true,
+            entry: { by_proxy: false, answers: [], free_text: expected },
+          },
+    );
+  });
+
+  it.each(freeTextCases)("$name: 回答と一緒", ({ input, expected }) => {
+    const result = buildEntry(
+      QUESTIONS,
+      form({ answers: { diarrhea: "present" }, freeText: input }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      entry: {
+        by_proxy: false,
+        answers: [{ question_key: "diarrhea", value: "present" }],
+        free_text: expected,
+      },
+    });
+  });
+
+  it.each(freeTextCases)("$name: 入力ありの判定", ({ input, expected }) => {
+    expect(hasInput(form({ freeText: input }))).toBe(expected !== null);
   });
 });
 

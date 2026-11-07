@@ -75,9 +75,9 @@ def _contradiction(**over: Any) -> dict[str, Any]:
 
 
 def _summary(**over: Any) -> dict[str, Any]:
-    # 口腔粘膜炎の最初の出来事は Day7 の記録の回想（おとといの夜 = 10/31、Day5）
+    # 口内炎の最初の出来事は Day7 の記録の回想（おとといの夜 = 10/31、Day5）
     base = {
-        "term": "口腔粘膜炎",
+        "term": "口内炎",
         "question_key": "stomatitis",
         "start_day": 5,
         "start_date": "2026-10-31",
@@ -87,12 +87,12 @@ def _summary(**over: Any) -> dict[str, Any]:
     return {**base, **over}
 
 
-# 口腔粘膜炎だけが present / improving の timeline（per_symptom は _summary() の1行で足りる）
+# 口内炎だけが present / improving の timeline（per_symptom は _summary() の1行で足りる）
 STOMATITIS_TIMELINE = {
     "events": [
         e
         for e in TIMELINE["events"]
-        if e["term"] == "口腔粘膜炎" or e["status"] == "absent"
+        if e["term"] == "口内炎" or e["status"] == "absent"
     ],
     "contradictions": [],
 }
@@ -390,7 +390,7 @@ def test_term_list_itself_has_no_severity_or_advice_words() -> None:
         ("下痢", None),
         ("下痢", "made_up_key"),
         ("しゃっくり", "diarrhea"),
-        ("手掌・足底発赤知覚不全症候群", "hand_foot"),  # FOLFOX の質問に無い
+        ("手足症候群", "hand_foot"),  # FOLFOX の質問に無い
     ],
 )
 def test_question_key_must_follow_the_term(term: str, question_key: Any) -> None:
@@ -403,7 +403,7 @@ def test_question_key_must_follow_the_term(term: str, question_key: Any) -> None
 
 def test_term_without_a_question_this_time_takes_null() -> None:
     collector = _collector()
-    event = _event(term="手掌・足底発赤知覚不全症候群", question_key=None)
+    event = _event(term="手足症候群", question_key=None)
     assert not handle_emit_timeline({"events": [event]}, collector).get("is_error")
 
 

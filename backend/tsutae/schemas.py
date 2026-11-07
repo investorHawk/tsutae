@@ -247,7 +247,7 @@ class TimelineEvent(Frozen):
     date: date  # 出来事の暦日（回想なら記録日より前）
     day: int | None
     course_no: int
-    term: str = Field(min_length=1)  # CTCAE v5.0 JCOG版の用語名（Grade は出さない）
+    term: str = Field(min_length=1)  # 用語の一覧の用語名（Grade は出さない）
     question_key: str | None = None  # 対応するクローズ質問（経過表の ○ に使う）
     status: SymptomStatus
     source_quote: str = Field(min_length=1)  # 伏せ字後の原文に部分一致すること（H2）
@@ -327,8 +327,15 @@ class Grid(Frozen):
     rows: list[GridRow]
 
 
+class RecordMark(Frozen):
+    """日付の印。「その日に記録があった」ことだけ（db の record_marks）。Claude には送らない。"""
+
+    patient_id: str
+    record_date: date
+
+
 class AttentionItem(Frozen):
-    kind: Literal["contradiction", "fever", "too_sick", "unprocessed"]
+    kind: Literal["contradiction", "fever", "too_sick", "not_received", "unprocessed"]
     day: int | None = None
     question_key: str | None = None
     closed_answer: str | None = None
@@ -351,6 +358,8 @@ class ReportHeader(Frozen):
     total_days: int
     no_input_days: int
     too_sick_days: int
+    # 印があって受け取った記録が無い日。入力なしには数えない（plan-device-records §5.6）
+    not_received_days: int = 0
     delay_note: str | None = None
     fallback: bool = False
 
@@ -402,7 +411,7 @@ class SyntheticPatient(Frozen):
     patient_id: str
     role: Literal["demo", "eval"]
     regimen: BuiltinRegimen
-    visit_date: date  # この日に受診（QR）する想定
+    visit_date: date  # この日に受診（受付）する想定
     reception_no: str
     courses: list[SyntheticCourse]
     entries: list[SyntheticEntry]

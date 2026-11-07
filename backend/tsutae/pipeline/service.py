@@ -6,7 +6,8 @@
 2. 患者・コース・記録・Skill（今の SKILL.md）・版ごとの質問集と記録の版の Skill
    （用語 → 質問 key の対応を記録ごとに引く。skill_versions。`pipeline.versions`）・
    その受診の医師の伏せ字（doctor_masks。D6）・今の版の form の質問の短い名前（紙の行名。
-   D4 で採用した版と FOLFOX/CAPOX@1。旧 D4 の版は無いので質問文。v1.1）を集め、
+   D4 で採用した版と FOLFOX/CAPOX@1。旧 D4 の版は無いので質問文。v1.1）・日付の印（手順4の
+   紙の「届いていない日」だけに使い、Claude には送らない）を集め、
    `prepare_input(exclude_literals=(仮名ID, 受付番号), doctor_masks=...)`。受付番号・
    仮名IDは Claude に送らない（自由記載に含む記録は known_identifier で外れる。§7 W2b）。
    医師の伏せ字は手順4の `build_report_data` にも同じものを渡す（片方だけだと
@@ -18,7 +19,8 @@
    `report_error:<型名>`）
 5. `db.save_visit_result`（timeline（AI 変換なしなら unprocessed だけの Timeline）・
    report・ready と fallback を1つのトランザクションで。印刷済み・期限切れなら何も
-   変えずに VisitClosedError）
+   変えずに VisitClosedError。生成中に記録が増えていれば状態は generating のままで、
+   `visit.run_generation` が次の回を回す。`db.repo_visit_regen`）
 
 - prepare_input までに失敗した（入力が作れない）ときは、フォールバックのレポートも
   作れないので failed。service が run_start・run_end（decision `prepare_error:<型名>`）を書く
@@ -66,6 +68,7 @@ from tsutae.schemas import (
     Entry,
     PreparedInput,
     Question,
+    RecordMark,
     RegimenSkill,
     ReportData,
     ReportFormatSkill,
@@ -113,6 +116,9 @@ class _VisitInputs:
     version_skills: Mapping[str, RegimenSkill]  # 記録の版 → その版（用語の対応。v1.1）
     doctor_masks: Mapping[int, DoctorMask]
     question_labels: Mapping[str, str]  # 今の版の form の短い名前（紙の行名。v1.1）
+    record_marks: tuple[
+        RecordMark, ...
+    ]  # 紙の「届いていない日」だけ。_prepare に渡さない
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +197,7 @@ def _gather(
         version_skills=regimen_skills_by_version(conn, sorted(used)),
         doctor_masks=db.list_doctor_masks(conn, int(visit["id"])),
         question_labels=version_labels(conn, regimen_skill.skill_version),
+        record_marks=tuple(db.list_record_marks(conn, patient_id)),
     )
 
 
@@ -239,6 +246,7 @@ def _render(
         questions_by_version=inputs.questions_by_version,
         doctor_masks=inputs.doctor_masks,
         question_labels=inputs.question_labels,
+        record_marks=inputs.record_marks,
     )
     skill = inputs.report_skill
     html = render_report_html(

@@ -2,7 +2,7 @@
 
 使い方: cd video && python3 scripts/make_bgm.py [--seconds N] [--seed S] [--out PATH]
 
-- 既定は 150 秒（DemoB の長さと同じ。Remotion 側で尺に合わせて切り、フェードアウトする）。
+- 既定は 175 秒（DemoB の長さと同じ。Remotion 側で尺に合わせて切り、フェードアウトする）。
 - 曲はこのファイルの中で正弦波から合成する自作の音だけで、第三者の音源・サンプルは使わない。
   （著作権の制約が無い自作曲）
 - 曲想: 診察室の話に合う、落ち着いて温かく前向きな器楽。F メジャー、88 BPM、
@@ -37,7 +37,7 @@ TAIL_SAMPLES = round(2.0 * SR)  # パッドの余韻・エコーが次の小節�
 FADE_IN_SECONDS = 2.0
 FADE_OUT_SECONDS = 2.0  # ファイルの終わり（Remotion 側でも別にフェードアウトする）
 PEAK_DBFS = -3.0
-DEFAULT_SECONDS = 150.0
+DEFAULT_SECONDS = 175.0
 DEFAULT_SEED = 7
 MAX_SECONDS = 600.0
 

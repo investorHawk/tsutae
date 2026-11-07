@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/patient/P-EVAL0001/demo-entries",
+  "request": null,
+  "status": 404,
+  "body": {
+    "error": "not_found"
+  }
+}

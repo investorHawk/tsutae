@@ -1,4 +1,5 @@
-import { listEntries } from "../../api/patient";
+import { getVisitDays } from "../../api/patientDevice";
+import { listDeviceEntries } from "../../patient/deviceStore";
 import { usePatientStrings } from "../../strings/PatientStrings";
 import EntryCard from "./EntryCard";
 import { type HistoryRow, historyRows } from "./historyRows";
@@ -15,11 +16,14 @@ interface HistoryData {
 }
 
 /**
- * 記録と受診日を読み、新しい順の行にする（受診日の区切りは受付の時刻の位置）。
+ * 端末の記録とサーバーの受診日を読み、新しい順の行にする（受診日の区切りは受付の時刻の位置）。
  * 質問文は記録の answers[].question_text（記録時点の質問集の文）。
  */
 async function loadHistory(pid: string): Promise<HistoryData> {
-  const { entries, visits } = await listEntries(pid);
+  const [entries, { visits }] = await Promise.all([
+    listDeviceEntries(pid),
+    getVisitDays(pid),
+  ]);
   return {
     noEntries: entries.length === 0,
     rows: historyRows(entries, visits),
@@ -35,7 +39,7 @@ function Row({ row }: { row: HistoryRow }) {
 }
 
 /**
- * 自分の記録の一覧（新しい順）。受診日（院内の QR で受付をした日）は区切りの行で示す。
+ * このスマホの記録の一覧（新しい順）。受診日（受付をした日）は区切りの行で示す。
  * 記録が無くても受診日があれば、history.empty の文の下に区切りだけを並べる。
  * 読めなければ common.load_failed と「読み直す」。
  */
@@ -63,7 +67,7 @@ export default function HistoryList({ pid }: { pid: string }) {
             <Row
               key={
                 row.kind === "entry"
-                  ? `entry-${row.entry.id}`
+                  ? `entry-${row.entry.client_entry_id}`
                   : `visit-${row.visit.visit_date}`
               }
               row={row}

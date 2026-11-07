@@ -242,18 +242,16 @@ def test_day_mismatch_alone_is_date_failure() -> None:
 
 def test_term_mismatch_with_same_question_key_still_matches_for_date() -> None:
     prepared = _prepared({1: TEXT2})
-    labels = [_label(11, [_lev("異常感覚", "numbness", "present", TEXT2, 1)])]
-    predicted = Timeline(
-        events=[_pev(1, "末梢性感覚ニューロパチー", "numbness", "present", TEXT2, 1)]
-    )
+    labels = [_label(11, [_lev("口腔痛", "stomatitis", "present", TEXT2, 1)])]
+    predicted = Timeline(events=[_pev(1, "口内炎", "stomatitis", "present", TEXT2, 1)])
     result = evaluate(predicted, prepared, labels)
     assert _ratio(result.term) == (0, 1)
     assert _ratio(result.matched) == (1, 1)
     assert _ratio(result.date) == (1, 1)
     [failure] = result.failures
     assert failure.metric == "term"
-    assert failure.expected == "異常感覚"
-    assert "末梢性感覚ニューロパチー" in failure.predicted
+    assert failure.expected == "口腔痛"
+    assert "口内炎" in failure.predicted
 
 
 def test_term_without_question_key_has_no_fallback() -> None:
@@ -303,19 +301,19 @@ def test_duplicate_term_in_one_entry_is_matched_one_to_one() -> None:
 
 
 def test_prediction_is_not_reused_across_label_events() -> None:
-    text = "しびれ。ピリピリ"
+    text = "口内炎。口の中が痛い"
     prepared = _prepared({1: text})
     labels = [
         _label(
             11,
             [
-                _lev("末梢性感覚ニューロパチー", "numbness", "improving", "しびれ", 1),
-                _lev("異常感覚", "numbness", "present", "ピリピリ", 1),
+                _lev("口内炎", "stomatitis", "improving", "口内炎", 1),
+                _lev("口腔痛", "stomatitis", "present", "口の中が痛い", 1),
             ],
         )
     ]
     predicted = Timeline(
-        events=[_pev(1, "異常感覚", "numbness", "present", "ピリピリ", 1)]
+        events=[_pev(1, "口腔痛", "stomatitis", "present", "口の中が痛い", 1)]
     )
     result = evaluate(predicted, prepared, labels)
     assert _ratio(result.matched) == (1, 2)
@@ -353,8 +351,8 @@ def test_status_breaks_ties_for_improving_and_present_with_same_key() -> None:
     text = "しびれはほとんど気にならない。つめたい物はまだ少しピリッとする"
     prepared = _prepared({1: text})
     events = [
-        _lev("末梢性感覚ニューロパチー", "numbness", "improving", "しびれは", 1),
-        _lev("異常感覚", "numbness", "present", "ピリッとする", 1),
+        _lev("末梢神経障害", "numbness", "improving", "しびれは", 1),
+        _lev("末梢神経障害", "numbness", "present", "ピリッとする", 1),
     ]
     predicted = Timeline(
         events=[_pev(1, "知覚過敏", "numbness", "improving", "しびれは", 1)]
@@ -372,12 +370,12 @@ def test_status_breaks_ties_for_improving_and_present_with_same_key() -> None:
 def test_contradiction_missed_and_spurious() -> None:
     prepared = _prepared({1: TEXT1, 2: TEXT2})
     labels = _basic_labels() + [
-        _label(12, [_lev("末梢性感覚ニューロパチー", "numbness", "present", TEXT2, 2)])
+        _label(12, [_lev("末梢神経障害", "numbness", "present", TEXT2, 2)])
     ]
     predicted = Timeline(
         events=[
             _pev(1, "下痢", "diarrhea", "present", "下痢が3回", 1),
-            _pev(2, "末梢性感覚ニューロパチー", "numbness", "present", TEXT2, 2),
+            _pev(2, "末梢神経障害", "numbness", "present", TEXT2, 2),
         ],
         contradictions=[_pcon(2, "numbness", "none", TEXT2, 2)],
     )
@@ -421,11 +419,9 @@ def test_no_contradictions_anywhere_gives_none_rates() -> None:
 def test_improving_predicted_absent_is_counted() -> None:
     text = "しびれはだいぶ楽"
     prepared = _prepared({1: text})
-    labels = [
-        _label(11, [_lev("末梢性感覚ニューロパチー", "numbness", "improving", text, 1)])
-    ]
+    labels = [_label(11, [_lev("末梢神経障害", "numbness", "improving", text, 1)])]
     predicted = Timeline(
-        events=[_pev(1, "末梢性感覚ニューロパチー", "numbness", "absent", text, 1)]
+        events=[_pev(1, "末梢神経障害", "numbness", "absent", text, 1)]
     )
     result = evaluate(predicted, prepared, labels)
     assert _ratio(result.mild_as_absent) == (1, 1)
@@ -441,7 +437,7 @@ def test_mild_tagged_present_is_not_a_mild_target() -> None:
     labels = [
         _label(
             11,
-            [_lev("末梢性感覚ニューロパチー", "numbness", "present", TEXT2, 1)],
+            [_lev("末梢神経障害", "numbness", "present", TEXT2, 1)],
             tags=["mild_improving"],
         )
     ]
@@ -460,7 +456,7 @@ def test_mild_targets_are_improving_events_only() -> None:
             11,
             [
                 _lev(
-                    "口腔粘膜炎",
+                    "口内炎",
                     "stomatitis",
                     "present",
                     "口内炎はまだ1つのこってる",

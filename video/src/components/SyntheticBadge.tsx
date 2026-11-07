@@ -1,6 +1,6 @@
 import { COLORS, FONT_FAMILY, FONT_SIZE } from "../theme";
 
-/** 右上の札（150 秒ずっと出す） */
+/** 右上の札（動画の頭から終わりまでずっと出す） */
 export const SyntheticBadge: React.FC = () => (
   <div
     style={{

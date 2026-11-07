@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/patient/push-config",
+  "request": null,
+  "status": 200,
+  "body": {
+    "available": true,
+    "public_key": "BA1Hxzyi1RUM1b5wjxsn7nGxAszw2u61m164i3MrAIxHF6YK5h4SDYic-dRuU_RCPCfA5aq9ojSwk5Y2EmClBPs"
+  }
+}

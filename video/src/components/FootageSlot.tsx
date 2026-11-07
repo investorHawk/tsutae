@@ -76,6 +76,8 @@ const SideText: React.FC<{
       lang="ja"
       style={{
         ...PHRASE_WRAP,
+        // 札の文は構成データの \n で改行できる
+        whiteSpace: "pre-line",
         fontSize: strong ? 52 : 72,
         fontWeight: 800,
         lineHeight: 1.35,
@@ -97,6 +99,8 @@ const Callout: React.FC<{ text: string }> = ({ text }) => (
     lang="ja"
     style={{
       ...PHRASE_WRAP,
+      // 構成データの \n で改行する（製品名を行の途中で割らない）
+      whiteSpace: "pre-line",
       position: "absolute",
       top: 110,
       right: 300,

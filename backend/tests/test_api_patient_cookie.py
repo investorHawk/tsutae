@@ -128,7 +128,7 @@ def test_bad_patient_cookies_are_401(client: TestClient) -> None:
     }
     for label, value in cases.items():
         _raw_cookie(client, value)
-        for path in (f"/api/patient/{pid}/questions", f"/api/patient/{pid}/entries"):
+        for path in (f"/api/patient/{pid}/questions", f"/api/patient/{pid}/visit-days"):
             r = client.get(path)
             assert r.status_code == 401, label
             assert r.json() == {"error": "not_logged_in"}, label

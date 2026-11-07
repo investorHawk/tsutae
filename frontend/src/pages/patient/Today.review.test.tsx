@@ -8,12 +8,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearPid, savePid } from "../../patient/pid";
 import { jsonResponse } from "../../test/fetchMock";
-import { callsTo, mockPatientApi } from "./testing/api";
+import { MARK, callsTo, mockPatientApi } from "./testing/api";
+import { savedInputs } from "./testing/device";
 import { PID, QUESTIONS_RESPONSE, questionText, s } from "./testing/fixtures";
 import { renderPatient } from "./testing/render";
 import Today from "./Today";
 
-const ENTRIES_URL = `/api/patient/${PID}/entries`;
+const MARK_URL = `/api/patient/${PID}/record-marks`;
 const QUESTIONS_URL = `/api/patient/${PID}/questions`;
 
 function renderToday() {
@@ -83,7 +84,7 @@ describe("Today: too_sick after something was entered asks first", () => {
     await choose("diarrhea", "answer.hard");
     await userEvent.click(tooSickButton());
     expect(screen.getByText(s("today.too_sick_confirm"))).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
     await userEvent.click(
       screen.getByRole("button", { name: s("today.too_sick_confirm_no") }),
     );
@@ -92,7 +93,7 @@ describe("Today: too_sick after something was entered asks first", () => {
     expect(
       within(group).getByRole("button", { name: s("answer.hard") }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 
   it("with free text: 'yes' sends only too_sick (with by_proxy)", async () => {
@@ -112,9 +113,8 @@ describe("Today: too_sick after something was entered asks first", () => {
     expect(
       await screen.findByText(s("today.too_sick_done")),
     ).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
-      { too_sick: true, by_proxy: true },
-    ]);
+    expect(await savedInputs()).toEqual([{ too_sick: true, by_proxy: true }]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(1);
   });
 });
 
@@ -139,15 +139,13 @@ describe("Today: too_sick with nothing entered records after 3 seconds", () => {
     expect(screen.getByText(countdownText(3))).toBeInTheDocument();
     await advance(2000);
     expect(screen.getByText(countdownText(1))).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
     await advance(1000);
     expect(
       await screen.findByText(s("today.too_sick_done")),
     ).toBeInTheDocument();
     await advance(5000);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([
-      { too_sick: true, by_proxy: true },
-    ]);
+    expect(await savedInputs()).toEqual([{ too_sick: true, by_proxy: true }]);
   });
 
   it("yes before the time: sent once", async () => {
@@ -158,7 +156,7 @@ describe("Today: too_sick with nothing entered records after 3 seconds", () => {
     await userEvent.click(yesButton());
     await screen.findByText(s("today.too_sick_done"));
     await advance(5000);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toHaveLength(1);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(1);
   });
 
   it("no: nothing is sent, the button can be pressed again", async () => {
@@ -171,7 +169,7 @@ describe("Today: too_sick with nothing entered records after 3 seconds", () => {
     );
     await advance(5000);
     expect(screen.queryByText(s("today.too_sick_confirm_empty"))).toBeNull();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
     expect(tooSickButton()).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -185,7 +183,7 @@ describe("Today: too_sick with nothing entered records after 3 seconds", () => {
     expect(screen.getByText(s("today.too_sick_confirm"))).toBeInTheDocument();
     expect(screen.queryByText(countdownText(1))).toBeNull();
     await advance(5000);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 
   it("leaving the page stops the countdown", async () => {
@@ -195,14 +193,14 @@ describe("Today: too_sick with nothing entered records after 3 seconds", () => {
     await advance(1000);
     view.unmount();
     await advance(5000);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 });
 
 describe("Today: where the error of too_sick is shown", () => {
   it("right after the too_sick button, before the questions", async () => {
     mockPatientApi({
-      createEntry: () => jsonResponse({ error: "boom" }, 500),
+      recordMark: () => jsonResponse({ error: "boom" }, 500),
     });
     renderToday();
     const firstGroup = await screen.findByRole("group", {
@@ -218,7 +216,7 @@ describe("Today: where the error of too_sick is shown", () => {
 
   it("a failed normal submit still shows the error near the submit button", async () => {
     mockPatientApi({
-      createEntry: () => jsonResponse({ error: "boom" }, 500),
+      recordMark: () => jsonResponse({ error: "boom" }, 500),
     });
     renderToday();
     await choose("diarrhea", "answer.present");
@@ -266,7 +264,7 @@ describe("Today: loading the questions", () => {
     await screen.findByRole("group", { name: questionText("fever") });
     expect(screen.queryByText(s("common.load_failed"))).toBeNull();
     expect(callsTo(fetchMock, "GET", QUESTIONS_URL)).toHaveLength(2);
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 });
 
@@ -281,7 +279,7 @@ describe("Today: temperature messages and focus", () => {
     expect(screen.getByText(s("temperature.out_of_range"))).toBeInTheDocument();
     expect(screen.queryByText(s("temperature.invalid"))).toBeNull();
     expect(input).toHaveFocus();
-    expect(callsTo(fetchMock, "POST", ENTRIES_URL)).toEqual([]);
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toEqual([]);
   });
 
   it("not a number: temperature.invalid", async () => {
@@ -299,12 +297,12 @@ describe("Today: temperature messages and focus", () => {
 describe("Today: while sending", () => {
   it("shows today.sending until the answer comes back", async () => {
     const pending = deferred<Response>();
-    mockPatientApi({ createEntry: () => pending.promise });
+    mockPatientApi({ recordMark: () => pending.promise });
     renderToday();
     await choose("diarrhea", "answer.present");
     await userEvent.click(submitButton());
     expect(await screen.findByText(s("today.sending"))).toBeInTheDocument();
-    pending.resolve(jsonResponse({ entry_id: 1, notices: [] }));
+    pending.resolve(jsonResponse(MARK));
     await screen.findByText(s("today.saved"));
     expect(screen.queryByText(s("today.sending"))).toBeNull();
   });
@@ -314,10 +312,10 @@ describe("Today: a network failure while sending", () => {
   it("keeps the input, shows error.generic, and the same entry can be sent again", async () => {
     let fail = true;
     const fetchMock = mockPatientApi({
-      createEntry: () =>
+      recordMark: () =>
         fail
           ? Promise.reject(new TypeError("Failed to fetch"))
-          : jsonResponse({ entry_id: 1, notices: [] }),
+          : jsonResponse(MARK),
     });
     renderToday();
     await choose("diarrhea", "answer.present");
@@ -332,9 +330,14 @@ describe("Today: a network failure while sending", () => {
     fail = false;
     await userEvent.click(submitButton());
     await screen.findByText(s("today.saved"));
-    // 送り直しは同じ内容（サーバーが直近の同じ記録を返すので二重にならない）
-    const sent = callsTo(fetchMock, "POST", ENTRIES_URL);
-    expect(sent).toHaveLength(2);
-    expect(sent[1]).toEqual(sent[0]);
+    // 押し直しても端末の記録は1件（同じ client_entry_id）
+    expect(callsTo(fetchMock, "POST", MARK_URL)).toHaveLength(2);
+    expect(await savedInputs()).toEqual([
+      {
+        by_proxy: false,
+        answers: [{ question_key: "diarrhea", value: "present" }],
+        free_text: null,
+      },
+    ]);
   });
 });

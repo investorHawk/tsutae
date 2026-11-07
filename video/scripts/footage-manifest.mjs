@@ -1,5 +1,5 @@
-// public/footage/*.mp4|mov・public/screens/F<n>-<k>.png・public/audio/bgm.wav を走査して
-// src/footage.generated.ts を書く。無いファイルを <OffthreadVideo> / <Img> に渡すと描画が落ちるので、
+// public/footage/*.mp4|mov・public/screens/F<n>-<k>.png・public/audio/bgm.wav・
+// public/voice/b<nn>*.m4a|mp3|wav・public/private/portrait.jpg を走査して src/footage.generated.ts を書く。無いファイルを <OffthreadVideo> / <Img> に渡すと描画が落ちるので、
 // 存在はここで判定する（onError に頼らない）。
 import { readdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -8,13 +8,18 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const footageDir = join(root, "public", "footage");
 const screensDir = join(root, "public", "screens");
+const voiceDir = join(root, "public", "voice");
 const outFile = join(root, "src", "footage.generated.ts");
 // BGM は scripts/make_bgm.py が書く（案 B だけが使う）。無ければ BGM なしで成立する
 const BGM_PATH = "audio/bgm.wav";
+// 先生の写真（git の管理外。無ければ冒頭は文字だけで成立する）
+const PORTRAIT_PATH = "private/portrait.jpg";
 
 const FOOTAGE_RE = /^(F\d{1,2})(?:[_-][^/]*)?\.(mp4|mov)$/i;
 const SCREEN_RE = /^(F\d{1,2})-(\d+)\.png$/i;
-const KNOWN_IDS = new Set(Array.from({ length: 10 }, (_, i) => `F${i + 1}`));
+// 声: 案 B の場面 id の頭（b01〜b12）＋任意の名前（b01_intro.m4a）。先生が場面ごとに録って置く
+const VOICE_RE = /^(b\d{2})(?:[_-][^/]*)?\.(m4a|mp3|wav)$/i;
+const KNOWN_IDS = new Set(Array.from({ length: 11 }, (_, i) => `F${i + 1}`));
 
 const listDir = (dir) => {
   if (!existsSync(dir)) return [];
@@ -56,6 +61,26 @@ const collectScreens = () => {
   );
 };
 
+/** 声のキー（小文字の b01 など）ごとのファイル。同じキーが複数なら b01.<拡張子> を優先し、無ければ名前順で最初 */
+const collectVoices = () => {
+  const found = {};
+  for (const name of listDir(voiceDir).sort()) {
+    const m = VOICE_RE.exec(name);
+    if (!m) continue;
+    const key = m[1].toLowerCase();
+    const exact = name.toLowerCase() === `${key}.${m[2].toLowerCase()}`;
+    if (!found[key] || exact) found[key] = `voice/${name}`;
+  }
+  return found;
+};
+
+const renderVoices = (voices) => {
+  const keys = Object.keys(voices).sort();
+  if (keys.length === 0) return "{}";
+  const rows = keys.map((k) => `  ${k}: ${JSON.stringify(voices[k])},`);
+  return `{\n${rows.join("\n")}\n}`;
+};
+
 const byIdNumber = (a, b) => Number(a.slice(1)) - Number(b.slice(1));
 
 const renderScreens = (screens) => {
@@ -71,14 +96,17 @@ const renderScreens = (screens) => {
 const collectBgm = () =>
   existsSync(join(root, "public", BGM_PATH)) ? BGM_PATH : null;
 
-const render = (footage, screens, bgm) => {
+const collectPortrait = () =>
+  existsSync(join(root, "public", PORTRAIT_PATH)) ? PORTRAIT_PATH : null;
+
+const render = (footage, screens, bgm, voices, portrait) => {
   const ids = Object.keys(footage).sort(byIdNumber);
   const footageBody =
     ids.length === 0
       ? "{}"
       : `{\n${ids.map((id) => `  ${id}: ${JSON.stringify(footage[id])},`).join("\n")}\n}`;
   return [
-    "// 生成物: scripts/footage-manifest.mjs が public/footage・public/screens・public/audio/bgm.wav を走査して書く。",
+    "// 生成物: scripts/footage-manifest.mjs が public/footage・public/screens・public/audio/bgm.wav・public/voice・public/private を走査して書く。",
     "// 手で編集しない（npm run studio / render / still / bundle / test の前に自動で書き直される）。",
     'import type { FootageId } from "./types";',
     "",
@@ -90,18 +118,26 @@ const render = (footage, screens, bgm) => {
     "/** BGM（public/audio/bgm.wav。scripts/make_bgm.py が書く）。無ければ null */",
     `export const bgmFile: string | null = ${JSON.stringify(bgm)};`,
     "",
+    "/** 場面ごとの声（public/voice/b<nn>*.m4a|mp3|wav。キーは場面 id の頭）。無ければ {} */",
+    `export const voiceFiles: Record<string, string> = ${renderVoices(voices)};`,
+    "",
+    "/** 冒頭の先生の写真（public/private/portrait.jpg。git の管理外）。無ければ null */",
+    `export const portraitFile: string | null = ${JSON.stringify(portrait)};`,
+    "",
   ].join("\n");
 };
 
 const footage = collectFootage();
 const screens = collectScreens();
 const bgm = collectBgm();
-const next = render(footage, screens, bgm);
+const voices = collectVoices();
+const portrait = collectPortrait();
+const next = render(footage, screens, bgm, voices, portrait);
 const prev = existsSync(outFile) ? readFileSync(outFile, "utf8") : "";
 if (prev !== next) writeFileSync(outFile, next);
 const screenSummary = Object.entries(screens)
   .map(([id, list]) => `${id}×${list.length}`)
   .join(", ");
 console.log(
-  `footage-manifest: footage [${Object.keys(footage).join(", ") || "なし"}] / screens [${screenSummary || "なし"}] / bgm [${bgm ?? "なし"}]`,
+  `footage-manifest: footage [${Object.keys(footage).join(", ") || "なし"}] / screens [${screenSummary || "なし"}] / bgm [${bgm ?? "なし"}] / voice [${Object.keys(voices).sort().join(", ") || "なし"}] / portrait [${portrait ?? "なし"}]`,
 );

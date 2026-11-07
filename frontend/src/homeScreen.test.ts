@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * ホーム画面に置いたときのアイコンと開き方（manifest・index.html）の約束。
+ * ホーム画面に置いたときのアイコンと開き方（manifest・index.html）と、通知の sw.js の約束。
  */
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -134,8 +134,44 @@ describe("index.html", () => {
     expect(fs.existsSync(inPublic("icon.svg"))).toBe(true);
   });
 
-  it("Service Worker は登録しない（オフライン動作は範囲外）", () => {
+  it("Service Worker は開いただけでは登録しない（登録は設定でオンにしたときだけ）", () => {
     expect(indexHtml).not.toContain("serviceWorker");
-    expect(fs.existsSync(inPublic("sw.js"))).toBe(false);
+  });
+});
+
+describe("sw.js", () => {
+  let sw = "";
+
+  beforeAll(() => {
+    sw = fs.readFileSync(inPublic("sw.js"), "utf8");
+  });
+
+  it("sw.js は通知専用で fetch を扱わない（オフライン動作は範囲外）", () => {
+    expect(sw).not.toContain("fetch");
+    expect(sw).not.toContain("caches");
+  });
+
+  it("push は waitUntil の中で必ず通知を出す", () => {
+    expect(sw).toContain('addEventListener("push"');
+    expect(sw).toContain("event.waitUntil(");
+    expect(sw).toContain("showNotification(");
+  });
+
+  it("通知を押したら /today を開く", () => {
+    expect(sw).toContain('addEventListener("notificationclick"');
+    expect(sw).toContain('"/today"');
+    expect(sw).toContain("openWindow(");
+    expect(sw).toContain(".focus()");
+  });
+
+  it("予備のタイトルは定型文の notify.title と同じ（本文の文は持たない）", () => {
+    const strings = JSON.parse(
+      fs.readFileSync(
+        new URL("../../backend/tsutae/patient_strings.json", import.meta.url),
+        "utf8",
+      ),
+    ) as Record<string, string>;
+    expect(sw).toContain(`FALLBACK_TITLE = "${strings["notify.title"]}"`);
+    expect(sw).not.toContain(strings["notify.body"]);
   });
 });

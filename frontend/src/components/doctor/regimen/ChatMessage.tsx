@@ -6,6 +6,7 @@ import type {
 import { turnFailureText } from "./chatLabels";
 import { changeGroupOf } from "./fieldLabels";
 import { isAiSource } from "./fieldState";
+import ReplyText from "./ReplyText";
 
 interface ChangeChip {
   key: string;
@@ -70,7 +71,9 @@ export default function ChatMessage({
   return (
     <li className="rf-msg rf-msg--claude">
       <span className="rf-msg-who">Claude</span>
-      <div className="rf-bubble">{row.text}</div>
+      <div className="rf-bubble">
+        <ReplyText text={row.text} />
+      </div>
       {chips.length > 0 ? (
         <div className="rf-chips" role="group" aria-label="変えた欄">
           {chips.map((chip) => (

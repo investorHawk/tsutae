@@ -14,13 +14,20 @@ import {
 } from "./doctor";
 import { ApiError, NETWORK_ERROR, getJson, postJson } from "./http";
 import {
-  createEntry,
   getPatientStrings,
   getQuestions,
-  listEntries,
   registerPatient,
   submitVisit,
 } from "./patient";
+import {
+  addRecordMark,
+  getDemoConfig,
+  getDemoEntries,
+  getVisitDays,
+  getVisitWindow,
+  undoRecordMark,
+  unregisterPatient,
+} from "./patientDevice";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -107,8 +114,20 @@ describe("患者 API は 20 秒で打ち切る", () => {
     ["registerPatient", () => registerPatient(PID)],
     ["getPatientStrings", () => getPatientStrings()],
     ["getQuestions", () => getQuestions(PID)],
-    ["createEntry", () => createEntry(PID, { too_sick: true })],
-    ["listEntries", () => listEntries(PID)],
+    ["addRecordMark", () => addRecordMark(PID)],
+    [
+      "undoRecordMark",
+      () =>
+        undoRecordMark(PID, {
+          recorded_at: "2026-11-09T20:00:00.000000+09:00",
+          clear_mark: true,
+        }),
+    ],
+    ["getVisitDays", () => getVisitDays(PID)],
+    ["getVisitWindow", () => getVisitWindow(PID)],
+    ["unregisterPatient", () => unregisterPatient(PID, null)],
+    ["getDemoConfig", () => getDemoConfig(PID)],
+    ["getDemoEntries", () => getDemoEntries(PID)],
     ["submitVisit", () => submitVisit("A-1")],
   ])("%s", async (_name, call) => {
     hangingFetch();

@@ -16,7 +16,7 @@ const compositions = (): CompositionProps[] => {
 };
 
 describe("Root の Composition", () => {
-  it("字幕だけの 3 案（DemoA / DemoB / DemoC）だけを並べる", () => {
+  it("3 案（字幕だけの DemoA・DemoC と、先生の声を置ける DemoB）だけを並べる", () => {
     expect(compositions().map((c) => c.id)).toEqual([
       "DemoA",
       "DemoB",

@@ -191,8 +191,8 @@
       {
         "field_id": "side_effects.se-stomatitis.ctcae_terms",
         "value": [
-          "口腔粘膜炎",
-          "口腔内痛"
+          "口内炎",
+          "口腔痛"
         ]
       },
       {
@@ -543,8 +543,8 @@
               "口の中が痛い"
             ],
             "ctcae_terms": [
-              "口腔粘膜炎",
-              "口腔内痛"
+              "口内炎",
+              "口腔痛"
             ],
             "question_key": "stomatitis"
           },

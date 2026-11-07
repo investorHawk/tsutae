@@ -6,6 +6,7 @@ import { describeRegimenError } from "../errors";
 import AiValueList from "./AiValueList";
 import type { AiRow } from "./aiRows";
 import PhonePreview from "./PhonePreview";
+import { UNNAMED_REGIMEN, filledName } from "./regimenName";
 import type { RegimenConfirmApi } from "./useRegimenConfirm";
 
 interface RegimenConfirmProps {
@@ -59,7 +60,9 @@ export default function RegimenConfirm({
     issues.length > 0 ||
     needCheck;
   const name =
-    draft.form.basic.display_name ?? preview.skill_name ?? "新しいレジメン";
+    filledName(draft.form.basic.display_name) ??
+    preview.skill_name ??
+    UNNAMED_REGIMEN;
   return (
     <div className="rf-confirm">
       {preview.ai_values.length > 0 ? (
@@ -112,7 +115,7 @@ export default function RegimenConfirm({
             </div>
           ) : (
             <p className="rf-ok">
-              検査に通りました（必須の項目・CTCAE の用語・質問の
+              検査に通りました（必須の項目・用語・質問の
               key・個人を特定しうる表現の検査）
             </p>
           )}

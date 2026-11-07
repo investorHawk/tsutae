@@ -1,9 +1,0 @@
-{
-  "method": "POST",
-  "path": "/api/patient/P-DEMO0001/entries/92/undo",
-  "request": null,
-  "status": 409,
-  "body": {
-    "error": "not_undoable"
-  }
-}

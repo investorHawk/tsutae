@@ -56,7 +56,7 @@ export interface ClosedAnswer {
   temperature?: number | null;
 }
 
-/** POST /api/patient/{pid}/entries の本文。too_sick のときは回答・自由記載を付けない。 */
+/** 入力から作る記録（まだ印も ID も無い）。too_sick のときは回答・自由記載を付けない。 */
 export interface EntryCreate {
   too_sick?: boolean;
   by_proxy?: boolean;
@@ -100,22 +100,27 @@ export interface RegisterRequest {
 /** GET /api/patient/strings。patient_strings.json そのもの（キー → 定型文）。 */
 export type PatientStrings = Readonly<Record<string, string>>;
 
+/**
+ * 緊急時の固定規則（plan-device-records §5.3）。その質問の体温が threshold_celsius 以上なら
+ * patient_string_key の案内を出す。比べるのは画面のコード（patient/fixedRules.ts）。
+ */
+export interface FixedRule {
+  question_key: string;
+  threshold_celsius: number;
+  patient_string_key: string;
+}
+
 export interface QuestionsResponse {
   skill_version: string;
   questions: Question[];
+  fixed_rules: FixedRule[];
   /** サーバーの今日（JST の YYYY-MM-DD。今日の記録の見出しの日付） */
   today: string;
 }
 
-export interface CreateEntryResponse {
-  entry_id: number;
-  /** patient_strings のキー（例 "fixed_rule.fever_38"） */
-  notices: string[];
-}
-
 /**
- * GET entries の回答。temperature は measured のときだけ数、それ以外は null（項目は必ずある）。
- * question_text はその記録の skill_version の質問集の文（無ければ null）。
+ * 端末の記録の回答。temperature は measured のときだけ数、それ以外は null（項目は必ずある）。
+ * question_text は記録したときの質問の文の写し（無ければ null）。
  */
 export interface PatientAnswer {
   question_key: string;
@@ -124,9 +129,14 @@ export interface PatientAnswer {
   question_text: string | null;
 }
 
-/** 自分の記録。AI の出力は含まない。 */
-export interface PatientEntry {
-  id: number;
+/**
+ * スマホに置く記録1件（plan-device-records §5.1。GET demo-entries も同じ形）。
+ * AI の出力は含まない。recorded_at・record_date はサーバーの印の応答の値。
+ */
+export interface DeviceEntry {
+  pid: string;
+  /** 入力の開始時に端末が作る UUID（押し直しても同じ。見本は demo-<seq>） */
+  client_entry_id: string;
   recorded_at: IsoDateTime;
   record_date: IsoDate;
   kind: EntryKind;
@@ -146,14 +156,51 @@ export interface PatientVisitDay {
   received_at: IsoDateTime;
 }
 
-export interface PatientEntriesResponse {
-  entries: PatientEntry[];
+/** GET visit-days。 */
+export interface PatientVisitDaysResponse {
   /** 新しい順 */
   visits: PatientVisitDay[];
 }
 
+/** POST record-marks の応答。サーバーの時計の値（端末の時計は使わない）。 */
+export interface RecordMarkResponse {
+  record_date: IsoDate;
+  recorded_at: IsoDateTime;
+}
+
+/** POST record-marks/undo の本文。recorded_at は印の応答の値。 */
+export interface UndoRecordMarkRequest {
+  recorded_at: IsoDateTime;
+  /** その日に端末の記録が他に無いとき true（印も消す） */
+  clear_mark: boolean;
+  /** 同じ記録を押し直して保存したとき true（10 分以内の先の印も1回目として消す） */
+  retried?: boolean;
+}
+
+/** GET visit-window: 受診で送る範囲（両端を含む）。 */
+export interface VisitWindowResponse {
+  start: IsoDate;
+  end: IsoDate;
+}
+
+/** GET demo-config。環境変数があり、デモ患者のときだけ true。 */
+export interface DemoConfigResponse {
+  demo_tools: boolean;
+}
+
+/** GET demo-entries。 */
+export interface DemoEntriesResponse {
+  entries: DeviceEntry[];
+}
+
+/** POST /api/visit で送る記録。端末の記録から pid と質問の文の写しを外した形。 */
+export interface VisitEntry extends Omit<DeviceEntry, "pid" | "answers"> {
+  answers: ClosedAnswer[];
+}
+
 export interface VisitRequest {
   reception_no: string;
+  entries?: VisitEntry[];
 }
 
 export interface VisitResponse {
@@ -290,6 +337,12 @@ export interface VisitSummary {
   created_at: IsoDateTime;
   expires_at: IsoDateTime;
   unprocessed_count: number;
+  /** この受診の変換に入っていない記録がある（生成中に届いた、自動の回数を使い切った後に届いた） */
+  regen_pending: boolean;
+  /** 記録が増えて自動で変換し直した回数 */
+  regen_count: number;
+  /** レポートを開ける。変換し直しが失敗した行でも、前のレポートが残っていれば true */
+  has_report: boolean;
 }
 
 export interface VisitsResponse {

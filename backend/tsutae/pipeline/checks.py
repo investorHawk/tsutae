@@ -5,7 +5,7 @@ H2 は引用の一致だけを見る。ここでは「入力から写すだけ�
 architecture §7 / §7b の「Grade・重症などの語を出さない」をプロンプトだけに任せない）:
 
 - events
-  - term は CTCAE 用語の一覧（ctcae_terms.json。term-mapper に渡すものと同じ）の名前そのもの
+  - term は用語の一覧（ctcae_terms.json。term-mapper に渡すものと同じ）の名前そのもの
   - question_key はその用語に対応する質問の key（その記録の版の質問に無ければ null）。
     対応は記録ごとに、全体の対応 ＋ その記録の版（Entry.skill_version）の term_keys
     （`skills.term_keys.entry_term_keys`。v1.1。spec 9.1）。term-mapper の一覧は入力の版の

@@ -1,9 +1,0 @@
-{
-  "method": "POST",
-  "path": "/api/patient/P-EVAL0001/entries/93/undo",
-  "request": null,
-  "status": 200,
-  "body": {
-    "ok": true
-  }
-}

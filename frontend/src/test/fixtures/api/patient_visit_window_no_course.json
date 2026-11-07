@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/api/patient/P-NOCOURSE/visit-window",
+  "request": null,
+  "status": 409,
+  "body": {
+    "error": "no_course"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "path": "/api/patient/P-EVAL0001/record-marks/undo",
+  "request": {
+    "recorded_at": "2026-11-09T10:00:00.000000+09:00",
+    "clear_mark": true,
+    "retried": true
+  },
+  "status": 200,
+  "body": {
+    "ok": true
+  }
+}

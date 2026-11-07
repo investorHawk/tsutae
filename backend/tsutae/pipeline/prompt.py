@@ -52,7 +52,7 @@ SYSTEM_PROMPT = f"""\
 2. Agent ツールで次の3役を呼ぶ（subagent_type に名前をそのまま書く。ほかのエージェントは呼ばない）
    - {DATE_NORMALIZER}: 自由記載から症状の記述を切り出し、出来事ごとの暦日（date）・Day・回想かどうかを決める
    - {CONTRADICTION_FINDER}: 同じ記録のクローズ回答と自由記載の食い違いを並べる（解決しない）
-   - {TERM_MAPPER}: {DATE_NORMALIZER} が切り出した記述を CTCAE v5.0 JCOG版の用語名と status に当てはめる
+   - {TERM_MAPPER}: {DATE_NORMALIZER} が切り出した記述を用語の一覧の用語名と status に当てはめる
    {DATE_NORMALIZER} と {CONTRADICTION_FINDER} は並行に呼んでよい。{TERM_MAPPER} には \
 {DATE_NORMALIZER} の結果を渡す。各役には入力 JSON の必要な部分（schedule・questions・entries）を\
 書き換えずに渡す。{DATE_NORMALIZER} には依頼文の「{DAY_TABLE_TITLE}」も書き写して渡す
@@ -76,7 +76,7 @@ date はその記録の record_date 以前（記録日より後の出来事は�
 null の記録・too_sick の記録からは作らない）
 - 同じ記録・同じ term・同じ date・同じ status・同じ source_quote の出来事、同じ記録・同じ \
 question_key・同じ free_text_quote の食い違いは重ねて出さない
-- term は CTCAE v5.0 JCOG版の用語名（{TERM_MAPPER} に渡した一覧）から選ぶ。一覧に無い言葉を作らない。\
+- term は用語の一覧の用語名（{TERM_MAPPER} に渡した一覧）から選ぶ。一覧に無い言葉を作らない。\
 当てはまる用語が無い記述は出来事にしない。question_key は一覧でその用語に対応する key \
 （入力の questions に無い key なら null）
 - Grade、重さの語（軽症・中等症・重症・軽度・高度など）、助言、受診の判断、\

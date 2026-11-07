@@ -39,11 +39,11 @@ const EFFECTS: readonly SideEffectRow[] = [
     ["悪心", "嘔吐", "食欲不振"],
     "nausea_appetite",
   ],
-  ["effect3", ["口内炎", "口の中が痛い"], ["口腔粘膜炎"], "stomatitis"],
+  ["effect3", ["口内炎", "口の中が痛い"], ["口内炎"], "stomatitis"],
   ["effect4", ["だるい", "疲れやすい"], ["疲労", "倦怠感"], "fatigue"],
   ["effect5", ["熱が出た", "寒気"], ["発熱", "悪寒"], "fever"],
   ["effect6", ["鼻血"], ["鼻出血"], "bleeding"],
-  ["effect7", ["髪が抜ける"], ["脱毛症"], null],
+  ["effect7", ["髪が抜ける"], ["脱毛"], null],
 ].map(([row_id, phrases, ctcae_terms, question_key]) => ({
   row_id: row_id as string,
   phrases: phrases as string[],
@@ -144,7 +144,7 @@ export function demoDraft(): RegimenDraft {
 
 const FIELD_LABELS: Readonly<Record<string, string>> = {
   phrases: "患者の言い方",
-  ctcae_terms: "CTCAE の用語",
+  ctcae_terms: "用語",
   question_key: "対応する質問",
   key: "key",
   label: "短い名前",

@@ -68,7 +68,9 @@ describe("PatientDetail の見出しと節", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: `患者 ${PID}` }),
     ).toBeInTheDocument();
-    await screen.findByText("まだ記録はありません");
+    await screen.findByText(
+      "記録は患者さんのスマホにあります。受付の後に表示されます",
+    );
     const names = screen
       .getAllByRole("heading", { level: 2 })
       .map((h) => h.textContent);
@@ -154,7 +156,9 @@ describe("PatientDetail の要約の行", () => {
 
   it("患者の行が無ければ「—」", async () => {
     renderWith({});
-    await screen.findByText("まだ記録はありません");
+    await screen.findByText(
+      "記録は患者さんのスマホにあります。受付の後に表示されます",
+    );
     const box = screen.getByLabelText("患者の要約");
     expect(within(box).getAllByText("—")).toHaveLength(4);
   });

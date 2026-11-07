@@ -16,7 +16,12 @@ import {
   isUnprocessedResponse,
   isVisitsResponse,
 } from "./doctorGuards";
-import { isPatientEntriesResponse, isQuestionsResponse } from "./patientGuards";
+import {
+  isDemoEntriesResponse,
+  isQuestionsResponse,
+  isRecordMarkResponse,
+  isVisitDaysResponse,
+} from "./patientGuards";
 import { type Item, isRecord } from "./validate";
 
 type Guard = (body: Item) => boolean;
@@ -31,7 +36,9 @@ const GUARDS: Readonly<Record<string, Guard>> = {
   doctor_pipeline_events: isPipelineEventsResponse,
   doctor_skill_changes: isSkillChangesResponse,
   doctor_skill_change_create: isCreateSkillChangeResponse,
-  patient_entries: isPatientEntriesResponse,
+  patient_demo_entries: isDemoEntriesResponse,
+  patient_record_mark: isRecordMarkResponse,
+  patient_visit_days: isVisitDaysResponse,
   patient_questions: isQuestionsResponse,
 };
 
@@ -97,17 +104,24 @@ const BROKEN: Array<[string, string, Mutate]> = [
   ...dateTimeCases("doctor_skill_changes", "decided_at", (b, v) => {
     b.skill_changes[0].decided_at = v;
   }),
-  ...dateTimeCases("patient_entries", "recorded_at", (b, v) => {
+  ...dateTimeCases("patient_demo_entries", "recorded_at", (b, v) => {
     b.entries[0].recorded_at = v;
   }),
-  ...dateCases("patient_entries", "record_date", (b, v) => {
+  ...dateCases("patient_demo_entries", "record_date", (b, v) => {
     b.entries[0].record_date = v;
   }),
+  // 印の応答（端末に保存する時刻と日付）
+  ...dateTimeCases("patient_record_mark", "recorded_at", (b, v) => {
+    b.recorded_at = v;
+  }),
+  ...dateCases("patient_record_mark", "record_date", (b, v) => {
+    b.record_date = v;
+  }),
   // 受診日の区切り（受診日と受付の時刻）
-  ...dateCases("patient_entries", "visit_date", (b, v) => {
+  ...dateCases("patient_visit_days", "visit_date", (b, v) => {
     b.visits[0].visit_date = v;
   }),
-  ...dateTimeCases("patient_entries", "received_at", (b, v) => {
+  ...dateTimeCases("patient_visit_days", "received_at", (b, v) => {
     b.visits[0].received_at = v;
   }),
   // 今日の記録の見出しの日付（サーバーの今日）

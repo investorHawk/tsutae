@@ -18,16 +18,19 @@
   直接作る）
 - 医師の Cookie は `login_doctor(client)`（`POST /api/doctor/login` を使わず、deps の
   署名で直接作る。医師 API が無くても使える）
+- 通知の sender は `FakePushSender`（既定。本物の送信に出ない）。VAPID の鍵は環境変数に
+  左右されないよう既定で無し（鍵ありのテストは `push_helpers.vapid_overrides()` を渡す）
+- 撮影用の見本も環境変数に左右されないよう既定で無し（ありのテストは `demo_tools=True`）
 """
 
 from __future__ import annotations
 
 import importlib.util
 import sqlite3
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -64,6 +67,10 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         secret_key=TEST_SECRET,
         report_ttl_hours=24,
         public_base_url="http://testserver",
+        vapid_public_key=None,
+        vapid_private_key=None,
+        vapid_subject=None,
+        demo_tools=False,
     )
     return replace(base, **overrides)
 
@@ -98,12 +105,27 @@ class FakeEditor:
         return self.stats
 
 
+@dataclass
+class FakePushSender:
+    """通知の sender の偽物。送った内容を覚える。errors は endpoint ごとに投げる例外。"""
+
+    errors: dict[str, Exception] = field(default_factory=dict)
+    calls: list[tuple[Any, str]] = field(default_factory=list)
+
+    def __call__(self, target: Any, payload: str) -> None:
+        self.calls.append((target, payload))
+        error = self.errors.get(target.endpoint)
+        if error is not None:
+            raise error
+
+
 def make_app(
     tmp_path: Path,
     *,
     runner: Any = None,
     editor: Any = None,
     settings: Settings | None = None,
+    push_sender: Any = None,
     **overrides: Any,
 ) -> FastAPI:
     resolved = settings or make_settings(tmp_path, **overrides)
@@ -111,6 +133,7 @@ def make_app(
         resolved,
         runner_factory=RunnerFactory(runner if runner is not None else FakeRunner()),
         skill_editor=editor if editor is not None else FakeEditor(),
+        push_sender=push_sender if push_sender is not None else FakePushSender(),
     )
 
 
@@ -121,11 +144,17 @@ def api_client(
     runner: Any = None,
     editor: Any = None,
     settings: Settings | None = None,
+    push_sender: Any = None,
     **overrides: Any,
 ) -> Iterator[TestClient]:
     """起動処理（init_db・ensure_skill_versions・purge_expired）を済ませた TestClient。"""
     app = make_app(
-        tmp_path, runner=runner, editor=editor, settings=settings, **overrides
+        tmp_path,
+        runner=runner,
+        editor=editor,
+        settings=settings,
+        push_sender=push_sender,
+        **overrides,
     )
     with TestClient(app) as client:
         yield client
@@ -168,6 +197,21 @@ def add_entry(
 ) -> int:
     with db_conn(app) as conn:
         return db.add_entry(conn, pid, entry, now(), skill_version).id
+
+
+def record_entry(client: TestClient, pid: str, body: Mapping[str, Any]) -> int:
+    """記録を1件サーバーに置いて id を返す（変換・D2 など、記録がある前提のテスト用）。
+
+    患者 API に記録の経路は無いので DB に直接入れる。今の版と時刻は記録の順序と同じく
+    `GET /questions` と `POST /record-marks` から受け取るので、印も付く。
+    """
+    url = f"/api/patient/{pid}"
+    version = client.get(f"{url}/questions").json()["skill_version"]
+    mark = client.post(f"{url}/record-marks").json()
+    entry = EntryCreate.model_validate(body)
+    at = datetime.fromisoformat(mark["recorded_at"])
+    with db_conn(client.app) as conn:
+        return db.add_entry(conn, pid, entry, at, version).id
 
 
 def register(client: TestClient, pid: str) -> Any:

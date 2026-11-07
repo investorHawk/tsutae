@@ -13,6 +13,9 @@
   フォールバックにし、service が AI 変換なしのレポートで ready（fallback=True）にする。
   入力が作れなければ service が failed にする。自由記載が無ければ AI は要らないので、
   通常と同じく fallback=False で ready になる
+- 回収は費用がかからず全ての記録を読むので、自動の変換し直しの回数（plan-device-records §6）を
+  使わない。それまでに届いた分の印（regen_pending）は先に下ろし、回収の最中に届いた分は
+  数えずにもう1回読む（`recover_stale` はリクエストを受けながら動く）
 - `recover_stale(settings, *, now, stale_after)` は purge の周期タスクから呼ぶ。稼働中に
   バックグラウンドの生成が DB を開けずに抜ける等で generating のまま残った受診を、
   次の再起動を待たずに同じやり方で救う。対象は「動きの無い」generating だけ
@@ -119,6 +122,14 @@ def _list_stale(
         conn.close()
 
 
+def _clear_pending(settings: Settings, visit_id: int) -> None:
+    conn = db.connect(settings.db_path)
+    try:
+        db.clear_regen_pending(conn, visit_id)
+    finally:
+        conn.close()
+
+
 def _record(settings: Settings, visit_id: int) -> str:
     """結果の状態を読み直し、`orphan_recovered` を残す。状態を返す。"""
     conn = db.connect(settings.db_path)
@@ -137,7 +148,8 @@ def _record(settings: Settings, visit_id: int) -> str:
 async def _recover_one(settings: Settings, visit_id: int) -> bool:
     """1件を救う。ready になれば True。例外は外へ出さない（型名だけ残す）。"""
     try:
-        await visit.run_generation(settings, OrphanRunner, visit_id)
+        _clear_pending(settings, visit_id)
+        await visit.run_generation(settings, OrphanRunner, visit_id, counted=False)
         return _record(settings, visit_id) == "ready"
     except Exception as exc:  # noqa: BLE001 — 1件の失敗で他を止めない
         _log.warning(

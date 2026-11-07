@@ -90,7 +90,7 @@ _FIELD_DESCRIPTIONS: Mapping[str, Mapping[str, str]] = {
             "day1_date より前は null。null でも省かない"
         ),
         "course_no": "schedule.course_no をそのまま",
-        "term": "用語の一覧（CTCAE v5.0 JCOG版）の用語名をそのまま",
+        "term": "用語の一覧の用語名をそのまま",
         "question_key": (
             "用語の一覧でその term に対応する key。入力の questions に無い key なら null"
         ),

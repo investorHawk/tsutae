@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/api/patient/push-config",
+  "request": null,
+  "status": 200,
+  "body": {
+    "available": false,
+    "public_key": null
+  }
+}

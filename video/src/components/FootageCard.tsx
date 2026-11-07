@@ -16,6 +16,9 @@ interface FootageCardProps {
   compact?: boolean;
 }
 
+/** これより長い「撮る内容」は字を小さくして枠に収める（F11 など） */
+const LONG_CONTENT_CHARS = 80;
+
 const DeviceOutline: React.FC<{ device: Device }> = ({ device }) => {
   const size =
     device === "phone"
@@ -104,7 +107,15 @@ const CardInfo: React.FC<{
       </Row>
       {compact ? null : (
         <Row label="撮る内容" labelWidth={labelWidth}>
-          {spec.content}
+          <span
+            style={
+              spec.content.length > LONG_CONTENT_CHARS
+                ? { fontSize: 36 }
+                : undefined
+            }
+          >
+            {spec.content}
+          </span>
         </Row>
       )}
       <div

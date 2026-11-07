@@ -377,3 +377,15 @@ describe("liveStatus", () => {
     });
   });
 });
+
+describe("regenerate_requested", () => {
+  it("記録の追加で変換し直したときは、そのことを出す", () => {
+    const [added, pressed] = toViewEvents([
+      ev({ event: "regenerate_requested", decision: "added_records" }),
+      ev({ event: "regenerate_requested" }),
+    ]);
+    expect(added?.decisionLabel).toBe("記録の追加");
+    expect(added?.tone).toBe("neutral");
+    expect(pressed?.decisionLabel).toBe("");
+  });
+});

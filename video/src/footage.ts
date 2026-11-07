@@ -11,6 +11,8 @@ export interface FootageSpec {
   minSeconds: number;
   content: string;
   optional?: boolean;
+  /** 録画ではなく静止画を置く素材の置き場所（無ければ video/public/footage/<id>.mp4） */
+  target?: string;
 }
 
 export const DEVICE_LABEL: Record<Device, string> = {
@@ -50,9 +52,9 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     slug: "patient_visit",
     scene: "受診",
     device: "phone",
-    minSeconds: 10,
+    minSeconds: 15,
     content:
-      "QR を読む（カメラ越しでも可）→ 受付番号 A-023 → 「先生に届けました」",
+      "下の「受診」タブ → 受付番号 A-023 → 「先生に届ける」→ 「先生に届けました。」",
   },
   F5: {
     id: "F5",
@@ -82,10 +84,11 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
   F8: {
     id: "F8",
     slug: "doctor_settings",
-    scene: "D4",
+    scene: "D4 レジメン",
     device: "pc",
-    minSeconds: 18,
-    content: "一文を入力 → 待ち（早送り可）→ 差分 → 承認 → 版が上がる",
+    minSeconds: 20,
+    content:
+      "「設定を変える」の「レジメン」→「＋ 新しいレジメン」→「Claude に伝える」に文を貼って送る → 待ち（早送り可）→ 左のフォームが埋まる →「確認へ進む」→ 確かめた印 →「採用して登録」",
   },
   F9: {
     id: "F9",
@@ -106,10 +109,20 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
       "任意（report の場面は画像 sample-report.png で描くので無くてよい）",
     optional: true,
   },
+  F11: {
+    id: "F11",
+    slug: "patient_reminder",
+    scene: "毎日のお知らせ",
+    device: "phone",
+    minSeconds: 7,
+    content:
+      "iPhone のロック画面に届いた通知のスクリーンショット（タイトル「つたえ」、本文「今日の記録をお願いします。つらい日はボタンひとつで記録になります。」）。1 枚でよい。他のアプリの通知と実際の URL を写さない",
+    target: "video/public/screens/F11-1.png",
+  },
 };
 
 export const FOOTAGE_IDS = Object.keys(FOOTAGE) as FootageId[];
 
 /** 撮影後に置く場所（カードに出す） */
 export const footageTargetPath = (id: FootageId): string =>
-  `video/public/footage/${id}.mp4`;
+  FOOTAGE[id].target ?? `video/public/footage/${id}.mp4`;

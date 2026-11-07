@@ -3,7 +3,8 @@
 - 患者 API（`tsutae/api/patient.py`）は pipeline・report・変換結果（get_timeline・
   get_report）・skillchange・D4 レジメンの下書き（tsutae.regimen・repo_regimen_drafts。
   チャットの文面を持つ。v1.1）を import しない
-- 患者側の API（`patient.py`・`visit.py`・`fixed_rules.py`）は変換結果の読み書き
+- 患者側の API（`patient.py`・`patient_device.py`・`patient_demo.py`・`skill_questions.py`・
+  `visit.py`・`visit_entries.py`・`fixed_rules.py`）は変換結果の読み書き
   （`db.get_report` 等の属性参照・名前・`getattr` の文字列・reports/timelines・
   regimen_drafts を引く SQL）を使わない（`from tsutae import db` 経由の抜け道を塞ぐ）
 - 実際の患者 API の応答（spec §18）: AI の出力（用語・引用・レポート）と医師向けの
@@ -11,6 +12,8 @@
   コード（日時・状態・キー）だけ
 - `tsutae/` のどこにも `datetime.now(` の直接呼び出しが無い（config.py を除く。
   時計は `tsutae.config.now()` / `today()` を使う）
+- 通知（plan-device-records §4.3）: 新しい経路とモジュールは変換結果・D4 の下書きを読まない。
+  通知の本文は patient_strings.json の値（と決まった url・badge）だけで、患者ごとに変わらない
 """
 
 from __future__ import annotations
@@ -40,8 +43,28 @@ FORBIDDEN_MODULES = (
 FORBIDDEN_NAMES = frozenset({"get_timeline", "get_report", "skillchange"})
 # 患者側の API。visit.py は生成を起こすため pipeline.service の import は許す
 PATIENT_SIDE = tuple(
-    PACKAGE_ROOT / "api" / name for name in ("patient.py", "visit.py", "fixed_rules.py")
+    PACKAGE_ROOT / "api" / name
+    for name in (
+        "patient.py",
+        "patient_device.py",
+        "patient_demo.py",
+        "skill_questions.py",
+        "visit.py",
+        "visit_entries.py",
+        "fixed_rules.py",
+    )
 )
+PUSH_MODULES = (
+    PACKAGE_ROOT / "api" / "patient_push.py",
+    PACKAGE_ROOT / "push" / "decide.py",
+    PACKAGE_ROOT / "push" / "dispatch.py",
+    PACKAGE_ROOT / "push" / "payload.py",
+    PACKAGE_ROOT / "push" / "sender.py",
+    PACKAGE_ROOT / "db" / "repo_push.py",
+    PACKAGE_ROOT / "db" / "repo_record_marks.py",
+    PACKAGE_ROOT / "patient_strings.py",
+)
+PUSH_PAYLOAD_MODULE = PACKAGE_ROOT / "push" / "payload.py"
 RESULT_ACCESSORS = frozenset(
     {"get_timeline", "get_report", "save_timeline", "save_report"}
 )
@@ -210,8 +233,141 @@ def test_patient_side_api_does_not_touch_results(path: Path) -> None:
     assert result_references(path) == []
 
 
-def test_fixed_rules_does_not_import_results_or_pipeline() -> None:
-    assert forbidden_imports(PATIENT_SIDE[2]) == []
+@pytest.mark.parametrize(
+    "path", [p for p in PATIENT_SIDE if p.name != "visit.py"], ids=lambda p: p.name
+)
+def test_patient_modules_do_not_import_results_or_pipeline(path: Path) -> None:
+    assert forbidden_imports(path) == []
+
+
+@pytest.mark.parametrize("path", PUSH_MODULES, ids=lambda p: p.name)
+def test_push_modules_do_not_touch_results(path: Path) -> None:
+    assert path.is_file()
+    assert forbidden_imports(path) == []
+    assert result_references(path) == []
+
+
+def test_every_push_module_is_checked() -> None:
+    """通知のパッケージに新しいファイルを足したら、上の検査の一覧にも足す。"""
+    package = {p for p in (PACKAGE_ROOT / "push").glob("*.py") if p.stem != "__init__"}
+    assert package <= set(PUSH_MODULES)
+
+
+def _literal_strings(path: Path) -> set[str]:
+    """モジュールの文字列の定数（docstring は除く）。"""
+    tree = _parse(path)
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Module | ast.FunctionDef | ast.ClassDef)
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    return {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+    }
+
+
+def test_notification_payload_module_has_no_wording_of_its_own() -> None:
+    """本文の文字列は patient_strings.json のキーで引くだけ。文を直接書かない。"""
+    assert _literal_strings(PUSH_PAYLOAD_MODULE) - {"annotations"} <= {
+        "__all__",
+        "notification_payload",
+        "notify.title",
+        "notify.body",
+        "title",
+        "body",
+        "url",
+        "badge",
+        "/today",
+    }
+
+
+def test_notification_payload_takes_no_patient_data() -> None:
+    """引数が無いので、症状・レジメン名・AI の文が入る道が無い。"""
+    tree = _parse(PUSH_PAYLOAD_MODULE)
+    (func,) = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+    assert func.name == "notification_payload"
+    assert not func.args.args and not func.args.kwonlyargs
+
+
+def test_notification_payload_values_are_patient_strings() -> None:
+    from tsutae.push.payload import notification_payload
+
+    strings = json.loads(PATIENT_STRINGS_PATH.read_text(encoding="utf-8"))
+    payload = json.loads(notification_payload())
+    assert set(payload) == {"title", "body", "url", "badge"}
+    assert payload["title"] == strings["notify.title"]
+    assert payload["body"] == strings["notify.body"]
+    assert payload["url"] == "/today"
+    assert payload["badge"] == 1
+
+
+def _subscribe_for_test(conn: Any, pid: str, endpoint: str) -> Any:
+    from datetime import datetime
+
+    from push_helpers import RFC8291_AUTH, RFC8291_P256DH
+
+    from tsutae import db
+    from tsutae.config import JST
+
+    return db.upsert_push_subscription(
+        conn,
+        pid,
+        endpoint=endpoint,
+        p256dh=RFC8291_P256DH,
+        auth=RFC8291_AUTH,
+        notify_time="20:00",
+        created_at=datetime(2026, 11, 9, 9, 0, tzinfo=JST),
+    )
+
+
+def test_sent_notifications_are_the_same_for_every_patient(tmp_path: Path) -> None:
+    """違うレジメンの患者でも、毎日の通知と試送で同じ本文が届く。名前も質問も入らない。"""
+    from datetime import date, datetime
+
+    from api_helpers import FakePushSender, make_settings
+    from push_helpers import ENDPOINT, SECOND_ENDPOINT
+
+    from tsutae import db
+    from tsutae.config import JST
+    from tsutae.push.dispatch import send_due_once, send_test_once
+    from tsutae.push.payload import notification_payload
+    from tsutae.schemas import Course
+    from tsutae.skills import load_regimen_skill
+
+    settings = make_settings(tmp_path)
+    conn = db.connect(settings.db_path)
+    db.init_db(conn)
+    pairs = (
+        ("FOLFOX", "P-ARCH0001", ENDPOINT),
+        ("CAPOX", "P-ARCH0002", SECOND_ENDPOINT),
+    )
+    subs = []
+    for regimen, pid, endpoint in pairs:
+        db.create_patient(conn, regimen, patient_id=pid)
+        db.upsert_course(
+            conn,
+            Course(patient_id=pid, course_no=1, infusion_date=date(2026, 11, 1)),
+        )
+        subs.append(_subscribe_for_test(conn, pid, endpoint))
+    conn.close()
+    sender = FakePushSender()
+    send_due_once(settings, sender, datetime(2026, 11, 9, 20, 0, tzinfo=JST))
+    send_test_once(settings, sender, subs[0].id)
+    assert len(sender.calls) == 3
+    assert {payload for _target, payload in sender.calls} == {notification_payload()}
+    banned = {"FOLFOX", "CAPOX", "P-ARCH", "regimen"}
+    for regimen, _pid, _endpoint in pairs:
+        skill = load_regimen_skill(regimen, settings.skills_dir)
+        banned.update(q.text for q in skill.questions)
+        banned.update(q.key for q in skill.questions)
+    assert not [word for word in banned if word in notification_payload()]
 
 
 @pytest.mark.parametrize(
@@ -338,21 +494,48 @@ def _ai_artifacts(timeline: Any, report: tuple[str, Any]) -> set[str]:
 
 def _patient_responses(client: Any, pid: str, other: str) -> list[Any]:
     """患者が叩く経路を一通り（成功と失敗）呼んだ応答。"""
+    from push_helpers import ENDPOINT, subscription_body
+
+    base = f"/api/patient/{pid}"
     fever = {"question_key": "fever", "value": "measured", "temperature": 38.4}
-    entry = {"answers": [fever], "free_text": "夜に熱っぽかった"}
+    entry = {
+        "client_entry_id": "demo-9001",
+        "recorded_at": "2026-11-09T20:00:00.000000+09:00",
+        "record_date": "2026-11-09",
+        "kind": "mixed",
+        "by_proxy": False,
+        "skill_version": "regimen-folfox@1",
+        "answers": [fever],
+        "free_text": "夜に熱っぽかった",
+    }
+    mark = client.post(f"{base}/record-marks")
+    undo = {"recorded_at": mark.json()["recorded_at"], "clear_mark": False}
     return [
+        mark,
+        client.post(f"{base}/record-marks/undo", json=undo),
+        client.post(f"{base}/record-marks/undo", json={"recorded_at": "x"}),
+        client.get(f"{base}/visit-window"),
+        client.get(f"{base}/visit-days"),
+        client.get(f"{base}/demo-config"),
+        client.get(f"{base}/demo-entries"),
         client.post("/api/patient/register", json={"pid": pid}),
         client.post("/api/patient/register", json={"pid": "P-ZZZZ9999"}),
         client.get("/api/patient/strings"),
         client.get(f"/api/patient/{pid}/questions"),
-        client.get(f"/api/patient/{pid}/entries"),
-        client.post(f"/api/patient/{pid}/entries", json=entry),
-        client.post(f"/api/patient/{pid}/entries", json={"answers": "x"}),
         client.get(f"/api/patient/{other}/questions"),
-        client.get(f"/api/patient/{other}/entries"),
-        client.post(f"/api/patient/{pid}/entries/999999/undo"),
-        client.post("/api/visit", json={"reception_no": "A-024"}),
+        client.get(f"/api/patient/{other}/visit-days"),
+        client.get("/api/patient/push-config"),
+        client.put(f"/api/patient/{pid}/push-subscription", json={"endpoint": "x"}),
+        client.put(f"/api/patient/{pid}/push-subscription", json=subscription_body()),
+        client.post(f"/api/patient/{pid}/push-test", json={"endpoint": ENDPOINT}),
+        client.request(
+            "DELETE",
+            f"/api/patient/{pid}/push-subscription",
+            json={"endpoint": ENDPOINT},
+        ),
+        client.post("/api/visit", json={"reception_no": "A-024", "entries": [entry]}),
         client.post("/api/visit", json={"reception_no": ""}),
+        client.post(f"{base}/unregister", json={"endpoint": None}),
     ]
 
 

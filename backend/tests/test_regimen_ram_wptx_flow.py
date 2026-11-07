@@ -6,7 +6,7 @@ API を呼ばない構成（偽の runner）。採用は T93 の関数（下書�
 - 医師のレジメンの一覧に RAM-WPTX（表示名 RAM＋wPTX）が出て、その患者を登録できる
 - 患者の質問は `regimen-ram-wptx@1`（だるさ・出血・しびれの新しい質問つき）
 - 自由記載の「だるい」は、版の term_keys で 倦怠感 → fatigue につながる（全体の対応では
-  null）。しびれは 末梢性感覚ニューロパチー → neuropathy（全体の対応では numbness）
+  null）。しびれは 末梢神経障害 → neuropathy（全体の対応では numbness）
 - 紙: ヘッダは表示名、経過表の行は form の短い名前（だるさ）、○ が付く
 - 医師画面（D2）の記録の回答に短い名前が付く
 """
@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from api_helpers import api_client, db_conn, login_doctor, register
+from api_helpers import api_client, db_conn, login_doctor, record_entry, register
 from e2e_scripts import grid_row, live_prepared, post_visit, report_html, section
 from fastapi.testclient import TestClient
 from pipeline_fakes import FakeRunner, standard_steps
@@ -108,11 +108,7 @@ def _record(client: TestClient, pid: str) -> None:
     assert {"fatigue", "bleeding", "neuropathy"} <= {
         q["key"] for q in body["questions"]
     }
-    r = client.post(
-        f"/api/patient/{pid}/entries",
-        json={"answers": _answers(), "free_text": FREE_TEXT},
-    )
-    assert r.status_code == 200, r.text
+    record_entry(client, pid, {"answers": _answers(), "free_text": FREE_TEXT})
 
 
 def _event(no: int, d: str, term: str, key: str, quote: str) -> dict[str, Any]:
@@ -138,9 +134,7 @@ def _runner(client: TestClient, pid: str) -> FakeRunner:
     d = entry.record_date.isoformat()
     events = [
         _event(entry.entry_no, d, "倦怠感", "fatigue", "今日はだるい"),
-        _event(
-            entry.entry_no, d, "末梢性感覚ニューロパチー", "neuropathy", "手足のしびれ"
-        ),
+        _event(entry.entry_no, d, "末梢神経障害", "neuropathy", "手足のしびれ"),
     ]
     per_symptom = [
         {

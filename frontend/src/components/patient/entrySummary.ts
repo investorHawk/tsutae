@@ -8,12 +8,7 @@
  * - 自由記載があれば free_text（中身は出さない。詳しくは開いて見る）
  * - 家族が代わりに入力した記録なら最後に proxy
  */
-import type {
-  AnswerValue,
-  EntryCreate,
-  PatientEntry,
-  Question,
-} from "../../api/types";
+import type { AnswerValue, DeviceEntry } from "../../api/types";
 
 export interface SummaryAnswer {
   questionKey: string;
@@ -86,41 +81,17 @@ export function summarizeEntry(source: SummarySource): SummaryItem[] {
   return source.byProxy === true ? [...items, { kind: "proxy" }] : items;
 }
 
-function isEntry(value: PatientEntry | EntryCreate): value is PatientEntry {
-  return "kind" in value;
-}
-
-/**
- * 要約の元を作る。GET entries の記録なら question_text を、送った EntryCreate なら
- * 質問集の文を使う。
- */
-export function summarySourceOf(
-  entry: PatientEntry | EntryCreate,
-  questions: readonly Question[] = [],
-): SummarySource {
-  if (isEntry(entry)) {
-    return {
-      tooSick: entry.kind === "too_sick",
-      answers: entry.answers.map((a) => ({
-        questionKey: a.question_key,
-        value: a.value,
-        temperature: a.temperature,
-        questionText: a.question_text,
-      })),
-      freeText: entry.free_text,
-      byProxy: entry.by_proxy,
-    };
-  }
-  const texts = new Map(questions.map((q) => [q.key, q.text]));
+/** 要約の元を作る。質問の文は記録に持たせた写し（記録時点の質問集の文）。 */
+export function summarySourceOf(entry: DeviceEntry): SummarySource {
   return {
-    tooSick: entry.too_sick === true,
-    answers: (entry.answers ?? []).map((a) => ({
+    tooSick: entry.kind === "too_sick",
+    answers: entry.answers.map((a) => ({
       questionKey: a.question_key,
       value: a.value,
-      temperature: a.temperature ?? null,
-      questionText: texts.get(a.question_key) ?? null,
+      temperature: a.temperature,
+      questionText: a.question_text,
     })),
-    freeText: entry.free_text ?? null,
-    byProxy: entry.by_proxy === true,
+    freeText: entry.free_text,
+    byProxy: entry.by_proxy,
   };
 }

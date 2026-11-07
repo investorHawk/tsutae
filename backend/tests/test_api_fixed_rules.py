@@ -1,13 +1,23 @@
-"""固定規則の案内（api/fixed_rules.py）。コードの閾値比較だけ。"""
+"""固定規則の案内（api/fixed_rules.py）。コードの閾値比較だけ。
+
+記録はサーバーに来ないので、患者画面の案内は画面のコードが出す。ここは同じ規則の判定を
+Python でも持ち、同じ表（frontend/src/test/fixtures/fixed_rule_cases.json）で確かめる。
+"""
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
+import pytest
+
 from tsutae.api.fixed_rules import notices_for
-from tsutae.config import SKILLS_DIR
+from tsutae.config import REPO_ROOT, SKILLS_DIR
 from tsutae.schemas import ClosedAnswer, EntryCreate, FixedRule, RegimenSkill
 from tsutae.skills import load_regimen_skill
 
 FEVER_KEY = "fixed_rule.fever_38"
+FRONTEND_FIXTURES = REPO_ROOT / "frontend" / "src" / "test" / "fixtures"
 
 
 def _folfox() -> RegimenSkill:
@@ -89,3 +99,15 @@ def test_does_not_mutate_arguments() -> None:
     before = (entry.model_dump(), skill.model_dump())
     notices_for(entry, skill)
     assert (entry.model_dump(), skill.model_dump()) == before
+
+
+# 画面のコードの判定（TypeScript）と同じ表で確かめる（plan-device-records §5.3）
+SHARED_CASES = json.loads(
+    (FRONTEND_FIXTURES / "fixed_rule_cases.json").read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize("case", SHARED_CASES, ids=lambda c: c["name"])
+def test_shared_table_with_the_screen(case: dict[str, Any]) -> None:
+    entry = EntryCreate(too_sick=case["too_sick"], answers=case["answers"])
+    assert notices_for(entry, _folfox()) == case["notices"]

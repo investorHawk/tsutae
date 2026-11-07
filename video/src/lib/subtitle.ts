@@ -1,5 +1,6 @@
 // 字幕: 字幕の文を「2 行以内・1 行 25 字前後」の塊に分け、塊の字数に比例して時間を配る。
 import { countChars } from "./text";
+import { VOICE_OFFSET_SECONDS } from "./voiceOffset";
 
 export const LINE_TARGET = 25;
 export const LINE_MAX = 28;
@@ -138,6 +139,25 @@ export const buildSubtitleChunks = (text: string): SubtitleChunk[] => {
     acc += visibleLength(p);
     return { lines: wrapLines(p), start, end: acc / total };
   });
+};
+
+/**
+ * 字幕の塊の時間を、実際の声に合わせる。starts は声の頭からの塊の開始（秒）。
+ * 最初の塊は場面の頭から、最後の塊は場面の終わりまで出す。数が合わなければそのまま返す
+ */
+export const timeChunks = (
+  chunks: SubtitleChunk[],
+  starts: readonly number[],
+  sceneSeconds: number,
+): SubtitleChunk[] => {
+  if (starts.length !== chunks.length || sceneSeconds <= 0) return chunks;
+  const startOf = (i: number): number =>
+    i === 0 ? 0 : (VOICE_OFFSET_SECONDS + starts[i]) / sceneSeconds;
+  return chunks.map((chunk, i) => ({
+    ...chunk,
+    start: startOf(i),
+    end: i === chunks.length - 1 ? 1 : startOf(i + 1),
+  }));
 };
 
 export interface ActiveChunk {

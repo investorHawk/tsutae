@@ -1,12 +1,20 @@
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { Caption } from "../components/Caption";
+import { notesLayout } from "../lib/pipelineNotes";
 import { COLORS, FONT_FAMILY } from "../theme";
 import type { HookId } from "../types";
 import { appear, ramp } from "./anim";
-import { BUILD_ORDER, EDGES, HOOK_TEXT, NODES } from "./pipelineLayout";
+import {
+  BUILD_ORDER,
+  EDGES,
+  HOOK_TEXT,
+  NODES,
+  type PipeNode,
+} from "./pipelineLayout";
 import {
   ArrowDefs,
   BackgroundFootage,
+  DiagramScale,
   EdgeLine,
   HookBanner,
   NodeBox,
@@ -46,6 +54,40 @@ const useSchedule = (durationInFrames: number, hooks: HookId[]) => {
   return { frame, startOf, litOf, current, hookStartOf: hookStart };
 };
 
+/** 注記を出す時刻（場面の割合）。1 行目は声の「Claude Agent SDK が」の頃、以降は少しずつ遅らせる */
+const noteStartRatio = (i: number): number => 0.42 + i * 0.12;
+
+/** SDK の枠・矢印・ノード（注記が 2 行以上なら縮める） */
+const Diagram: React.FC<{
+  frame: number;
+  nodes: PipeNode[];
+  startOf: (id: string) => number;
+  litOf: (h: HookId) => number;
+}> = ({ frame, nodes, startOf, litOf }) => (
+  <>
+    <SdkFrame opacity={ramp(frame, startOf("main"), 10) * 0.8} />
+    <svg width={1920} height={1080} style={{ position: "absolute", inset: 0 }}>
+      <ArrowDefs />
+      {EDGES.map((e) => (
+        <EdgeLine
+          key={`${e.from}-${e.to}`}
+          edge={e}
+          t={ramp(frame, startOf(e.tone === "reject" ? "reject" : e.to), 10)}
+        />
+      ))}
+    </svg>
+    {nodes.map((n) => (
+      <NodeBox
+        key={n.id}
+        node={n}
+        frame={frame}
+        start={startOf(n.id)}
+        lit={n.hook ? litOf(n.hook) : 0}
+      />
+    ))}
+  </>
+);
+
 /** README の図を簡略化: 伏せ字 → H1 → 主エージェント → 3 役 → emit → H2 → A4。Hook は赤で点灯 */
 export const PipelineScene: React.FC<SceneComponentProps> = ({
   scene,
@@ -59,37 +101,26 @@ export const PipelineScene: React.FC<SceneComponentProps> = ({
   const nodes = NODES.filter(
     (n) => !n.onlyWithHooks || (n.hook && hooks.includes(n.hook)),
   );
-  const noteStyle = appear(frame, Math.round(durationInFrames * 0.78));
+  const notes = scene.props?.notes ?? [];
+  const layout = notesLayout(notes.length);
   return (
     <AbsoluteFill style={{ background: COLORS.paper, fontFamily: FONT_FAMILY }}>
       <BackgroundFootage id={scene.props?.backgroundFootage} />
       {scene.title ? <Caption text={scene.title} /> : null}
-      <SdkFrame opacity={ramp(frame, startOf("main"), 10) * 0.8} />
-      <svg
-        width={1920}
-        height={1080}
-        style={{ position: "absolute", inset: 0 }}
-      >
-        <ArrowDefs />
-        {EDGES.map((e) => (
-          <EdgeLine
-            key={`${e.from}-${e.to}`}
-            edge={e}
-            t={ramp(frame, startOf(e.tone === "reject" ? "reject" : e.to), 10)}
-          />
-        ))}
-      </svg>
-      {nodes.map((n) => (
-        <NodeBox
-          key={n.id}
-          node={n}
-          frame={frame}
-          start={startOf(n.id)}
-          lit={n.hook ? litOf(n.hook) : 0}
+      <DiagramScale scale={layout.scale} origin={layout.origin}>
+        <Diagram frame={frame} nodes={nodes} startOf={startOf} litOf={litOf} />
+      </DiagramScale>
+      {notes.map((note, i) => (
+        <NoteChip
+          key={note}
+          text={note}
+          top={layout.tops[i]}
+          height={layout.height}
+          style={appear(
+            frame,
+            Math.round(durationInFrames * noteStartRatio(i)),
+          )}
         />
-      ))}
-      {(scene.props?.notes ?? []).map((note, i) => (
-        <NoteChip key={note} text={note} top={780 - i * 80} style={noteStyle} />
       ))}
       {current ? (
         <HookBanner

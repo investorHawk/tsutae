@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/visit",
+  "request": {
+    "reception_no": "A-999"
+  },
+  "status": 409,
+  "body": {
+    "error": "already_printed"
+  }
+}

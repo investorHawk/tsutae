@@ -5,13 +5,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { jsonResponse, mockFetch } from "../test/fetchMock";
 import { ApiError, INVALID_RESPONSE } from "./http";
+import { getQuestions, registerPatient, submitVisit } from "./patient";
 import {
-  createEntry,
-  getQuestions,
-  listEntries,
-  registerPatient,
-  submitVisit,
-} from "./patient";
+  addRecordMark,
+  getDemoEntries,
+  getVisitDays,
+  getVisitWindow,
+} from "./patientDevice";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -28,8 +28,16 @@ const QUESTION = {
 /** サーバーの今日（GET questions の today） */
 const TODAY = "2026-11-09";
 
+/** 固定規則（GET questions の fixed_rules） */
+const RULE = {
+  question_key: "fever",
+  threshold_celsius: 38,
+  patient_string_key: "fixed_rule.fever_38",
+};
+
 const ENTRY = {
-  id: 1,
+  pid: PID,
+  client_entry_id: "demo-1",
   recorded_at: "2026-11-01T20:00:00+09:00",
   record_date: "2026-11-01",
   kind: "answers",
@@ -63,21 +71,35 @@ async function expectInvalid(body: unknown, call: () => Promise<unknown>) {
 
 describe("getQuestions の応答の検査", () => {
   it.each([
-    ["questions が無い", { skill_version: "regimen-folfox@1", today: TODAY }],
+    [
+      "questions が無い",
+      { skill_version: "regimen-folfox@1", fixed_rules: [RULE], today: TODAY },
+    ],
     [
       "questions が null",
-      { skill_version: "x", today: TODAY, questions: null },
+      {
+        skill_version: "x",
+        fixed_rules: [RULE],
+        today: TODAY,
+        questions: null,
+      },
     ],
     ["本文が配列", [QUESTION]],
     ["本文が null", null],
     [
       "要素が文字列",
-      { skill_version: "x", today: TODAY, questions: ["diarrhea"] },
+      {
+        skill_version: "x",
+        fixed_rules: [RULE],
+        today: TODAY,
+        questions: ["diarrhea"],
+      },
     ],
     [
       "key が無い",
       {
         skill_version: "x",
+        fixed_rules: [RULE],
         today: TODAY,
         questions: [{ ...QUESTION, key: 1 }],
       },
@@ -86,6 +108,7 @@ describe("getQuestions の応答の検査", () => {
       "text が null",
       {
         skill_version: "x",
+        fixed_rules: [RULE],
         today: TODAY,
         questions: [{ ...QUESTION, text: null }],
       },
@@ -94,37 +117,101 @@ describe("getQuestions の応答の検査", () => {
       "answer_type が未知",
       {
         skill_version: "x",
+        fixed_rules: [RULE],
         today: TODAY,
         questions: [{ ...QUESTION, answer_type: "scale" }],
       },
     ],
-    ["skill_version が無い", { today: TODAY, questions: [QUESTION] }],
+    [
+      "skill_version が無い",
+      { fixed_rules: [RULE], today: TODAY, questions: [QUESTION] },
+    ],
     [
       "skill_version が null",
-      { skill_version: null, today: TODAY, questions: [QUESTION] },
+      {
+        skill_version: null,
+        fixed_rules: [RULE],
+        today: TODAY,
+        questions: [QUESTION],
+      },
     ],
     [
       "skill_version が数",
-      { skill_version: 1, today: TODAY, questions: [QUESTION] },
+      {
+        skill_version: 1,
+        fixed_rules: [RULE],
+        today: TODAY,
+        questions: [QUESTION],
+      },
     ],
     [
       "質問の key が重複",
       {
         skill_version: "x",
+        fixed_rules: [RULE],
         today: TODAY,
         questions: [QUESTION, { ...QUESTION }],
       },
     ],
-    ["today が無い", { skill_version: "x", questions: [QUESTION] }],
+    [
+      "today が無い",
+      { skill_version: "x", fixed_rules: [RULE], questions: [QUESTION] },
+    ],
     [
       "today が null",
-      { skill_version: "x", today: null, questions: [QUESTION] },
+      {
+        skill_version: "x",
+        fixed_rules: [RULE],
+        today: null,
+        questions: [QUESTION],
+      },
     ],
     [
       "today が日時",
       {
         skill_version: "x",
+        fixed_rules: [RULE],
         today: "2026-11-09T10:00:00+09:00",
+        questions: [QUESTION],
+      },
+    ],
+    [
+      "fixed_rules が無い",
+      { skill_version: "x", today: TODAY, questions: [QUESTION] },
+    ],
+    [
+      "fixed_rules が null",
+      {
+        skill_version: "x",
+        fixed_rules: null,
+        today: TODAY,
+        questions: [QUESTION],
+      },
+    ],
+    [
+      "規則の閾値が文字列",
+      {
+        skill_version: "x",
+        fixed_rules: [{ ...RULE, threshold_celsius: "38" }],
+        today: TODAY,
+        questions: [QUESTION],
+      },
+    ],
+    [
+      "規則の閾値が null",
+      {
+        skill_version: "x",
+        fixed_rules: [{ ...RULE, threshold_celsius: null }],
+        today: TODAY,
+        questions: [QUESTION],
+      },
+    ],
+    [
+      "規則の文のキーが無い",
+      {
+        skill_version: "x",
+        fixed_rules: [{ ...RULE, patient_string_key: undefined }],
+        today: TODAY,
         questions: [QUESTION],
       },
     ],
@@ -136,6 +223,7 @@ describe("getQuestions の応答の検査", () => {
     const body = {
       skill_version: "regimen-folfox@1",
       questions: [QUESTION],
+      fixed_rules: [RULE],
       today: TODAY,
     };
     mockFetch(() => jsonResponse(body));
@@ -143,22 +231,28 @@ describe("getQuestions の応答の検査", () => {
   });
 });
 
-describe("createEntry の応答の検査", () => {
+describe("addRecordMark の応答の検査", () => {
+  const MARK = {
+    record_date: "2026-11-09",
+    recorded_at: "2026-11-09T20:00:00.000000+09:00",
+  };
+
   it.each([
-    ["notices が無い", { entry_id: 1 }],
-    ["notices が null", { entry_id: 1, notices: null }],
-    ["notices に数", { entry_id: 1, notices: [38] }],
-    ["notices が文字列", { entry_id: 1, notices: "fixed_rule.fever_38" }],
-    ["entry_id が無い", { notices: [] }],
+    ["record_date が無い", { recorded_at: MARK.recorded_at }],
+    ["recorded_at が無い", { record_date: MARK.record_date }],
+    ["record_date が日時", { ...MARK, record_date: MARK.recorded_at }],
+    [
+      "recorded_at に時差が無い",
+      { ...MARK, recorded_at: "2026-11-09T20:00:00" },
+    ],
     ["本文が空", {}],
   ])("%s は invalid_response", async (_label, body) => {
-    await expectInvalid(body, () => createEntry(PID, { too_sick: true }));
+    await expectInvalid(body, () => addRecordMark(PID));
   });
 
   it("正しい形はそのまま返す", async () => {
-    const body = { entry_id: 3, notices: ["fixed_rule.fever_38"] };
-    mockFetch(() => jsonResponse(body));
-    await expect(createEntry(PID, { too_sick: true })).resolves.toEqual(body);
+    mockFetch(() => jsonResponse(MARK));
+    await expect(addRecordMark(PID)).resolves.toEqual(MARK);
   });
 });
 
@@ -168,30 +262,16 @@ const VISIT = {
   received_at: "2026-11-09T09:40:00+09:00",
 };
 
-describe("listEntries の応答の検査", () => {
-  const withEntry = (patch: Record<string, unknown>) => ({
-    entries: [{ ...ENTRY, ...patch }],
-    visits: [VISIT],
-  });
-  const withAnswer = (patch: Record<string, unknown>) =>
-    withEntry({ answers: [{ ...ENTRY.answers[0], ...patch }] });
+describe("getVisitDays の応答の検査", () => {
   const withVisit = (patch: Record<string, unknown>) => ({
-    entries: [ENTRY],
     visits: [{ ...VISIT, ...patch }],
   });
 
   it.each([
-    ["entries が無い", { visits: [] }],
-    ["entries が null", { entries: null, visits: [] }],
-    ["要素が null", { entries: [null], visits: [] }],
-    // 受診日（§8）: visits は必須の配列。要素は visit_date と received_at
-    ["visits が無い", { entries: [ENTRY] }],
-    ["visits が null", { entries: [ENTRY], visits: null }],
-    ["visits の要素が文字列", { entries: [ENTRY], visits: ["2026-11-09"] }],
-    [
-      "同じ visit_date が2つ",
-      { entries: [ENTRY], visits: [VISIT, { ...VISIT }] },
-    ],
+    ["visits が無い", {}],
+    ["visits が null", { visits: null }],
+    ["visits の要素が文字列", { visits: ["2026-11-09"] }],
+    ["同じ visit_date が2つ", { visits: [VISIT, { ...VISIT }] }],
     ["visit_date が無い", withVisit({ visit_date: undefined })],
     ["visit_date が日時", withVisit({ visit_date: VISIT.received_at })],
     ["visit_date が存在しない日", withVisit({ visit_date: "2026-02-30" })],
@@ -201,6 +281,41 @@ describe("listEntries の応答の検査", () => {
       "received_at に時差が無い",
       withVisit({ received_at: "2026-11-09T09:40:00" }),
     ],
+  ])("%s は invalid_response", async (_label, body) => {
+    await expectInvalid(body, () => getVisitDays(PID));
+  });
+
+  it("受診が無い（visits が空）のは通す", async () => {
+    const body = { visits: [] };
+    mockFetch(() => jsonResponse(body));
+    await expect(getVisitDays(PID)).resolves.toEqual(body);
+  });
+});
+
+describe("getVisitWindow の応答の検査", () => {
+  it.each([
+    ["start が無い", { end: "2026-11-09" }],
+    ["end が無い", { start: "2026-10-13" }],
+    ["start が日時", { start: VISIT.received_at, end: "2026-11-09" }],
+  ])("%s は invalid_response", async (_label, body) => {
+    await expectInvalid(body, () => getVisitWindow(PID));
+  });
+});
+
+describe("getDemoEntries の応答の検査（端末の形）", () => {
+  const withEntry = (patch: Record<string, unknown>) => ({
+    entries: [{ ...ENTRY, ...patch }],
+  });
+  const withAnswer = (patch: Record<string, unknown>) =>
+    withEntry({ answers: [{ ...ENTRY.answers[0], ...patch }] });
+
+  it.each([
+    ["entries が無い", {}],
+    ["entries が null", { entries: null }],
+    ["要素が null", { entries: [null] }],
+    ["pid が無い", withEntry({ pid: undefined })],
+    ["client_entry_id が無い", withEntry({ client_entry_id: undefined })],
+    ["同じ client_entry_id が2つ", { entries: [ENTRY, { ...ENTRY }] }],
     ["answers が無い", withEntry({ answers: undefined })],
     ["answers が null", withEntry({ answers: null })],
     ["kind が未知", withEntry({ kind: "ai_summary" })],
@@ -261,19 +376,13 @@ describe("listEntries の応答の検査", () => {
       withEntry({ answers: [ENTRY.answers[0], { ...ENTRY.answers[0] }] }),
     ],
   ])("%s は invalid_response", async (_label, body) => {
-    await expectInvalid(body, () => listEntries(PID));
+    await expectInvalid(body, () => getDemoEntries(PID));
   });
 
   it("question_text が null の回答は通す（質問集に無い。画面は history.previous_question）", async () => {
     const body = withAnswer({ question_text: null });
     mockFetch(() => jsonResponse(body));
-    await expect(listEntries(PID)).resolves.toEqual(body);
-  });
-
-  it("受診が無い（visits が空）のは通す", async () => {
-    const body = { entries: [ENTRY], visits: [] };
-    mockFetch(() => jsonResponse(body));
-    await expect(listEntries(PID)).resolves.toEqual(body);
+    await expect(getDemoEntries(PID)).resolves.toEqual(body);
   });
 
   it.each([30, 37.25, 45])("measured で temperature %s は通す", async (t) => {
@@ -283,7 +392,7 @@ describe("listEntries の応答の検査", () => {
       temperature: t,
     });
     mockFetch(() => jsonResponse(body));
-    await expect(listEntries(PID)).resolves.toEqual(body);
+    await expect(getDemoEntries(PID)).resolves.toEqual(body);
   });
 });
 

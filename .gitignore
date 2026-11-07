@@ -1,6 +1,7 @@
 # secrets
 .env
 .env.*
+!.env.example
 *.key
 
 # python
@@ -50,6 +51,11 @@ video/public/footage/*.mp4
 video/public/footage/*.mov
 video/public/audio/*.mp3
 video/public/audio/*.wav
+video/public/voice/*.m4a
+video/public/voice/*.mp3
+video/public/voice/*.wav
+# 先生の写真など、公開リポジトリに入れない素材
+video/public/private/
 video/out/
 video/build/
 video/node_modules/.remotion/

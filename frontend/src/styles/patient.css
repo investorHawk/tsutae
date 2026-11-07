@@ -38,8 +38,8 @@
   --p-rule: #c8c8c8;
   --p-disabled-border: #8c8c8c;
   --p-focus: #111111;
-  /* 下のタブの高さ（タブ 56px ＋ 上下の余白 ＋ 上の線） */
-  --p-nav-h: 80px;
+  /* 下のタブの高さ（「これまでの記録」が2行に折れたタブ 約 60px ＋ 上下の余白 ＋ 上の線） */
+  --p-nav-h: 84px;
   --p-error: #9b0000;
   --p-notice-bg: #fff3cc;
   --p-notice-border: #7a5200;
@@ -422,6 +422,38 @@
   color: var(--p-muted);
 }
 
+/* ホーム画面に追加の案内（iPhone のブラウザ）。番号はアプリで入れ直すので大きく見せる */
+.patient-app .p-guide-steps {
+  padding-left: 1.5em;
+  margin: 0 0 20px;
+}
+
+.patient-app .p-guide-steps li {
+  margin-bottom: 12px;
+}
+
+.patient-app .p-guide-number {
+  padding: 16px;
+  margin: 0 0 20px;
+  text-align: center;
+  border: 3px solid var(--p-primary);
+  border-radius: 12px;
+}
+
+.patient-app .p-guide-number-label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.patient-app .p-guide-number-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* 入力の補足（押せない理由・入力例）。押せないボタン・入力欄の直前に出す */
 .patient-app .p-hint {
   margin: 0 0 8px;
@@ -517,7 +549,7 @@
   border-radius: 12px;
 }
 
-/* 受診日の区切り（院内の QR で受付をした日。受付の時刻の位置に入る）: 左右に伸びる
+/* 受診日の区切り（受診タブで受付をした日。受付の時刻の位置に入る）: 左右に伸びる
    緑の水平線（3px）の中央に「受診日 11月9日（月）」。線は飾りで、読み上げは文字だけ。
    帯（地の塗り・角丸）にはしない。390px でも文字は中で折れ、横にはみ出さない */
 .patient-app .p-visit-day {
@@ -687,7 +719,32 @@
   border-radius: 8px;
 }
 
-/* --- 下のタブ（今日の記録／これまでの記録）。画面の下に固定（PC-2） ------------ */
+/* --- 設定（毎日のお知らせ） --------------------------------------------- */
+
+.patient-app .p-notify-status {
+  font-weight: 700;
+}
+
+/* 今日の記録の下の案内の帯。設定へのリンクで、押す面は帯の全体 */
+.patient-app .p-notify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--p-tap);
+  padding: 8px 16px;
+  margin: 8px 0 12px;
+  font-size: max(18px, 1em);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  color: var(--p-primary);
+  background: var(--p-tag-present-bg);
+  border: 2px solid var(--p-primary);
+  border-radius: 12px;
+}
+
+/* --- 下のタブ。画面の下に固定（PC-2） ------------------------------------ */
 
 .patient-app .p-nav {
   position: fixed;
@@ -695,15 +752,18 @@
   bottom: 0;
   left: 0;
   z-index: 10;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--p-bg);
   border-top: 2px solid var(--p-border);
 }
 
+/* 4つのタブは文字の長さに合わせて幅を分ける。等分だと「これまでの記録」が3行に折れる。
+   幅 360px 以上で全て1行に入り（patientCss.test.ts で計算）、より狭ければ2行に折れる */
 .patient-app .p-nav-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
+  gap: 4px;
   max-width: 560px;
   margin: 0 auto;
 }
@@ -714,9 +774,10 @@
   align-items: center;
   justify-content: center;
   min-height: var(--p-tap);
-  padding: 8px;
-  font-size: max(18px, 1em);
+  padding: 4px 2px;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.3;
   color: var(--p-primary);
   text-align: center;
   border: 2px solid var(--p-primary);

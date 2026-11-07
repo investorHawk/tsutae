@@ -1,6 +1,12 @@
-import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Sequence,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import { FootageSlot } from "../components/FootageSlot";
 import { FOOTAGE } from "../footage";
+import { calloutAt } from "../lib/callouts";
 import { footageSegments } from "../lib/timeline";
 import { COLORS } from "../theme";
 import type { SceneComponentProps } from "./types";
@@ -12,31 +18,32 @@ const frameRange = (fromSeconds: number, seconds: number, fps: number) => {
   return { from, durationInFrames: Math.max(1, to - from) };
 };
 
-/** 録画の場面。複数の録画は props.split の秒配分で順に出す */
+/** 録画の場面。複数の録画は props.split の秒配分で順に出す。札は lib/callouts.ts の割り当てで出す */
 export const FootageScene: React.FC<SceneComponentProps> = ({ scene }) => {
   const { fps } = useVideoConfig();
+  const frame = useCurrentFrame();
   const segments = footageSegments(scene);
   const callouts = scene.props?.callouts ?? [];
   return (
     <AbsoluteFill style={{ background: COLORS.paper }}>
-      {segments.map((seg, i) => (
-        <Sequence
-          key={`${seg.id}-${i}`}
-          {...frameRange(seg.fromSeconds, seg.seconds, fps)}
-          layout="none"
-        >
-          <FootageSlot
-            id={seg.id}
-            seconds={seg.seconds}
-            label={
-              segments.length === 1 && scene.title
-                ? scene.title
-                : FOOTAGE[seg.id].scene
-            }
-            callout={callouts[i] ?? null}
-          />
-        </Sequence>
-      ))}
+      {segments.map((seg, i) => {
+        const range = frameRange(seg.fromSeconds, seg.seconds, fps);
+        const progress = (frame - range.from) / range.durationInFrames;
+        return (
+          <Sequence key={`${seg.id}-${i}`} {...range} layout="none">
+            <FootageSlot
+              id={seg.id}
+              seconds={seg.seconds}
+              label={
+                segments.length === 1 && scene.title
+                  ? scene.title
+                  : FOOTAGE[seg.id].scene
+              }
+              callout={calloutAt(callouts, i, segments.length, progress)}
+            />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };

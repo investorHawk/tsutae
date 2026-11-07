@@ -32,9 +32,9 @@ const testOnly = Object.entries(testSources).filter(
 );
 
 describe("患者画面のテスト（.tsx）に直書きの日本語が無い", () => {
-  it("検査対象に4画面のテストがある", () => {
+  it("検査対象に5画面のテストがある", () => {
     const files = testOnly.map(([file]) => file);
-    for (const page of ["Register", "Today", "History", "Visit"]) {
+    for (const page of ["Register", "Today", "History", "Visit", "Settings"]) {
       expect(files).toContain(`../../pages/patient/${page}.test.tsx`);
     }
   });
@@ -52,9 +52,9 @@ describe("患者画面のテスト（.tsx）に直書きの日本語が無い", 
 });
 
 describe("患者画面（pages/patient・components/patient）に直書きの文字列が無い", () => {
-  it("検査対象に4画面と部品と .ts の補助がある", () => {
+  it("検査対象に5画面と部品と .ts の補助がある", () => {
     const files = Object.keys(sources);
-    for (const page of ["Register", "Today", "History", "Visit"]) {
+    for (const page of ["Register", "Today", "History", "Visit", "Settings"]) {
       expect(files.some((f) => f.endsWith(`/pages/patient/${page}.tsx`))).toBe(
         true,
       );
@@ -64,6 +64,7 @@ describe("患者画面（pages/patient・components/patient）に直書きの文
       "reception.ts",
       "entryForm.ts",
       "patientApi.ts",
+      "pushStatus.ts",
     ]) {
       expect(files).toContain(`./${helper}`);
     }

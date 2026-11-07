@@ -1,5 +1,8 @@
 """緊急時の固定規則（患者画面の案内）。判定はコードの閾値比較だけ。
 
+記録はスマホに置くので、案内を出すのは画面のコード（plan-device-records §5.3。規則は
+`GET /questions` の fixed_rules）。ここは同じ判定の Python の側で、同じ表でテストする。
+
 - 対象はクローズ回答の体温（value=measured）だけ。自由記載は読まない
 - 体温 >= threshold_celsius なら、その規則の patient_string_key を返す
 - 規則の順に並べ、同じキーは1回だけ。引数は書き換えない

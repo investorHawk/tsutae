@@ -142,7 +142,7 @@ def test_system_prompt_states_output_rules() -> None:
         "contradiction-finder",
         "emit_timeline",
         "emit_report",
-        "CTCAE v5.0 JCOG版",
+        "用語の一覧",
         "Grade",
         "助言",
         "推測",

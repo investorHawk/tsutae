@@ -15,21 +15,37 @@ visits の行そのものは残す（状態の履歴として）。
 - purge_expired は status を問わず、期限を過ぎて中身が残っている受診を全て消す
 - create_visit_once は同じ患者・日・受付番号の期限内の受診があれば作らない（送り直し）
 - begin_regeneration は開いている failed・ready（fallback=True）の受診と、医師の伏せ字
-  （doctor_masks）が1件以上ある開いた ready の受診だけを generating に戻す（医師の
-  「AI でもう一度変換」「伏せ字を保存して AI で変換し直す」。確認と書き込みを1文で行う）
+  （doctor_masks）が1件以上ある開いた ready の受診と、追加の記録（regen_pending）がある開いた
+  ready の受診だけを generating に戻す（医師の「AI でもう一度変換」「伏せ字を保存して AI で
+  変換し直す」。確認と書き込みを1文で行う）
 - 印刷済み・期限切れでは医師の伏せ字（doctor_masks）もレポートと同じトランザクションで消す
+- 印刷済み・期限切れで、その患者に開いた受診が他に無ければ、受付で受け取った記録
+  （client_entry_id のある行）も同じトランザクションで消す（`repo_received`）。
+  create_visit_once は受診の作成と記録の保存を同じトランザクションで行う
+- 2台目のスマホ（plan-device-records §6）: 新しい記録が届くと、その患者のその日の開いた受診を
+  番号を問わず変換し直す。その患者に今日の印刷済みの受診があれば、番号を問わず
+  VisitAlreadyPrintedError。
+  どちらも記録の保存と同じトランザクションで決めるので、印刷と追加はどちらかが先になる
+  （`repo_visit_regen`）
+- 費用の歯止め: 1人の患者が1日に開ける受診は `MAX_OPEN_VISITS_PER_DAY` 件まで。新しい番号が
+  それを超えると TooManyOpenVisitsError（何も保存しない）。自動の変換し直しは1受診3回までなので、
+  1人の患者の1日の変換は「受診の数 × (1 + 3)」回までになる
 """
 
 from __future__ import annotations
 
 import contextlib
 import sqlite3
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
 from tsutae.config import now as clock_now
 from tsutae.db.connection import (
     NotFoundError,
+    TooManyOpenVisitsError,
+    VisitAlreadyPrintedError,
     VisitClosedError,
     date_from_db,
     date_to_db,
@@ -40,15 +56,46 @@ from tsutae.db.connection import (
     write_transaction,
 )
 from tsutae.db.repo_doctor_masks import erase_doctor_masks
+from tsutae.db.repo_received import (
+    ReceivedEntry,
+    erase_received_rows,
+    insert_received_rows,
+)
+from tsutae.db.repo_visit_regen import (
+    STATUS_GUARD,
+    begin_added_records_on_open_visits,
+    hold_for_regeneration,
+)
 from tsutae.schemas import ReportData, Timeline
 
 VISIT_STATUSES = ("generating", "ready", "printed", "failed")
 RECEPTION_NO_MAX = 32
+# 番号を間違えて増える分は残し、番号を変えて送り続ける分を止める（1人の患者の1日の費用の歯止め）
+MAX_OPEN_VISITS_PER_DAY = 5
 
 _VISIT_COLUMNS = (
     "id, patient_id, reception_no, visit_date, created_at, status, expires_at,"
-    " fallback, course_no"
+    " fallback, course_no, regen_pending, regen_count"
 )
+
+
+@dataclass(frozen=True)
+class VisitReceipt:
+    """受付の結果。regenerate は visit_id の受診の変換し直しを始めた（generating に戻した）か。
+
+    others は、同じ記録で変換し直しを始めた同じ日の別の番号の受診。呼び出し側は、created なら
+    visit_id の生成を、restarted の受診の変換し直しを起動する。
+    """
+
+    visit_id: int
+    created: bool
+    regenerate: bool
+    others: tuple[int, ...] = ()
+
+    @property
+    def restarted(self) -> tuple[int, ...]:
+        """記録が増えて変換し直しを始めた受診（visit_id の受診が先）。"""
+        return ((self.visit_id,) if self.regenerate else ()) + self.others
 
 
 def _validate_status(status: str) -> None:
@@ -76,6 +123,8 @@ def _visit_row(row: sqlite3.Row) -> dict[str, Any]:
         "expires_at": dt_from_db(row["expires_at"]),
         "fallback": bool(row["fallback"]),
         "course_no": row["course_no"],
+        "regen_pending": bool(row["regen_pending"]),
+        "regen_count": row["regen_count"],
     }
 
 
@@ -100,24 +149,71 @@ def create_visit_once(
     visit_date: date,
     expires_at: datetime,
     course_no: int | None,
-) -> tuple[int, bool]:
-    """同じ患者・同じ日・同じ受付番号で、受付番号が残り期限内の受診があればその id と
-    False を、無ければ作って (id, True) を返す（送り直しで二重にしない）。
+    entries: Sequence[ReceivedEntry] = (),
+) -> VisitReceipt:
+    """同じ患者・同じ日・同じ受付番号で、受付番号が残り期限内の受診があればそれを使い、
+    無ければ作る（送り直しで二重にしない）。
 
-    探すのと入れるのを1つの write_transaction で行う。期限内は `expires_at > 今`
+    探すのと入れるのを1つの書き込みのトランザクションで行う。期限内は `expires_at > 今`
     （`config.now()`）。印刷済み・期限切れ（受付番号を消した受診）は使わない。
+    entries（受付で受け取った記録）も同じトランザクションで入れる。すでにある ID は飛ばす。
+    新しい記録が1件以上入ったら、この日の開いた受診を番号を問わず変換し直す
+    （`begin_added_records_on_open_visits`）。新しく作る受診は最初の生成で全ての記録を読むので
+    動かさない。
+    その患者に今日の印刷済みの受診があれば、番号を問わず VisitAlreadyPrintedError（何も
+    保存しない。記録は端末に残る）。新しい受診を作るときに、その日の開いた受診が上限に
+    達していれば TooManyOpenVisitsError（同じく何も保存しない）。
     """
     cleaned = _check_new_visit(conn, pid, reception_no, course_no)
     with write_transaction(conn):
+        # 最初の読みから書き込みのロックを取る（別の接続の印刷が確認と保存の間に入らない）
+        if not conn.in_transaction:
+            conn.execute("BEGIN IMMEDIATE")
+        now_db = _now_db()
+        day = date_to_db(visit_date)
+        if _printed_on(conn, pid, day):
+            raise VisitAlreadyPrintedError("visit is already printed today")
         row = conn.execute(
             "SELECT id FROM visits WHERE patient_id = ? AND reception_no = ?"
             " AND visit_date = ? AND expires_at > ? ORDER BY id LIMIT 1",
-            (pid, cleaned, date_to_db(visit_date), dt_to_db(clock_now())),
+            (pid, cleaned, day, now_db),
         ).fetchone()
-        if row is not None:
-            return int(row["id"]), False
-        vid = _insert_visit(conn, pid, cleaned, visit_date, expires_at, course_no)
-    return vid, True
+        if row is None and _open_visits_on(conn, pid, day, now_db) >= (
+            MAX_OPEN_VISITS_PER_DAY
+        ):
+            raise TooManyOpenVisitsError("too many open visits today")
+        added = insert_received_rows(conn, pid, entries)
+        started = (
+            begin_added_records_on_open_visits(conn, pid, day, now_db) if added else ()
+        )
+        created = row is None
+        vid = (
+            _insert_visit(conn, pid, cleaned, visit_date, expires_at, course_no)
+            if created
+            else int(row["id"])
+        )
+    others = tuple(i for i in started if i != vid)
+    return VisitReceipt(vid, created, vid in started, others)
+
+
+def _printed_on(conn: sqlite3.Connection, pid: str, day: str | None) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM visits WHERE patient_id = ? AND visit_date = ?"
+        " AND status = 'printed' LIMIT 1",
+        (pid, day),
+    ).fetchone()
+    return row is not None
+
+
+def _open_visits_on(
+    conn: sqlite3.Connection, pid: str, day: str | None, now_db: str
+) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM visits WHERE patient_id = ? AND visit_date = ?"
+        + STATUS_GUARD,
+        (pid, day, now_db),
+    ).fetchone()
+    return int(row["n"])
 
 
 def _check_new_visit(
@@ -239,15 +335,6 @@ def _validate_settable_status(status: str) -> None:
     _validate_status(status)
 
 
-# 閉じた受診（印刷済み・受付番号を消した・期限を過ぎた）は条件付き UPDATE で触らない。
-# 別の接続の mark_printed と競合しても printed を ready に戻さない。期限の比較は
-# purge_expired（expires_at <= now で消す）と同じ境界: expires_at > now の間だけ開いている。
-# 日時は固定幅の JST 文字列なので、文字列の比較が時刻の順と一致する（connection.py）
-_STATUS_GUARD = (
-    " AND reception_no IS NOT NULL AND status != 'printed' AND expires_at > ?"
-)
-
-
 def _now_db() -> str:
     """条件付き書き込みで expires_at と比べる「今」。"""
     return dt_to_db(clock_now())
@@ -263,40 +350,42 @@ def _update_status(
     """条件付きで状態を変え、変えたら True。呼び出し側で write_transaction を開く。"""
     if fallback is None:
         cur = conn.execute(
-            "UPDATE visits SET status = ? WHERE id = ?" + _STATUS_GUARD,
+            "UPDATE visits SET status = ? WHERE id = ?" + STATUS_GUARD,
             (status, vid, now_db),
         )
     else:
         cur = conn.execute(
-            "UPDATE visits SET status = ?, fallback = ? WHERE id = ?" + _STATUS_GUARD,
+            "UPDATE visits SET status = ?, fallback = ? WHERE id = ?" + STATUS_GUARD,
             (status, int(bool(fallback)), vid, now_db),
         )
     return cur.rowcount > 0
 
 
 # やり直せるのは、生成が終わって AI の結果が無い受診（failed か、AI 変換なしの ready）と、
-# 医師の伏せ字が1件以上ある ready（AI の結果でも。伏せた記録を変換に入れ直す）
+# 医師の伏せ字が1件以上ある ready（AI の結果でも。伏せた記録を変換に入れ直す）と、追加の記録が
+# ある ready（AI の結果でも。変換に入っていない記録を入れる）
 _REGENERABLE = (
     " AND (status = 'failed' OR (status = 'ready' AND (fallback = 1"
+    " OR regen_pending = 1"
     " OR EXISTS (SELECT 1 FROM doctor_masks m WHERE m.visit_id = visits.id))))"
 )
 
 
 def begin_regeneration(conn: sqlite3.Connection, vid: int) -> bool:
-    """開いている failed・ready（fallback=True、または医師の伏せ字あり）の受診を
-    generating に戻し True を返す。
+    """開いている failed・ready（fallback=True、医師の伏せ字あり、または追加の記録あり）の
+    受診を generating に戻し True を返す。
 
-    fallback は False に戻す（結果は次の save_visit_result が決める）。レポートと変換
-    結果は残す（新しい生成が上書きする）。それ以外（generating・医師の伏せ字の無い
+    fallback は False に戻す（結果は次の save_visit_result が決める）。全ての記録で変換するので
+    regen_pending も下ろす（regen_count は自動の回数なので数えない）。レポートと変換
+    結果は残す（新しい生成が上書きする）。それ以外（generating・医師の伏せ字も追加の記録も無い
     AI の結果の ready・印刷済み・期限切れ（purge 前を含む））は何も変えずに False。
     条件の確認と書き込みを1つの UPDATE で行うので、二重に押されても generating に
     するのは1回だけ。受診が無ければ NotFoundError。
     """
     with write_transaction(conn):
         cur = conn.execute(
-            "UPDATE visits SET status = 'generating', fallback = 0 WHERE id = ?"
-            + _STATUS_GUARD
-            + _REGENERABLE,
+            "UPDATE visits SET status = 'generating', fallback = 0, regen_pending = 0"
+            " WHERE id = ?" + STATUS_GUARD + _REGENERABLE,
             (vid, _now_db()),
         )
     if cur.rowcount > 0:
@@ -397,6 +486,8 @@ def save_visit_result(
     受診が無ければ NotFoundError、印刷済み・期限切れ（purge 前を含む）なら
     VisitClosedError（何も変えない）。
     status は set_visit_status と同じく printed を受け付けない。
+    生成中に記録が増えていて自動の回数が残っていれば、結果は保存して状態は generating の
+    ままにする（`hold_for_regeneration`）。前のレポートで印刷される隙を作らない。
     """
     _validate_settable_status(status)
     _check_html(html)
@@ -408,6 +499,7 @@ def save_visit_result(
             _raise_not_open(conn, vid)
         _write_if_open(conn, vid, _TIMELINE_SQL, values[:1], now_db)
         _write_if_open(conn, vid, _REPORT_SQL, values[1:], now_db)
+        hold_for_regeneration(conn, vid)
 
 
 def get_report(conn: sqlite3.Connection, vid: int) -> tuple[str, ReportData] | None:
@@ -417,6 +509,12 @@ def get_report(conn: sqlite3.Connection, vid: int) -> tuple[str, ReportData] | N
     if row is None:
         return None
     return row["html"], ReportData.model_validate_json(row["data_json"])
+
+
+def has_report(conn: sqlite3.Connection, vid: int) -> bool:
+    """レポートの行があるか（中身は読まない）。"""
+    row = conn.execute("SELECT 1 FROM reports WHERE visit_id = ?", (vid,)).fetchone()
+    return row is not None
 
 
 def _erase_results(conn: sqlite3.Connection, vid: int) -> None:
@@ -435,6 +533,7 @@ def mark_printed(
 ) -> bool:
     """印刷済みにする。レポート・変換結果・受付番号を削除し status=printed。
 
+    その患者に開いた受診が他に無ければ、受付で受け取った記録も消す。
     refuse_generating=True なら、生成中（やり直しの最中を含む）は何も変えずに False。
     状態の確認と削除は同じ書き込みロックの中で行う（AI でもう一度変換との競合で、
     生成中の受診を印刷済みにしない）。
@@ -450,20 +549,24 @@ def mark_printed(
         if cur.rowcount == 0:
             return False
         _erase_results(conn, vid)
+        pid = conn.execute(
+            "SELECT patient_id FROM visits WHERE id = ?", (vid,)
+        ).fetchone()["patient_id"]
+        erase_received_rows(conn, pid, _now_db())
     _checkpoint(conn)
     return True
 
 
 def purge_expired(conn: sqlite3.Connection, now: datetime) -> int:
     """expires_at <= now で中身が残っている受診から結果（医師の伏せ字を含む）と受付番号を
-    消し、件数を返す。
+    消し、件数を返す。その患者に開いた受診が他に無ければ、受付で受け取った記録も消す。
 
     status は問わない（printed でも中身が残っていれば消す）し、変えもしない
     （failed/ready/generating のまま）。既に消した受診は数えない（冪等）。
     """
     with write_transaction(conn):
         rows = conn.execute(
-            "SELECT v.id FROM visits v"
+            "SELECT v.id, v.patient_id FROM visits v"
             " WHERE v.expires_at <= ?"
             " AND (v.reception_no IS NOT NULL"
             " OR EXISTS (SELECT 1 FROM reports r WHERE r.visit_id = v.id)"
@@ -475,6 +578,8 @@ def purge_expired(conn: sqlite3.Connection, now: datetime) -> int:
         ids = [int(r["id"]) for r in rows]
         for vid in ids:
             _erase_results(conn, vid)
+        for pid in {str(r["patient_id"]) for r in rows}:
+            erase_received_rows(conn, pid, dt_to_db(now))
     if ids:
         _checkpoint(conn)
     return len(ids)

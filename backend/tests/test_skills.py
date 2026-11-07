@@ -180,7 +180,7 @@ def test_regimen_body_carries_the_conversion_rules(name: str) -> None:
         "recalled",
         "absent",
         "improving",
-        "CTCAE v5.0",
+        "用語の一覧",
         "部分文字列",
         "解決しない",
         # §5 食い違い: 改善中もクローズ「なし」と食い違う／まとめた質問は全部 absent のときだけ

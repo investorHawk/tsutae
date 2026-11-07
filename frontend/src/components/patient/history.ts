@@ -1,18 +1,22 @@
 /** 自分の記録（P2）の並べ方と日時の出し方。文字は数字と記号だけ（定型文は t() で）。 */
-import type { PatientEntry } from "../../api/types";
+import type { DeviceEntry } from "../../api/types";
 import { fillTemplate } from "../../strings/template";
 
 const TIME_PATTERN = /T(\d{2}):(\d{2})/;
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-function timeOf(entry: PatientEntry): number {
+function timeOf(entry: DeviceEntry): number {
   const ms = Date.parse(entry.recorded_at);
   return Number.isNaN(ms) ? 0 : ms;
 }
 
-/** 記録日時の新しい順（同じなら id の大きい順）に並べた新しい配列。 */
-export function newestFirst(entries: readonly PatientEntry[]): PatientEntry[] {
-  return [...entries].sort((a, b) => timeOf(b) - timeOf(a) || b.id - a.id);
+/** 記録日時の新しい順（同じなら ID の順。並びを毎回同じにするため）に並べた新しい配列。 */
+export function newestFirst(entries: readonly DeviceEntry[]): DeviceEntry[] {
+  return [...entries].sort(
+    (a, b) =>
+      timeOf(b) - timeOf(a) ||
+      b.client_entry_id.localeCompare(a.client_entry_id),
+  );
 }
 
 /** 日付（YYYY-MM-DD）の月・日・曜日。 */
@@ -28,7 +32,7 @@ export interface RecordedAtParts extends DateParts {
   time: string | null;
 }
 
-type RecordedAt = Pick<PatientEntry, "recorded_at" | "record_date">;
+type RecordedAt = Pick<DeviceEntry, "recorded_at" | "record_date">;
 
 /**
  * 暦に実在する YYYY-MM-DD の月・日・曜日。曜日は端末の時差によらず日付から決める。

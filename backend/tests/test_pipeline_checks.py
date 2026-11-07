@@ -46,13 +46,13 @@ def test_context_copies_schedule_and_entries() -> None:
 def test_term_keys_drop_questions_not_asked_this_time() -> None:
     terms = [
         {"term": "下痢", "question_key": "diarrhea"},
-        {"term": "手掌・足底発赤知覚不全症候群", "question_key": "hand_foot"},
+        {"term": "手足症候群", "question_key": "hand_foot"},
         {"term": "疲労", "question_key": None},
     ]
     ctx = OutputContext.from_prepared(PREPARED, terms=terms)
     assert dict(ctx.term_keys) == {
         "下痢": "diarrhea",
-        "手掌・足底発赤知覚不全症候群": None,  # FOLFOX には手足症候群の質問が無い
+        "手足症候群": None,  # FOLFOX には手足症候群の質問が無い
         "疲労": None,
     }
 
@@ -206,7 +206,7 @@ def test_same_start_date_in_any_term_order_is_accepted() -> None:
     other = _event(
         status="present",
         source_quote="下痢",
-        term="口腔粘膜炎",
+        term="口内炎",
         question_key="stomatitis",
     )
     timeline = Timeline(events=[base, other])

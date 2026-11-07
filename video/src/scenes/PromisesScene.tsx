@@ -92,7 +92,7 @@ export const PromisesScene: React.FC<SceneComponentProps> = ({
         starts={dont.map((_, i) => startAt(i))}
         frame={frame}
         left={110}
-        width={800}
+        width={720}
       />
       <Column
         title="患者情報の扱い"
@@ -101,8 +101,8 @@ export const PromisesScene: React.FC<SceneComponentProps> = ({
         mark="✓"
         starts={privacy.map((_, i) => startAt(dont.length + i))}
         frame={frame}
-        left={1010}
-        width={820}
+        left={910}
+        width={900}
       />
     </AbsoluteFill>
   );

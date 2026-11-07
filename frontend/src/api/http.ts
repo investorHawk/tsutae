@@ -36,7 +36,7 @@ export function isApiError(value: unknown): value is ApiError {
   return value instanceof ApiError;
 }
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface RequestOptions {
   /**
@@ -163,6 +163,24 @@ export function deleteJson<T>(
   options?: RequestOptions,
 ): Promise<T> {
   return request<T>("DELETE", path, undefined, options);
+}
+
+/** 本文つきの PUT（通知の登録）。 */
+export function putJson<T>(
+  path: string,
+  body: unknown,
+  options?: RequestOptions,
+): Promise<T> {
+  return request<T>("PUT", path, body, options);
+}
+
+/** 本文つきの DELETE（通知の登録を切る。endpoint を URL に入れない）。 */
+export function deleteJsonBody<T>(
+  path: string,
+  body: unknown,
+  options?: RequestOptions,
+): Promise<T> {
+  return request<T>("DELETE", path, body, options);
 }
 
 /** 経路の一部に入れる値を URL エンコードする。 */

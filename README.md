@@ -1,8 +1,19 @@
-# つたえ — 症例は全て合成です（デモ・評価に実患者のデータは一切使っていません）
+<p align="center">
+  <img src="frontend/public/icon-512.png" alt="つたえのアイコン" width="120">
+</p>
+
+<h1 align="center">つたえ</h1>
+
+<p align="center">抗がん剤治療中の毎日の記録を、医師が決めた形式の A4 一枚にして診察室へ届けるアプリ</p>
+
+<p align="center"><strong>症例は全て合成です（デモ・評価に実患者のデータは一切使っていません）</strong></p>
 
 外来化学療法（FOLFOX/CAPOX）中の消化器がん患者が毎日スマホで記録し、受診時にアプリの受診タブで受付番号を入れて送ると、Claude が記録を「暦日・コース日数・標準用語・原文引用」つきの時系列に直し、**医師が決めた形式の A4 一枚**として診察室に届けるアプリです。記録の中身はスマホに置き、サーバーには印刷までの間だけ置きます。患者のスマホに AI の文は出ません。
 
-> Built with Claude (Code): Japan 2026 提出作品（ソロ、期間中の新規制作）。コードは全て Claude Code（Claude Opus）が書き、OpenAI Codex は読み取り専用のレビューにだけ使いました。
+> Built with Claude (Code): Japan 2026 提出作品（ソロ、期間中の新規制作。初コミットは 2026-11-03 18:06 JST）。コードは全て Claude Code（Claude Opus）が書き、OpenAI Codex は読み取り専用のレビューにだけ使いました。
+
+## デモ動画
+[デモ動画を見る（YouTube、2分55秒）](https://youtu.be/UzpKCuJvz3w)
 
 ## 作品概要
 このプロジェクトは、医師が、がん化学療法中の患者の副作用（有害事象）の症状を、短時間で抜けを減らして把握するためのものです。
@@ -27,7 +38,9 @@
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
 | テスト件数 | 7229件 通過 / 全7229件（backend 4603/4603、frontend 2626/2626。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 3回実測（`docs/eval/2026-11-04.md`・`2026-11-04-2.md`・`2026-11-06.md`、合成2人・4コース・出来事61件）。最新（今の用語の一覧）: 日付 91.8%、用語 91.8%、食い違い 再現率 100%・適合率 100%、改善中→なし 0件（9件中）、否定→あり 0件（18件中）、引用 100%。失敗 5 件は全て用語の予測が無かったもの（悪寒・食欲不振2件・味覚異常・疲労）。前回の用語 75.4% からの上昇は、しびれの3語を1語にまとめて当て分けの失敗 11 件が無くなった分で、変換の精度が上がったという意味ではない |
-| 動作確認 | ブラウザ（スマホ幅・院内 PC 幅）で 登録 → 記録 → 38.0℃ の案内 → 履歴 → 受付 → 印刷待ち → レポート → 変換ログ → 未処理 → 設定の書き換えと承認・却下 → 印刷済み → コース登録 を通しで確認（API を呼ばない構成で5回。記録をスマホに移す前の形）。**本物の Claude**: Agent SDK のスモーク7項目が全て OK、デモ患者の変換が1回で成功（ready・AI変換なしでない・H2 の拒否0回、2026-11-04）。一文で頼む D4（当時は regimen-folfox に質問を足す書き換え。今はレポートの形式だけ）の本物の書き換えも1回で成功（pending・差分 2 行追加・H3 の拒否0回・約 0.10 ドル、2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`）。新しい D4 レジメン（チャットで作る）も FOLFIRI＋BV で2回通した（どちらも1往復・未入力0・ツール3回・拒否0・H4 の拒否0、一時の写しの上で採用まで。32.8 秒・約 0.12 ドルと 36.0 秒・約 0.13 ドル、2026-11-05。`docs/eval/demo-regimen-20261105-0857.json`・`demo-regimen-20261105-2025.json`）。レジメンの画面のブラウザでの通しは未実施。毎日の通知・スマホ保存・受診タブは自動テストまでで、実機とブラウザの通しは未確認 |
+| 本物の Claude での確認 | Agent SDK のスモーク7項目が全て OK、デモ患者の変換が成功（2026-11-04 と 2026-11-06。`docs/eval/demo-visit-20261109-0703.json`・`demo-visit-20261109-1800.json`）。D4 レポートの形式の書き換えが1回で成功（2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`）。D4 レジメンを FOLFIRI＋BV で2回通した（2026-11-05。`docs/eval/demo-regimen-20261105-0857.json`・`demo-regimen-20261105-2025.json`） |
+| ブラウザでの確認 | スマホ幅・院内 PC 幅で 登録 → 記録 → 受付 → レポート → 印刷済み などを、API を呼ばない構成で通した。スマホ保存への移行後も、Chrome のスマホ表示で通した（2026-11-06。本物の Claude は呼ばない構成）。D4 レジメンの画面を通しで確かめた記録は無い |
+| 実機での確認 | 作者の iPhone で、通知（ロック画面への到着・押して開く・バッジ・指定した時刻・記録した日に届かない・オフで届かない）とスマホ保存（閉じても再起動しても残る・受診タブからレポートまで・印刷後の断り）を確かめた（2026-11-06）。**未確認**: Android の実機、2台目のスマホの実機、消音モードの音、再起動の後の通知、`navigator.storage.persist()` の結果、アイコンを消すと記録が消えるか |
 
 ## 何をするか
 
@@ -47,19 +60,24 @@
 | D5 変換ログ | Hook の発火・サブエージェントの動き・所要時間（文面は出さない） |
 | D6 未処理 | 伏せ字漏れの疑いで Claude に送らなかった記録の原文（院内画面だけ。紙には件数だけ） |
 
-## なぜ作るか（先生が書く）
-- 誰が、どの場面で、どれくらい困っているか
-- 聞き取り 約2分 → 約20秒（実感値、未測定）
+## 使った技術と動作に必要なもの
 
-## 既存品（Juno、国内 ePRO）との違い（先生が書く）
-`docs/spec.md` 14節の比較表をここに置く。
+| 項目 | 内容 |
+|---|---|
+| バックエンド | Python 3.12 以上、FastAPI、Uvicorn、pydantic、Jinja2、SQLite、pywebpush 2.5.0 |
+| AI | Claude Agent SDK（`claude-agent-sdk` 0.2.177）。既定のモデルは主エージェント `claude-opus-5-5`、サブエージェント `claude-sonnet-5-5` |
+| フロントエンド | React 18.3.1、TypeScript 5.6.3、Vite 5.4.8、react-router-dom 6.26.2。患者画面はホーム画面に追加して使うウェブアプリ |
+| テスト | pytest、Vitest、Testing Library |
+| デモ動画の制作 | Remotion 4.0.540（`video/`。アプリの動作には不要） |
+| 動作に必要なもの | Python 3.12 以上、Node.js と npm。変換と D4 には Anthropic の API キーが要る（秘密の値の項目名は `.env.example`） |
+| 開発と確認の環境 | macOS と iPhone で確認した。他の OS と Android の実機は未確認 |
 
 ## なぜ紙か
 電子カルテ連携なしで医師の手元に届く。患者は AI の文を見ない。レポートは `ReportData` から Jinja2 で**決定的に**描く（AI は HTML を書かない）。A4 一枚・モノクロで、通常版と「AI変換なし」版の両方が1ページに収まることを確かめている。
 
 ![受診時レポートの見本（A4 一枚）](docs/images/sample-report.png)
 
-*本物の Claude（主エージェント claude-opus-5-5、3役 claude-sonnet-5-5）が作ったデモ患者（合成）の第3コースのレポート（2026-11-04、`scripts/run_demo_visit.py`。所要83秒・約0.47ドル・H2 の拒否0回。結果は `docs/eval/demo-visit-20261109-0703.html|json`）。回想（11/2 の「おとといの夜から口内炎」を Day5 に戻す）・食い違い（Day5 の下痢）・否定と改善の区別を、医師が直さずに出力した。*
+*本物の Claude が作ったデモ患者（合成）の第3コースのレポート（2026-11-06、`scripts/run_demo_visit.py`。結果は `docs/eval/demo-visit-20261109-1800.html|json`）。回想（11/2 の「おとといの夜から口内炎」を Day5 に戻す）・食い違い（Day5 の下痢）・否定と改善の区別（Day10 の「熱はもう出ていない」、Day6 の「きのうよりはまし」）を、医師が直さずに出力した。しゃっくりと悪寒はこの回の症状別の時系列に入らず、原文は引用の段で読める。*
 
 ## Claude の使い方
 ```mermaid
@@ -130,6 +148,8 @@ flowchart LR
 - 検出漏れはゼロにできない（下の「既知の限界」）。**本プロジェクトは合成データだけで運用し、実患者のデータを送らない**。実運用では本人同意と送る情報の最小化が前提（要配慮個人情報）
 
 ## 動かし方（開発）
+起動の前に、`.env.example` を `.env` に写して値を入れる（`.env` はコミットしない）。変換と D4 には API キーが要る。`DOCTOR_PASSWORD` を空のままにすると医師画面にログインできず、`TSUTAE_SECRET` を空のままにすると Cookie の署名鍵が空になるので、どちらも値を決める。手順 3 の `TSUTAE_DB` は使う DB、`TSUTAE_TODAY` はデモ用に固定する「今日」。
+
 ```bash
 # 1. 準備（Python 3.12）
 python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -144,6 +164,10 @@ TSUTAE_DB=data/device.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 make dev-ap
 make dev-web                                                                        # http://127.0.0.1:5173
 ```
 - 記録を入れるのはスマホ（ブラウザ）の側。設定の「見本の記録を入れる」で、デモ患者の合成データを端末に入れてから、受診タブで受付番号を入れて送る。`make seed`（`--device-records` なし。記録をサーバーの DB にも入れる）の DB で見本を送ると、受付で二重に数えるので、新しい DB を作る
+
+<details>
+<summary>スマホと通知の試し方（詳しい手順）</summary>
+
 - スマホで試す（同じ Wi-Fi）: 登録用 QR の URL が Mac の IP を指すようにする。localhost 以外を指すときは、既定の鍵・パスワードのままだと起動が止まる
   ```bash
   TSUTAE_DB=data/device.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=http://<Mac の IP>:5173 \
@@ -178,9 +202,11 @@ make dev-web                                                                    
   - Funnel は使わない。全世界に公開され、公開リポジトリに載る `P-DEMO0001` で受付を送られると Claude の費用がかかる。Serve でも撮影の前後以外は止める（`tailscale serve reset`。導入時に確かめる）
   - iPhone の VPN がオフだと、アプリを開いても通知を押しても画面が開かない。撮影中はステータスバーに VPN の印が出る
 - ホーム画面に置く: iPhone は Safari の共有メニューの「ホーム画面に追加」、Android は Chrome のメニューの「ホーム画面に追加」。アイコンから全画面で開く。iPhone はホーム画面のアプリと Safari で Cookie・localStorage・記録の保存先が別なので、Safari（ホーム画面の外）では全ての患者画面で追加の案内だけを出し、記録させない。アプリの初回は「このスマホは登録されていません」の画面で番号を入れて登録する（番号は医師画面の登録用QRの隣の「登録の番号」。デモ患者は `P-DEMO0001`）。番号の入力は iPhone の実機で確認済み。Android は実機で未確認で、全画面になるには HTTPS が要る見込み
+
+</details>
+
 - 患者: `http://127.0.0.1:5173/register?pid=P-DEMO0001`（デモ患者。受付番号は例えば `A-023`。PC のブラウザなら案内は出ない）
-- 医師: `http://127.0.0.1:5173/doctor/login`（パスワードは `DOCTOR_PASSWORD`、既定 `demo-doctor`）
-- 環境変数（`.env` に書く）: `ANTHROPIC_API_KEY`（変換と D4 に必須）、`DOCTOR_PASSWORD`、`TSUTAE_SECRET`（Cookie の署名鍵。本番では必ず変える）、`TSUTAE_TODAY`（デモ用に「今日」を固定）、`TSUTAE_DB`、`TSUTAE_MODEL`（既定 `claude-opus-5-5`）、`TSUTAE_SUBAGENT_MODEL`（既定 `claude-sonnet-5-5`）、`TSUTAE_PUBLIC_BASE_URL`（登録用 QR の URL。https なら Cookie に `Secure`）、`TSUTAE_VAPID_PUBLIC_KEY`・`TSUTAE_VAPID_PRIVATE_KEY`・`TSUTAE_VAPID_SUBJECT`（通知の鍵。無ければ通知だけ使えない）、`TSUTAE_DEMO_TOOLS`（`1` のときだけ、デモ患者の設定に撮影用の見本のボタンと経路を出す）
+- 医師: `http://127.0.0.1:5173/doctor/login`（パスワードは `.env` に入れた値）
 - テスト / lint: `make test` / `make lint`
 - Agent SDK の動作確認: `make smoke`／精度評価: `make eval`（どちらも API を呼ぶ）
 - 見本のレポート: `.venv/bin/python scripts/render_sample_report.py [--fallback]`
@@ -243,4 +269,4 @@ make dev-web                                                                    
 - 有害事象の用語名は、このアプリの用語の一覧（`backend/tsutae/data/ctcae_terms.json`）を使う
 
 ## ライセンス
-未定（公開リポジトリ化の際に決める）
+[MIT](LICENSE)

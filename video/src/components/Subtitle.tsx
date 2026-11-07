@@ -1,20 +1,28 @@
 import { useMemo } from "react";
 import { interpolate, useCurrentFrame } from "remotion";
-import { buildSubtitleChunks, chunkAt } from "../lib/subtitle";
+import { buildSubtitleChunks, chunkAt, timeChunks } from "../lib/subtitle";
 import { COLORS, FONT_FAMILY, FONT_SIZE, SUBTITLE_TOP } from "../theme";
 
 interface SubtitleProps {
   text: string;
   durationInFrames: number;
+  /** 実際の声での塊の開始（秒）と場面の秒数。あれば字幕を声に合わせる */
+  voiceStarts?: readonly number[];
+  sceneSeconds?: number;
 }
 
 /** 下部の字幕。2 行以内の塊を字数に比例した時間で切り替える */
 export const Subtitle: React.FC<SubtitleProps> = ({
   text,
   durationInFrames,
+  voiceStarts,
+  sceneSeconds = 0,
 }) => {
   const frame = useCurrentFrame();
-  const chunks = useMemo(() => buildSubtitleChunks(text), [text]);
+  const chunks = useMemo(() => {
+    const built = buildSubtitleChunks(text);
+    return voiceStarts ? timeChunks(built, voiceStarts, sceneSeconds) : built;
+  }, [text, voiceStarts, sceneSeconds]);
   if (chunks.length === 0) return null;
   const { index, startFrame } = chunkAt(chunks, frame, durationInFrames);
   const current = chunks[index];

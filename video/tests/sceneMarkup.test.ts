@@ -147,19 +147,23 @@ describe("録画の場面の札と F11", () => {
   });
 
   it("b06: 場面の前半は 1 つ目の札、後半は 2 つ目の札", () => {
-    const early = markup(FootageScene, "b06-visit", 224);
+    const early = markup(FootageScene, "b06-visit", 209);
     expect(early).toContain("患者さんの画面に AI の文は出ない");
     expect(early).not.toContain("記録はスマホに保存");
-    const late = markup(FootageScene, "b06-visit", 225);
-    expect(late).toContain("記録はスマホに保存。印刷すると消す");
+    const late = markup(FootageScene, "b06-visit", 210);
+    expect(late).toContain(
+      "記録はスマホに保存。\nサーバーの分は\n印刷済みで消す",
+    );
     expect(late).not.toContain("患者さんの画面に AI の文は出ない");
   });
 
-  it("b09: 札はレジメンの説明 → JSON → 確かめて採用の順に出る", () => {
+  it("b09: 札はレジメンの説明 → チャットと SDK → 確かめて採用の順に出る", () => {
     mocks.screenFiles.F8 = ["screens/F8-1.png"];
     const at = (frame: number) => markup(FootageScene, "b09-regimen", frame);
     expect(at(30)).toContain("レジメン＝抗がん剤の種類と投与の仕方");
-    expect(at(200)).toContain("JSON がわからなくても、AI が指示どおりに設定");
+    expect(at(200)).toContain(
+      "チャットで伝えると、\nClaude Agent SDK が指示どおりに設定",
+    );
     expect(at(400)).toContain("入れた値は、医師が確かめてから採用");
   });
 

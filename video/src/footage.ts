@@ -114,7 +114,7 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     slug: "patient_reminder",
     scene: "毎日のお知らせ",
     device: "phone",
-    minSeconds: 5,
+    minSeconds: 7,
     content:
       "iPhone のロック画面に届いた通知のスクリーンショット（タイトル「つたえ」、本文「今日の記録をお願いします。つらい日はボタンひとつで記録になります。」）。1 枚でよい。他のアプリの通知と実際の URL を写さない",
     target: "video/public/screens/F11-1.png",

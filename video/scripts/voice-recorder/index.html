@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ナレーション録音</title>
+    <style>
+      :root {
+        --paper: #f7f6f2;
+        --card: #ffffff;
+        --ink: #1f2933;
+        --sub: #5f6b76;
+        --line: #dcdcd4;
+        --navy: #1f3a5f;
+        --red: #b42318;
+        --red-bg: #fdecea;
+        --amber: #8a5a00;
+        --amber-bg: #fdf3dc;
+        --green: #1b6e4b;
+        --green-bg: #e5f4ec;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", system-ui,
+          sans-serif;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 24px;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      #mic-area {
+        margin-left: auto;
+        font-size: 14px;
+        color: var(--sub);
+      }
+      select {
+        max-width: 320px;
+        padding: 6px;
+        font-size: 14px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: calc(100vh - 60px);
+      }
+      nav {
+        padding: 16px;
+        background: var(--card);
+        border-right: 1px solid var(--line);
+      }
+      nav button {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2px 8px;
+        width: 100%;
+        margin-bottom: 4px;
+        padding: 8px 10px;
+        text-align: left;
+        background: none;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 14px;
+        color: inherit;
+        cursor: pointer;
+      }
+      nav button:hover {
+        background: var(--paper);
+      }
+      nav button.current {
+        border-color: var(--navy);
+        background: var(--paper);
+      }
+      nav small {
+        grid-column: 1 / -1;
+        color: var(--sub);
+      }
+      nav button:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+      .mark {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .mark.over {
+        color: var(--amber);
+      }
+      #total {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--sub);
+      }
+      main {
+        max-width: 880px;
+        padding: 24px 32px 48px;
+      }
+      .eyebrow {
+        margin: 0 0 4px;
+        font-size: 14px;
+        color: var(--sub);
+      }
+      h2 {
+        margin: 0 0 16px;
+        font-size: 26px;
+      }
+      .goal {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 24px;
+        margin-bottom: 16px;
+      }
+      .goal strong {
+        font-size: 22px;
+        color: var(--navy);
+      }
+      .goal audio {
+        height: 36px;
+      }
+      .goal span {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--sub);
+      }
+      .script {
+        margin: 0 0 24px;
+        padding: 20px 24px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 25px;
+        line-height: 1.9;
+      }
+      .script-input {
+        display: block;
+        width: 100%;
+        margin: 0 0 12px;
+        padding: 14px 18px;
+        background: var(--card);
+        border: 2px solid var(--navy);
+        border-radius: 8px;
+        color: var(--ink);
+        font: inherit;
+        font-size: 22px;
+        line-height: 1.7;
+        resize: vertical;
+      }
+      .diff {
+        margin: 0 0 12px;
+        padding: 12px 16px;
+        background: var(--card);
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        font-size: 18px;
+        line-height: 1.8;
+      }
+      .diff del {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .diff ins {
+        background: var(--green-bg);
+        color: var(--green);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .warn {
+        margin: 12px 0;
+        padding: 10px 14px;
+        background: var(--amber-bg);
+        border-radius: 6px;
+        color: var(--amber);
+        font-weight: 600;
+      }
+      .btn.small {
+        padding: 7px 14px;
+        font-size: 14px;
+      }
+      .actions.tight {
+        margin: 0 0 12px;
+        gap: 8px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .btn {
+        padding: 12px 22px;
+        border: 1px solid var(--navy);
+        border-radius: 6px;
+        background: var(--card);
+        color: var(--navy);
+        font: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--navy);
+        color: #fff;
+      }
+      .btn.rec {
+        background: var(--red);
+        border-color: var(--red);
+        color: #fff;
+      }
+      .btn:focus-visible,
+      nav button:focus-visible {
+        outline: 3px solid #7aa7d9;
+        outline-offset: 2px;
+      }
+      .saved-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        font-size: 15px;
+      }
+      .saved-row audio,
+      .review audio {
+        height: 40px;
+      }
+      .live {
+        padding: 20px 24px;
+        background: var(--card);
+        border: 2px solid var(--red);
+        border-radius: 8px;
+      }
+      .live.rehearsal {
+        border-color: var(--navy);
+      }
+      .live-label {
+        margin: 0 0 4px;
+        font-weight: 700;
+      }
+      .timer {
+        font-size: 56px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .timer small {
+        font-size: 22px;
+        font-weight: 500;
+        color: var(--sub);
+      }
+      .timer.over {
+        color: var(--red);
+      }
+      .bar {
+        position: relative;
+        height: 14px;
+        margin: 8px 0;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: var(--navy);
+      }
+      .bar.level i {
+        background: var(--green);
+      }
+      .bar.hot i,
+      .bar.over i {
+        background: var(--red);
+      }
+      .bar-label {
+        font-size: 13px;
+        color: var(--sub);
+      }
+      .countdown {
+        font-size: 96px;
+        font-weight: 700;
+        line-height: 1.1;
+        text-align: center;
+      }
+      .review {
+        padding: 20px 24px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .review h3 {
+        margin: 0 0 12px;
+        font-size: 19px;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 32px;
+        margin-bottom: 12px;
+      }
+      .stats b {
+        display: block;
+        font-size: 28px;
+        font-variant-numeric: tabular-nums;
+      }
+      .stats span {
+        font-size: 13px;
+        color: var(--sub);
+      }
+      .checks {
+        margin: 12px 0;
+        padding: 0;
+        list-style: none;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .checks li {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .tag {
+        flex: none;
+        width: 4.5em;
+        padding: 1px 0;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .tag.ok {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .tag.warn {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .tag.ng {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .note {
+        margin: 8px 0;
+        font-size: 14px;
+        color: var(--sub);
+      }
+      .done {
+        margin: 12px 0;
+        padding: 10px 14px;
+        background: var(--green-bg);
+        border-radius: 6px;
+        color: var(--green);
+        font-weight: 600;
+      }
+      .error {
+        margin: 12px 0;
+        padding: 10px 14px;
+        background: var(--red-bg);
+        border-radius: 6px;
+        color: var(--red);
+      }
+      /* cmux の分割画面など幅が狭いとき: 場面の一覧を小さなボタンに畳み、録音中は隠す */
+      @media (max-width: 760px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr);
+          min-height: 0;
+        }
+        header {
+          padding: 8px 16px;
+        }
+        nav {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          padding: 8px 16px;
+          border-right: none;
+          border-bottom: 1px solid var(--line);
+        }
+        nav button {
+          display: flex;
+          gap: 4px;
+          width: auto;
+          max-width: 148px;
+          margin: 0;
+          padding: 4px 8px;
+          font-size: 13px;
+          border-color: var(--line);
+        }
+        nav button span:first-child {
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+        nav small {
+          display: none;
+        }
+        #total {
+          flex-basis: 100%;
+          margin: 4px 0 0;
+          padding: 0;
+          border: none;
+          font-size: 12px;
+        }
+        #total > div {
+          display: inline;
+          margin-right: 8px;
+        }
+        body.capturing nav {
+          display: none;
+        }
+        main {
+          padding: 12px 16px 32px;
+        }
+        h2 {
+          margin-bottom: 8px;
+          font-size: 21px;
+        }
+        .goal {
+          margin-bottom: 8px;
+        }
+        .script {
+          margin-bottom: 12px;
+          padding: 12px 16px;
+          font-size: 21px;
+          line-height: 1.75;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ナレーション録音</h1>
+      <div id="mic-area">
+        マイク
+        <select id="mic">
+          <option value="">既定のマイク</option>
+        </select>
+      </div>
+    </header>
+    <div class="layout">
+      <nav id="scenes"></nav>
+      <main id="main"></main>
+    </div>
+    <script type="module" src="/app.mjs"></script>
+  </body>
+</html>

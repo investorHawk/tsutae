@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { FOOTAGE } from "../src/footage";
 import { buildSubtitleChunks } from "../src/lib/subtitle";
+import { VOICE_OFFSET_SECONDS } from "../src/lib/voice";
+import { VOICE_CUES } from "../src/storyboards/bVoiceCues";
 import { countChars } from "../src/lib/text";
 import {
   footageSegments,
@@ -176,17 +178,17 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
   it("場面の id・秒・種類は承認された順のとおり", () => {
     expect(scenes.map((s) => [s.id, s.seconds, s.kind])).toEqual([
       ["b01-intro", 17, "intro"],
-      ["b02-before", 15, "before"],
-      ["b03-notes", 16, "notes"],
-      ["b04-after", 11, "after"],
-      ["b05-patient", 18, "footage"],
-      ["b06-visit", 15, "footage"],
-      ["b07-pipeline", 12, "pipeline"],
+      ["b02-before", 14, "before"],
+      ["b03-notes", 15, "notes"],
+      ["b04-after", 12, "after"],
+      ["b05-patient", 19, "footage"],
+      ["b06-visit", 14, "footage"],
+      ["b07-pipeline", 13, "pipeline"],
       ["b08-report", 16, "report"],
-      ["b09-regimen", 15, "footage"],
-      ["b10-whypaper", 12, "whypaper"],
-      ["b11-promises", 8, "promises"],
-      ["b12-closing", 20, "closing"],
+      ["b09-regimen", 14, "footage"],
+      ["b10-whypaper", 11, "whypaper"],
+      ["b11-promises", 7, "promises"],
+      ["b12-closing", 23, "closing"],
     ]);
   });
 
@@ -197,11 +199,11 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     ],
     [
       "b05-patient",
-      "外来化学療法中の患者さんは毎日スマホで、3 択と自由記載を記録します。つらい日はボタン 1 つ。抗がん剤が変わっても、入力の形は同じ。決めた時刻にお知らせが届き、書き忘れと言い忘れが減ります。",
+      "外来化学療法の患者さんは毎日スマホで、3 択と自由記載を記録します。つらい日はボタン 1 つ。抗がん剤が変わっても、入力の形は同じ。決めた時刻にお知らせが届き、書き忘れと言い忘れが減ります。",
     ],
     [
       "b06-visit",
-      "受診日は、受付番号を入れて送るだけ。患者さんの画面に AI の文は出ません。記録はスマホに保存。サーバーへ送るのは受診のときだけで、印刷すると消します。",
+      "受診日は、受付番号を入れて送るだけ。患者さんの画面に AI の文は出ません。記録はスマホに保存。サーバーへ送るのは受診のときだけで、印刷が済むと消します。",
     ],
     [
       "b07-pipeline",
@@ -209,7 +211,7 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     ],
     [
       "b09-regimen",
-      "新しいレジメンも、医師が Claude に文で伝えるだけ。JSON がわからなくても、AI が指示どおりに設定します。入れた値は、医師が確かめてから採用します。",
+      "新しいレジメンも、医師がチャットから文で伝えるだけ。Claude Agent SDK が指示どおりに設定します。入れた値は、医師が確かめてから採用します。",
     ],
     [
       "b11-promises",
@@ -248,10 +250,10 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     expect(NOTES_AT.answer).toBeCloseTo(chunks[2].start, 2);
   });
 
-  it("b05-patient は F1 → F2 → F11 を 8・5・5 秒で、札を 1 つずつ", () => {
+  it("b05-patient は F1 → F2 → F11 を 7・5・7 秒で、札を 1 つずつ", () => {
     const scene = byId("b05-patient");
     expect(scene?.footage).toEqual(["F1", "F2", "F11"]);
-    expect(scene?.props?.split).toEqual([8, 5, 5]);
+    expect(scene?.props?.split).toEqual([7, 5, 7]);
     expect(scene?.props?.callouts).toEqual([
       "「おとといの夜から口内炎がいたい」",
       "抗がん剤が変わっても、入力の形は同じ",
@@ -264,12 +266,15 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     expect(scene?.footage).toEqual(["F4"]);
     expect(scene?.props?.callouts).toEqual([
       "患者さんの画面に AI の文は出ない",
-      "記録はスマホに保存。印刷すると消す",
+      "記録はスマホに保存。\nサーバーの分は\n印刷済みで消す",
     ]);
     const chunks = buildSubtitleChunks(scene?.narration ?? "");
-    const cue = chunks.find((c) => c.lines.join("").startsWith("記録はスマホ"));
-    // 札は場面の半分（F4 の 2 枚目の静止画の頭）で変わる。声の位置との差は 0.5 秒以内
-    expect(Math.abs((cue?.start ?? 0) * 15 - 7.5)).toBeLessThan(0.5);
+    const at = chunks.findIndex((c) =>
+      c.lines.join("").startsWith("記録はスマホ"),
+    );
+    // 札は場面の半分（F4 の 2 枚目の静止画の頭）で変わる。実際の声との差は 0.5 秒以内
+    const voiceAt = VOICE_OFFSET_SECONDS + VOICE_CUES.b06.starts[at];
+    expect(Math.abs(voiceAt - (scene?.seconds ?? 0) / 2)).toBeLessThan(0.5);
   });
 
   it("b07-pipeline は 58% の出典の注記を画面に残し、声からは外す", () => {
@@ -299,17 +304,24 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     expect(scene?.narration).toContain("レジメン別のノート");
   });
 
-  it("b09-regimen は JSON を知らなくても AI が設定することを声と札で言い、確かめて採用も残す", () => {
+  it("b09-regimen はチャットの文から Claude Agent SDK が設定することを声と札で言い、確かめて採用も残す", () => {
     const scene = byId("b09-regimen");
     expect(scene?.narration).toContain(
-      "JSON がわからなくても、AI が指示どおりに設定します。",
+      "Claude Agent SDK が指示どおりに設定します。",
     );
+    expect(JSON.stringify(scene)).not.toContain("JSON");
     expect(scene?.narration).toContain("医師が確かめてから採用します");
     expect(scene?.props?.callouts).toEqual([
       "レジメン＝抗がん剤の種類と投与の仕方",
-      "JSON がわからなくても、AI が指示どおりに設定",
+      "チャットで伝えると、\nClaude Agent SDK が指示どおりに設定",
       "入れた値は、医師が確かめてから採用",
     ]);
+  });
+
+  it("b11-promises の受付番号は、送らない相手が Claude だと分かる", () => {
+    expect(byId("b11-promises")?.props?.privacy).toContain(
+      "受付番号は Claude に送らない",
+    );
   });
 
   it("b09-regimen は F8 だけ", () => {

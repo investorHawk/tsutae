@@ -43,7 +43,7 @@ describe("撮影リストと manifest", () => {
       slug: "patient_reminder",
       scene: "毎日のお知らせ",
       device: "phone",
-      minSeconds: 5,
+      minSeconds: 7,
     });
     expect(FOOTAGE.F11.content).toContain("今日の記録をお願いします。");
     expect(footageTargetPath("F11")).toBe("video/public/screens/F11-1.png");

@@ -1,9 +1,25 @@
 // 場面ごとの声（先生が録った public/voice/b01.m4a など）を鳴らす時刻。React / remotion を import しない。
 // 声の長さから尺を決めることはしない（場面の秒数は構成データのまま）。
 import type { TimedScene } from "./timeline";
+import { VOICE_OFFSET_SECONDS } from "./voiceOffset";
 
-/** 場面の頭から声を鳴らし始めるまで（秒）。場面の切り替えのフェードと重ねない */
-export const VOICE_OFFSET_SECONDS = 0.3;
+export { VOICE_OFFSET_SECONDS };
+
+/**
+ * 場面の演出の割合の基準にするフレーム数。声があれば声の終わりまで（その後は最後の状態で止まる）。
+ * 割合は声の位置に合わせてあるので、場面に余白があっても声とずれない
+ */
+export const contentFrames = (
+  durationInFrames: number,
+  voiceSeconds: number | undefined,
+  fps: number,
+): number =>
+  voiceSeconds === undefined
+    ? durationInFrames
+    : Math.min(
+        durationInFrames,
+        Math.round((VOICE_OFFSET_SECONDS + voiceSeconds) * fps),
+      );
 
 export interface VoiceTrack {
   /** 声のキー（場面 id の頭。"b01"） */

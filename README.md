@@ -261,6 +261,7 @@ make dev-web                                                                    
 - 仕様: `docs/spec.md`
 - 実装の契約: `docs/architecture.md`
 - 決めたことと理由: `docs/decisions.md`
+- 開発の経緯: [`docs/development-history.md`](docs/development-history.md)
 - 日程: `docs/plan.md` ／ タスク: `docs/tasks.md`
 - 毎日の通知とスマホ保存の仕様: `docs/plan-device-records.md`
 - 企画（正本）: `docs/reference/concept.md`

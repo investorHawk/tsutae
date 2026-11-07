@@ -8,39 +8,51 @@ import type { Bubble } from "../types";
 import { appear, CLAMP } from "./anim";
 import type { SceneComponentProps } from "./types";
 
+/** 吹き出しが 5 つ以上なら、下の札にかからないよう小さく詰める */
+const COMPACT_FROM = 5;
+const COMPACT_BUBBLE: React.CSSProperties = {
+  padding: "8px 30px",
+  fontSize: 40,
+  lineHeight: 1.35,
+};
+
 const Conversation: React.FC<{
   bubbles: Bubble[];
   frame: number;
   step: number;
-}> = ({ bubbles, frame, step }) => (
-  <div
-    style={{
-      position: "absolute",
-      top: 170,
-      left: 100,
-      width: 1080,
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-    }}
-  >
-    {bubbles.map((b, i) => {
-      const a = appear(frame, Math.round(8 + i * step));
-      return (
-        <SpeechBubble
-          key={b.text}
-          who={b.who}
-          text={`${b.who === "doctor" ? "医師" : "患者"}「${b.text}」`}
-          opacity={a.opacity}
-          style={{
-            transform: a.transform,
-            alignSelf: b.who === "doctor" ? "flex-start" : "flex-end",
-          }}
-        />
-      );
-    })}
-  </div>
-);
+}> = ({ bubbles, frame, step }) => {
+  const compact = bubbles.length >= COMPACT_FROM;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: compact ? 148 : 170,
+        left: 100,
+        width: 1080,
+        display: "flex",
+        flexDirection: "column",
+        gap: compact ? 8 : 10,
+      }}
+    >
+      {bubbles.map((b, i) => {
+        const a = appear(frame, Math.round(8 + i * step));
+        return (
+          <SpeechBubble
+            key={b.text}
+            who={b.who}
+            text={`${b.who === "doctor" ? "医師" : "患者"}「${b.text}」`}
+            opacity={a.opacity}
+            style={{
+              ...(compact ? COMPACT_BUBBLE : {}),
+              transform: a.transform,
+              alignSelf: b.who === "doctor" ? "flex-start" : "flex-end",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
 
 const LOSS_STYLE: React.CSSProperties = {
   flex: 1,

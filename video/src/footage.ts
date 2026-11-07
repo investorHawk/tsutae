@@ -11,6 +11,8 @@ export interface FootageSpec {
   minSeconds: number;
   content: string;
   optional?: boolean;
+  /** 録画ではなく静止画を置く素材の置き場所（無ければ video/public/footage/<id>.mp4） */
+  target?: string;
 }
 
 export const DEVICE_LABEL: Record<Device, string> = {
@@ -50,7 +52,7 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     slug: "patient_visit",
     scene: "受診",
     device: "phone",
-    minSeconds: 10,
+    minSeconds: 15,
     content:
       "下の「受診」タブ → 受付番号 A-023 → 「先生に届ける」→ 「先生に届けました。」",
   },
@@ -107,10 +109,20 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
       "任意（report の場面は画像 sample-report.png で描くので無くてよい）",
     optional: true,
   },
+  F11: {
+    id: "F11",
+    slug: "patient_reminder",
+    scene: "毎日のお知らせ",
+    device: "phone",
+    minSeconds: 7,
+    content:
+      "iPhone のロック画面に届いた通知のスクリーンショット（タイトル「つたえ」、本文「今日の記録をお願いします。つらい日はボタンひとつで記録になります。」）。1 枚でよい。他のアプリの通知と実際の URL を写さない",
+    target: "video/public/screens/F11-1.png",
+  },
 };
 
 export const FOOTAGE_IDS = Object.keys(FOOTAGE) as FootageId[];
 
 /** 撮影後に置く場所（カードに出す） */
 export const footageTargetPath = (id: FootageId): string =>
-  `video/public/footage/${id}.mp4`;
+  FOOTAGE[id].target ?? `video/public/footage/${id}.mp4`;

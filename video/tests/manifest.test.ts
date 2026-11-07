@@ -1,5 +1,17 @@
+import { execFileSync } from "node:child_process";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { FOOTAGE, FOOTAGE_IDS } from "../src/footage";
+import { FOOTAGE, FOOTAGE_IDS, footageTargetPath } from "../src/footage";
 import {
   footageFiles,
   screenFiles,
@@ -9,7 +21,7 @@ import { voiceKeyOf } from "../src/lib/voice";
 import { scenesB } from "../src/storyboards";
 
 describe("撮影リストと manifest", () => {
-  it("撮影リストは F1〜F10 の 10 本", () => {
+  it("撮影リストは F1〜F11 の 11 本", () => {
     expect(FOOTAGE_IDS).toEqual([
       "F1",
       "F2",
@@ -21,8 +33,87 @@ describe("撮影リストと manifest", () => {
       "F8",
       "F9",
       "F10",
+      "F11",
     ]);
     for (const id of FOOTAGE_IDS) expect(FOOTAGE[id].id).toBe(id);
+  });
+
+  it("F11 はスマホの通知の静止画で、置き場所は public/screens/F11-1.png", () => {
+    expect(FOOTAGE.F11).toMatchObject({
+      slug: "patient_reminder",
+      scene: "毎日のお知らせ",
+      device: "phone",
+      minSeconds: 7,
+    });
+    expect(FOOTAGE.F11.content).toContain("今日の記録をお願いします。");
+    expect(footageTargetPath("F11")).toBe("video/public/screens/F11-1.png");
+    expect(footageTargetPath("F1")).toBe("video/public/footage/F1.mp4");
+  });
+
+  it("先生の写真の置き場所は git の管理外", () => {
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const ignored = readFileSync(join(repoRoot, ".gitignore"), "utf8");
+    expect(ignored.split("\n")).toContain("video/public/private/");
+  });
+
+  it("manifest は写真があれば portraitFile に載せ、無ければ null にする", () => {
+    const script = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "scripts",
+      "footage-manifest.mjs",
+    );
+    const root = mkdtempSync(join(tmpdir(), "tsutae-manifest-"));
+    const generated = () => {
+      execFileSync(process.execPath, [
+        join(root, "scripts", "footage-manifest.mjs"),
+      ]);
+      return readFileSync(join(root, "src", "footage.generated.ts"), "utf8");
+    };
+    try {
+      for (const dir of ["scripts", "src", "public/private"]) {
+        mkdirSync(join(root, dir), { recursive: true });
+      }
+      copyFileSync(script, join(root, "scripts", "footage-manifest.mjs"));
+      expect(generated()).toContain("portraitFile: string | null = null");
+      writeFileSync(join(root, "public", "private", "portrait.jpg"), "");
+      expect(generated()).toContain(
+        'portraitFile: string | null = "private/portrait.jpg"',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("manifest の生成は撮影リストの全ての id の静止画を拾う（空のファイルを一時フォルダで）", () => {
+    const script = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "scripts",
+      "footage-manifest.mjs",
+    );
+    const root = mkdtempSync(join(tmpdir(), "tsutae-manifest-"));
+    try {
+      for (const dir of ["scripts", "src", "public/screens"]) {
+        mkdirSync(join(root, dir), { recursive: true });
+      }
+      copyFileSync(script, join(root, "scripts", "footage-manifest.mjs"));
+      for (const id of FOOTAGE_IDS) {
+        writeFileSync(join(root, "public", "screens", `${id}-1.png`), "");
+      }
+      execFileSync(process.execPath, [
+        join(root, "scripts", "footage-manifest.mjs"),
+      ]);
+      const generated = readFileSync(
+        join(root, "src", "footage.generated.ts"),
+        "utf8",
+      );
+      for (const id of FOOTAGE_IDS) {
+        expect(generated, id).toContain(`${id}: ["screens/${id}-1.png"]`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("manifest の録画は既知の id で public/footage の下を指す", () => {

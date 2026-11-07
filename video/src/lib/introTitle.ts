@@ -1,4 +1,4 @@
-// intro の題（"25 年間、消化器外科医として癌治療"）を画面の部品に分ける。React / remotion を import しない。
+// intro の題（"25 年間、消化器外科医としてがん治療"）を画面の部品に分ける。React / remotion を import しない。
 
 export interface IntroTitle {
   /** 大きく出す頭の数字（無ければ空） */

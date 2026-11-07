@@ -7,6 +7,7 @@ import { FootageScene } from "./FootageScene";
 import { HookDemoScene } from "./HookDemoScene";
 import { IntroScene } from "./IntroScene";
 import { MaskingScene } from "./MaskingScene";
+import { NotesScene } from "./NotesScene";
 import { PipelineScene } from "./PipelineScene";
 import { ProblemScene } from "./ProblemScene";
 import { PromisesScene } from "./PromisesScene";
@@ -25,6 +26,7 @@ export const SCENE_COMPONENTS: Record<
   problem: ProblemScene,
   before: BeforeScene,
   after: AfterScene,
+  notes: NotesScene,
   footage: FootageScene,
   pipeline: PipelineScene,
   masking: MaskingScene,

@@ -20,7 +20,7 @@ const scene = (id: string, seconds: number): Scene => ({
 describe("voiceKeyOf（場面 id の頭）", () => {
   it("最初の - より前を小文字で返す", () => {
     expect(voiceKeyOf("b01-intro")).toBe("b01");
-    expect(voiceKeyOf("B11-closing")).toBe("b11");
+    expect(voiceKeyOf("B12-closing")).toBe("b12");
     expect(voiceKeyOf("b05")).toBe("b05");
   });
 });
@@ -61,7 +61,7 @@ describe("voiceTracks（声のある場面ごとの再生の頭）", () => {
     );
     expect(voiceTracks(layoutScenes(scenesA, fps), files, fps)).toEqual([]);
     expect(voiceTracks(layoutScenes(scenesB, fps), files, fps)).toHaveLength(
-      11,
+      12,
     );
   });
 });

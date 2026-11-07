@@ -3,7 +3,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEVICE_LABEL, FOOTAGE, FOOTAGE_IDS } from "../src/footage.ts";
+import {
+  DEVICE_LABEL,
+  FOOTAGE,
+  FOOTAGE_IDS,
+  footageTargetPath,
+} from "../src/footage.ts";
 import { countChars } from "../src/lib/text.ts";
 import { footageSegments, layoutScenes } from "../src/lib/timeline.ts";
 import { STORYBOARDS } from "../src/storyboards/index.ts";
@@ -86,7 +91,7 @@ const shotListDoc = () => {
   const rows = FOOTAGE_IDS.map((id) => {
     const f = FOOTAGE[id];
     const uses = usageOf(id);
-    return `| ${id} \`${f.slug}\` | ${cell(f.scene)} | ${DEVICE_LABEL[f.device]} | ${f.minSeconds} | ${cell(f.content)} | ${uses.length ? cell(uses.join("<br>")) : "（どの案でも使わない・任意）"} | \`video/public/footage/${id}.mp4\` |`;
+    return `| ${id} \`${f.slug}\` | ${cell(f.scene)} | ${DEVICE_LABEL[f.device]} | ${f.minSeconds} | ${cell(f.content)} | ${uses.length ? cell(uses.join("<br>")) : "（どの案でも使わない・任意）"} | \`${footageTargetPath(id)}\` |`;
   });
   return [
     "# 撮影リスト（3 案共通）",

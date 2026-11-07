@@ -11,7 +11,13 @@ import { SyntheticBadge } from "./components/SyntheticBadge";
 import { bgmFile, voiceFiles } from "./footage.generated";
 import { bgmVolumeAt } from "./lib/bgm";
 import { layoutScenes, type TimedScene } from "./lib/timeline";
-import { voiceTracks, type VoiceTrack } from "./lib/voice";
+import {
+  contentFrames,
+  voiceKeyOf,
+  voiceTracks,
+  type VoiceTrack,
+} from "./lib/voice";
+import { VOICE_CUES } from "./storyboards/bVoiceCues";
 import { SCENE_COMPONENTS } from "./scenes";
 import { COLORS, FONT_FAMILY } from "./theme";
 import type { Scene, Variant } from "./types";
@@ -22,6 +28,14 @@ export type DemoProps = {
   scenes: Scene[];
   /** BGM を重ねるか（案 B だけ true。public/audio/bgm.wav が無ければ鳴らさない） */
   bgm?: boolean;
+};
+
+/** 声が置いてある場面の実測。無ければ undefined（字数の割合で動く） */
+const cueOf = (sceneId: string) => {
+  const key = voiceKeyOf(sceneId);
+  return Object.hasOwn(voiceFiles, key) && Object.hasOwn(VOICE_CUES, key)
+    ? VOICE_CUES[key]
+    : undefined;
 };
 
 /** 字幕 */
@@ -37,6 +51,8 @@ const SubtitleTrack: React.FC<{ timed: TimedScene }> = ({ timed }) => {
       <Subtitle
         text={scene.caption ?? scene.narration}
         durationInFrames={durationInFrames}
+        voiceStarts={cueOf(scene.id)?.starts}
+        sceneSeconds={scene.seconds}
       />
     </Sequence>
   );
@@ -92,7 +108,11 @@ export const Demo: React.FC<DemoProps> = ({ variant, scenes, bgm = false }) => {
             >
               <Component
                 scene={scene}
-                durationInFrames={durationInFrames}
+                durationInFrames={contentFrames(
+                  durationInFrames,
+                  cueOf(scene.id)?.seconds,
+                  fps,
+                )}
                 variant={variant}
               />
             </SceneFade>

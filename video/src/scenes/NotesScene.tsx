@@ -195,6 +195,33 @@ const ChipRow: React.FC<{ top: number; children: React.ReactNode }> = ({
   </div>
 );
 
+/** 専門用語の説明。見出しと右上の札の間、ノートの上に収める */
+const Definition: React.FC<{ lines: string[]; frame: number }> = ({
+  lines,
+  frame,
+}) => (
+  <div
+    lang="ja"
+    style={{
+      position: "absolute",
+      top: 18,
+      left: 780,
+      padding: "8px 24px",
+      borderRadius: 14,
+      border: `4px solid ${COLORS.navy}`,
+      background: COLORS.white,
+      color: COLORS.navy,
+      fontSize: 38,
+      fontWeight: 800,
+      lineHeight: 1.3,
+      whiteSpace: "pre-line",
+      ...appear(frame, 6),
+    }}
+  >
+    {lines.join("\n")}
+  </div>
+);
+
 /** 3 段階目: 使いやすいアプリへ、と「つたえ」を紺で強調する */
 const Answer: React.FC<{
   answer: string;
@@ -240,7 +267,13 @@ export const NotesScene: React.FC<SceneComponentProps> = ({
   durationInFrames,
 }) => {
   const frame = useCurrentFrame();
-  const { formatLabel, burdens = [], answer, brand } = scene.props ?? {};
+  const {
+    definition = [],
+    formatLabel,
+    burdens = [],
+    answer,
+    brand,
+  } = scene.props ?? {};
   const at = (ratio: number) => Math.round(durationInFrames * ratio);
   const answerAt = at(NOTES_AT.answer);
   return (
@@ -253,6 +286,9 @@ export const NotesScene: React.FC<SceneComponentProps> = ({
     >
       <AbsoluteFill style={{ opacity: 1 - ramp(frame, answerAt, 10) }}>
         {scene.title ? <Caption text={scene.title} /> : null}
+        {definition.length > 0 ? (
+          <Definition lines={definition} frame={frame} />
+        ) : null}
         <Notebooks frame={frame} />
         <ChipRow top={NOTE_TOP + NOTE.height + 22}>
           <div style={{ ...CHIP_STYLE, ...appear(frame, at(NOTES_AT.label)) }}>

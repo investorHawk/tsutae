@@ -1,4 +1,4 @@
-// 生成物: scripts/footage-manifest.mjs が public/footage・public/screens・public/audio/bgm.wav・public/voice を走査して書く。
+// 生成物: scripts/footage-manifest.mjs が public/footage・public/screens・public/audio/bgm.wav・public/voice・public/private を走査して書く。
 // 手で編集しない（npm run studio / render / still / bundle / test の前に自動で書き直される）。
 import type { FootageId } from "./types";
 
@@ -19,3 +19,6 @@ export const bgmFile: string | null = "audio/bgm.wav";
 
 /** 場面ごとの声（public/voice/b<nn>*.m4a|mp3|wav。キーは場面 id の頭）。無ければ {} */
 export const voiceFiles: Record<string, string> = {};
+
+/** 冒頭の先生の写真（public/private/portrait.jpg。git の管理外）。無ければ null */
+export const portraitFile: string | null = "private/portrait.jpg";

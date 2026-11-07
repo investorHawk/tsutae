@@ -50,6 +50,41 @@ describe("撮影リストと manifest", () => {
     expect(footageTargetPath("F1")).toBe("video/public/footage/F1.mp4");
   });
 
+  it("先生の写真の置き場所は git の管理外", () => {
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const ignored = readFileSync(join(repoRoot, ".gitignore"), "utf8");
+    expect(ignored.split("\n")).toContain("video/public/private/");
+  });
+
+  it("manifest は写真があれば portraitFile に載せ、無ければ null にする", () => {
+    const script = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "scripts",
+      "footage-manifest.mjs",
+    );
+    const root = mkdtempSync(join(tmpdir(), "tsutae-manifest-"));
+    const generated = () => {
+      execFileSync(process.execPath, [
+        join(root, "scripts", "footage-manifest.mjs"),
+      ]);
+      return readFileSync(join(root, "src", "footage.generated.ts"), "utf8");
+    };
+    try {
+      for (const dir of ["scripts", "src", "public/private"]) {
+        mkdirSync(join(root, dir), { recursive: true });
+      }
+      copyFileSync(script, join(root, "scripts", "footage-manifest.mjs"));
+      expect(generated()).toContain("portraitFile: string | null = null");
+      writeFileSync(join(root, "public", "private", "portrait.jpg"), "");
+      expect(generated()).toContain(
+        'portraitFile: string | null = "private/portrait.jpg"',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("manifest の生成は撮影リストの全ての id の静止画を拾う（空のファイルを一時フォルダで）", () => {
     const script = join(
       dirname(fileURLToPath(import.meta.url)),

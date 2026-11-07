@@ -108,6 +108,8 @@ export interface SceneProps {
   clockSeconds?: number;
   /** after: 光らせる要確認の行（画像の行と同じ順） */
   alerts?: string[];
+  /** notes: 専門用語の説明（2 行）。見出しの横に、最後の段階の前まで出す */
+  definition?: string[];
   /** notes: 書式の違うノートの札 */
   formatLabel?: string;
   /** notes: 患者と医師の負担の札（2 つ） */

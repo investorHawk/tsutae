@@ -181,12 +181,12 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
       ["b04-after", 11, "after"],
       ["b05-patient", 18, "footage"],
       ["b06-visit", 15, "footage"],
-      ["b07-pipeline", 13, "pipeline"],
-      ["b08-report", 17, "report"],
-      ["b09-regimen", 11, "footage"],
-      ["b10-whypaper", 13, "whypaper"],
+      ["b07-pipeline", 12, "pipeline"],
+      ["b08-report", 16, "report"],
+      ["b09-regimen", 15, "footage"],
+      ["b10-whypaper", 12, "whypaper"],
       ["b11-promises", 8, "promises"],
-      ["b12-closing", 21, "closing"],
+      ["b12-closing", 20, "closing"],
     ]);
   });
 
@@ -209,7 +209,7 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     ],
     [
       "b09-regimen",
-      "新しいレジメンも、医師が Claude に文で伝えるだけ。AI が入れた値は、医師が確かめてから採用します。",
+      "新しいレジメンも、医師が Claude に文で伝えるだけ。JSON がわからなくても、AI が指示どおりに設定します。入れた値は、医師が確かめてから採用します。",
     ],
     [
       "b11-promises",
@@ -278,6 +278,38 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     expect(scene?.props?.notes?.[1]).toContain("58%");
     expect(scene?.props?.notes?.[1]).toContain("Chung ら, JAMIA 2019");
     expect(scene?.narration).not.toContain("58%");
+  });
+
+  it("b02-before の会話は「変わりありませんでしたか」「下痢しました」から始まり、声は変えない", () => {
+    const scene = byId("b02-before");
+    expect(scene?.props?.bubbles?.slice(0, 3)).toEqual([
+      { who: "doctor", text: "変わりありませんでしたか" },
+      { who: "patient", text: "下痢しました" },
+      { who: "doctor", text: "下痢はいつからでしたか" },
+    ]);
+    expect(scene?.narration).not.toContain("変わりありません");
+  });
+
+  it("b03-notes はレジメンの意味を札で説明する（声は変えない）", () => {
+    const scene = byId("b03-notes");
+    expect(scene?.props?.definition).toEqual([
+      "レジメン",
+      "＝抗がん剤の種類と投与の仕方",
+    ]);
+    expect(scene?.narration).toContain("レジメン別のノート");
+  });
+
+  it("b09-regimen は JSON を知らなくても AI が設定することを声と札で言い、確かめて採用も残す", () => {
+    const scene = byId("b09-regimen");
+    expect(scene?.narration).toContain(
+      "JSON がわからなくても、AI が指示どおりに設定します。",
+    );
+    expect(scene?.narration).toContain("医師が確かめてから採用します");
+    expect(scene?.props?.callouts).toEqual([
+      "レジメン＝抗がん剤の種類と投与の仕方",
+      "JSON がわからなくても、AI が指示どおりに設定",
+      "入れた値は、医師が確かめてから採用",
+    ]);
   });
 
   it("b09-regimen は F8 だけ", () => {

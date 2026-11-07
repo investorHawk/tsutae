@@ -3,6 +3,7 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FootageScene } from "../src/scenes/FootageScene";
+import { IntroScene } from "../src/scenes/IntroScene";
 import { NOTES_AT, NotesScene } from "../src/scenes/NotesScene";
 import { scenesB } from "../src/storyboards";
 import type { Scene } from "../src/types";
@@ -10,6 +11,7 @@ import type { Scene } from "../src/types";
 const mocks = vi.hoisted(() => ({
   frame: 0,
   screenFiles: {} as Record<string, string[]>,
+  portraitFile: null as string | null,
 }));
 
 vi.mock("remotion", async (importOriginal) => ({
@@ -17,6 +19,8 @@ vi.mock("remotion", async (importOriginal) => ({
   useCurrentFrame: () => mocks.frame,
   useVideoConfig: () => ({ fps: 30 }),
   Sequence: ({ children }: { children: ReactNode }) => children,
+  Img: ({ src }: { src: string }) => `写真 ${src}`,
+  staticFile: (path: string) => path,
 }));
 
 vi.mock("../src/footage.generated", () => ({
@@ -24,6 +28,9 @@ vi.mock("../src/footage.generated", () => ({
   screenFiles: mocks.screenFiles,
   bgmFile: null,
   voiceFiles: {},
+  get portraitFile() {
+    return mocks.portraitFile;
+  },
 }));
 
 vi.mock("../src/components/ScreenSlides", () => ({
@@ -68,6 +75,20 @@ describe("NotesScene の 3 段階", () => {
     expect(opacityOf(html, "医師: 読むのに時間がかかる")).toBe(0);
   });
 
+  it("レジメンの説明は、声の頭から 2 段階目まで出て、3 段階目で消える", () => {
+    const text = "＝抗がん剤の種類と投与の仕方";
+    expect(opacityOf(markup(NotesScene, "b03-notes", 20), text)).toBe(1);
+    expect(
+      opacityOf(
+        markup(NotesScene, "b03-notes", frameAt(NOTES_AT.answer) - 1),
+        text,
+      ),
+    ).toBe(1);
+    expect(markup(NotesScene, "b03-notes", duration - 1)).toContain(
+      "opacity:0",
+    );
+  });
+
   it("2 段階目: 負担の札が順に出る", () => {
     const first = frameAt(NOTES_AT.burdens[0]) + 12;
     const second = frameAt(NOTES_AT.burdens[1]) + 12;
@@ -96,6 +117,25 @@ describe("NotesScene の 3 段階", () => {
   });
 });
 
+describe("b01-intro の先生の写真", () => {
+  beforeEach(() => {
+    mocks.portraitFile = null;
+  });
+
+  it("写真が無ければ出さず、文字は中央のまま", () => {
+    const html = markup(IntroScene, "b01-intro", 100);
+    expect(html).not.toContain("写真 ");
+    expect(html).not.toContain("padding-left");
+  });
+
+  it("写真があれば出し、文字を右に寄せる", () => {
+    mocks.portraitFile = "private/portrait.jpg";
+    const html = markup(IntroScene, "b01-intro", 100);
+    expect(html).toContain("写真 private/portrait.jpg");
+    expect(html).toContain("padding-left");
+  });
+});
+
 describe("録画の場面の札と F11", () => {
   beforeEach(() => {
     for (const key of Object.keys(mocks.screenFiles)) {
@@ -113,6 +153,14 @@ describe("録画の場面の札と F11", () => {
     const late = markup(FootageScene, "b06-visit", 225);
     expect(late).toContain("記録はスマホに保存。印刷すると消す");
     expect(late).not.toContain("患者さんの画面に AI の文は出ない");
+  });
+
+  it("b09: 札はレジメンの説明 → JSON → 確かめて採用の順に出る", () => {
+    mocks.screenFiles.F8 = ["screens/F8-1.png"];
+    const at = (frame: number) => markup(FootageScene, "b09-regimen", frame);
+    expect(at(30)).toContain("レジメン＝抗がん剤の種類と投与の仕方");
+    expect(at(200)).toContain("JSON がわからなくても、AI が指示どおりに設定");
+    expect(at(400)).toContain("入れた値は、医師が確かめてから採用");
   });
 
   it("b05: F11 の静止画が無ければ、撮影枠のカードに置き場所を出す", () => {

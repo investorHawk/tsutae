@@ -1,4 +1,11 @@
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import {
+  AbsoluteFill,
+  Img,
+  interpolate,
+  staticFile,
+  useCurrentFrame,
+} from "remotion";
+import { portraitFile } from "../footage.generated";
 import { splitIntroTitle } from "../lib/introTitle";
 import { COLORS, FONT_FAMILY, FONT_SIZE } from "../theme";
 import { appear, CLAMP } from "./anim";
@@ -74,6 +81,26 @@ const Hero: React.FC<{ frame: number; duration: number; title: string }> = ({
   );
 };
 
+/** 先生の写真の位置（public/private/portrait.jpg があるときだけ出す） */
+const PORTRAIT = { left: 130, top: 160, width: 480, height: 600 } as const;
+
+const Portrait: React.FC<{ file: string; frame: number }> = ({
+  file,
+  frame,
+}) => (
+  <Img
+    src={staticFile(file)}
+    style={{
+      position: "absolute",
+      ...PORTRAIT,
+      objectFit: "cover",
+      borderRadius: 6,
+      boxShadow: "0 14px 34px rgba(0,0,0,0.16)",
+      ...appear(frame, 4, 26, 0),
+    }}
+  />
+);
+
 /** 前半: 大きな「25 年間」と副題、経歴の札が順に出る */
 const Career: React.FC<{ frame: number; duration: number } & IntroData> = ({
   frame,
@@ -91,7 +118,16 @@ const Career: React.FC<{ frame: number; duration: number } & IntroData> = ({
     CLAMP,
   );
   return (
-    <AbsoluteFill style={{ ...CENTER, opacity: out }}>
+    <AbsoluteFill
+      style={{
+        ...CENTER,
+        opacity: out,
+        ...(portraitFile
+          ? { paddingLeft: PORTRAIT.left + PORTRAIT.width + 30 }
+          : {}),
+      }}
+    >
+      {portraitFile ? <Portrait file={portraitFile} frame={frame} /> : null}
       <Hero frame={frame} duration={duration} title={title} />
       <div style={{ marginTop: 64, display: "flex", gap: 28 }}>
         {career.map((c, i) => (

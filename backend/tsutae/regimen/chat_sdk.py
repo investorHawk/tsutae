@@ -4,6 +4,7 @@
   pipeline と同じ部品を使う:
   - cwd は空の一時ディレクトリ・`setting_sources=[]`（ファイルの設定・Skill を読まない）
   - `--no-session-persistence`（会話を ~/.claude/projects/ に残さない）・
+    往復の後に `query_cleaned` でそのセッションのファイルも消す（spec 13.3）・
     `env=NO_CLAUDE_MD_ENV`（開発用の CLAUDE.md を読まない）
   - `allowed_tools` は `REGIMEN_ALLOWED_TOOLS`（MCP の3つ）だけ、`disallowed_tools` は
     `REGIMEN_DISALLOWED_TOOLS`。Hook は H1（依頼文に二次検出）と H4（3つ以外を deny。
@@ -41,6 +42,7 @@ from tsutae.pipeline.hooks import make_h1, make_h4
 from tsutae.pipeline.logs import EventLogger
 from tsutae.pipeline.orchestrator import NO_CLAUDE_MD_ENV, NO_SESSION_PERSISTENCE
 from tsutae.pipeline.runner import RunFailedError, stats_from_result
+from tsutae.pipeline.session_files import query_cleaned
 from tsutae.regimen.chat_args import (
     ASK_TOOL,
     PROPOSE_QUESTIONS_TOOL,
@@ -154,10 +156,14 @@ class SdkRegimenChat:
     """`claude_agent_sdk.query` で1往復を回す（RegimenChat）。"""
 
     def __init__(
-        self, settings: Settings | None = None, query_fn: QueryFn | None = None
+        self,
+        settings: Settings | None = None,
+        query_fn: QueryFn | None = None,
+        projects_root: Path | None = None,
     ) -> None:
         self.settings = settings
         self.query_fn: QueryFn = query_fn if query_fn is not None else query
+        self.projects_root = projects_root
 
     async def turn(self, draft: TurnInput, text: str) -> TurnResult:
         settings = self.settings if self.settings is not None else get_settings()
@@ -177,8 +183,14 @@ class SdkRegimenChat:
     ) -> tuple[ResultMessage | None, str]:
         result: ResultMessage | None = None
         last_text = ""
+        messages = query_cleaned(
+            self.query_fn,
+            prompt=prompt,
+            options=options,
+            projects_root=self.projects_root,
+        )
         try:
-            async for message in self.query_fn(prompt=prompt, options=options):
+            async for message in messages:
                 if isinstance(message, ResultMessage):
                     result = message
                 elif isinstance(message, AssistantMessage):

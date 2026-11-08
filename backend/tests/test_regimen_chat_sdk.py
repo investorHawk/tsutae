@@ -259,3 +259,14 @@ async def test_sdk_chat_failure_keeps_stats(tmp_path: Path) -> None:
         await chat.turn(_draft(), TEXT)
     assert sdk_error_code(info.value) == "max_turns"
     assert info.value.stats.cost_usd == 0.05
+
+
+async def test_sdk_chat_removes_session_files(tmp_path: Path) -> None:
+    """会話の後に ~/.claude/projects/<cwd>/<session>/ を消す（spec 13.3）。"""
+    sid = "0b6f2a4e-3c1d-4e5f-9a7b-8c9d0e1f2a3b"
+    session = tmp_path / "-tmp-tsutae-regimen" / sid / "subagents"
+    session.mkdir(parents=True)
+    query = ToolQuery([], result=dataclasses.replace(result_message(), session_id=sid))
+    chat = SdkRegimenChat(get_settings(), query_fn=query, projects_root=tmp_path)
+    await chat.turn(_draft(), TEXT)
+    assert not session.parent.exists()

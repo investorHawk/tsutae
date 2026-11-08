@@ -17,6 +17,7 @@ from api_helpers import add_entry, add_patient, api_client, db_conn, register
 from fastapi.testclient import TestClient
 
 from tsutae import db
+from tsutae.api.body_limit import DEFAULT_BODY_MAX_BYTES
 from tsutae.api.visit_entries import MAX_VISIT_ENTRIES, VISIT_BODY_MAX_BYTES
 from tsutae.schemas import EntryCreate, Question
 
@@ -391,7 +392,11 @@ def test_full_size_records_fit_the_limit(client: TestClient, pid: str) -> None:
     assert len(body.encode()) < VISIT_BODY_MAX_BYTES
 
 
-def test_other_routes_are_not_limited_by_the_middleware(client: TestClient) -> None:
-    big = b" " * (VISIT_BODY_MAX_BYTES + 1)
+def test_other_routes_use_the_default_limit(client: TestClient) -> None:
+    """5MB は受付だけ。他の経路は既定の上限（test_api_body_limit）。"""
+    big = b" " * (DEFAULT_BODY_MAX_BYTES + 1)
     r = client.post("/api/patient/register", content=big, headers=_json_headers())
+    assert r.status_code == 413
+    ok = b" " * (DEFAULT_BODY_MAX_BYTES + 1)
+    r = client.post("/api/visit", content=ok, headers=_json_headers())
     assert r.status_code == 422

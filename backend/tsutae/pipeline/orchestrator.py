@@ -116,7 +116,9 @@ DISALLOWED_TOOLS: tuple[str, ...] = (
 )
 # 会話の記録（依頼文＝伏せ字後の自由記載、サブエージェントの出力、emit_* の引数＝
 # 変換結果）を ~/.claude/projects/<cwd>/<session>.jsonl に書かせない（spec §13.3）。
-# SDK の transport は既定でこのフラグを付けない
+# SDK の transport は既定でこのフラグを付けない。このフラグは .jsonl を止めるだけで、
+# CLI は <session>/subagents/agent-*.meta.json（モデルが書いた description を含む）を
+# 書くので、実行の後に runner（session_files.query_cleaned）がセッションのディレクトリを消す
 NO_SESSION_PERSISTENCE: dict[str, str | None] = {"no-session-persistence": None}
 # setting_sources=["project"] は cwd と全ての祖先の CLAUDE.md も読む（system_prompt を
 # 文字列にしても止まらない）。リポジトリ直下の開発用 CLAUDE.md を変換の文脈に入れない

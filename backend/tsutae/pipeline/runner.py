@@ -5,6 +5,11 @@
   上へ出す（振り分けは orchestrator.convert）。CLI は失敗の時も is_error の
   ResultMessage を返してから ResultError を出すので、その費用・トークン数を
   `RunFailedError.stats` に残す（いちばん費用のかかる失敗をログから消さない）
+- query は `session_files.query_cleaned` を通して回す。終わり（成功・SDK の失敗・
+  `asyncio.wait_for` の時間切れによる取り消し）に query を閉じ（CLI を止め）、その実行が
+  `~/.claude/projects/` に残したセッションのファイル（`<session>/subagents/*.meta.json`
+  など）を消す。`--no-session-persistence` は `.jsonl` しか止めないため（spec 13.3）。
+  消す場所は `projects_root`（既定は実行の時の `session_files.projects_dir()`）
 - テストでは `query_fn` に偽物を渡す（実際の API は呼ばない）。FakeRunner は
   backend/tests/pipeline_fakes.py
 """
@@ -13,10 +18,12 @@ from __future__ import annotations
 
 import math
 from collections.abc import AsyncIterator, Callable, Mapping
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKError, ResultMessage, query
 
+from tsutae.pipeline.session_files import query_cleaned
 from tsutae.pipeline.tools import RunCollector
 from tsutae.schemas import RunStats
 
@@ -87,15 +94,24 @@ class RunFailedError(ClaudeSDKError):
 class SdkRunner:
     """`claude_agent_sdk.query` で1回の変換を回す。"""
 
-    def __init__(self, query_fn: QueryFn | None = None) -> None:
+    def __init__(
+        self, query_fn: QueryFn | None = None, projects_root: Path | None = None
+    ) -> None:
         self.query_fn: QueryFn = query_fn if query_fn is not None else query
+        self.projects_root = projects_root
 
     async def run(
         self, prompt: str, options: ClaudeAgentOptions, collector: RunCollector
     ) -> RunStats:
         result: ResultMessage | None = None
+        messages = query_cleaned(
+            self.query_fn,
+            prompt=prompt,
+            options=options,
+            projects_root=self.projects_root,
+        )
         try:
-            async for message in self.query_fn(prompt=prompt, options=options):
+            async for message in messages:
                 if isinstance(message, ResultMessage):
                     result = message
         except ClaudeSDKError as exc:

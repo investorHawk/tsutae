@@ -455,3 +455,20 @@ async def test_sdk_editor_does_not_wrap_other_exceptions(work_root: Path) -> Non
     )
     with pytest.raises(RuntimeError):
         await editor.edit(work_root, NAME, "下痢の質問を短く")
+
+
+async def test_sdk_editor_removes_session_files(
+    work_root: Path, tmp_path: Path
+) -> None:
+    """書き換えの後に ~/.claude/projects/<cwd>/<session>/ を消す（spec 13.3）。"""
+    sid = "0b6f2a4e-3c1d-4e5f-9a7b-8c9d0e1f2a3b"
+    projects = tmp_path / "projects"
+    session = projects / "-tmp-work" / sid / "subagents"
+    session.mkdir(parents=True)
+
+    async def fake_query(*, prompt: str, options: ClaudeAgentOptions):
+        yield dataclasses.replace(_result(), session_id=sid)
+
+    editor = SdkSkillEditor(get_settings(), query_fn=fake_query, projects_root=projects)
+    await editor.edit(work_root, NAME, "下痢の質問を短く")
+    assert not session.parent.exists()

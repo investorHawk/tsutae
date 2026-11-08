@@ -13,6 +13,8 @@
   理由をモデルに返して直させる）
 - 依頼文は frontmatter の決まり（Skill の種類ごと）と、regimen Skill なら今の質問の
   key の一覧を含む（新しい key を重ねさせない）。版・key は edit が写しから読む
+- query は `query_cleaned` を通す。書き換えの後に、CLI が ~/.claude/projects/ に残した
+  そのセッションのファイルを消す（`--no-session-persistence` と合わせて spec 13.3）
 - `setting_sources=[]`（SDK の分離モード）。書き換えに Skill の読み込みは要らず、
   ~/.claude/settings.json 等の Hook・許可の設定を混ぜない（None だと全部読む）
 - Hook が記録するロガーは、プロトコルの引数に無いので `logging_to(logger)` で渡す
@@ -45,6 +47,7 @@ from tsutae.pipeline.hooks import H3_MATCHER, make_h1, make_h4
 from tsutae.pipeline.logs import EventLogger, MemoryLogger, reason_code
 from tsutae.pipeline.orchestrator import NO_SESSION_PERSISTENCE, sdk_error_code
 from tsutae.pipeline.runner import RunFailedError, stats_from_result
+from tsutae.pipeline.session_files import query_cleaned
 from tsutae.schemas import RunStats
 from tsutae.skillchange.check import (
     SKILL_CHECK_MATCHER,
@@ -320,10 +323,14 @@ class SdkSkillEditor:
     """`claude_agent_sdk.query` で写しの SKILL.md を書き換える。"""
 
     def __init__(
-        self, settings: Settings | None = None, query_fn: QueryFn | None = None
+        self,
+        settings: Settings | None = None,
+        query_fn: QueryFn | None = None,
+        projects_root: Path | None = None,
     ) -> None:
         self.settings = settings
         self.query_fn: QueryFn = query_fn if query_fn is not None else query
+        self.projects_root = projects_root
 
     async def edit(
         self, work_root: Path, skill_name: str, request_text: str
@@ -342,8 +349,14 @@ class SdkSkillEditor:
             skill_name, request_text, question_keys=baseline.question_keys
         )
         result: ResultMessage | None = None
+        messages = query_cleaned(
+            self.query_fn,
+            prompt=prompt,
+            options=options,
+            projects_root=self.projects_root,
+        )
         try:
-            async for message in self.query_fn(prompt=prompt, options=options):
+            async for message in messages:
                 if isinstance(message, ResultMessage):
                     result = message
         except ClaudeSDKError as exc:

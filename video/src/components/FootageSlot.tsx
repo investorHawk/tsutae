@@ -21,6 +21,8 @@ interface FootageSlotProps {
   label?: string;
   /** 右の帯の一言 */
   callout?: string | null;
+  /** 横の動画の札の上端（既定 110。画面の要所を隠すときに下げる） */
+  calloutTop?: number;
 }
 
 /** manifest にある録画だけを <OffthreadVideo> に渡す */
@@ -94,7 +96,10 @@ const SideText: React.FC<{
   </div>
 );
 
-const Callout: React.FC<{ text: string }> = ({ text }) => (
+const Callout: React.FC<{ text: string; top?: number }> = ({
+  text,
+  top = 110,
+}) => (
   <div
     lang="ja"
     style={{
@@ -102,7 +107,7 @@ const Callout: React.FC<{ text: string }> = ({ text }) => (
       // 構成データの \n で改行する（製品名を行の途中で割らない）
       whiteSpace: "pre-line",
       position: "absolute",
-      top: 110,
+      top,
       right: 300,
       // 「口内炎は、食事がとれたかも次から聞いて」（21 字＋括弧）が 1 行に収まる幅
       maxWidth: 1240,
@@ -118,6 +123,28 @@ const Callout: React.FC<{ text: string }> = ({ text }) => (
     }}
   >
     {text}
+  </div>
+);
+
+/** 手元のスマホを撮った動画（800×1080 に切り抜いたもの）を中央の角丸の枠に出す。左右は札の帯 */
+const HAND_HEIGHT = 812;
+const HAND_WIDTH = Math.round((HAND_HEIGHT * 800) / 1080);
+
+const HandFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div
+    style={{
+      position: "absolute",
+      top: 30,
+      left: 960 - HAND_WIDTH / 2,
+      width: HAND_WIDTH,
+      height: HAND_HEIGHT,
+      borderRadius: 28,
+      overflow: "hidden",
+      background: COLORS.ink,
+      boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+    }}
+  >
+    {children}
   </div>
 );
 
@@ -150,6 +177,7 @@ export const FootageSlot: React.FC<FootageSlotProps> = ({
   seconds,
   label,
   callout,
+  calloutTop,
 }) => {
   const spec = FOOTAGE[id];
   if (!hasMedia(id)) {
@@ -160,13 +188,26 @@ export const FootageSlot: React.FC<FootageSlotProps> = ({
     );
   }
   const media = (
-    <Media id={id} seconds={seconds} cover={spec.device === "camera"} />
+    <Media
+      id={id}
+      seconds={seconds}
+      cover={spec.device === "camera" || spec.device === "hand"}
+    />
   );
   if (spec.device === "camera") {
     return (
       <AbsoluteFill>
         {media}
-        {callout ? <Callout text={callout} /> : null}
+        {callout ? <Callout text={callout} top={calloutTop} /> : null}
+      </AbsoluteFill>
+    );
+  }
+  if (spec.device === "hand") {
+    return (
+      <AbsoluteFill style={{ background: COLORS.paper }}>
+        <HandFrame>{media}</HandFrame>
+        <SideText side="left" text={label ?? spec.scene} />
+        {callout ? <SideText side="right" text={callout} strong /> : null}
       </AbsoluteFill>
     );
   }
@@ -174,7 +215,7 @@ export const FootageSlot: React.FC<FootageSlotProps> = ({
     return (
       <AbsoluteFill>
         <PcFrame>{media}</PcFrame>
-        {callout ? <Callout text={callout} /> : null}
+        {callout ? <Callout text={callout} top={calloutTop} /> : null}
       </AbsoluteFill>
     );
   }

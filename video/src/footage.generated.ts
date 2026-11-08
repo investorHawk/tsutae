@@ -2,7 +2,13 @@
 // 手で編集しない（npm run studio / render / still / bundle / test の前に自動で書き直される）。
 import type { FootageId } from "./types";
 
-export const footageFiles: Partial<Record<FootageId, string>> = {};
+export const footageFiles: Partial<Record<FootageId, string>> = {
+  F1: "footage/F1.mp4",
+  F2: "footage/F2.mp4",
+  F4: "footage/F4.mp4",
+  F7: "footage/F7.mp4",
+  F8: "footage/F8.mp4",
+};
 
 /** 録画が無いときに出す静止画（public/screens/F<n>-<k>.png を k の順に） */
 export const screenFiles: Partial<Record<FootageId, string[]>> = {

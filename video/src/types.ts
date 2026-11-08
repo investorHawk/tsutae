@@ -67,6 +67,17 @@ export interface Fact {
   label: string;
   value: string;
   note?: string;
+  /** 数字の横にマス目で出す内訳（hit 個を紺、残りを灰。total 個） */
+  tally?: { hit: number; total: number };
+  /** ラベルの下に出す当てはめの実例（元の文 → 日付・用語） */
+  example?: { quote: string; day: string; term: string };
+}
+
+/** footage: 早送りした区間（場面の頭からの秒）と倍率 */
+export interface SpeedBadge {
+  from: number;
+  to: number;
+  rate: number;
 }
 
 export interface SceneProps {
@@ -120,6 +131,12 @@ export interface SceneProps {
   brand?: string;
   /** footage: 右の帯に出す一言（split の区間ごと。null は出さない。区間より多ければ最後の区間を均等に割って順に出す） */
   callouts?: (string | null)[];
+  /** footage: 早送りした区間（場面の頭からの秒）と倍率。この間だけ「早送り ×N」の印を出す（scripts/cut_footage_b.sh と同じ値） */
+  speedBadges?: SpeedBadge[];
+  /** footage: 画面の下に小さく出す注記（出典など。声には入れない） */
+  footnote?: string;
+  /** footage: 横の動画の札の上端（px。既定 110） */
+  calloutTop?: number;
   /** promises */
   dont?: string[];
   privacy?: string[];

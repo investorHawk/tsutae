@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FOOTAGE } from "../src/footage";
 import { buildSubtitleChunks } from "../src/lib/subtitle";
@@ -183,7 +185,7 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
       ["b04-after", 12, "after"],
       ["b05-patient", 19, "footage"],
       ["b06-visit", 14, "footage"],
-      ["b07-pipeline", 13, "pipeline"],
+      ["b07-pipeline", 13, "footage"],
       ["b08-report", 16, "report"],
       ["b09-regimen", 14, "footage"],
       ["b10-whypaper", 11, "whypaper"],
@@ -255,7 +257,7 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     expect(scene?.footage).toEqual(["F1", "F2", "F11"]);
     expect(scene?.props?.split).toEqual([7, 5, 7]);
     expect(scene?.props?.callouts).toEqual([
-      "「おとといの夜から口内炎がいたい」",
+      "「一昨日の夜から口内炎が痛い」",
       "抗がん剤が変わっても、入力の形は同じ",
       "決めた時刻にお知らせ。書き忘れと言い忘れが減る",
     ]);
@@ -277,12 +279,57 @@ describe("案 B（DemoB）の 175 秒の構成", () => {
     expect(Math.abs(voiceAt - (scene?.seconds ?? 0) / 2)).toBeLessThan(0.5);
   });
 
-  it("b07-pipeline は 58% の出典の注記を画面に残し、声からは外す", () => {
+  it("b07-pipeline は変換ログの録画（F7）で、58% の出典の注記を画面の下に残し、声からは外す", () => {
     const scene = byId("b07-pipeline");
-    expect(scene?.props?.notes).toHaveLength(2);
-    expect(scene?.props?.notes?.[1]).toContain("58%");
-    expect(scene?.props?.notes?.[1]).toContain("Chung ら, JAMIA 2019");
+    expect(scene?.footage).toEqual(["F7"]);
+    expect(scene?.props?.footnote).toContain("58%");
+    expect(scene?.props?.footnote).toContain("Chung ら, JAMIA 2019");
     expect(scene?.narration).not.toContain("58%");
+  });
+
+  it("b12-closing のマス目は「61 件中 56 件」と同じ数", () => {
+    const fact = byId("b12-closing")?.props?.facts?.[0];
+    expect(fact?.tally).toEqual({ hit: 56, total: 61 });
+    expect(fact?.value).toBe("61 件中 56 件");
+  });
+
+  it("b12-closing の当てはめの実例は、見本レポート（本物の Claude の変換）にある値だけを使う", () => {
+    const report = readFileSync(
+      join(__dirname, "../../docs/eval/demo-visit-20261109-1800.html"),
+      "utf8",
+    )
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ");
+    const ex = byId("b12-closing")?.props?.facts?.[0]?.example;
+    expect(ex).toEqual({
+      quote: "きょうも水道の水でピリピリ",
+      day: "Day2（10/28）",
+      term: "末梢神経障害",
+    });
+    // 症状別の時系列の 1 行: 末梢神経障害 Day2〜（10/28） 「きょうも水道の水でピリピリ」
+    expect(report).toContain(`${ex?.term} Day2〜（10/28） 「${ex?.quote}」`);
+  });
+
+  it("b08-report は当てはめの例を重ねない（元の形のまま）", () => {
+    expect(byId("b08-report")?.props).toEqual({
+      focus: ["timeline", "symptoms"],
+    });
+  });
+
+  it("早送りした区間には印を出し、区間は場面の中に収まる", () => {
+    expect(byId("b07-pipeline")?.props?.speedBadges).toEqual([
+      { from: 0, to: 8.5, rate: 7 },
+    ]);
+    expect(byId("b09-regimen")?.props?.speedBadges).toEqual([
+      { from: 3, to: 4.5, rate: 27 },
+    ]);
+    for (const s of scenes) {
+      for (const b of s.props?.speedBadges ?? []) {
+        expect(b.from, s.id).toBeGreaterThanOrEqual(0);
+        expect(b.to, s.id).toBeLessThanOrEqual(s.seconds);
+        expect(b.from, s.id).toBeLessThan(b.to);
+      }
+    }
   });
 
   it("b02-before の会話は「変わりありませんでしたか」「下痢しました」から始まり、声は変えない", () => {

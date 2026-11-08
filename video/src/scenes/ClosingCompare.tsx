@@ -63,7 +63,53 @@ const BarRow: React.FC<{
   );
 };
 
-const FactCard: React.FC<{ fact: Fact }> = ({ fact }) => (
+const TALLY_COLS = 16;
+const TALLY_CELL = 22;
+const TALLY_GAP = 5;
+const TALLY_FILL_FRAMES = 40; // 紺のマスが端から順に埋まるフレーム
+const EXAMPLE_LEAD = 15; // 実例を出してから、マスを埋め始めるまでのフレーム
+
+/** hit 個を紺、残りを灰の枠で並べたマス目。紺は from から順に埋まる */
+const TallyGrid: React.FC<{
+  hit: number;
+  total: number;
+  frame: number;
+  from: number;
+}> = ({ hit, total, frame, from }) => {
+  const filled = Math.round(
+    interpolate(frame, [from, from + TALLY_FILL_FRAMES], [0, hit], CLAMP),
+  );
+  return (
+    <div
+      aria-label={`${total} 件中 ${hit} 件`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${TALLY_COLS}, ${TALLY_CELL}px)`,
+        gap: TALLY_GAP,
+      }}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <div
+          key={i}
+          style={{
+            width: TALLY_CELL,
+            height: TALLY_CELL,
+            borderRadius: 4,
+            boxSizing: "border-box",
+            background: i < filled ? COLORS.navy : COLORS.white,
+            border: `3px solid ${i < hit ? COLORS.navy : COLORS.line}`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const FactCard: React.FC<{ fact: Fact; frame: number; from: number }> = ({
+  fact,
+  frame,
+  from,
+}) => (
   <div
     style={{
       padding: "22px 48px",
@@ -77,15 +123,63 @@ const FactCard: React.FC<{ fact: Fact }> = ({ fact }) => (
     <div style={{ fontSize: 44, fontWeight: 800, color: COLORS.inkSoft }}>
       {fact.label}
     </div>
+    {fact.example ? (
+      <div
+        lang="ja"
+        style={{
+          marginTop: 8,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "baseline",
+          gap: 18,
+          whiteSpace: "nowrap",
+          fontSize: 38,
+          fontWeight: 700,
+          color: COLORS.ink,
+          ...appear(frame, from, 10, 12),
+        }}
+      >
+        <span style={{ fontSize: 30, color: COLORS.inkSoft }}>例</span>
+        <span style={{ fontWeight: 800 }}>「{fact.example.quote}」</span>
+        <span style={{ color: COLORS.navy, fontWeight: 900 }}>→</span>
+        <span>
+          日付{" "}
+          <span style={{ color: COLORS.navy, fontWeight: 900 }}>
+            {fact.example.day}
+          </span>
+          ・用語{" "}
+          <span style={{ color: COLORS.navy, fontWeight: 900 }}>
+            {fact.example.term}
+          </span>
+        </span>
+      </div>
+    ) : null}
     <div
       style={{
-        fontSize: 104,
-        fontWeight: 900,
-        color: COLORS.navy,
-        lineHeight: 1.15,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 40,
       }}
     >
-      {fact.value}
+      {fact.tally ? (
+        <TallyGrid
+          hit={fact.tally.hit}
+          total={fact.tally.total}
+          frame={frame}
+          from={from + EXAMPLE_LEAD}
+        />
+      ) : null}
+      <div
+        style={{
+          fontSize: 104,
+          fontWeight: 900,
+          color: COLORS.navy,
+          lineHeight: 1.15,
+        }}
+      >
+        {fact.value}
+      </div>
     </div>
     {fact.note ? (
       <div style={{ fontSize: 32, color: COLORS.inkSoft }}>{fact.note}</div>
@@ -151,7 +245,7 @@ export const ClosingCompare: React.FC<{
         }}
       >
         {facts.map((f) => (
-          <FactCard key={f.label} fact={f} />
+          <FactCard key={f.label} fact={f} frame={frame} from={factsAt + 6} />
         ))}
       </div>
     </div>

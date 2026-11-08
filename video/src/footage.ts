@@ -1,7 +1,8 @@
 // 撮影リスト（docs/video/storyboards.md の表のとおり）。React / remotion を import しない。
 import type { FootageId } from "./types";
 
-export type Device = "phone" | "pc" | "camera";
+/** hand: 手で操作するスマホを別の端末で撮った動画（スマホの周りを縦に切り抜いて、左右に札を出す） */
+export type Device = "phone" | "pc" | "camera" | "hand";
 
 export interface FootageSpec {
   id: FootageId;
@@ -19,6 +20,7 @@ export const DEVICE_LABEL: Record<Device, string> = {
   phone: "スマホ縦（9:16）",
   pc: "PC 横（16:9）",
   camera: "カメラ",
+  hand: "手元のスマホを撮影（縦に切り抜き）",
 };
 
 export const FOOTAGE: Record<FootageId, FootageSpec> = {
@@ -26,16 +28,16 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     id: "F1",
     slug: "patient_today",
     scene: "今日の記録",
-    device: "phone",
+    device: "hand",
     minSeconds: 14,
     content:
-      "3 択を 5 問タップ → 体温 → 自由記載に「おとといの夜から口内炎がいたい」と打つ → 保存。家族の代理のチェックも一度見せる",
+      "手で操作する iPhone を別の iPhone で撮る: 3 択をタップ → 自由記載に「一昨日の夜から口内炎が痛い」と打つ（scripts/cut_footage_b.sh が 7 秒に切る）",
   },
   F2: {
     id: "F2",
     slug: "patient_too_sick",
     scene: "つらくて書けない",
-    device: "phone",
+    device: "hand",
     minSeconds: 6,
     content: "ボタンを押す → 確認 → 履歴に「つらくて書けない」が残る",
   },
@@ -51,10 +53,10 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     id: "F4",
     slug: "patient_visit",
     scene: "受診",
-    device: "phone",
+    device: "camera",
     minSeconds: 15,
     content:
-      "下の「受診」タブ → 受付番号 A-023 → 「先生に届ける」→ 「先生に届けました。」",
+      "医師画面の前で iPhone を操作して撮る: 受付番号 A-023 → 「先生に届ける」→ 「先生に届けました。」→ 医師画面の印刷待ちに A-023 → スマホのこれまでの記録",
   },
   F5: {
     id: "F5",
@@ -76,16 +78,17 @@ export const FOOTAGE: Record<FootageId, FootageSpec> = {
     id: "F7",
     slug: "doctor_pipeline",
     scene: "D5 変換ログ",
-    device: "pc",
-    minSeconds: 10,
-    content: "任意（案 C の pipeline の背景に薄く敷く。無くても成立）",
+    device: "camera",
+    minSeconds: 13,
+    content:
+      "医師画面を撮る: 変換ログ（Hook と担当が動く。早送り）→ 印刷待ち → A4 のレポート。案 B の 7 場面目。案 C では pipeline の背景に薄く敷く（無くても成立）",
     optional: true,
   },
   F8: {
     id: "F8",
     slug: "doctor_settings",
     scene: "D4 レジメン",
-    device: "pc",
+    device: "camera",
     minSeconds: 20,
     content:
       "「設定を変える」の「レジメン」→「＋ 新しいレジメン」→「Claude に伝える」に文を貼って送る → 待ち（早送り可）→ 左のフォームが埋まる →「確認へ進む」→ 確かめた印 →「採用して登録」",

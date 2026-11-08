@@ -38,7 +38,7 @@ Several regimen-specific notebooks have been published, but they have no common 
 | Item | Value |
 |---|---|
 | Spec | `docs/spec.md` (v1.0, approved 2026-11-03) |
-| Test count | 7284 passed / 7284 total (backend 4657/4657, frontend 2627/2627. Updated automatically by `make test`. Tests that call the API are skipped without a key) |
+| Test count | 7302 passed / 7302 total (backend 4659/4659, frontend 2643/2643. Updated automatically by `make test`. Tests that call the API are skipped without a key) |
 | Accuracy evaluation | Measured 3 times (`docs/eval/2026-11-04.md`, `2026-11-04-2.md`, `2026-11-06.md`; 2 synthetic patients, 4 cycles, 61 events). Latest (current term list): dates 91.8%, terms 91.8%, contradictions recall 100% and precision 100%, "improving" → "none" 0 (of 9), negation → "present" 0 (of 18), quotes 100%. All 5 failures were cases with no term predicted (chills, anorexia ×2, dysgeusia, fatigue). The rise from the previous 75.4% for terms comes from merging three numbness terms into one, which removed 11 mis-assignments between them; it does not mean the conversion itself became more accurate |
 | Checked with real Claude | All 7 Agent SDK smoke items OK; demo-patient conversion succeeded (2026-11-04 and 2026-11-06. `docs/eval/demo-visit-20261109-0703.json`, `demo-visit-20261109-1800.json`). The D4 report-format rewrite succeeded on the first try (2026-11-04. `docs/eval/demo-skill-change-20261104-0719.diff`). A D4 regimen was run through twice with FOLFIRI + BV (2026-11-05. `docs/eval/demo-regimen-20261105-0857.json`, `demo-regimen-20261105-2025.json`) |
 | Checked in a browser | Registration → recording → reception → report → printed, and more, at phone width and in-hospital PC width, in a configuration that does not call the API. After the move to on-phone storage, also run through in Chrome's mobile view (2026-11-06; configuration that does not call real Claude). There is no record of running through the D4 regimen screens end to end |
@@ -175,9 +175,9 @@ make dev-web                                                                    
   TSUTAE_DB=data/device.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=http://<Mac IP>:5173 \
     TSUTAE_SECRET=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))") \
     DOCTOR_PASSWORD=<demo password> make dev-api
-  (cd frontend && npx vite --host 0.0.0.0)
+  (cd frontend && npm run build && npx vite preview --host 0.0.0.0 --port 5173 --strictPort)
   ```
-  This opens the dev server to the Wi-Fi, so anyone on that Wi-Fi can read even `.env` (the same hole as in the Serve note below). Use it only on a trusted Wi-Fi such as at home, and stop it when you are done
+  The screens are served by `vite preview`, which returns only what is in `dist/`. Never open the dev server (`npx vite --host`) to the Wi-Fi: anyone on that Wi-Fi could read even `.env` (the same hole as in the Serve note below). After changing a screen, start again from `npm run build`. The API is still reachable from the Wi-Fi through preview, so use it only on a trusted Wi-Fi such as at home, and stop it when you are done
 - Try the daily notification (HTTPS is required; notifications do not work over `http://` on the same Wi-Fi. Use a fixed Tailscale Serve URL. Do not expose it publicly):
   1. Install the Tailscale app on both the Mac and the iPhone and log in with the same account. Keep the iPhone's VPN on. Allow HTTPS when asked the first time. If "Block incoming connections" (Shields Up) is on in Tailscale on the Mac, the iPhone cannot open the page (Safari says the server has stopped responding), so turn it off only while checking with `tailscale set --shields-up=false` and turn it back on afterward. The Mac itself could not reach the `ts.net` URL over TLS, so open the physician screens on the Mac at `http://localhost:5173`. If the URL changes, the home-screen app and the notification subscription become different ones, so do not use a Quick Tunnel
   2. Generate the notification keys (VAPID) and write the three printed lines into `.env` (do not commit it). Change `TSUTAE_VAPID_SUBJECT` to your own contact (`mailto:` or `https://`)

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { registerPatient } from "../../api/patient";
 import { ErrorMessage } from "../../components/patient/Messages";
+import PidSwitchConfirm from "../../components/patient/PidSwitchConfirm";
 import {
   GENERIC_ERROR_KEY,
   registerErrorKeyOf,
@@ -24,6 +25,7 @@ function pidProblem(pid: string): string | null {
 /**
  * P0 登録（/register?pid=...。院内で渡された登録用QR）。
  * ボタンでスマホに仮名ID を保存 → POST register（失敗なら保存を戻す）→ /today。パスワードなし。
+ * すでに別の番号が入っていれば、置き換える前に確かめる（PidSwitchConfirm）。
  */
 export default function Register() {
   const { t } = usePatientStrings();
@@ -32,6 +34,8 @@ export default function Register() {
   const pid = (params.get("pid") ?? "").trim();
   const [sending, setSending] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [savedPid] = useState(loadPid);
+  const switchingFrom = savedPid !== null && savedPid !== pid ? savedPid : null;
   const problem =
     pidProblem(pid) ?? (errorKey === INVALID_KEY ? INVALID_KEY : null);
 
@@ -71,14 +75,24 @@ export default function Register() {
       ) : (
         <>
           {errorKey && <ErrorMessage messageKey={errorKey} />}
-          <button
-            type="button"
-            className="p-button--primary"
-            disabled={sending}
-            onClick={handleRegister}
-          >
-            {t("register.button")}
-          </button>
+          {switchingFrom !== null ? (
+            <PidSwitchConfirm
+              current={switchingFrom}
+              next={pid}
+              sending={sending}
+              onConfirm={handleRegister}
+              onCancel={() => navigate("/today", { replace: true })}
+            />
+          ) : (
+            <button
+              type="button"
+              className="p-button--primary"
+              disabled={sending}
+              onClick={handleRegister}
+            >
+              {t("register.button")}
+            </button>
+          )}
         </>
       )}
     </section>

@@ -10,6 +10,16 @@ export default defineConfig({
       "/api": { target: "http://127.0.0.1:8000", changeOrigin: false },
     },
   },
+  // 端末に見せる preview だけに付ける（開発サーバーは React のインラインの前置きが CSP に触れる）
+  preview: {
+    cors: false,
+    headers: {
+      "Content-Security-Policy":
+        "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: "src/test/setup.ts",

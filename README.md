@@ -38,7 +38,7 @@
 | 項目 | 値 |
 |---|---|
 | 仕様 | `docs/spec.md`（v1.0、2026-11-03 承認） |
-| テスト件数 | 7284件 通過 / 全7284件（backend 4657/4657、frontend 2627/2627。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
+| テスト件数 | 7302件 通過 / 全7302件（backend 4659/4659、frontend 2643/2643。`make test` が自動更新。API を呼ぶテストはキーが無いと skip） |
 | 精度評価 | 3回実測（`docs/eval/2026-11-04.md`・`2026-11-04-2.md`・`2026-11-06.md`、合成2人・4コース・出来事61件）。最新（今の用語の一覧）: 日付 91.8%、用語 91.8%、食い違い 再現率 100%・適合率 100%、改善中→なし 0件（9件中）、否定→あり 0件（18件中）、引用 100%。失敗 5 件は全て用語の予測が無かったもの（悪寒・食欲不振2件・味覚異常・疲労）。前回の用語 75.4% からの上昇は、しびれの3語を1語にまとめて当て分けの失敗 11 件が無くなった分で、変換の精度が上がったという意味ではない |
 | 本物の Claude での確認 | Agent SDK のスモーク7項目が全て OK、デモ患者の変換が成功（2026-11-04 と 2026-11-06。`docs/eval/demo-visit-20261109-0703.json`・`demo-visit-20261109-1800.json`）。D4 レポートの形式の書き換えが1回で成功（2026-11-04。`docs/eval/demo-skill-change-20261104-0719.diff`）。D4 レジメンを FOLFIRI＋BV で2回通した（2026-11-05。`docs/eval/demo-regimen-20261105-0857.json`・`demo-regimen-20261105-2025.json`） |
 | ブラウザでの確認 | スマホ幅・院内 PC 幅で 登録 → 記録 → 受付 → レポート → 印刷済み などを、API を呼ばない構成で通した。スマホ保存への移行後も、Chrome のスマホ表示で通した（2026-11-06。本物の Claude は呼ばない構成）。D4 レジメンの画面を通しで確かめた記録は無い |
@@ -175,9 +175,9 @@ make dev-web                                                                    
   TSUTAE_DB=data/device.db TSUTAE_DEMO_TOOLS=1 TSUTAE_TODAY=2026-11-09 TSUTAE_PUBLIC_BASE_URL=http://<Mac の IP>:5173 \
     TSUTAE_SECRET=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))") \
     DOCTOR_PASSWORD=<デモ用のパスワード> make dev-api
-  (cd frontend && npx vite --host 0.0.0.0)
+  (cd frontend && npm run build && npx vite preview --host 0.0.0.0 --port 5173 --strictPort)
   ```
-  開発サーバーを同じ Wi-Fi に開くので、Wi-Fi の中の人には `.env` まで読める（下の Serve の注意と同じ穴）。自宅など信頼できる Wi-Fi でだけ使い、終わったら止める
+  画面は `vite preview` で出す（`dist/` の中だけを返す）。開発サーバー（`npx vite --host`）は Wi-Fi に開かない。Wi-Fi の中の人に `.env` まで読まれる（下の Serve の注意と同じ穴）。画面を直したら `npm run build` からやり直す。preview でも API は Wi-Fi に届くので、自宅など信頼できる Wi-Fi でだけ使い、終わったら止める
 - 毎日の通知を試す（HTTPS が要る。同じ Wi-Fi の `http://` では通知を使えない。Tailscale Serve の固定 URL を使う。外には公開しない）:
   1. Mac と iPhone の両方に Tailscale のアプリを入れ、同じアカウントでログインする。iPhone の VPN はオンにしておく。初回に HTTPS の許可を求められたら許可する。Mac の Tailscale の「着信の遮断」（Shields Up）がオンだと iPhone から開けない（Safari に「サーバが応答を停止しています」と出る）ので、確認の間だけ `tailscale set --shields-up=false` で切り、終わったら戻す。Mac 自身から `ts.net` の URL には TLS で届かなかったので、医師画面は Mac では `http://localhost:5173` で開く。URL が変わると、ホーム画面アプリ・通知の登録が別物になるので、Quick Tunnel は使わない
   2. 通知の鍵（VAPID）を作り、出た3行を `.env` に書く（コミットしない）。`TSUTAE_VAPID_SUBJECT` は自分の連絡先（`mailto:` か `https://`）に直す

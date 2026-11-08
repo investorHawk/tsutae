@@ -65,6 +65,24 @@ def test_serve_steps_say_the_phone_needs_tailscale(name: str) -> None:
     assert "VPN" in section
 
 
+WIFI_PREVIEW = "npx vite preview --host 0.0.0.0 --port 5173 --strictPort"
+WIFI_SECTIONS = {
+    "ja": lambda: _section(
+        "README.md", "スマホで試す（同じ Wi-Fi）", "毎日の通知を試す"
+    ),
+    "en": lambda: _section(
+        "README.en.md", "Try it on a phone (same Wi-Fi)", "Try the daily notification"
+    ),
+}
+
+
+@pytest.mark.parametrize("name", WIFI_SECTIONS)
+def test_wifi_steps_start_preview_not_the_dev_server(name: str) -> None:
+    lines = _code_lines(WIFI_SECTIONS[name]())
+    assert any("npm run build" in line and WIFI_PREVIEW in line for line in lines)
+    assert [line for line in lines if _DEV_SERVER.search(line)] == []
+
+
 def test_demo_script_does_not_send_serve_to_the_dev_server() -> None:
     before = _section("docs/demo-script.md", "## 撮影の前に", "## 流れ")
     assert "開発サーバーは Serve に出さない" in before

@@ -392,7 +392,7 @@ describe("after registering a number", () => {
       expect(callsTo(fetchMock, "PUT", SUBSCRIPTION_URL)).toHaveLength(1),
     );
     await userEvent.click(
-      await screen.findByRole("button", { name: s("register.button") }),
+      await screen.findByRole("button", { name: s("register.switch_confirm") }),
     );
     await screen.findByText("today page");
     await settle();

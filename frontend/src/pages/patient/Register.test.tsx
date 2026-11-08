@@ -151,7 +151,7 @@ describe("Register (P0)", () => {
     mockFetch(() => jsonResponse({ error: "boom" }, 500));
     renderPatient(ROUTES, `/register?pid=${PID}`);
     await userEvent.click(
-      screen.getByRole("button", { name: s("register.button") }),
+      screen.getByRole("button", { name: s("register.switch_confirm") }),
     );
     expect(await screen.findByText(s("error.generic"))).toBeInTheDocument();
     expect(loadPid()).toBe("P-OLD00001");

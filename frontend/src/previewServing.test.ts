@@ -8,16 +8,21 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const SECRET = "SYNTHETIC-OUTSIDE-OF-DIST";
 const INDEX = '<div id="root"></div>';
+/** docs/decisions.md の値。変えるときは実物のブラウザで画面が動くことを確かめる。 */
+const CSP =
+  "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 type Next = () => void;
 
 interface FakeRes {
   statusCode: number;
   body: string;
+  headers: Record<string, unknown>;
 }
 
-let call: (url: string) => Promise<FakeRes>;
+let call: (url: string, extra?: Record<string, string>) => Promise<FakeRes>;
 let apiProxy: { target?: string; changeOrigin?: boolean } | undefined;
+let devHeaders: unknown;
 let finish: () => void = () => undefined;
 let site = "";
 
@@ -64,17 +69,6 @@ beforeAll(async () => {
     return this;
   };
   const { preview, resolveConfig } = await import("vite");
-  const server = await preview({
-    root: site,
-    configFile: false,
-    logLevel: "silent",
-    preview: { host: "127.0.0.1", port: 5173, open: false },
-  });
-  finish = () => {
-    http.Server.prototype.listen = realListen;
-    fs.rmSync(site, { recursive: true, force: true });
-    void server.close().catch(() => undefined);
-  };
   // 本物の設定を読む（cwd は frontend）。preview の proxy は server.proxy を引き継ぐ
   const resolved = await resolveConfig(
     { logLevel: "silent" },
@@ -84,7 +78,25 @@ beforeAll(async () => {
     true,
   );
   apiProxy = resolved.preview.proxy?.["/api"] as typeof apiProxy;
-  call = (url) =>
+  devHeaders = resolved.server.headers;
+  const server = await preview({
+    root: site,
+    configFile: false,
+    logLevel: "silent",
+    preview: {
+      host: "127.0.0.1",
+      port: 5173,
+      open: false,
+      headers: resolved.preview.headers,
+      cors: resolved.preview.cors,
+    },
+  });
+  finish = () => {
+    http.Server.prototype.listen = realListen;
+    fs.rmSync(site, { recursive: true, force: true });
+    void server.close().catch(() => undefined);
+  };
+  call = (url, extra = {}) =>
     new Promise((resolve, reject) => {
       const req = new http.IncomingMessage(null) as Record<string, unknown> & {
         push(chunk: null): void;
@@ -93,11 +105,12 @@ beforeAll(async () => {
         url,
         originalUrl: url,
         method: "GET",
-        headers: { host: "evil.example", accept: "text/html,*/*" },
+        headers: { host: "evil.example", accept: "text/html,*/*", ...extra },
       });
       req.push(null);
       const res = new http.ServerResponse(req) as Record<string, unknown> & {
         statusCode: number;
+        getHeaders(): Record<string, unknown>;
       };
       const chunks: string[] = [];
       res.write = (chunk: unknown) => {
@@ -108,7 +121,11 @@ beforeAll(async () => {
         if (chunk !== undefined && typeof chunk !== "function") {
           chunks.push(String(chunk));
         }
-        resolve({ statusCode: res.statusCode, body: chunks.join("") });
+        resolve({
+          statusCode: res.statusCode,
+          body: chunks.join(""),
+          headers: res.getHeaders(),
+        });
         return res;
       };
       server.middlewares(req as never, res as never, () =>
@@ -149,6 +166,27 @@ describe("vite preview", () => {
       expect((await call(path)).body).toContain(INDEX);
     },
   );
+
+  it.each(["/today", "/doctor/login", "/register?pid=P-AB12CD34", "/sw.js"])(
+    "sends the security headers: %s",
+    async (path) => {
+      const { headers } = await call(path);
+      expect(headers["content-security-policy"]).toBe(CSP);
+      expect(headers["x-content-type-options"]).toBe("nosniff");
+      expect(headers["referrer-policy"]).toBe("no-referrer");
+    },
+  );
+
+  it("does not let other sites read the responses", async () => {
+    const { headers } = await call("/today", {
+      origin: "https://evil.example",
+    });
+    expect(headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("keeps the CSP off the dev server (React's inline preamble)", () => {
+    expect(devHeaders).toBeUndefined();
+  });
 
   it("passes /api to the backend without changing the Host", () => {
     expect(apiProxy?.target).toBe("http://127.0.0.1:8000");

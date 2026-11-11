@@ -12,7 +12,7 @@
 
 外来化学療法（FOLFOX/CAPOX）中の消化器がん患者が毎日スマホで記録し、受診時にアプリの受診タブで受付番号を入れて送ると、Claude が記録を「暦日・コース日数・標準用語・原文引用」つきの時系列に直し、**医師が決めた形式の A4 一枚**として診察室に届けるアプリです。記録の中身はスマホに置き、サーバーには印刷までの間だけ置きます。患者のスマホに AI の文は出ません。
 
-> Built with Claude (Code): Japan 2026 提出作品（ソロ、期間中の新規制作。初コミットは 2026-11-03 18:06 JST）。コードは全て Claude Code（Claude Opus）が書き、OpenAI Codex は読み取り専用のレビューにだけ使いました。
+> Built with Claude (Code): Japan 2026 提出作品（ソロ、期間中の新規制作。初コミットは 2026-11-03 18:06 JST）。コードは全て Claude Code（Claude Opus）が書きました。
 
 ## デモ動画
 [デモ動画を見る（YouTube、2分55秒）](https://www.youtube.com/watch?v=UVTjTdUxErU)
